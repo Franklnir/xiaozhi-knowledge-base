@@ -31,19 +31,17 @@ def set_session_cookie(response: RedirectResponse, request: Request, user: dict)
         "username": user["username"],
         "session_version": user.get("session_version", 1),
     })
-    # Check if HTTPS (consider proxy headers for HuggingFace/VPS)
-    secure = (
-        request.url.scheme == "https"
-        or request.headers.get("x-forwarded-proto") == "https"
-        or os.getenv("COOKIE_SECURE", "").lower() in {"1", "true", "yes"}
-    )
+    # HuggingFace Spaces: always secure, no domain restriction
+    is_hf = bool(os.getenv("SPACE_ID"))
+    secure = is_hf or request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     response.set_cookie(
         SESSION_COOKIE,
         token,
         max_age=SESSION_MAX_AGE,
         httponly=True,
         secure=secure,
-        samesite="lax",
+        samesite="none" if is_hf else "lax",
+        path="/",
     )
 
 
