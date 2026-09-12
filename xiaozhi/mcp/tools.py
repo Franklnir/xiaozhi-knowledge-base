@@ -562,7 +562,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         if owner_id is None:
             return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif."}
         from xiaozhi.services.reminder_service import add_reminder
-        result = add_reminder(owner_id, text)
+        result = add_reminder(store, owner_id, text)
         if owner_id:
             record_mcp_tool_history(owner_id, "set_reminder", text, {"text": text}, result)
         return result

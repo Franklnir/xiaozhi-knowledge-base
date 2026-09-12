@@ -239,6 +239,20 @@ class SQLiteStore:
                 updated_at TEXT,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
+
+            -- Reminders
+            CREATE TABLE IF NOT EXISTS reminders (
+                id TEXT PRIMARY KEY,
+                owner_id INTEGER NOT NULL,
+                message TEXT NOT NULL,
+                scheduled_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                sent_at TEXT,
+                FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_reminders_owner ON reminders(owner_id, status);
+            CREATE INDEX IF NOT EXISTS idx_reminders_scheduled ON reminders(scheduled_at, status);
         """)
         conn.commit()
 
@@ -954,3 +968,65 @@ class SQLiteStore:
 
     def get_pending_relay_commands(self, owner_id: int, room_id: int) -> List[Dict[str, Any]]:
         return []
+
+    # ── Reminders ─────────────────────────────────────────────────────────
+
+    def add_reminder(self, owner_id: int, reminder_id: str, message: str, scheduled_at: str) -> Dict[str, Any]:
+        conn = self._get_conn()
+        now = utc_now()
+        conn.execute(
+            "INSERT INTO reminders (id, owner_id, message, scheduled_at, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)",
+            (reminder_id, owner_id, message, scheduled_at, now)
+        )
+        conn.commit()
+        return {
+            "id": reminder_id,
+            "owner_id": owner_id,
+            "message": message,
+            "scheduled_at": scheduled_at,
+            "status": "pending",
+            "created_at": now,
+        }
+
+    def list_reminders(self, owner_id: int) -> List[Dict[str, Any]]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM reminders WHERE owner_id = ? ORDER BY scheduled_at",
+            (owner_id,)
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_reminder(self, owner_id: int, reminder_id: str) -> bool:
+        conn = self._get_conn()
+        cursor = conn.execute(
+            "DELETE FROM reminders WHERE id = ? AND owner_id = ?",
+            (reminder_id, owner_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+    def get_due_reminders(self) -> List[Dict[str, Any]]:
+        conn = self._get_conn()
+        now = utc_now()
+        rows = conn.execute(
+            "SELECT * FROM reminders WHERE status = 'pending' AND scheduled_at <= ?",
+            (now,)
+        ).fetchall()
+        reminders = [dict(row) for row in rows]
+        if reminders:
+            ids = [r["id"] for r in reminders]
+            placeholders = ",".join("?" * len(ids))
+            conn.execute(
+                f"UPDATE reminders SET status = 'triggered' WHERE id IN ({placeholders})",
+                ids
+            )
+            conn.commit()
+        return reminders
+
+    def mark_reminder_sent(self, reminder_id: str) -> None:
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE reminders SET status = 'sent', sent_at = ? WHERE id = ?",
+            (utc_now(), reminder_id)
+        )
+        conn.commit()

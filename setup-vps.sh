@@ -1,8 +1,7 @@
 #!/bin/bash
 # EduSmart Xiaozhi - VPS Setup Script (1GB RAM)
 # Tested on: Ubuntu 22.04/24.04, Debian 12
-# Run: curl -sSL https://raw.githubusercontent.com/.../setup.sh | bash
-# Or: chmod +x setup.sh && sudo ./setup.sh
+# Run: chmod +x setup.sh && sudo ./setup.sh
 
 set -e
 
@@ -21,7 +20,7 @@ TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
 echo "Detected RAM: ${TOTAL_RAM}MB"
 
 # Setup swap (2GB)
-echo "[1/6] Setting up 2GB swap..."
+echo "[1/7] Setting up 2GB swap..."
 if [ ! -f /swapfile ]; then
     fallocate -l 2G /swapfile
     chmod 600 /swapfile
@@ -39,7 +38,7 @@ echo 'vm.vfs_cache_pressure=50' >> /etc/sysctl.conf
 sysctl -p > /dev/null 2>&1
 
 # Install Docker
-echo "[2/6] Installing Docker..."
+echo "[2/7] Installing Docker..."
 if ! command -v docker &> /dev/null; then
     curl -fsSL https://get.docker.com | sh
     systemctl enable docker
@@ -50,7 +49,7 @@ else
 fi
 
 # Install Docker Compose
-echo "[3/6] Installing Docker Compose..."
+echo "[3/7] Installing Docker Compose..."
 if ! command -v docker-compose &> /dev/null; then
     curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
@@ -60,12 +59,11 @@ else
 fi
 
 # Clone repo
-echo "[4/6] Cloning repository..."
+echo "[4/7] Cloning repository..."
 APP_DIR="/opt/edusmart"
 if [ ! -d "$APP_DIR" ]; then
     mkdir -p $APP_DIR
     cd $APP_DIR
-    # Change this to your repo URL
     git clone https://huggingface.co/spaces/Irsyadmiler/xiaozhi .
     echo "  Repo: cloned to $APP_DIR"
 else
@@ -74,17 +72,24 @@ else
     echo "  Repo: updated"
 fi
 
+# Create required directories
+echo "[5/7] Creating directories..."
+mkdir -p data
+
 # Setup .env
-echo "[5/6] Configuring environment..."
+echo "[6/7] Configuring environment..."
 cd $APP_DIR
 if [ ! -f .env ]; then
     cp .env.example .env
     
     # Auto-generate secrets
     APP_SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || openssl rand -base64 32)
+    JWT_SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(64))" 2>/dev/null || openssl rand -base64 64)
     DATA_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 2>/dev/null || echo "")
     
+    # Replace placeholders
     sed -i "s/CHANGE_ME_GENERATE_RANDOM_STRING/$APP_SECRET/" .env
+    sed -i "s/CHANGE_ME_GENERATE_RANDOM_STRING/$JWT_SECRET/" .env
     if [ -n "$DATA_KEY" ]; then
         sed -i "s/CHANGE_ME_GENERATE_FERNET_KEY/$DATA_KEY/" .env
     fi
@@ -92,7 +97,7 @@ if [ ! -f .env ]; then
     echo "  .env: created (edit HF_TOKEN manually!)"
     echo ""
     echo "  ============================================"
-    echo "  IMPORTANT: Edit /opt/edusmart/.env and set:"
+    echo "  IMPORTANT: Edit $APP_DIR/.env and set:"
     echo "    HF_TOKEN=hf_your_token_here"
     echo "    HF_DATASET_REPO=username/repo-name"
     echo "  ============================================"
@@ -101,10 +106,10 @@ else
 fi
 
 # Build & start
-echo "[6/6] Building and starting..."
+echo "[7/7] Building and starting..."
 cd $APP_DIR
-docker-compose -f docker-compose.prod.yml build --no-cache
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml down 2>/dev/null || true
+docker compose -f docker-compose.prod.yml up -d --build
 
 echo ""
 echo "============================================"
@@ -113,8 +118,8 @@ echo "============================================"
 echo ""
 echo "  App:     http://$(hostname -I | awk '{print $1}')"
 echo "  Logs:    docker logs -f edusmart"
-echo "  Restart: cd $APP_DIR && docker-compose -f docker-compose.prod.yml restart"
-echo "  Update:  cd $APP_DIR && git pull && docker-compose -f docker-compose.prod.yml up -d --build"
+echo "  Restart: cd $APP_DIR && docker compose -f docker-compose.prod.yml restart"
+echo "  Update:  cd $APP_DIR && git pull && docker compose -f docker-compose.prod.yml up -d --build"
 echo ""
 echo "  Memory:  $(free -h | awk '/^Mem:/{print $2}') RAM + $(free -h | awk '/^Swap:/{print $2}') Swap"
 echo "  Docker:  docker stats edusmart"
