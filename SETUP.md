@@ -11,7 +11,8 @@
 7. [GitHub Actions CI/CD](#github-actions-cicd)
 8. [Security Configuration](#security-configuration)
 9. [Environment Variables](#environment-variables)
-10. [Troubleshooting](#troubleshooting)
+10. [Domain & SSL](#domain--ssl)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -25,6 +26,11 @@ EduSmart Xiaozhi is a knowledge base platform with voice assistant integration, 
 - Deployment: Docker, Docker Compose
 - CI/CD: GitHub Actions
 - Platforms: VPS, HuggingFace Spaces
+
+**Production URLs:**
+- 🌐 **Main:** https://xiaozhiscig.biz.id
+- 🌐 **WWW:** https://www.xiaozhiscig.biz.id
+- 🔒 **SSL:** Let's Encrypt (auto-renew)
 
 ---
 
