@@ -101,6 +101,10 @@ async def admin_mcp_monitor(request: Request):
     managed_users = store.list_admin_manageable_users()
     user_lookup = {int(u["id"]): u for u in managed_users}
 
+    # Get MCP settings for all users
+    mcp_settings = store.get_all_mcp_settings_for_admin()
+    blocked_lookup = {int(s["user_id"]): bool(s["mcp_blocked"]) for s in mcp_settings}
+
     connections = []
     for uid, state in all_states.items():
         user_info = user_lookup.get(uid, {})
@@ -113,6 +117,7 @@ async def admin_mcp_monitor(request: Request):
             "request_id": state.get("request_id", ""),
             "updated_at": state.get("updated_at", ""),
             "bridge_running": task is not None and not task.done() if task else False,
+            "mcp_blocked": blocked_lookup.get(uid, False),
         })
 
     stored_tokens = store.list_xiaozhi_tokens()
@@ -128,6 +133,7 @@ async def admin_mcp_monitor(request: Request):
             "request_id": "",
             "updated_at": "",
             "bridge_running": False,
+            "mcp_blocked": blocked_lookup.get(uid, False),
         })
 
     connections.sort(key=lambda c: (not c["connected"], c["username"]))
@@ -242,6 +248,108 @@ async def admin_api_mcp_health(request: Request):
             "bridge_tasks": len(mcp_bridge_tasks),
         },
     }
+
+
+# ── MCP Block/Unblock ────────────────────────────────────────────────────
+
+@router.post("/admin/api/mcp/block/{target_user_id}")
+async def admin_api_mcp_block(request: Request, target_user_id: int, csrf_token: str = Form(...), reason: str = Form("")):
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    # Block the user
+    store.set_mcp_blocked(target_user_id, True, reason)
+
+    # Disconnect if currently connected
+    user_task = mcp_bridge_tasks.pop(target_user_id, None)
+    if user_task and not user_task.done():
+        user_task.cancel()
+
+    clear_mcp_state(target_user_id)
+    signal_mcp_reload()
+
+    return {"success": True, "message": f"User {target_user_id} MCP diblokir."}
+
+
+@router.post("/admin/api/mcp/unblock/{target_user_id}")
+async def admin_api_mcp_unblock(request: Request, target_user_id: int, csrf_token: str = Form(...)):
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    store.set_mcp_blocked(target_user_id, False)
+    signal_mcp_reload()
+
+    return {"success": True, "message": f"User {target_user_id} MCP diaktifkan kembali."}
+
+
+@router.get("/admin/api/mcp/settings")
+async def admin_api_mcp_settings(request: Request):
+    admin = require_admin(request)
+    store = get_store()
+
+    settings = store.get_all_mcp_settings_for_admin()
+    return {"success": True, "settings": settings}
+
+
+# ── MCP Tool Toggles ─────────────────────────────────────────────────────
+
+@router.get("/admin/api/mcp/tools/{target_user_id}")
+async def admin_api_mcp_tools(request: Request, target_user_id: int):
+    admin = require_admin(request)
+    store = get_store()
+
+    # List of all available MCP tools
+    all_tools = [
+        "search_course_materials",
+        "read_live_api_data",
+        "read_material_database",
+        "read_material_detail",
+        "save_chat_history",
+        "control_relay",
+        "control_smart_home_room",
+        "get_relay_status",
+        "all_relays_on",
+        "all_relays_off",
+        "control_real_relay_by_voice",
+        "get_real_relay_status",
+        "all_real_relays_on",
+        "all_real_relays_off",
+        "play_youtube_song",
+        "search_web",
+        "search_news",
+        "set_reminder",
+        "calculate",
+        "translate_text",
+    ]
+
+    toggles = store.get_mcp_tool_toggles(target_user_id)
+
+    tools_with_status = []
+    for tool in all_tools:
+        tools_with_status.append({
+            "name": tool,
+            "enabled": toggles.get(tool, True),  # Default True
+        })
+
+    return {"success": True, "user_id": target_user_id, "tools": tools_with_status}
+
+
+@router.post("/admin/api/mcp/tools/{target_user_id}/toggle")
+async def admin_api_mcp_tool_toggle(
+    request: Request,
+    target_user_id: int,
+    tool_name: str = Form(...),
+    enabled: str = Form("true"),
+    csrf_token: str = Form(...),
+):
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    store.set_mcp_tool_toggle(target_user_id, tool_name, enabled.lower() in {"true", "1", "on"})
+    return {"success": True, "tool": tool_name, "enabled": enabled.lower() in {"true", "1", "on"}}
 
 
 # ── User Analytics ─────────────────────────────────────────────────────────

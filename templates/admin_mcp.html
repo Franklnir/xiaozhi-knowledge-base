@@ -13,6 +13,17 @@
         color: #6b7280;
         word-break: break-all;
     }
+    .block-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .block-badge-blocked { background: #fee2e2; color: #dc2626; }
+    .block-badge-allowed { background: #ecfdf5; color: #047857; }
 </style>
 
 <div class="app-page">
@@ -59,6 +70,7 @@
                     <tr>
                         <th>User</th>
                         <th>Status</th>
+                        <th>Block</th>
                         <th>Request ID</th>
                         <th>Pesan</th>
                         <th>Terakhir Update</th>
@@ -91,6 +103,13 @@
                             {% endif %}
                         </td>
                         <td>
+                            {% if conn.mcp_blocked %}
+                            <span class="block-badge block-badge-blocked">DIBLOKIR</span>
+                            {% else %}
+                            <span class="block-badge block-badge-allowed">AKTIF</span>
+                            {% endif %}
+                        </td>
+                        <td>
                             <span class="mcp-request-id">{{ conn.request_id or '-' }}</span>
                         </td>
                         <td>
@@ -112,12 +131,25 @@
                                     <button type="submit" class="app-button app-button-small app-button-primary">Hubungkan</button>
                                 </form>
                                 {% endif %}
+
+                                {% if conn.mcp_blocked %}
+                                <form action="/admin/api/mcp/unblock/{{ conn.user_id }}" method="POST" style="display:inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="app-button app-button-small" style="background:#047857;color:white">Aktifkan</button>
+                                </form>
+                                {% else %}
+                                <form action="/admin/api/mcp/block/{{ conn.user_id }}" method="POST" style="display:inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <input type="hidden" name="reason" value="">
+                                    <button type="submit" class="app-button app-button-small" style="background:#dc2626;color:white" onclick="return confirm('Blokir MCP user ini?')">Blokir</button>
+                                </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="py-10 text-center text-sm text-slate-500">Belum ada koneksi MCP.</td>
+                        <td colspan="7" class="py-10 text-center text-sm text-slate-500">Belum ada koneksi MCP.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
