@@ -32,6 +32,7 @@ from xiaozhi.config import (
     REAL_RELAY_MAX_RELAYS,
     RESTORED_USER_USERNAME,
     UI_THEMES,
+    USER_FEATURE_FLAGS,
     USER_LIMIT_DEFAULTS,
     fernet,
     logger as config_logger,
