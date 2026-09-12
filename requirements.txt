@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+huggingface_hub
+cryptography
+pydantic
+mcp<2
+python-multipart
+jinja2
+itsdangerous
+yt-dlp
+imageio-ffmpeg
+anyio
+websockets
+requests
+PyJWT>=2.8.0

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content_login %}
+<section class="auth-layout">
+    <div class="auth-card">
+        <div class="mb-7">
+            <p class="app-eyebrow">Akun Baru</p>
+            <h1 class="app-title text-2xl">Daftar Xiaozhi Indonesia</h1>
+        </div>
+
+        {% if error %}
+        <div class="app-alert app-alert-danger mb-5">
+            {{ error }}
+        </div>
+        {% endif %}
+        {% if success %}
+        <div class="app-alert app-alert-success mb-5">
+            {{ success }}
+        </div>
+        {% endif %}
+
+        <form action="/register" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div>
+                <label for="username" class="app-label">Username</label>
+                <input id="username" type="text" name="username" required pattern="[a-z0-9_]{3,32}" autocomplete="username" class="app-input">
+                <p class="mt-1 text-xs text-slate-500">Huruf kecil, angka, underscore. Minimal 3 karakter.</p>
+            </div>
+            <div>
+                <label for="password" class="app-label">Password</label>
+                <input id="password" type="password" name="password" required minlength="8" autocomplete="new-password" class="app-input">
+                <p class="mt-1 text-xs text-slate-500">Minimal 8 karakter.</p>
+            </div>
+            <button type="submit" class="app-button app-button-primary app-button-full">
+                Daftar
+            </button>
+        </form>
+
+        <p class="mt-6 text-center text-sm text-slate-600">
+            Sudah punya akun?
+            <a href="/login" class="font-semibold text-emerald-700 hover:text-emerald-800">Masuk</a>
+        </p>
+    </div>
+</section>
+{% endblock %}

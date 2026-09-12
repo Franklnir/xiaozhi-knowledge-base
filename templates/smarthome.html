@@ -1,0 +1,947 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .smarthome-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+        gap: 22px;
+        align-items: start;
+    }
+    .floor-plan {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        grid-template-rows: repeat(12, minmax(0, 1fr));
+        gap: 12px;
+        min-height: 760px;
+        aspect-ratio: auto;
+        overflow: hidden;
+        border-radius: 8px;
+        border: 1px solid rgb(203 213 225);
+        padding: 20px;
+        background:
+            linear-gradient(90deg, rgba(148, 163, 184, .16) 1px, transparent 1px),
+            linear-gradient(rgba(148, 163, 184, .16) 1px, transparent 1px),
+            #f8fafc;
+        background-size: 28px 28px;
+    }
+    .floor-plan.room-version {
+        min-height: 860px;
+        gap: 14px;
+        padding: 18px;
+        border: 8px solid rgb(51 65 85);
+        background:
+            linear-gradient(90deg, rgba(148, 163, 184, .16) 1px, transparent 1px),
+            linear-gradient(rgba(148, 163, 184, .16) 1px, transparent 1px),
+            repeating-linear-gradient(45deg, rgba(226, 232, 240, .7) 0 8px, rgba(241, 245, 249, .8) 8px 16px),
+            #eef2f7;
+        background-size: 24px 24px, 24px 24px, auto, auto;
+        box-shadow: inset 0 0 0 4px rgb(226 232 240);
+    }
+    .floor-plan.room-version::before,
+    .floor-plan.room-version::after {
+        display: none;
+    }
+    .floor-plan.room-version::before {
+        left: 40%;
+        top: 0;
+        width: 8px;
+        height: 50%;
+    }
+    .floor-plan.room-version::after {
+        left: 0;
+        top: 40%;
+        width: 100%;
+        height: 8px;
+    }
+    .room-tile {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-width: 0;
+        min-height: 0;
+        border: 2px solid rgb(100 116 139);
+        border-radius: 8px;
+        background:
+            linear-gradient(135deg, rgba(248, 250, 252, .94), rgba(203, 213, 225, .7)),
+            #e2e8f0;
+        padding: 14px;
+        text-align: left;
+        transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+        cursor: pointer;
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08);
+        filter: grayscale(.28) saturate(.82);
+        overflow: hidden;
+    }
+    .floor-plan.room-version .room-tile {
+        overflow: hidden;
+        border: 4px solid rgb(71 85 105);
+        border-radius: 2px;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, .9), rgba(241, 245, 249, .94)),
+            repeating-linear-gradient(90deg, transparent 0 16px, rgba(148, 163, 184, .14) 16px 17px);
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08);
+    }
+    .floor-plan.room-version .room-tile::before {
+        content: "";
+        position: absolute;
+        inset: 8px;
+        border: 1px dashed rgba(100, 116, 139, .28);
+        pointer-events: none;
+    }
+    .room-tile::after {
+        content: "";
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        z-index: 3;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        background: rgb(100 116 139);
+        box-shadow: inset 0 0 0 8px rgb(226 232 240);
+        opacity: .55;
+        pointer-events: none;
+        transition: width .2s ease, height .2s ease, background .2s ease, box-shadow .2s ease, opacity .2s ease;
+    }
+    .room-tile > span:not(.furniture):not(.fixture):not(.doorway):not(.window-mark):not(.plant-mark) {
+        position: relative;
+        z-index: 7;
+    }
+    .room-tile:hover {
+        transform: translateY(-1px);
+        border-color: rgb(15 23 42);
+    }
+    .room-tile.is-on {
+        border-color: rgb(22 163 74);
+        background:
+            radial-gradient(circle at 82% 82%, rgba(134, 239, 172, .95) 0 12%, rgba(187, 247, 208, .64) 13% 28%, transparent 48%),
+            linear-gradient(135deg, rgb(236 253 245), rgb(187 247 208));
+        box-shadow: 0 0 0 4px rgba(34, 197, 94, .28), 0 20px 46px rgba(22, 163, 74, .22);
+        filter: none;
+    }
+    .room-tile[data-color="yellow"].is-on {
+        border-color: rgb(217 119 6);
+        background:
+            radial-gradient(circle at 78% 78%, rgba(254, 240, 138, 1) 0 13%, rgba(253, 186, 116, .75) 15% 30%, transparent 52%),
+            linear-gradient(135deg, rgb(255 251 235), rgb(253 224 71));
+        box-shadow: 0 0 0 4px rgba(245, 158, 11, .34), 0 0 42px rgba(250, 204, 21, .65), 0 20px 46px rgba(146, 64, 14, .24);
+    }
+    .room-tile[data-color="white"].is-on {
+        border-color: rgb(2 132 199);
+        background:
+            radial-gradient(circle at 78% 78%, rgba(255, 255, 255, 1) 0 12%, rgba(186, 230, 253, .85) 15% 32%, transparent 54%),
+            linear-gradient(135deg, rgb(255 255 255), rgb(186 230 253));
+        box-shadow: 0 0 0 4px rgba(14, 165, 233, .28), 0 0 40px rgba(186, 230, 253, .85), 0 20px 46px rgba(12, 74, 110, .18);
+    }
+    .room-tile[data-color="red"].is-on {
+        border-color: rgb(220 38 38);
+        background:
+            radial-gradient(circle at 78% 78%, rgba(252, 165, 165, 1) 0 14%, rgba(248, 113, 113, .78) 16% 34%, transparent 54%),
+            linear-gradient(135deg, rgb(254 242 242), rgb(252 165 165));
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, .32), 0 0 40px rgba(239, 68, 68, .56), 0 20px 46px rgba(127, 29, 29, .22);
+    }
+    .room-tile[data-color="blue"].is-on {
+        border-color: rgb(2 132 199);
+        background:
+            radial-gradient(circle at 78% 78%, rgba(125, 211, 252, 1) 0 14%, rgba(56, 189, 248, .72) 16% 34%, transparent 54%),
+            linear-gradient(135deg, rgb(240 249 255), rgb(186 230 253));
+        box-shadow: 0 0 0 4px rgba(14, 165, 233, .32), 0 0 40px rgba(56, 189, 248, .5), 0 20px 46px rgba(12, 74, 110, .22);
+    }
+    .room-tile.is-on::after {
+        width: 58px;
+        height: 58px;
+        opacity: 1;
+        background: rgb(134 239 172);
+        box-shadow: 0 0 18px rgba(34, 197, 94, .9), 0 0 46px rgba(34, 197, 94, .52), inset 0 0 0 12px rgba(255, 255, 255, .48);
+    }
+    .room-tile[data-color="yellow"].is-on::after {
+        background: rgb(250 204 21);
+        box-shadow: 0 0 22px rgba(250, 204, 21, 1), 0 0 64px rgba(245, 158, 11, .72), inset 0 0 0 12px rgba(255, 255, 255, .5);
+    }
+    .room-tile[data-color="white"].is-on::after {
+        background: rgb(255 255 255);
+        box-shadow: 0 0 18px rgba(255, 255, 255, 1), 0 0 58px rgba(125, 211, 252, .72), inset 0 0 0 12px rgba(186, 230, 253, .46);
+    }
+    .room-tile[data-color="red"].is-on::after {
+        background: rgb(248 113 113);
+        box-shadow: 0 0 20px rgba(248, 113, 113, .95), 0 0 58px rgba(220, 38, 38, .66), inset 0 0 0 12px rgba(255, 255, 255, .42);
+    }
+    .room-tile[data-color="blue"].is-on::after {
+        background: rgb(56 189 248);
+        box-shadow: 0 0 20px rgba(56, 189, 248, .95), 0 0 58px rgba(14, 165, 233, .62), inset 0 0 0 12px rgba(255, 255, 255, .46);
+    }
+    .floor-plan.room-version .room-tile.is-on {
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08), inset 0 0 42px rgba(134, 239, 172, .34), 0 0 0 5px rgba(16, 185, 129, .28), 0 18px 38px rgba(15, 23, 42, .16);
+    }
+    .floor-plan.room-version .room-tile[data-color="yellow"].is-on {
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08), inset 0 0 50px rgba(250, 204, 21, .52), 0 0 0 5px rgba(245, 158, 11, .32), 0 0 42px rgba(250, 204, 21, .48), 0 18px 38px rgba(15, 23, 42, .16);
+    }
+    .floor-plan.room-version .room-tile[data-color="white"].is-on {
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08), inset 0 0 50px rgba(186, 230, 253, .58), 0 0 0 5px rgba(14, 165, 233, .26), 0 0 42px rgba(186, 230, 253, .64), 0 18px 38px rgba(15, 23, 42, .16);
+    }
+    .floor-plan.room-version .room-tile[data-color="red"].is-on {
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08), inset 0 0 48px rgba(248, 113, 113, .45), 0 0 0 5px rgba(239, 68, 68, .3), 0 0 38px rgba(239, 68, 68, .42), 0 18px 38px rgba(15, 23, 42, .16);
+    }
+    .floor-plan.room-version .room-tile[data-color="blue"].is-on {
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08), inset 0 0 48px rgba(56, 189, 248, .42), 0 0 0 5px rgba(14, 165, 233, .3), 0 0 38px rgba(14, 165, 233, .36), 0 18px 38px rgba(15, 23, 42, .16);
+    }
+    .floor-plan.room-version .room-tile::after {
+        top: 52%;
+        right: 12px;
+        bottom: auto;
+        z-index: 4;
+        width: 28px;
+        height: 28px;
+        transform: translateY(-50%);
+        box-shadow: inset 0 0 0 7px rgb(226 232 240);
+    }
+    .floor-plan.room-version .room-tile.is-on::after {
+        width: 44px;
+        height: 44px;
+        box-shadow: 0 0 18px rgba(34, 197, 94, .78), 0 0 38px rgba(34, 197, 94, .42), inset 0 0 0 10px rgba(255, 255, 255, .48);
+    }
+    .room-tile.is-pending,
+    .relay-row.is-pending {
+        opacity: .65;
+    }
+    .room-channel {
+        display: inline-flex;
+        width: fit-content;
+        border-radius: 6px;
+        background: rgb(15 23 42);
+        padding: 4px 7px;
+        font-size: 11px;
+        font-weight: 800;
+        color: white;
+        letter-spacing: 0;
+    }
+    .room-name {
+        display: block;
+        margin-top: 10px;
+        font-size: 18px;
+        font-weight: 800;
+        color: rgb(15 23 42);
+    }
+    .room-device {
+        display: block;
+        margin-top: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        color: rgb(71 85 105);
+    }
+    .room-info {
+        display: block;
+        min-width: 0;
+    }
+    .room-state {
+        width: fit-content;
+        border-radius: 6px;
+        border: 1px solid rgb(100 116 139);
+        background: rgb(241 245 249);
+        padding: 5px 8px;
+        font-size: 12px;
+        font-weight: 800;
+        color: rgb(51 65 85);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+    }
+    .room-tile.is-on .room-state {
+        border-color: rgb(16 185 129);
+        background: rgb(16 185 129);
+        color: white;
+        box-shadow: 0 0 18px rgba(16, 185, 129, .46);
+    }
+    .room-tile[data-color="white"].is-on .room-state {
+        border-color: rgb(2 132 199);
+        background: rgb(14 165 233);
+        color: white;
+        box-shadow: 0 0 18px rgba(14, 165, 233, .42);
+    }
+    .room-tile[data-color="yellow"].is-on .room-state {
+        border-color: rgb(217 119 6);
+        background: rgb(245 158 11);
+        color: rgb(255 251 235);
+        box-shadow: 0 0 18px rgba(245, 158, 11, .55);
+    }
+    .room-tile[data-color="red"].is-on .room-state {
+        border-color: rgb(220 38 38);
+        background: rgb(220 38 38);
+        color: white;
+        box-shadow: 0 0 18px rgba(220, 38, 38, .52);
+    }
+    .room-tile[data-color="blue"].is-on .room-state {
+        border-color: rgb(2 132 199);
+        background: rgb(2 132 199);
+        color: white;
+        box-shadow: 0 0 18px rgba(2, 132, 199, .48);
+    }
+    .room-living { grid-column: 1 / 6; grid-row: 1 / 6; }
+    .room-kitchen { grid-column: 6 / 10; grid-row: 1 / 4; }
+    .room-bathroom { grid-column: 10 / 13; grid-row: 1 / 4; }
+    .room-terrace { grid-column: 6 / 13; grid-row: 4 / 7; }
+    .room-bedroom-main { grid-column: 1 / 5; grid-row: 6 / 13; }
+    .room-bedroom-two { grid-column: 5 / 9; grid-row: 7 / 13; }
+    .room-ac { grid-column: 9 / 13; grid-row: 7 / 10; }
+    .room-basement { grid-column: 9 / 13; grid-row: 10 / 13; }
+    .furniture,
+    .fixture,
+    .doorway,
+    .window-mark,
+    .plant-mark {
+        display: none;
+    }
+    .floor-plan.room-version .room-channel {
+        position: absolute;
+        left: 12px;
+        top: 12px;
+        z-index: 9;
+    }
+    .floor-plan.room-version .room-info {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        z-index: 9;
+        display: block;
+        border: 1px solid rgba(203, 213, 225, .9);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, .88);
+        padding: 7px 9px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, .08);
+        backdrop-filter: blur(4px);
+    }
+    .floor-plan.room-version .room-name {
+        position: static;
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        margin: 0;
+        font-size: clamp(13px, .95vw, 16px);
+        line-height: 1.12;
+        text-overflow: ellipsis;
+    }
+    .floor-plan.room-version .room-device {
+        position: static;
+        overflow: hidden;
+        margin: 3px 0 0;
+        font-size: clamp(10px, .75vw, 12px);
+        line-height: 1.15;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .floor-plan.room-version .room-state {
+        position: absolute;
+        right: 12px;
+        top: 12px;
+        z-index: 9;
+        min-width: 44px;
+        text-align: center;
+    }
+    .floor-plan.room-version .furniture,
+    .floor-plan.room-version .fixture,
+    .floor-plan.room-version .doorway,
+    .floor-plan.room-version .window-mark,
+    .floor-plan.room-version .plant-mark {
+        display: block;
+        position: absolute;
+        z-index: 5;
+        pointer-events: none;
+    }
+    .furniture {
+        border: 2px solid rgb(100 116 139);
+        background: rgb(226 232 240);
+        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55);
+    }
+    .fixture {
+        border: 2px solid rgb(100 116 139);
+        background: rgb(241 245 249);
+    }
+    .doorway {
+        width: 34px;
+        height: 20px;
+        border-bottom: 3px solid rgb(14 165 233);
+        border-right: 2px solid rgba(14, 165, 233, .5);
+        border-radius: 0 0 20px 0;
+    }
+    .window-mark {
+        height: 5px;
+        border-radius: 99px;
+        background: rgb(56 189 248);
+        box-shadow: 0 0 0 2px rgba(14, 165, 233, .18);
+    }
+    .plant-mark {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        background: radial-gradient(circle at 35% 35%, rgb(134 239 172), rgb(22 163 74));
+        border: 2px solid rgb(21 128 61);
+    }
+    .sofa { left: 12%; top: 50%; width: 36%; height: 20%; border-radius: 8px; background: rgb(203 213 225); }
+    .sofa::before,
+    .sofa::after,
+    .bed::before,
+    .bed-small::before,
+    .dining-table::before,
+    .desk::before,
+    .carpet::before {
+        content: "";
+        position: absolute;
+        pointer-events: none;
+    }
+    .sofa::before { left: 8%; top: -28%; width: 84%; height: 34%; border-radius: 8px 8px 4px 4px; background: rgb(148 163 184); }
+    .sofa::after { right: -10%; top: 14%; width: 14%; height: 72%; border-radius: 5px; background: rgb(148 163 184); }
+    .coffee-table { left: 52%; top: 55%; width: 22%; height: 12%; border-radius: 999px; background: rgb(248 250 252); }
+    .tv-console { left: 56%; top: 20%; width: 28%; height: 7%; border-radius: 4px; background: rgb(100 116 139); }
+    .rug { left: 30%; top: 46%; width: 44%; height: 34%; border-radius: 999px; border-color: rgb(125 211 252); background: rgba(186, 230, 253, .6); }
+    .counter { left: 8%; top: 22%; width: 84%; height: 18%; border-radius: 4px; background: rgb(226 232 240); }
+    .island { left: 30%; top: 55%; width: 44%; height: 18%; border-radius: 6px; background: rgb(248 250 252); }
+    .sink { right: 12%; top: 24%; width: 18%; height: 12%; border-radius: 999px; background: rgb(224 242 254); }
+    .stove { left: 12%; top: 24%; width: 20%; height: 12%; border-radius: 4px; background: rgb(148 163 184); }
+    .toilet { left: 12%; top: 52%; width: 22%; height: 20%; border-radius: 999px 999px 8px 8px; background: rgb(248 250 252); }
+    .shower { right: 10%; top: 44%; width: 34%; height: 34%; border-radius: 4px; background: rgba(186, 230, 253, .55); }
+    .vanity { left: 12%; top: 25%; width: 34%; height: 12%; border-radius: 4px; background: rgb(226 232 240); }
+    .bed { left: 10%; top: 47%; width: 46%; height: 34%; border-radius: 8px; background: rgb(203 213 225); }
+    .bed::before { left: 8%; top: 8%; width: 35%; height: 24%; border-radius: 4px; background: rgb(248 250 252); }
+    .wardrobe { right: 8%; top: 20%; width: 18%; height: 54%; border-radius: 4px; background: rgb(148 163 184); }
+    .side-table { right: 32%; top: 58%; width: 12%; height: 12%; border-radius: 4px; background: rgb(226 232 240); }
+    .bed-small { left: 12%; top: 45%; width: 50%; height: 34%; border-radius: 8px; background: rgb(203 213 225); }
+    .bed-small::before { left: 8%; top: 8%; width: 32%; height: 24%; border-radius: 4px; background: rgb(248 250 252); }
+    .desk { right: 10%; top: 24%; width: 30%; height: 14%; border-radius: 4px; background: rgb(226 232 240); }
+    .desk::before { left: 35%; top: 120%; width: 30%; height: 48%; border-radius: 999px; background: rgb(148 163 184); }
+    .ac-unit { left: 10%; top: 32%; width: 44%; height: 20%; border-radius: 8px; background: rgb(186 230 253); }
+    .fan-mark { right: 16%; top: 34%; width: 46px; height: 46px; border-radius: 999px; background: conic-gradient(from 20deg, rgb(14 165 233) 0 22%, transparent 22% 35%, rgb(14 165 233) 35% 57%, transparent 57% 70%, rgb(14 165 233) 70% 92%, transparent 92%); border-color: rgb(2 132 199); }
+    .alarm-panel { left: 12%; top: 36%; width: 28%; height: 28%; border-radius: 8px; background: rgb(254 202 202); border-color: rgb(220 38 38); }
+    .storage-box { right: 12%; top: 34%; width: 32%; height: 22%; border-radius: 4px; background: rgb(203 213 225); }
+    .shoe-rack { left: 10%; top: 32%; width: 34%; height: 26%; border-radius: 4px; background: rgb(203 213 225); }
+    .bench { right: 10%; top: 34%; width: 34%; height: 18%; border-radius: 999px; background: rgb(226 232 240); }
+    .dining-table { left: 30%; top: 18%; width: 38%; height: 48%; border-radius: 999px; background: rgb(248 250 252); }
+    .dining-table::before { left: -18%; top: 32%; width: 136%; height: 36%; border-radius: 999px; border-top: 8px dotted rgb(148 163 184); border-bottom: 8px dotted rgb(148 163 184); }
+    .living-door { right: 4%; bottom: 0; }
+    .kitchen-door { left: 6%; bottom: 0; }
+    .bath-door { left: 6%; bottom: 0; }
+    .bed-main-door { right: 4%; top: 4%; transform: rotate(180deg); }
+    .bed-two-door { left: 4%; top: 4%; transform: rotate(180deg); }
+    .ac-door { left: 4%; bottom: 0; }
+    .basement-door { left: 4%; top: 0; transform: rotate(180deg); }
+    .terrace-door { left: 12%; top: 0; transform: rotate(180deg); }
+    .living-window { left: 14%; top: 0; width: 42%; }
+    .kitchen-window { right: 14%; top: 0; width: 42%; }
+    .bath-window { right: 12%; top: 0; width: 42%; }
+    .bed-main-window { left: 0; top: 42%; width: 5px; height: 34%; }
+    .bed-two-window { left: 18%; bottom: 0; width: 48%; }
+    .ac-window { right: 12%; top: 0; width: 44%; }
+    .basement-window { right: 14%; bottom: 0; width: 42%; }
+    .terrace-plant-one { left: 8%; top: 34%; }
+    .terrace-plant-two { right: 8%; top: 34%; }
+    .relay-row {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        border-radius: 8px;
+        border: 1px solid rgb(148 163 184);
+        background: rgb(248 250 252);
+        padding: 12px;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .72);
+    }
+    .relay-row.is-on {
+        border-color: rgb(22 163 74);
+        background: linear-gradient(135deg, rgb(236 253 245), rgb(187 247 208));
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, .18), 0 10px 24px rgba(22, 163, 74, .16);
+    }
+    .relay-dot {
+        display: grid;
+        height: 42px;
+        width: 42px;
+        place-items: center;
+        border-radius: 8px;
+        border: 1px solid rgb(203 213 225);
+        background: rgb(248 250 252);
+        font-size: 12px;
+        font-weight: 800;
+        color: rgb(71 85 105);
+    }
+    .relay-row.is-on .relay-dot {
+        border-color: rgb(22 163 74);
+        background: rgb(22 163 74);
+        color: white;
+        box-shadow: 0 0 18px rgba(34, 197, 94, .42);
+    }
+    .log-entry {
+        border-bottom: 1px solid rgb(226 232 240);
+        padding: 8px 0;
+        font-size: 12px;
+        color: rgb(71 85 105);
+    }
+    .log-entry:first-child {
+        padding-top: 0;
+    }
+    .log-time {
+        margin-right: 8px;
+        font-weight: 800;
+        color: rgb(100 116 139);
+    }
+    .log-on { color: rgb(4 120 87); }
+    .log-off { color: rgb(185 28 28); }
+    .log-sys { color: rgb(3 105 161); }
+    @media (max-width: 1024px) {
+        .smarthome-layout {
+            grid-template-columns: 1fr;
+        }
+        .floor-plan {
+            min-height: 780px;
+        }
+        .floor-plan.room-version {
+            min-height: 820px;
+        }
+    }
+    @media (max-width: 640px) {
+        .floor-plan {
+            grid-template-columns: 1fr;
+            grid-template-rows: none;
+            aspect-ratio: auto;
+            min-height: auto;
+            padding: 10px;
+        }
+        .room-tile {
+            grid-column: 1 !important;
+            grid-row: auto !important;
+            min-height: 118px;
+        }
+        .floor-plan.room-version {
+            border-width: 4px;
+            min-height: auto;
+        }
+        .floor-plan.room-version::before,
+        .floor-plan.room-version::after {
+            display: none;
+        }
+        .floor-plan.room-version .room-tile {
+            min-height: 132px;
+        }
+        .floor-plan.room-version .furniture,
+        .floor-plan.room-version .fixture,
+        .floor-plan.room-version .doorway,
+        .floor-plan.room-version .window-mark,
+        .floor-plan.room-version .plant-mark {
+            opacity: .45;
+        }
+    }
+</style>
+
+<div class="app-page">
+    <header class="app-page-header">
+        <div>
+            <p class="app-eyebrow">Simulasi virtual</p>
+            <h1 class="app-title">Simulasi Smarthome Virtual</h1>
+            <p class="app-subtitle">Kontrol 8 channel relay virtual dari halaman ini atau lewat tool Xiaozhi MCP yang memakai endpoint tersimpan di dashboard.</p>
+        </div>
+        <div class="app-toolbar">
+            <button type="button" onclick="setAllRelays(true)" class="app-button app-button-success">Semua ON</button>
+            <button type="button" id="roomVersionButton" onclick="toggleRoomVersion()" class="app-button app-button-sky" aria-pressed="false">Versi Ruangan</button>
+            <button type="button" onclick="setAllRelays(false)" class="app-button app-button-danger">Semua OFF</button>
+            <button type="button" onclick="loadState(true)" class="app-button">Refresh</button>
+        </div>
+    </header>
+
+    {% if message %}
+    <div class="app-alert app-alert-info">
+        {{ message }}
+    </div>
+    {% endif %}
+
+    {% if not virtual_smarthome_enabled %}
+    <div class="app-alert app-alert-warning">
+        Simulasi Smart Home Virtual sedang dinonaktifkan agar tidak konflik dengan Relay Nyata. Aktifkan kembali dari halaman <a href="/relay-nyata" class="underline">Relay Nyata</a>.
+    </div>
+    {% endif %}
+
+    {% if not mcp_token_saved %}
+    <div class="app-alert app-alert-warning">
+        Endpoint Xiaozhi belum tersimpan. Simulasi lokal tetap bisa dipakai, tetapi kontrol dari Xiaozhi aktif setelah endpoint disimpan di <a href="/dashboard" class="underline">dashboard</a>.
+    </div>
+    {% endif %}
+
+    <section class="app-stat-grid">
+        <div class="app-stat-card">
+            <p class="app-stat-label">Relay Aktif</p>
+            <p class="app-stat-value"><span id="activeCount">0</span> / <span id="totalCount">8</span></p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Endpoint MCP</p>
+            <p class="mt-3 text-sm font-bold text-slate-950" id="tokenStatus">{% if mcp_token_saved %}Tersimpan{% else %}Belum tersimpan{% endif %}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Bridge Xiaozhi</p>
+            <p class="mt-3 text-sm font-bold text-slate-950" id="mcpStatus">Memuat</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Update</p>
+            <p class="mt-3 text-sm font-bold text-slate-950" id="updatedAt">-</p>
+        </div>
+    </section>
+
+    <section class="smarthome-layout">
+        <div class="app-card">
+            <div class="app-card-header">
+                <div>
+                    <h2 class="app-section-title">Denah Rumah</h2>
+                    <p class="app-section-subtitle">Klik ruangan untuk mengubah status relay.</p>
+                </div>
+                <div class="app-status-pill" id="serverStatus">Server: memuat</div>
+            </div>
+            <div class="floor-plan" id="floorPlan">
+                <button type="button" class="room-tile room-living" data-channel="1" data-color="yellow" onclick="toggleRelay(1)">
+                    <span class="room-channel">CH1</span>
+                    <span class="room-info">
+                        <span class="room-name">Ruang Tamu</span>
+                        <span class="room-device">Lampu utama</span>
+                    </span>
+                    <span class="room-state">OFF</span>
+                    <span aria-hidden="true" class="furniture rug"></span>
+                    <span aria-hidden="true" class="furniture sofa"></span>
+                    <span aria-hidden="true" class="furniture coffee-table"></span>
+                    <span aria-hidden="true" class="furniture tv-console"></span>
+                    <span aria-hidden="true" class="doorway living-door"></span>
+                    <span aria-hidden="true" class="window-mark living-window"></span>
+                </button>
+                <button type="button" class="room-tile room-kitchen" data-channel="2" data-color="white" onclick="toggleRelay(2)">
+                    <span class="room-channel">CH2</span>
+                    <span class="room-info">
+                        <span class="room-name">Dapur</span>
+                        <span class="room-device">Lampu dapur</span>
+                    </span>
+                    <span class="room-state">OFF</span>
+                    <span aria-hidden="true" class="fixture counter"></span>
+                    <span aria-hidden="true" class="fixture stove"></span>
+                    <span aria-hidden="true" class="fixture sink"></span>
+                    <span aria-hidden="true" class="furniture island"></span>
+                    <span aria-hidden="true" class="doorway kitchen-door"></span>
+                    <span aria-hidden="true" class="window-mark kitchen-window"></span>
+                </button>
+                <button type="button" class="room-tile room-bathroom" data-channel="3" data-color="white" onclick="toggleRelay(3)">
+                    <span class="room-channel">CH3</span>
+                    <span class="room-info">
+                        <span class="room-name">Kamar Mandi</span>
+                        <span class="room-device">Lampu mandi</span>
+                    </span>
+                    <span class="room-state">OFF</span>
+                    <span aria-hidden="true" class="fixture vanity"></span>
+                    <span aria-hidden="true" class="fixture toilet"></span>
+                    <span aria-hidden="true" class="fixture shower"></span>
+                    <span aria-hidden="true" class="doorway bath-door"></span>
+                    <span aria-hidden="true" class="window-mark bath-window"></span>
+                </button>
+                <button type="button" class="room-tile room-terrace" data-channel="5" data-color="white" onclick="toggleRelay(5)">
+                    <span class="room-channel">CH5</span>
+                    <span class="room-info">
+                        <span class="room-name">Teras</span>
+                        <span class="room-device">Lampu teras</span>
+                    </span>
+                    <span class="room-state">OFF</span>
+                    <span aria-hidden="true" class="plant-mark terrace-plant-one"></span>
+                    <span aria-hidden="true" class="plant-mark terrace-plant-two"></span>
+                    <span aria-hidden="true" class="furniture shoe-rack"></span>
+                    <span aria-hidden="true" class="furniture bench"></span>
+                    <span aria-hidden="true" class="doorway terrace-door"></span>
+                </button>
+                <button type="button" class="room-tile room-bedroom-main" data-channel="4" data-color="white" onclick="toggleRelay(4)">
+                    <span class="room-channel">CH4</span>
+                    <span class="room-info">
+                        <span class="room-name">Kamar Tidur Utama</span>
+                        <span class="room-device">Lampu kamar utama</span>
+                    </span>
+                    <span class="room-state">OFF</span>
+                    <span aria-hidden="true" class="furniture bed"></span>
+                    <span aria-hidden="true" class="furniture wardrobe"></span>
+                    <span aria-hidden="true" class="furniture side-table"></span>
+                    <span aria-hidden="true" class="doorway bed-main-door"></span>
+                    <span aria-hidden="true" class="window-mark bed-main-window"></span>
+                </button>
+                <button type="button" class="room-tile room-bedroom-two" data-channel="7" data-color="white" onclick="toggleRelay(7)">
+                    <span class="room-channel">CH7</span>
+                    <span class="room-info">
+                        <span class="room-name">Kamar Tidur 2</span>
+                        <span class="room-device">Lampu kamar kedua</span>
+                    </span>
+                    <span class="room-state">OFF</span>
+                    <span aria-hidden="true" class="furniture bed-small"></span>
+                    <span aria-hidden="true" class="furniture desk"></span>
+                    <span aria-hidden="true" class="doorway bed-two-door"></span>
+                    <span aria-hidden="true" class="window-mark bed-two-window"></span>
+                </button>
+                <button type="button" class="room-tile room-ac" data-channel="8" data-color="blue" onclick="toggleRelay(8)">
+                    <span class="room-channel">CH8</span>
+                    <span class="room-info">
+                        <span class="room-name">Ruang AC</span>
+                        <span class="room-device">Pendingin ruangan</span>
+                    </span>
+                    <span class="room-state">OFF</span>
+                    <span aria-hidden="true" class="fixture ac-unit"></span>
+                    <span aria-hidden="true" class="furniture fan-mark"></span>
+                    <span aria-hidden="true" class="doorway ac-door"></span>
+                    <span aria-hidden="true" class="window-mark ac-window"></span>
+                </button>
+                <button type="button" class="room-tile room-basement" data-channel="6" data-color="red" onclick="toggleRelay(6)">
+                    <span class="room-channel">CH6</span>
+                    <span class="room-info">
+                        <span class="room-name">Basement</span>
+                        <span class="room-device">Alarm</span>
+                    </span>
+                    <span class="room-state">OFF</span>
+                    <span aria-hidden="true" class="fixture alarm-panel"></span>
+                    <span aria-hidden="true" class="furniture storage-box"></span>
+                    <span aria-hidden="true" class="doorway basement-door"></span>
+                    <span aria-hidden="true" class="window-mark basement-window"></span>
+                </button>
+            </div>
+        </div>
+
+        <aside class="app-sidebar">
+            <div class="app-card">
+                <h2 class="app-section-title">Koneksi Xiaozhi</h2>
+                <div class="mt-4 app-alert {% if mcp_token_saved %}app-alert-success{% else %}app-alert-warning{% endif %}">
+                    {% if mcp_token_saved %}
+                        Tersimpan: {{ mcp_token_preview }}
+                    {% else %}
+                        Belum tersimpan
+                    {% endif %}
+                </div>
+                <a href="/dashboard" class="app-button app-button-full mt-3">Atur Endpoint MCP</a>
+            </div>
+
+            <div class="app-card">
+                <div class="app-card-header">
+                    <h2 class="app-section-title">Relay</h2>
+                    <span class="app-chip app-chip-small">8 CH</span>
+                </div>
+                <div class="space-y-3" id="relayList"></div>
+            </div>
+
+            <div class="app-card">
+                <div class="app-card-header">
+                    <h2 class="app-section-title">Log Aktivitas</h2>
+                    <button type="button" onclick="clearLog()" class="app-button app-button-ghost app-button-small">Bersihkan</button>
+                </div>
+                <div class="max-h-72 overflow-y-auto" id="logBox"></div>
+            </div>
+        </aside>
+    </section>
+</div>
+
+<script>
+    const CSRF_TOKEN = {{ csrf_token|tojson }};
+    const INITIAL_STATE = {{ initial_state|tojson }};
+    const relayState = {};
+    const pendingChannels = new Set();
+    let lastServerOnline = null;
+    let roomVersionEnabled = localStorage.getItem("smartHomeRoomVersion") === "true";
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function relayStatusText(relay) {
+        if (relay.device === "Alarm") {
+            return relay.state ? "AKTIF" : "NONAKTIF";
+        }
+        if (relay.device === "AC") {
+            return relay.state ? "AKTIF" : "OFF";
+        }
+        return relay.state ? "ON" : "OFF";
+    }
+
+    function formatUpdatedAt(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "-";
+        return date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function setServerStatus(online) {
+        if (lastServerOnline === online) return;
+        lastServerOnline = online;
+        const el = document.getElementById("serverStatus");
+        if (online) {
+            el.textContent = "Server: online";
+            el.className = "app-status-pill is-online";
+        } else {
+            el.textContent = "Server: offline";
+            el.className = "app-status-pill is-offline";
+        }
+    }
+
+    function applyRoomVersion() {
+        const floorPlan = document.getElementById("floorPlan");
+        const button = document.getElementById("roomVersionButton");
+        floorPlan.classList.toggle("room-version", roomVersionEnabled);
+        button.setAttribute("aria-pressed", roomVersionEnabled ? "true" : "false");
+        button.className = roomVersionEnabled
+            ? "app-button app-button-sky"
+            : "app-button";
+    }
+
+    function toggleRoomVersion() {
+        roomVersionEnabled = !roomVersionEnabled;
+        localStorage.setItem("smartHomeRoomVersion", roomVersionEnabled ? "true" : "false");
+        applyRoomVersion();
+        addLog("sys", roomVersionEnabled ? "Versi ruangan arsitektur aktif" : "Versi ruangan sederhana aktif");
+    }
+
+    function renderState(payload, options = {}) {
+        document.getElementById("activeCount").textContent = payload.activeCount ?? 0;
+        document.getElementById("totalCount").textContent = payload.totalCount ?? 8;
+        document.getElementById("tokenStatus").textContent = payload.tokenSaved ? "Tersimpan" : "Belum tersimpan";
+        document.getElementById("mcpStatus").textContent = payload.mcpConnected
+            ? "Terhubung"
+            : (payload.tokenSaved ? "Menunggu bridge" : "Endpoint belum ada");
+        document.getElementById("updatedAt").textContent = formatUpdatedAt(payload.updatedAt);
+
+        const relayList = document.getElementById("relayList");
+        relayList.innerHTML = "";
+
+        (payload.relays || []).forEach((relay) => {
+            const previous = relayState[relay.channel];
+            relayState[relay.channel] = Boolean(relay.state);
+
+            const tile = document.querySelector(`.room-tile[data-channel="${relay.channel}"]`);
+            if (tile) {
+                tile.classList.toggle("is-on", Boolean(relay.state));
+                tile.classList.toggle("is-pending", pendingChannels.has(relay.channel));
+                const stateEl = tile.querySelector(".room-state");
+                if (stateEl) stateEl.textContent = relayStatusText(relay);
+            }
+
+            const row = document.createElement("div");
+            row.className = "relay-row" + (relay.state ? " is-on" : "") + (pendingChannels.has(relay.channel) ? " is-pending" : "");
+            row.dataset.channel = relay.channel;
+            row.innerHTML = `
+                <div class="relay-dot">CH${relay.channel}</div>
+                <div class="min-w-0">
+                    <div class="truncate text-sm font-bold text-slate-950">${escapeHtml(relay.name)}</div>
+                    <div class="truncate text-xs font-semibold text-slate-500">${escapeHtml(relay.device)} - ${relayStatusText(relay)}</div>
+                </div>
+                <button type="button" class="app-button app-button-small" onclick="toggleRelay(${relay.channel})">
+                    ${relay.state ? "Matikan" : "Nyalakan"}
+                </button>
+            `;
+            relayList.appendChild(row);
+
+            if (options.logChanges && previous !== undefined && previous !== relay.state) {
+                addLog(relay.state ? "on" : "off", `${relay.name} ${relayStatusText(relay)}`);
+            }
+        });
+    }
+
+    async function loadState(logChanges = false) {
+        try {
+            const response = await fetch("/api/smarthome/state", {
+                headers: { "Accept": "application/json" },
+                credentials: "same-origin",
+            });
+            if (!response.ok) throw new Error("Gagal membaca status smarthome");
+            const payload = await response.json();
+            setServerStatus(true);
+            renderState(payload, { logChanges });
+        } catch (error) {
+            const wasOnline = lastServerOnline;
+            setServerStatus(false);
+            if (wasOnline !== false) addLog("off", error.message || "Server tidak bisa dihubungi");
+        }
+    }
+
+    async function postCommand(url, body) {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-CSRF-Token": CSRF_TOKEN,
+            },
+            credentials: "same-origin",
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "Perintah gagal dijalankan");
+        }
+        const payload = await response.json();
+        setServerStatus(true);
+        renderState(payload, { logChanges: false });
+        return payload;
+    }
+
+    function setPending(channel, pending) {
+        if (pending) {
+            pendingChannels.add(channel);
+        } else {
+            pendingChannels.delete(channel);
+        }
+        const tile = document.querySelector(`.room-tile[data-channel="${channel}"]`);
+        if (tile) tile.classList.toggle("is-pending", pending);
+        const row = document.querySelector(`.relay-row[data-channel="${channel}"]`);
+        if (row) row.classList.toggle("is-pending", pending);
+    }
+
+    async function setRelay(channel, state) {
+        setPending(channel, true);
+        try {
+            const payload = await postCommand("/api/smarthome/relay", { channel, state });
+            const relay = (payload.relays || []).find((item) => item.channel === channel);
+            if (relay) addLog(relay.state ? "on" : "off", `${relay.name} ${relayStatusText(relay)}`);
+        } catch (error) {
+            addLog("off", error.message || "Perintah gagal");
+            await loadState(false);
+        } finally {
+            setPending(channel, false);
+        }
+    }
+
+    function toggleRelay(channel) {
+        if (pendingChannels.has(channel)) return;
+        setRelay(channel, !relayState[channel]);
+    }
+
+    async function setAllRelays(state) {
+        for (let channel = 1; channel <= 8; channel += 1) setPending(channel, true);
+        try {
+            await postCommand("/api/smarthome/all", { state });
+            addLog(state ? "on" : "off", state ? "Semua relay ON" : "Semua relay OFF");
+        } catch (error) {
+            addLog("off", error.message || "Perintah gagal");
+            await loadState(false);
+        } finally {
+            for (let channel = 1; channel <= 8; channel += 1) setPending(channel, false);
+        }
+    }
+
+    function addLog(type, message) {
+        const box = document.getElementById("logBox");
+        const date = new Date();
+        const time = date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        entry.innerHTML = `<span class="log-time">${time}</span><span class="log-${type}">${escapeHtml(message)}</span>`;
+        box.prepend(entry);
+        while (box.children.length > 35) box.lastElementChild.remove();
+    }
+
+    function clearLog() {
+        document.getElementById("logBox").innerHTML = "";
+    }
+
+    renderState(INITIAL_STATE, { logChanges: false });
+    applyRoomVersion();
+    setServerStatus(true);
+    addLog("sys", "Simulator siap digunakan");
+    window.setInterval(() => loadState(true), 1500);
+</script>
+{% endblock %}

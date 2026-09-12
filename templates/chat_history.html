@@ -1,0 +1,636 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .chat-history-shell {
+        display: grid;
+        grid-template-columns: 1fr;
+        min-height: 0;
+        overflow: hidden;
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+        background: white;
+        box-shadow: var(--app-shadow);
+    }
+    .chat-session-list {
+        border-bottom: 1px solid var(--app-border);
+        background: var(--app-surface-muted);
+    }
+    .chat-session-toolbar {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border-bottom: 1px solid var(--app-border);
+        background: white;
+    }
+    .chat-session-items {
+        max-height: 260px;
+        overflow-y: auto;
+        padding: 8px;
+    }
+    .chat-token-strip {
+        display: grid;
+        gap: 4px;
+        border: 1px solid var(--app-border);
+        border-radius: 8px;
+        background: var(--app-surface-muted);
+        padding: 10px 12px;
+        color: var(--app-muted);
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .chat-token-strip strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--app-text);
+        font-size: 13px;
+    }
+    .chat-session-item {
+        width: 100%;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        padding: 12px;
+        text-align: left;
+        color: var(--app-text);
+    }
+    .chat-session-item:hover,
+    .chat-session-item.is-active {
+        border-color: #bae6fd;
+        background: #e0f2fe;
+    }
+    .chat-session-title {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 14px;
+        font-weight: 750;
+    }
+    .chat-session-meta {
+        display: block;
+        margin-top: 6px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+        color: var(--app-muted);
+    }
+    .chat-thread {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-width: 0;
+    }
+    .chat-thread-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--app-border);
+        background: white;
+    }
+    .chat-thread-body {
+        max-height: 640px;
+        overflow-y: auto;
+        padding: 18px;
+        background: #ffffff;
+    }
+    .chat-message-row {
+        display: block;
+        margin-bottom: 26px;
+    }
+    .chat-message-row.is-user {
+        justify-content: flex-start;
+    }
+    .chat-message-bubble {
+        width: min(100%, 760px);
+        max-width: 100%;
+        border-radius: 8px;
+        padding: 10px 12px 8px;
+        color: #0f172a;
+        box-shadow: 0 1px 1px rgba(15, 23, 42, .04);
+    }
+    .chat-message-user {
+        background: #e0f2fe;
+    }
+    .chat-message-ai,
+    .chat-message-tool {
+        background: #f1f5f9;
+    }
+    .chat-message-tool {
+        width: min(100%, 760px);
+        max-width: 100%;
+    }
+    .chat-message-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 12px;
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.2;
+    }
+    .chat-speaker {
+        font-weight: 800;
+    }
+    .chat-timestamp {
+        white-space: nowrap;
+        font-weight: 650;
+    }
+    .chat-message-content {
+        color: #020617;
+        font-size: 13px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .chat-message-footer {
+        margin-top: 7px;
+        text-align: right;
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 650;
+    }
+    .chat-empty {
+        display: grid;
+        min-height: 420px;
+        place-items: center;
+        text-align: center;
+        color: var(--app-muted);
+    }
+    @media (max-width: 900px) {
+        .chat-history-shell {
+            grid-template-columns: 1fr;
+        }
+        .chat-session-list {
+            border-bottom: 1px solid var(--app-border);
+        }
+        .chat-session-items,
+        .chat-thread-body {
+            max-height: none;
+        }
+    }
+</style>
+
+<div class="app-page">
+    <header class="app-page-header">
+        <div>
+            <p class="app-eyebrow">Riwayat Xiaozhi</p>
+            <h1 class="app-title">Riwayat Chat</h1>
+            <p class="app-subtitle">Menampilkan percakapan, pemanggilan tool, dan respons yang masuk dari endpoint MCP milik token aktif.</p>
+        </div>
+        <div class="app-toolbar">
+            <span class="app-status-pill {% if mcp_status.connected %}is-online{% elif not mcp_status.tokenSaved %}is-offline{% endif %}" id="mcpStatusPill">
+                <span class="app-status-dot"></span>
+                <span id="mcpStatusText">{{ mcp_status.statusText }}</span>
+            </span>
+            <a href="/dashboard" class="app-button">Dashboard</a>
+        </div>
+    </header>
+
+    <div class="app-alert {% if mcp_status.connected %}app-alert-success{% elif mcp_status.tokenSaved %}app-alert-info{% else %}app-alert-warning{% endif %}" id="mcpTokenAlert">
+        <span id="mcpTokenText">
+            {% if mcp_status.tokenSaved %}
+                Token MCP: {{ mcp_status.tokenPreview }}. Riwayat di bawah difilter untuk token ini.
+            {% else %}
+                Simpan endpoint MCP di dashboard agar riwayat chat dari Xiaozhi bisa tampil di sini.
+            {% endif %}
+        </span>
+    </div>
+
+    {% if message %}
+    <div class="app-alert app-alert-info">
+        {{ message }}
+    </div>
+    {% endif %}
+
+    <section class="app-stat-grid">
+        <div class="app-stat-card">
+            <p class="app-stat-label">Total Riwayat</p>
+            <p class="app-stat-value" id="statTotal">{{ stats.total }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Transcript Chat</p>
+            <p class="app-stat-value" id="statTranscript">{{ stats.transcript }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Interaksi Tool</p>
+            <p class="app-stat-value" id="statTool">{{ stats.tool }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Ditampilkan</p>
+            <p class="app-stat-value" id="statShown">{{ histories|length }}</p>
+        </div>
+    </section>
+
+    <section class="chat-history-shell">
+        <aside class="chat-session-list">
+            <div class="chat-session-toolbar">
+                <div class="chat-token-strip">
+                    <span>Token MCP aktif</span>
+                    <strong id="chatTokenPreview">{% if mcp_status.tokenPreview %}{{ mcp_status.tokenPreview }}{% else %}-{% endif %}</strong>
+                </div>
+                <form action="/riwayat-chat" method="GET" class="grid gap-2">
+                    <input type="search" name="q" value="{{ query }}" placeholder="Cari riwayat chat..." class="app-input">
+                    <div class="grid grid-cols-[1fr_auto] gap-2">
+                        <select name="limit" class="app-select">
+                            {% for option in [50, 100, 200, 300] %}
+                            <option value="{{ option }}" {% if limit == option %}selected{% endif %}>{{ option }} riwayat</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="app-button app-button-primary">Cari</button>
+                    </div>
+                </form>
+                <form action="/riwayat-chat/clear" method="POST" onsubmit="return confirm('Hapus semua riwayat chat?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="app-button app-button-danger app-button-full">Hapus Riwayat</button>
+                </form>
+            </div>
+            <div class="chat-session-items" id="chatSessionList"></div>
+        </aside>
+
+        <div class="chat-thread">
+            <div class="chat-thread-header">
+                <div>
+                    <h2 class="app-section-title" id="threadTitle">Pilih riwayat</h2>
+                    <p class="app-section-subtitle" id="threadMeta">Riwayat terbaru akan masuk otomatis.</p>
+                </div>
+                <span class="app-chip app-chip-small app-chip-neutral" id="threadBadge">Realtime</span>
+            </div>
+            <div class="chat-thread-body" id="chatThreadBody">
+                <div class="chat-empty">
+                    <div>
+                        <p class="text-base font-bold text-slate-800">Belum ada percakapan dipilih.</p>
+                        <p class="mt-2 text-sm">Klik salah satu riwayat di sisi kiri.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    const initialHistories = {{ histories|tojson }};
+    const initialMcpStatus = {{ mcp_status|tojson }};
+    const activeQuery = {{ query|tojson }};
+    const activeLimit = {{ limit|tojson }};
+    let histories = Array.isArray(initialHistories) ? initialHistories : [];
+    let mcpStatus = initialMcpStatus || {};
+    let selectedHistoryId = histories.length ? Number(histories[0].id) : null;
+    let maxHistoryId = histories.reduce((max, item) => Math.max(max, Number(item.id || 0)), 0);
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function compactText(value, maxLength = 76) {
+        const text = String(value || "").replace(/\s+/g, " ").trim();
+        if (!text) return "Tanpa pesan";
+        if (text.length <= maxLength) return text;
+        return `${text.slice(0, maxLength - 3).trim()}...`;
+    }
+
+    function formatDateTime(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value || "-";
+        return date.toLocaleString("id-ID", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+        });
+    }
+
+    function formatFullTimestamp(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value || "-";
+        const pad = (number) => String(number).padStart(2, "0");
+        return [
+            date.getFullYear(),
+            pad(date.getMonth() + 1),
+            pad(date.getDate()),
+        ].join("-") + " " + [
+            pad(date.getHours()),
+            pad(date.getMinutes()),
+            pad(date.getSeconds()),
+        ].join(":");
+    }
+
+    function historyTitle(item) {
+        return compactText(item.user_message || item.xiaozhi_answer || item.tool_name || "Riwayat chat");
+    }
+
+    function historyKind(item) {
+        if (item.source === "chat_transcript") return "Transcript";
+        if (String(item.tool_name || "").startsWith("xiaozhi_ws")) return "Chat MCP";
+        return "Tool MCP";
+    }
+
+    const emoteAliases = {
+        angry: "😠",
+        confused: "😕",
+        cry: "😢",
+        happy: "😊",
+        laugh: "😄",
+        love: "😍",
+        neutral: "😐",
+        sad: "😢",
+        smile: "😊",
+        surprised: "😮",
+        thinking: "🤔",
+        wink: "😉",
+    };
+
+    function normalizeEmote(value) {
+        const emote = String(value || "").trim();
+        if (!emote || emote.length > 16) return "";
+        return emoteAliases[emote.toLowerCase()] || emote;
+    }
+
+    function findEmote(value) {
+        if (!value) return "";
+        if (typeof value === "string") return normalizeEmote(value);
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                const emote = findEmote(item);
+                if (emote) return emote;
+            }
+            return "";
+        }
+        if (typeof value !== "object") return "";
+        for (const key of ["emoji", "emote", "emotion", "expression", "face"]) {
+            const emote = findEmote(value[key]);
+            if (emote) return emote;
+        }
+        for (const key of ["metadata", "meta", "extra", "payload", "result"]) {
+            const nested = value[key];
+            if (nested && typeof nested === "object") {
+                const emote = findEmote(nested);
+                if (emote) return emote;
+            }
+        }
+        return "";
+    }
+
+    function payloadEmote(payloadText) {
+        if (!payloadText) return "";
+        try {
+            return findEmote(JSON.parse(payloadText));
+        } catch (error) {
+            return "";
+        }
+    }
+
+    function withPayloadEmote(text, payloadText) {
+        const cleanText = String(text || "").trim();
+        const emote = payloadEmote(payloadText);
+        if (!emote || !cleanText || cleanText.includes(emote)) return cleanText;
+        return `${emote} ${cleanText}`;
+    }
+
+    function readablePayloadValue(value) {
+        if (!value) return "";
+        if (typeof value === "string") return value.trim();
+        if (Array.isArray(value)) {
+            return value.map(readablePayloadValue).filter(Boolean).join("\n");
+        }
+        if (typeof value !== "object") return "";
+
+        for (const key of ["chat", "message", "text", "content", "answer", "response", "output", "transcript"]) {
+            const text = readablePayloadValue(value[key]);
+            if (text) return text;
+        }
+        for (const key of ["result", "data", "payload"]) {
+            const nested = value[key];
+            if (nested && typeof nested === "object") {
+                const text = readablePayloadValue(nested);
+                if (text) return text;
+            }
+        }
+        return "";
+    }
+
+    function readablePayloadText(payloadText) {
+        const raw = String(payloadText || "").trim();
+        if (!raw || raw === "{}" || raw === "[]") return "";
+        try {
+            return readablePayloadValue(JSON.parse(raw));
+        } catch (error) {
+            if (raw.startsWith("{") || raw.startsWith("[")) return "";
+            return raw;
+        }
+    }
+
+    function renderMcpStatus(status = mcpStatus) {
+        mcpStatus = status || {};
+        const pill = document.getElementById("mcpStatusPill");
+        const text = document.getElementById("mcpStatusText");
+        const alert = document.getElementById("mcpTokenAlert");
+        const tokenText = document.getElementById("mcpTokenText");
+        const tokenPreview = document.getElementById("chatTokenPreview");
+        const connected = Boolean(mcpStatus.connected);
+        const saved = Boolean(mcpStatus.tokenSaved);
+        const preview = mcpStatus.tokenPreview || "-";
+
+        if (pill) {
+            pill.classList.toggle("is-online", connected);
+            pill.classList.toggle("is-offline", !saved);
+        }
+        if (text) text.textContent = mcpStatus.statusText || (saved ? "Endpoint tersimpan" : "Endpoint MCP belum tersimpan");
+        if (tokenPreview) tokenPreview.textContent = preview;
+        if (alert) {
+            alert.className = `app-alert ${connected ? "app-alert-success" : (saved ? "app-alert-info" : "app-alert-warning")}`;
+        }
+        if (tokenText) {
+            tokenText.textContent = saved
+                ? `Token MCP: ${preview}. Riwayat di bawah difilter untuk token ini.`
+                : "Simpan endpoint MCP di dashboard agar riwayat chat dari Xiaozhi bisa tampil di sini.";
+        }
+    }
+
+    function renderStats(stats) {
+        if (!stats) return;
+        document.getElementById("statTotal").textContent = stats.total ?? 0;
+        document.getElementById("statTranscript").textContent = stats.transcript ?? 0;
+        document.getElementById("statTool").textContent = stats.tool ?? 0;
+        document.getElementById("statShown").textContent = histories.length;
+    }
+
+    function renderSessionList() {
+        const list = document.getElementById("chatSessionList");
+        if (!histories.length) {
+            const emptyText = mcpStatus.tokenSaved
+                ? "Belum ada riwayat untuk token ini."
+                : "Endpoint MCP belum tersimpan.";
+            list.innerHTML = `<div class="p-5 text-center text-sm font-semibold text-slate-500">${escapeHtml(emptyText)}</div>`;
+            return;
+        }
+        list.innerHTML = histories.map((item) => {
+            const id = Number(item.id);
+            const active = id === selectedHistoryId ? "is-active" : "";
+            return `
+                <button type="button" class="chat-session-item ${active}" data-history-id="${id}">
+                    <span class="chat-session-title">${escapeHtml(historyTitle(item))}</span>
+                    <span class="chat-session-meta">${escapeHtml(historyKind(item))} &middot; ${escapeHtml(formatDateTime(item.created_at))}</span>
+                </button>
+            `;
+        }).join("");
+        list.querySelectorAll("[data-history-id]").forEach((button) => {
+            button.addEventListener("click", () => {
+                selectedHistoryId = Number(button.dataset.historyId);
+                renderSessionList();
+                renderThread();
+            });
+        });
+    }
+
+    function renderMessageBubble(role, value, variant, createdAt, options = {}) {
+        if (!value) return "";
+        const footer = options.footer
+            ? `<div class="chat-message-footer">${escapeHtml(options.footer)}</div>`
+            : "";
+        return `
+            <div class="chat-message-row">
+                <article class="chat-message-bubble chat-message-${escapeHtml(variant)}">
+                    <div class="chat-message-meta">
+                        <span class="chat-speaker">${escapeHtml(role)}</span>
+                        <time class="chat-timestamp">${escapeHtml(formatFullTimestamp(createdAt))}</time>
+                    </div>
+                    <div class="chat-message-content">${escapeHtml(value)}</div>
+                    ${footer}
+                </article>
+            </div>
+        `;
+    }
+
+    function renderToolBubble(item) {
+        const toolText = readablePayloadText(item.response_payload) || readablePayloadText(item.request_payload);
+        if (!toolText) return "";
+        return renderMessageBubble(
+            "Tool",
+            toolText,
+            "tool",
+            item.created_at,
+        );
+    }
+
+    function renderHistoryMessages(item) {
+        const messages = [];
+        const userText = withPayloadEmote(item.user_message, item.request_payload);
+        const aiText = withPayloadEmote(item.xiaozhi_answer, item.response_payload);
+        messages.push(renderMessageBubble("User", userText, "user", item.created_at));
+        if (item.source !== "chat_transcript" || (!item.user_message && !item.xiaozhi_answer)) {
+            messages.push(renderToolBubble(item));
+        }
+        messages.push(renderMessageBubble(
+            "AI",
+            aiText,
+            "ai",
+            item.created_at,
+            { footer: "Content generated by AI (deepseek)" },
+        ));
+        return messages.filter(Boolean).join("");
+    }
+
+    function renderThread() {
+        const item = histories.find((entry) => Number(entry.id) === selectedHistoryId);
+        const body = document.getElementById("chatThreadBody");
+        if (!item) {
+            document.getElementById("threadTitle").textContent = "Pilih riwayat";
+            document.getElementById("threadMeta").textContent = mcpStatus.tokenSaved
+                ? "Riwayat terbaru dari token MCP ini akan masuk otomatis."
+                : "Simpan endpoint MCP lebih dulu.";
+            body.innerHTML = `
+                <div class="chat-empty">
+                    <div>
+                        <p class="text-base font-bold text-slate-800">${mcpStatus.tokenSaved ? "Belum ada percakapan dipilih." : "Endpoint MCP belum aktif."}</p>
+                        <p class="mt-2 text-sm">${mcpStatus.tokenSaved ? "Klik salah satu riwayat di sisi kiri." : "Buka dashboard untuk menyimpan endpoint Xiaozhi."}</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        document.getElementById("threadTitle").textContent = historyTitle(item);
+        document.getElementById("threadBadge").textContent = item.tool_name || historyKind(item);
+        document.getElementById("threadMeta").textContent = `${historyKind(item)} - ${formatFullTimestamp(item.created_at)}`;
+        const messagesHtml = renderHistoryMessages(item);
+        body.innerHTML = `
+            ${messagesHtml || `
+                <div class="chat-empty">
+                    <div>
+                        <p class="text-base font-bold text-slate-800">Riwayat ini belum punya isi chat.</p>
+                        <p class="mt-2 text-sm">Detail akan muncul saat MCP mengirim user, tool, atau AI message.</p>
+                    </div>
+                </div>
+            `}
+        `;
+        body.scrollTop = body.scrollHeight;
+    }
+
+    function mergeNewItems(items) {
+        if (!Array.isArray(items) || !items.length) return false;
+        const byId = new Map(histories.map((item) => [Number(item.id), item]));
+        let changed = false;
+        let newestId = 0;
+        items.forEach((item) => {
+            const id = Number(item.id || 0);
+            const existing = byId.get(id);
+            if (!existing || JSON.stringify(existing) !== JSON.stringify(item)) {
+                byId.set(id, item);
+                changed = true;
+            }
+            if (!existing && id > newestId) newestId = id;
+        });
+        if (!changed) return false;
+        histories = Array.from(byId.values()).sort((a, b) => Number(b.id || 0) - Number(a.id || 0)).slice(0, Number(activeLimit || 100));
+        maxHistoryId = Math.max(maxHistoryId, ...items.map((item) => Number(item.id || 0)));
+        if (newestId) selectedHistoryId = newestId;
+        return true;
+    }
+
+    async function pollChatHistory() {
+        try {
+            const params = new URLSearchParams({
+                after_id: String(maxHistoryId),
+                q: activeQuery || "",
+                limit: String(activeLimit || 100),
+            });
+            const response = await fetch(`/api/chat-history?${params.toString()}`, {
+                headers: { "Accept": "application/json" },
+                credentials: "same-origin",
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) return;
+            if (payload.mcp_status) {
+                renderMcpStatus(payload.mcp_status);
+                if (!histories.length) {
+                    renderSessionList();
+                    renderThread();
+                }
+            }
+            renderStats(payload.stats);
+            if (mergeNewItems(payload.items)) {
+                renderSessionList();
+                renderThread();
+            }
+        } catch (error) {
+            // Keep the realtime loop quiet; the next tick can recover.
+        }
+    }
+
+    renderMcpStatus();
+    renderSessionList();
+    renderThread();
+    window.setInterval(pollChatHistory, 1000);
+</script>
+{% endblock %}

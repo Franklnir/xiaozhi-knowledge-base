@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .admin-user-table th { white-space: nowrap; }
+    .admin-user-table td { vertical-align: middle; }
+    .limit-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .limit-badge-ok { background: #ecfdf5; color: #047857; }
+    .limit-badge-warn { background: #fef3c7; color: #b45309; }
+    .limit-badge-full { background: #fee2e2; color: #dc2626; }
+    .edit-limits-panel { display: none; margin-top: 12px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .edit-limits-panel.active { display: block; }
+    .limit-edit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    @media (max-width: 768px) { .limit-edit-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+
+<div class="app-page">
+    <header class="app-page-header">
+        <div>
+            <p class="app-eyebrow">Panel Admin</p>
+            <h1 class="app-title">Manajemen User</h1>
+            <p class="app-subtitle">Kelola akun user, batas penggunaan, dan fitur.</p>
+        </div>
+        <div class="app-status-pill is-online">
+            <span class="app-status-dot"></span>
+            {{ totals.users }} user
+        </div>
+    </header>
+
+    {% if message %}
+    <div class="app-alert app-alert-info">{{ message }}</div>
+    {% endif %}
+
+    <section class="app-stat-grid">
+        <div class="app-stat-card">
+            <p class="app-stat-label">Total User</p>
+            <p class="app-stat-value">{{ totals.users }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Total Materi</p>
+            <p class="app-stat-value">{{ totals.materials }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">API Realtime</p>
+            <p class="app-stat-value">{{ totals.live_apis }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Perangkat Relay</p>
+            <p class="app-stat-value">{{ totals.relay_rooms }}</p>
+        </div>
+    </section>
+
+    <section class="app-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+            <h2 class="app-section-title" style="margin:0">Daftar User</h2>
+            <input type="search" id="adminUserSearch" class="app-input" style="max-width:280px" placeholder="Cari username...">
+        </div>
+
+        <div class="app-table-wrap">
+            <table class="app-table admin-user-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px">ID</th>
+                        <th>Username</th>
+                        <th>MCP</th>
+                        <th>Materi</th>
+                        <th>API</th>
+                        <th>Relay</th>
+                        <th>Fitur</th>
+                        <th style="width:100px">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in managed_users %}
+                    <tr class="admin-user-row" data-search="{{ (item.username ~ ' ' ~ item.id)|lower|e }}" data-user-id="{{ item.id }}">
+                        <td><span class="app-table-subtext">{{ item.id }}</span></td>
+                        <td>
+                            <span class="app-table-title">{{ item.username }}</span>
+                            {% if item.created_at %}
+                            <br><span class="app-table-subtext">{{ item.created_at[:10] }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.mcp_status.connected %}
+                            <span class="app-chip app-chip-small app-chip-success">Online</span>
+                            {% elif item.mcp_status.has_token %}
+                            <span class="app-chip app-chip-small app-chip-info">Stored</span>
+                            {% else %}
+                            <span class="app-chip app-chip-small app-chip-neutral">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="limit-badge {% if item.usage.materials >= item.limits.max_materials and item.limits.max_materials > 0 %}limit-badge-full{% else %}limit-badge-ok{% endif %}">
+                                {{ item.usage.materials }}/{{ item.limits.max_materials if item.limits.max_materials > 0 else '&#8734;' }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="limit-badge {% if item.usage.live_apis >= item.limits.max_live_apis and item.limits.max_live_apis > 0 %}limit-badge-full{% else %}limit-badge-ok{% endif %}">
+                                {{ item.usage.live_apis }}/{{ item.limits.max_live_apis if item.limits.max_live_apis > 0 else '&#8734;' }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="limit-badge {% if item.usage.relay_rooms >= item.limits.max_relay_rooms and item.limits.max_relay_rooms > 0 %}limit-badge-full{% else %}limit-badge-ok{% endif %}">
+                                {{ item.usage.relay_rooms }}/{{ item.limits.max_relay_rooms if item.limits.max_relay_rooms > 0 else '&#8734;' }}
+                            </span>
+                        </td>
+                        <td>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+                                <input type="checkbox"
+                                    {% if item.features.youtube_music %}checked{% endif %}
+                                    onchange="toggleFeature({{ item.id }}, 'youtube_music', this.checked)"
+                                    style="width:14px;height:14px;cursor:pointer">
+                                <span>YouTube</span>
+                            </label>
+                        </td>
+                        <td>
+                            <button type="button" class="app-button app-button-small" onclick="toggleEdit({{ item.id }})">Edit</button>
+                        </td>
+                    </tr>
+                    <tr id="edit-{{ item.id }}" class="edit-limits-row" style="display:none">
+                        <td colspan="8">
+                            <form action="/admin/users/{{ item.id }}/limits" method="POST" style="padding:8px 0">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <div class="limit-edit-grid">
+                                    <label>
+                                        <span class="app-label">Total Materi</span>
+                                        <input class="app-input" type="number" name="max_materials" min="0" value="{{ item.limits.max_materials }}">
+                                    </label>
+                                    <label>
+                                        <span class="app-label">Kata/Materi</span>
+                                        <input class="app-input" type="number" name="max_words_per_material" min="0" value="{{ item.limits.max_words_per_material }}">
+                                    </label>
+                                    <label>
+                                        <span class="app-label">API Realtime</span>
+                                        <input class="app-input" type="number" name="max_live_apis" min="0" value="{{ item.limits.max_live_apis }}">
+                                    </label>
+                                    <label>
+                                        <span class="app-label">Perangkat Relay</span>
+                                        <input class="app-input" type="number" name="max_relay_rooms" min="0" value="{{ item.limits.max_relay_rooms }}">
+                                    </label>
+                                </div>
+                                <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+                                    <button type="button" class="app-button app-button-small" onclick="toggleEdit({{ item.id }})">Batal</button>
+                                    <button type="submit" class="app-button app-button-primary app-button-small">Simpan</button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr id="adminEmptyRow">
+                        <td colspan="8" class="py-10 text-center text-sm text-slate-500">Belum ada user terdaftar.</td>
+                    </tr>
+                    {% endfor %}
+                    {% if managed_users %}
+                    <tr id="adminNoMatchRow" class="hidden">
+                        <td colspan="8" class="py-10 text-center text-sm text-slate-500">User tidak ditemukan.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<script>
+    function toggleEdit(userId) {
+        const row = document.getElementById('edit-' + userId);
+        if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+    }
+
+    async function toggleFeature(userId, feature, enabled) {
+        const csrf = document.querySelector('input[name="csrf_token"]').value;
+        const fd = new FormData();
+        fd.append("csrf_token", csrf);
+        fd.append("feature", feature);
+        fd.append("enabled", enabled ? "true" : "false");
+        try {
+            const r = await fetch(`/admin/users/${userId}/feature`, {method:"POST", body:fd, credentials:"same-origin"});
+            const d = await r.json();
+            if (!d.success) alert(d.detail || "Gagal");
+        } catch(e) { alert("Error: " + e.message); }
+    }
+
+    const searchInput = document.getElementById("adminUserSearch");
+    const userRows = Array.from(document.querySelectorAll(".admin-user-row"));
+    const editRows = Array.from(document.querySelectorAll(".edit-limits-row"));
+    const noMatchRow = document.getElementById("adminNoMatchRow");
+
+    function filterUsers() {
+        const q = (searchInput?.value || "").trim().toLowerCase();
+        let visible = 0;
+        userRows.forEach((row) => {
+            const userId = row.dataset.userId;
+            const match = !q || row.dataset.search.includes(q);
+            row.style.display = match ? "" : "none";
+            const editRow = document.getElementById("edit-" + userId);
+            if (editRow && !match) editRow.style.display = "none";
+            if (match) visible++;
+        });
+        if (noMatchRow) noMatchRow.classList.toggle("hidden", visible !== 0);
+    }
+
+    if (searchInput) searchInput.addEventListener("input", filterUsers);
+</script>
+{% endblock %}

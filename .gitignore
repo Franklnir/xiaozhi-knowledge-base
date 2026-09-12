@@ -1,0 +1,10 @@
+.env
+.hf_db_cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+.commandcode/
+data/
+*.db
+*.db-shm
+*.db-wal
