@@ -93,6 +93,7 @@
         margin-bottom: 16px;
         border-bottom: 1px solid var(--app-border);
         padding-bottom: 8px;
+        flex-wrap: wrap;
     }
     .doc-tab {
         padding: 8px 16px;
@@ -119,6 +120,25 @@
     .doc-tab-content.active {
         display: block;
     }
+    .tool-card {
+        padding: 14px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+        margin-bottom: 12px;
+    }
+    .tool-name {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--app-accent);
+        font-family: monospace;
+    }
+    .tool-desc {
+        font-size: 13px;
+        color: var(--app-muted);
+        margin-top: 6px;
+        line-height: 1.5;
+    }
 </style>
 
 <div class="app-page">
@@ -135,6 +155,8 @@
         <button class="doc-tab active" onclick="switchTab('mcp')">MCP Setup</button>
         <button class="doc-tab" onclick="switchTab('youtube')">YouTube Music</button>
         <button class="doc-tab" onclick="switchTab('smarthome')">Smart Home</button>
+        <button class="doc-tab" onclick="switchTab('tools')">Tools MCP</button>
+        <button class="doc-tab" onclick="switchTab('knowledge')">Knowledge Base</button>
         <button class="doc-tab" onclick="switchTab('faq')">FAQ</button>
     </div>
 
@@ -146,7 +168,7 @@
                     <span>🔌</span> Apa itu MCP?
                 </div>
                 <p class="doc-step-desc">
-                    MCP (Model Context Protocol) adalah protokol yang menghubungkan asisten suara XiaoZhi dengan knowledge base EduSmart. 
+                    MCP (Model Context Protocol) adalah protokol yang menghubungkan asisten suara XiaoZhi dengan knowledge base Xiaozhi Indonesia. 
                     Dengan MCP, XiaoZhi bisa membaca materi, mengontrol smarthome, memutar lagu, dan lainnya.
                 </p>
             </div>
@@ -186,9 +208,9 @@
                 <div class="doc-step">
                     <div class="doc-step-number">3</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Tempel di Dashboard EduSmart</div>
+                        <div class="doc-step-title">Tempel di Dashboard Xiaozhi Indonesia</div>
                         <div class="doc-step-desc">
-                            Kembali ke halaman <strong>Dashboard</strong> EduSmart.<br>
+                            Kembali ke halaman <strong>Dashboard</strong> Xiaozhi Indonesia.<br>
                             Cari bagian <strong>"Koneksi XiaoZhi"</strong> di sidebar kanan.<br>
                             Tempel URL MCP yang sudah disalin, lalu klik <strong>"Simpan"</strong>.
                         </div>
@@ -213,7 +235,7 @@
                         <div class="doc-step-desc">
                             Kembali ke <a href="https://xiaozhi.me" class="doc-link" target="_blank">https://xiaozhi.me</a>.<br>
                             Cek apakah status MCP sudah <strong>"Online"</strong> atau <strong>"Terhubung"</strong>.<br>
-                            Jika sudah, XiaoZhi sudah bisa membaca data dari EduSmart!
+                            Jika sudah, XiaoZhi sudah bisa membaca data dari Xiaozhi Indonesia!
                         </div>
                     </div>
                 </div>
@@ -242,24 +264,25 @@
         <div class="app-card">
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🎵</span> Setup Putar Lagu YouTube di ESP32
+                    <span>🎵</span> Cara Kerja YouTube Music
                 </div>
                 <p class="doc-step-desc">
-                    Kamu bisa meminta XiaoZhi memutar lagu dari YouTube. Audio akan diputar melalui speaker ESP32.
+                    Fitur YouTube Music memungkinkan XiaoZhi mencari dan memutar lagu dari YouTube. 
+                    Audio akan di-stream langsung ke perangkat ESP32 yang terhubung ke speaker.
                 </p>
             </div>
 
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>📋</span> Persiapan
+                    <span>⚙️</span> Cara Kerja Teknis
                 </div>
 
                 <div class="doc-step">
                     <div class="doc-step-number">1</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Pastikan MCP Terhubung</div>
+                        <div class="doc-step-title">User Minta Lagu via Suara</div>
                         <div class="doc-step-desc">
-                            Sebelum bisa memutar lagu, pastikan koneksi MCP sudah <strong>Online</strong> di Dashboard.
+                            Kamu katakan ke XiaoZhi: <em>"Putar lagu Bohemian Rhapsody"</em>
                         </div>
                     </div>
                 </div>
@@ -267,9 +290,9 @@
                 <div class="doc-step">
                     <div class="doc-step-number">2</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Aktifkan Fitur YouTube</div>
+                        <div class="doc-step-title">XiaoZhi Panggil Tool MCP</div>
                         <div class="doc-step-desc">
-                            Di Dashboard, pastikan toggle <strong>"YouTube Music"</strong> dalam keadaan <strong>aktif</strong> (centang hijau).
+                            XiaoZhi akan memanggil tool <code>play_youtube_song</code> dengan query pencarian.
                         </div>
                     </div>
                 </div>
@@ -277,100 +300,100 @@
                 <div class="doc-step">
                     <div class="doc-step-number">3</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">ESP32 Harus Terhubung</div>
+                        <div class="doc-step-title">Sistem Cari di YouTube</div>
                         <div class="doc-step-desc">
-                            Pastikan ESP32/audio player sudah terhubung ke internet dan terdaftar di sistem.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="doc-section">
-                <div class="doc-section-title">
-                    <span>🎤</span> Cara Memutar Lagu
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-number">1</div>
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Gunakan Perintah Suara</div>
-                        <div class="doc-step-desc">
-                            Katakan ke XiaoZhi:<br>
-                            <em>"Putar lagu [judul lagu]"</em><br>
-                            <em>"Mainkan musik lofi"</em><br>
-                            <em>"Cari lagu Bohemian Rhapsody"</em>
+                            Sistem menggunakan <code>yt-dlp</code> untuk mencari lagu dan mendapatkan URL audio stream.
                         </div>
                     </div>
                 </div>
 
                 <div class="doc-step">
-                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-number">4</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">XiaoZhi Akan Mencari</div>
+                        <div class="doc-step-title">Audio Di-queue ke ESP32</div>
                         <div class="doc-step-desc">
-                            XiaoZhi akan mencari lagu di YouTube dan menampilkan hasilnya.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-number">3</div>
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Audio Diputar di ESP32</div>
-                        <div class="doc-step-desc">
-                            Audio akan otomatis diputar melalui speaker ESP32 yang terhubung.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="doc-section">
-                <div class="doc-section-title">
-                    <span>📝</span> Konfigurasi Firmware ESP32
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-number">1</div>
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Download Firmware</div>
-                        <div class="doc-step-desc">
-                            Download file <code>esp32_youtube_player.ino</code> dari repository.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-number">2</div>
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Edit Konfigurasi WiFi</div>
-                        <div class="doc-step-desc">
-                            Buka file dan edit bagian WiFi:
+                            URL audio stream dikirim ke ESP32 melalui endpoint API polling.
                         </div>
                         <div class="doc-code">
-                            const char* ssid = "NAMA_WIFI_KAMU";<br>
-                            const char* password = "PASSWORD_WIFI";
+                            Endpoint: GET /api/audio/commands/{device_id}<br>
+                            Response: { "title": "...", "stream_url": "https://..." }
                         </div>
                     </div>
                 </div>
 
                 <div class="doc-step">
-                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-number">5</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Upload ke ESP32</div>
+                        <div class="doc-step-title">ESP32 Putar Audio</div>
                         <div class="doc-step-desc">
-                            Upload firmware menggunakan Arduino IDE atau PlatformIO.
+                            ESP32 mengambil audio dari URL stream dan memutarnya melalui speaker.
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="doc-warning">
-                <strong>⚠️ Catatan Penting:</strong>
-                <ul style="margin:8px 0 0 20px">
-                    <li>ESP32 harus terhubung ke WiFi yang sama dengan server</li>
-                    <li>Speaker harus terhubung ke ESP32</li>
-                    <li>Pastikan fitur YouTube aktif di Dashboard</li>
-                </ul>
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📡</span> Endpoint API untuk Firmware ESP32
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Polling Perintah Audio</div>
+                        <div class="doc-desc">
+                            ESP32 harus melakukan polling ke endpoint ini untuk mengecek apakah ada perintah audio baru:
+                        </div>
+                        <div class="doc-code">
+                            GET /api/audio/commands/{device_id}<br><br>
+                            Response:<br>
+                            {<br>
+                            &nbsp;&nbsp;"commands": [<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;{<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 123,<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"title": "Lagu Title",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"stream_url": "https://...",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"video_url": "https://youtube.com/...",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"duration": "3:45"<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                            &nbsp;&nbsp;]<br>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Konfirmasi Audio Diputar</div>
+                        <div class="doc-desc">
+                            Setelah audio diputar, ESP32 harus mengirim konfirmasi:
+                        </div>
+                        <div class="doc-code">
+                            POST /api/audio/ack/{command_id}<br><br>
+                            Body: { "device_id": "esp32-xxx" }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📋</span> Persyaratan
+                </div>
+
+                <div class="doc-warning">
+                    <strong>Fitur YouTube Music harus diaktifkan oleh admin.</strong><br>
+                    Hubungi admin jika fitur ini belum aktif di akun kamu.
+                </div>
+
+                <div class="doc-tip">
+                    <strong>💡 Tips:</strong>
+                    <ul style="margin:8px 0 0 20px">
+                        <li>Pastikan MCP dalam status <strong>Online</strong></li>
+                        <li>Pastikan ESP32 terdaftar dan terhubung</li>
+                        <li>Pastikan speaker terhubung ke ESP32</li>
+                        <li>Gunakan perintah yang jelas: <em>"Putar lagu [judul]"</em></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -496,6 +519,329 @@
         </div>
     </div>
 
+    <!-- Tools MCP Tab -->
+    <div id="tab-tools" class="doc-tab-content">
+        <div class="app-card">
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🔧</span> Daftar Tools MCP
+                </div>
+                <p class="doc-step-desc">
+                    Berikut adalah daftar tools yang tersedia di MCP. Tools ini dipanggil oleh XiaoZhi saat menjawab pertanyaan kamu.
+                </p>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📚</span> Tools Knowledge Base
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">search_course_materials</div>
+                    <div class="tool-desc">
+                        Mencari materi berdasarkan kata kunci. Digunakan saat kamu bertanya tentang materi perkuliahan, tugas, jadwal, atau data API realtime.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">read_live_api_data</div>
+                    <div class="tool-desc">
+                        Membaca data API realtime terbaru (cuaca, suhu, sensor, dll). Digunakan saat kamu bertanya tentang data yang berubah-ubah.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">read_material_database</div>
+                    <div class="tool-desc">
+                        Membaca daftar materi dari database. Digunakan untuk melihat semua materi yang tersimpan.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">read_material_detail</div>
+                    <div class="tool-desc">
+                        Membaca satu materi secara lengkap berdasarkan ID atau judul. Digunakan saat kamu ingin tahu detail isi materi.
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🏠</span> Tools Smart Home
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">control_relay</div>
+                    <div class="tool-desc">
+                        Mengontrol relay berdasarkan nomor channel (1-8). Digunakan untuk menyalakan/mematikan perangkat tertentu.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">control_smart_home_room</div>
+                    <div class="tool-desc">
+                        Mengontrol perangkat berdasarkan nama ruangan. Lebih mudah digunakan karena tidak perlu tahu nomor channel.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">get_relay_status</div>
+                    <div class="tool-desc">
+                        Membaca status semua relay. Digunakan untuk mengetahui perangkat mana yang sedang menyala atau mati.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">all_relays_on / all_relays_off</div>
+                    <div class="tool-desc">
+                        Menyalakan atau mematikan semua perangkat sekaligus.
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>⚡</span> Tools Relay Nyata (ESP32)
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">control_real_relay_by_voice</div>
+                    <div class="tool-desc">
+                        Mengontrol relay fisik ESP32 berdasarkan perintah suara. Digunakan untuk perangkat nyata yang terhubung ke ESP32.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">get_real_relay_status</div>
+                    <div class="tool-desc">
+                        Membaca status relay fisik ESP32.
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🎵</span> Tools Multimedia
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">play_youtube_song</div>
+                    <div class="tool-desc">
+                        Mencari lagu di YouTube dan mengirim audio stream ke ESP32. Digunakan saat kamu minta diputar lagu.
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🌐</span> Tools Web & Utilitas
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">search_web</div>
+                    <div class="tool-desc">
+                        Mencari informasi dari internet menggunakan Google News. Digunakan untuk pertanyaan umum yang butuh data terkini.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">search_news</div>
+                    <div class="tool-desc">
+                        Mencari berita terkini dari Indonesia. Digunakan saat kamu ingin tahu berita terbaru.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">set_reminder</div>
+                    <div class="tool-desc">
+                        Membuat pengingat/alarm. Digunakan saat kamu minta diingatkan sesuatu pada waktu tertentu.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">calculate</div>
+                    <div class="tool-desc">
+                        Menghitung ekspresi matematika. Digunakan untuk hitung-hitungan, konversi, atau operasi matematika.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">translate_text</div>
+                    <div class="tool-desc">
+                        Menerjemahkan teks ke bahasa lain. Digunakan saat kamu minta terjemahan.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">save_chat_history</div>
+                    <div class="tool-desc">
+                        Menyimpan riwayat chat. Dipanggil otomatis untuk menyimpan percakapan.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Knowledge Base Tab -->
+    <div id="tab-knowledge" class="doc-tab-content">
+        <div class="app-card">
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📖</span> Apa itu Knowledge Base?
+                </div>
+                <p class="doc-step-desc">
+                    Knowledge Base adalah database materi yang bisa dibaca oleh XiaoZhi. 
+                    Kamu bisa menyimpan materi perkuliahan, tugas, catatan, jadwal, dan data API realtime.
+                    Saat kamu bertanya ke XiaoZhi, dia akan mencari jawaban dari knowledge base ini.
+                </p>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📋</span> Jenis Materi
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Materi Perkuliahan</div>
+                        <div class="doc-step-desc">
+                            Materi kuliah, modul, atau bahan belajar. Bisa berupa teks panjang yang dipecah per topik.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Tugas Mahasiswa</div>
+                        <div class="doc-step-desc">
+                            Daftar tugas, deadline, dan instruksi pengerjaan.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Catatan Dosen</div>
+                        <div class="doc-step-desc">
+                            Catatan penting dari dosen atau pengumuman resmi.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Jadwal Kuliah</div>
+                        <div class="doc-step-desc">
+                            Jadwal perkuliahan, ujian, atau kegiatan akademik.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Pengumuman & Info</div>
+                        <div class="doc-step-desc">
+                            Pengumuman umum, informasi penting, atau berita kampus.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Data dari API (Realtime)</div>
+                        <div class="doc-step-desc">
+                            Data yang diambil dari API eksternal seperti cuaca, suhu, harga, dll. Data ini bersifat realtime dan selalu diperbarui.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>➕</span> Cara Menambah Materi
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Buka Dashboard</div>
+                        <div class="doc-step-desc">
+                            Klik menu <strong>"Dashboard"</strong> di sidebar.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Klik "Tambah Materi"</div>
+                        <div class="doc-step-desc">
+                            Klik tombol <strong>"+ Tambah Materi"</strong> di bagian atas.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Isi Form</div>
+                        <div class="doc-step-desc">
+                            <ul style="margin:0 0 0 20px">
+                                <li><strong>Judul:</strong> Nama materi</li>
+                                <li><strong>Kategori:</strong> Pilih kategori yang sesuai</li>
+                                <li><strong>Konten:</strong> Isi materi (bisa teks panjang)</li>
+                                <li><strong>Keywords:</strong> Kata kunci untuk pencarian</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">4</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Simpan</div>
+                        <div class="doc-step-desc">
+                            Klik tombol <strong>"Simpan"</strong>. Materi akan langsung tersedia untuk dibaca oleh XiaoZhi.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🔍</span> Cara XiaoZhi Membaca Materi
+                </div>
+                <p class="doc-step-desc">
+                    Saat kamu bertanya ke XiaoZhi, dia akan:
+                </p>
+                <ol style="margin:8px 0 0 20px; font-size:13px; color:var(--app-muted); line-height:1.8">
+                    <li>Menerima pertanyaan dari kamu</li>
+                    <li>Memanggil tool <code>search_course_materials</code> atau <code>read_material_database</code></li>
+                    <li>Mencari materi yang relevan di database</li>
+                    <li>Membaca isi materi yang ditemukan</li>
+                    <li>Menjawab pertanyaan berdasarkan isi materi</li>
+                </ol>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>💡</span> Tips Menulis Materi
+                </div>
+
+                <div class="doc-tip">
+                    <strong>Agar XiaoZhi bisa menjawab dengan akurat:</strong>
+                    <ul style="margin:8px 0 0 20px">
+                        <li>Gunakan judul yang jelas dan deskriptif</li>
+                        <li>Tambahkan keywords yang relevan</li>
+                        <li>Gunakan format yang terstruktur (heading, list)</li>
+                        <li>Pecah materi panjang menjadi beberapa bagian</li>
+                        <li>Hindari singkatan yang tidak umum</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- FAQ Tab -->
     <div id="tab-faq" class="doc-tab-content">
         <div class="app-card">
@@ -520,7 +866,7 @@
                         <div class="doc-step-desc">
                             <strong>A:</strong> Periksa:
                             <ul style="margin:8px 0 0 20px">
-                                <li>Fitur YouTube aktif di Dashboard</li>
+                                <li>Fitur YouTube harus diaktifkan oleh admin</li>
                                 <li>ESP32 terhubung ke WiFi</li>
                                 <li>Speaker terhubung ke ESP32</li>
                                 <li>MCP dalam status Online</li>
@@ -547,8 +893,7 @@
                     <div class="doc-step-content">
                         <div class="doc-step-title">Q: Berapa banyak materi yang bisa disimpan?</div>
                         <div class="doc-step-desc">
-                            <strong>A:</strong> Tergantung batas yang ditetapkan admin. 
-                            Default: <strong>3 materi</strong>, maksimal <strong>6000 kata</strong> per materi. 
+                            <strong>A:</strong> Tergantung batas yang ditetapkan. 
                             Hubungi admin jika butuh kapasitas lebih.
                         </div>
                     </div>
@@ -573,20 +918,12 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="doc-section">
-                <div class="doc-section-title">
-                    <span>🆘</span> Butuh Bantuan?
-                </div>
                 <div class="doc-step">
                     <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Bagaimana cara menghubungi admin?</div>
                         <div class="doc-step-desc">
-                            Jika mengalami masalah yang tidak tercantum di sini, hubungi admin melalui:
-                            <ul style="margin:8px 0 0 20px">
-                                <li>Chat langsung di aplikasi</li>
-                                <li>Hubungi admin melalui kontak yang tersedia</li>
-                            </ul>
+                            <strong>A:</strong> Hubungi admin melalui kontak yang tersedia di aplikasi atau melalui kontak resmi.
                         </div>
                     </div>
                 </div>
