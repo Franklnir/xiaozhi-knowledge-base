@@ -1,0 +1,614 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .doc-section {
+        margin-bottom: 24px;
+    }
+    .doc-section-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--app-text);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .doc-step {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 16px;
+        padding: 16px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+    }
+    .doc-step-number {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        background: var(--app-brand);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .doc-step-content {
+        flex: 1;
+    }
+    .doc-step-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--app-text);
+        margin-bottom: 6px;
+    }
+    .doc-step-desc {
+        font-size: 13px;
+        color: var(--app-muted);
+        line-height: 1.6;
+    }
+    .doc-code {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+        padding: 12px;
+        font-family: monospace;
+        font-size: 12px;
+        color: var(--app-text);
+        overflow-x: auto;
+        margin: 8px 0;
+    }
+    .doc-tip {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: var(--app-radius);
+        padding: 12px;
+        font-size: 13px;
+        color: #0369a1;
+        margin: 12px 0;
+    }
+    .doc-warning {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: var(--app-radius);
+        padding: 12px;
+        font-size: 13px;
+        color: #92400e;
+        margin: 12px 0;
+    }
+    .doc-link {
+        color: var(--app-sky);
+        text-decoration: underline;
+        font-weight: 600;
+    }
+    .doc-link:hover {
+        opacity: 0.8;
+    }
+    .doc-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid var(--app-border);
+        padding-bottom: 8px;
+    }
+    .doc-tab {
+        padding: 8px 16px;
+        border-radius: var(--app-radius) var(--app-radius) 0 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--app-muted);
+        cursor: pointer;
+        border: 1px solid transparent;
+        background: transparent;
+    }
+    .doc-tab:hover {
+        background: var(--app-soft);
+        color: var(--app-text);
+    }
+    .doc-tab.active {
+        background: var(--app-brand);
+        color: white;
+        border-color: var(--app-brand);
+    }
+    .doc-tab-content {
+        display: none;
+    }
+    .doc-tab-content.active {
+        display: block;
+    }
+</style>
+
+<div class="app-page">
+    <header class="app-page-header">
+        <div>
+            <p class="app-eyebrow">Panduan</p>
+            <h1 class="app-title">Dokumentasi Pengguna</h1>
+            <p class="app-subtitle">Panduan lengkap menggunakan Xiaozhi Indonesia.</p>
+        </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="doc-tabs">
+        <button class="doc-tab active" onclick="switchTab('mcp')">MCP Setup</button>
+        <button class="doc-tab" onclick="switchTab('youtube')">YouTube Music</button>
+        <button class="doc-tab" onclick="switchTab('smarthome')">Smart Home</button>
+        <button class="doc-tab" onclick="switchTab('faq')">FAQ</button>
+    </div>
+
+    <!-- MCP Setup Tab -->
+    <div id="tab-mcp" class="doc-tab-content active">
+        <div class="app-card">
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🔌</span> Apa itu MCP?
+                </div>
+                <p class="doc-step-desc">
+                    MCP (Model Context Protocol) adalah protokol yang menghubungkan asisten suara XiaoZhi dengan knowledge base EduSmart. 
+                    Dengan MCP, XiaoZhi bisa membaca materi, mengontrol smarthome, memutar lagu, dan lainnya.
+                </p>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📋</span> Langkah-Langkah Setup MCP
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Buka Website XiaoZhi</div>
+                        <div class="doc-step-desc">
+                            Kunjungi <a href="https://xiaozhi.me" class="doc-link" target="_blank">https://xiaozhi.me</a> dan login ke akun XiaoZhi kamu.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Ambil Token MCP</div>
+                        <div class="doc-step-desc">
+                            Di halaman XiaoZhi, cari menu <strong>"MCP Endpoint"</strong> atau <strong>"Koneksi MCP"</strong>.<br>
+                            Salin URL yang dimulai dengan <code>wss://</code>
+                        </div>
+                        <div class="doc-code">
+                            Contoh: wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1Ni...
+                        </div>
+                        <div class="doc-tip">
+                            <strong>💡 Tips:</strong> Pastikan menyalin URL LENGKAP, bukan hanya token-nya saja!
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Tempel di Dashboard EduSmart</div>
+                        <div class="doc-step-desc">
+                            Kembali ke halaman <strong>Dashboard</strong> EduSmart.<br>
+                            Cari bagian <strong>"Koneksi XiaoZhi"</strong> di sidebar kanan.<br>
+                            Tempel URL MCP yang sudah disalin, lalu klik <strong>"Simpan"</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">4</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Tunggu Koneksi</div>
+                        <div class="doc-step-desc">
+                            Setelah menyimpan, sistem akan mencoba menghubungkan ke XiaoZhi.<br>
+                            Tunggu beberapa detik hingga status berubah menjadi <strong>"Terhubung"</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">5</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Verifikasi di XiaoZhi</div>
+                        <div class="doc-step-desc">
+                            Kembali ke <a href="https://xiaozhi.me" class="doc-link" target="_blank">https://xiaozhi.me</a>.<br>
+                            Cek apakah status MCP sudah <strong>"Online"</strong> atau <strong>"Terhubung"</strong>.<br>
+                            Jika sudah, XiaoZhi sudah bisa membaca data dari EduSmart!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>⚠️</span> Troubleshooting MCP
+                </div>
+
+                <div class="doc-warning">
+                    <strong>Jika koneksi gagal:</strong>
+                    <ul style="margin:8px 0 0 20px">
+                        <li>Pastikan URL dimulai dengan <code>wss://</code></li>
+                        <li>Pastikan menyalin URL LENGKAP (bukan hanya token)</li>
+                        <li>Coba hapus dan simpan ulang token</li>
+                        <li>Periksa koneksi internet</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- YouTube Music Tab -->
+    <div id="tab-youtube" class="doc-tab-content">
+        <div class="app-card">
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🎵</span> Setup Putar Lagu YouTube di ESP32
+                </div>
+                <p class="doc-step-desc">
+                    Kamu bisa meminta XiaoZhi memutar lagu dari YouTube. Audio akan diputar melalui speaker ESP32.
+                </p>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📋</span> Persiapan
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Pastikan MCP Terhubung</div>
+                        <div class="doc-step-desc">
+                            Sebelum bisa memutar lagu, pastikan koneksi MCP sudah <strong>Online</strong> di Dashboard.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Aktifkan Fitur YouTube</div>
+                        <div class="doc-step-desc">
+                            Di Dashboard, pastikan toggle <strong>"YouTube Music"</strong> dalam keadaan <strong>aktif</strong> (centang hijau).
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">ESP32 Harus Terhubung</div>
+                        <div class="doc-step-desc">
+                            Pastikan ESP32/audio player sudah terhubung ke internet dan terdaftar di sistem.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🎤</span> Cara Memutar Lagu
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Gunakan Perintah Suara</div>
+                        <div class="doc-step-desc">
+                            Katakan ke XiaoZhi:<br>
+                            <em>"Putar lagu [judul lagu]"</em><br>
+                            <em>"Mainkan musik lofi"</em><br>
+                            <em>"Cari lagu Bohemian Rhapsody"</em>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">XiaoZhi Akan Mencari</div>
+                        <div class="doc-step-desc">
+                            XiaoZhi akan mencari lagu di YouTube dan menampilkan hasilnya.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Audio Diputar di ESP32</div>
+                        <div class="doc-step-desc">
+                            Audio akan otomatis diputar melalui speaker ESP32 yang terhubung.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📝</span> Konfigurasi Firmware ESP32
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Download Firmware</div>
+                        <div class="doc-step-desc">
+                            Download file <code>esp32_youtube_player.ino</code> dari repository.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Edit Konfigurasi WiFi</div>
+                        <div class="doc-step-desc">
+                            Buka file dan edit bagian WiFi:
+                        </div>
+                        <div class="doc-code">
+                            const char* ssid = "NAMA_WIFI_KAMU";<br>
+                            const char* password = "PASSWORD_WIFI";
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Upload ke ESP32</div>
+                        <div class="doc-step-desc">
+                            Upload firmware menggunakan Arduino IDE atau PlatformIO.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-warning">
+                <strong>⚠️ Catatan Penting:</strong>
+                <ul style="margin:8px 0 0 20px">
+                    <li>ESP32 harus terhubung ke WiFi yang sama dengan server</li>
+                    <li>Speaker harus terhubung ke ESP32</li>
+                    <li>Pastikan fitur YouTube aktif di Dashboard</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Smart Home Tab -->
+    <div id="tab-smarthome" class="doc-tab-content">
+        <div class="app-card">
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🏠</span> Smart Home Virtual
+                </div>
+                <p class="doc-step-desc">
+                    Smart Home Virtual adalah simulasi kontrol perangkat rumah menggunakan relay virtual. 
+                    Kamu bisa mengontrol lampu, AC, alarm, dll melalui perintah suara.
+                </p>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📋</span> Daftar Ruangan
+                </div>
+
+                <div class="app-table-wrap">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th>Channel</th>
+                                <th>Ruangan</th>
+                                <th>Perangkat</th>
+                                <th>Contoh Perintah</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>Ruang Tamu</td>
+                                <td>Lampu utama</td>
+                                <td><em>"Nyalakan lampu ruang tamu"</em></td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>Dapur</td>
+                                <td>Lampu dapur</td>
+                                <td><em>"Matikan lampu dapur"</em></td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>Kamar Mandi</td>
+                                <td>Lampu kamar mandi</td>
+                                <td><em>"Nyalakan lampu kamar mandi"</em></td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>Kamar Tidur Utama</td>
+                                <td>Lampu kamar utama</td>
+                                <td><em>"Matikan lampu kamar tidur"</em></td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td>Teras</td>
+                                <td>Lampu teras</td>
+                                <td><em>"Nyalakan lampu teras"</em></td>
+                            </tr>
+                            <tr>
+                                <td>6</td>
+                                <td>Basement</td>
+                                <td>Alarm</td>
+                                <td><em>"Nyalakan alarm"</em></td>
+                            </tr>
+                            <tr>
+                                <td>7</td>
+                                <td>Kamar Tidur 2</td>
+                                <td>Lampu kamar kedua</td>
+                                <td><em>"Matikan lampu kamar 2"</em></td>
+                            </tr>
+                            <tr>
+                                <td>8</td>
+                                <td>Ruang AC</td>
+                                <td>AC</td>
+                                <td><em>"Nyalakan AC"</em></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🎤</span> Contoh Perintah Suara
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-desc">
+                            <strong>Kontrol satu ruangan:</strong><br>
+                            <em>"Nyalakan lampu ruang tamu"</em><br>
+                            <em>"Matikan AC"</em><br>
+                            <em>"Hidupkan alarm"</em>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-desc">
+                            <strong>Kontrol semua perangkat:</strong><br>
+                            <em>"Nyalakan semua lampu"</em><br>
+                            <em>"Matikan semua perangkat"</em>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-desc">
+                            <strong>Cek status:</strong><br>
+                            <em>"Status smarthome"</em><br>
+                            <em>"Lampu mana yang menyala?"</em>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ Tab -->
+    <div id="tab-faq" class="doc-tab-content">
+        <div class="app-card">
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>❓</span> Pertanyaan Umum
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: XiaoZhi tidak bisa membaca materi saya?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Pastikan koneksi MCP sudah <strong>Online</strong> di Dashboard. 
+                            Jika belum, ulangi langkah setup MCP.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Lagu YouTube tidak bisa diputar?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Periksa:
+                            <ul style="margin:8px 0 0 20px">
+                                <li>Fitur YouTube aktif di Dashboard</li>
+                                <li>ESP32 terhubung ke WiFi</li>
+                                <li>Speaker terhubung ke ESP32</li>
+                                <li>MCP dalam status Online</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Smart home tidak merespons?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Pastikan:
+                            <ul style="margin:8px 0 0 20px">
+                                <li>MCP dalam status Online</li>
+                                <li>Perintah suara sesuai dengan nama ruangan</li>
+                                <li>Gunakan perintah yang jelas seperti "Nyalakan" atau "Matikan"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Berapa banyak materi yang bisa disimpan?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Tergantung batas yang ditetapkan admin. 
+                            Default: <strong>3 materi</strong>, maksimal <strong>6000 kata</strong> per materi. 
+                            Hubungi admin jika butuh kapasitas lebih.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Bagaimana cara mengubah tema?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Di sidebar bawah, ada dropdown <strong>"Tema"</strong>. 
+                            Pilih tema yang diinginkan: Neo Brutalism, Dark, atau Original.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Apakah data saya aman?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Ya! Semua data dienkripsi menggunakan Fernet encryption. 
+                            Token MCP disimpan dalam bentuk terenkripsi di database.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🆘</span> Butuh Bantuan?
+                </div>
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-desc">
+                            Jika mengalami masalah yang tidak tercantum di sini, hubungi admin melalui:
+                            <ul style="margin:8px 0 0 20px">
+                                <li>Chat langsung di aplikasi</li>
+                                <li>Hubungi admin melalui kontak yang tersedia</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchTab(tabName) {
+        // Hide all tab contents
+        document.querySelectorAll('.doc-tab-content').forEach(el => {
+            el.classList.remove('active');
+        });
+        // Deactivate all tabs
+        document.querySelectorAll('.doc-tab').forEach(el => {
+            el.classList.remove('active');
+        });
+        // Show selected tab content
+        document.getElementById('tab-' + tabName).classList.add('active');
+        // Activate clicked tab
+        event.target.classList.add('active');
+    }
+</script>
+{% endblock %}

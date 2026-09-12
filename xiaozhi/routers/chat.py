@@ -96,3 +96,18 @@ async def clear_chat_history(request: Request, csrf_token: str = Form(...)):
     validate_csrf(request, csrf_token, user)
     removed = store.clear_chat_history(user["id"])
     return redirect_with_message("/riwayat-chat", f"{removed} riwayat chat dihapus.")
+
+
+@router.get("/dokumentasi", response_class=HTMLResponse)
+async def documentation_page(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
+    return render(
+        request,
+        "documentation.html",
+        {
+            "user": user,
+            "active_page": "documentation",
+        },
+    )
