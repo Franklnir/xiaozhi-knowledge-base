@@ -966,6 +966,15 @@ class SQLiteStore:
         conn = self._get_conn()
         rows = conn.execute("SELECT * FROM users WHERE role != 'admin' ORDER BY username").fetchall()
         result = []
+
+        # Get all MCP connection states (import here to avoid circular import)
+        try:
+            from xiaozhi.services.mcp_service import mcp_connection_states, mcp_state_lock, mcp_bridge_tasks
+            with mcp_state_lock:
+                all_mcp_states = {int(uid): dict(state) for uid, state in mcp_connection_states.items()}
+        except ImportError:
+            all_mcp_states = {}
+
         for row in rows:
             user_id = row["id"]
             usage = {
@@ -978,6 +987,14 @@ class SQLiteStore:
             if limits_row:
                 limits_dict = dict(limits_row)
                 limits = {k: limits_dict.get(k, v) for k, v in USER_LIMIT_DEFAULTS.items()}
+
+            # Check MCP status from real-time connection states
+            mcp_state = all_mcp_states.get(user_id, {})
+            has_token = conn.execute("SELECT COUNT(*) FROM xiaozhi_tokens WHERE user_id = ?", (user_id,)).fetchone()[0] > 0
+            is_connected = mcp_state.get("connected", False)
+            bridge_task = mcp_bridge_tasks.get(user_id) if 'mcp_bridge_tasks' in dir() else None
+            bridge_running = bridge_task is not None and not bridge_task.done() if bridge_task else False
+
             result.append({
                 "id": user_id,
                 "username": row["username"],
@@ -986,7 +1003,12 @@ class SQLiteStore:
                 "limits": limits,
                 "usage": usage,
                 "features": self.get_user_features(user_id),
-                "mcp_status": {"has_token": False, "connected": False, "message": "", "updated_at": ""},
+                "mcp_status": {
+                    "has_token": has_token,
+                    "connected": is_connected or bridge_running,
+                    "message": mcp_state.get("message", ""),
+                    "updated_at": mcp_state.get("updated_at", ""),
+                },
             })
         return result
 

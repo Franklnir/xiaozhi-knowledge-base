@@ -181,11 +181,17 @@
                         </td>
                         <td>
                             {% if item.mcp_status.connected %}
-                            <span class="app-chip app-chip-small app-chip-success">Online</span>
+                            <span class="app-chip app-chip-small app-chip-success" title="{{ item.mcp_status.message }}">
+                                ✓ Terhubung
+                            </span>
                             {% elif item.mcp_status.has_token %}
-                            <span class="app-chip app-chip-small app-chip-info">Stored</span>
+                            <span class="app-chip app-chip-small app-chip-info" title="Token tersimpan, menunggu koneksi">
+                                ⏳ Stored
+                            </span>
                             {% else %}
-                            <span class="app-chip app-chip-small app-chip-neutral">-</span>
+                            <span class="app-chip app-chip-small app-chip-neutral">
+                                ✗ Tidak ada
+                            </span>
                             {% endif %}
                         </td>
                         <td>
