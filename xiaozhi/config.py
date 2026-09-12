@@ -143,6 +143,12 @@ if not APP_SECRET_KEY:
 
 session_serializer = URLSafeTimedSerializer(APP_SECRET_KEY, salt="edusmart-session")
 csrf_serializer = URLSafeTimedSerializer(APP_SECRET_KEY, salt="edusmart-csrf")
+google_oauth_serializer = URLSafeTimedSerializer(APP_SECRET_KEY, salt="edusmart-google-oauth")
+
+# ── Google OAuth ───────────────────────────────────────────────────────────
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
 
 # ── JWT Secret ─────────────────────────────────────────────────────────────
 JWT_SECRET = os.getenv("JWT_SECRET")

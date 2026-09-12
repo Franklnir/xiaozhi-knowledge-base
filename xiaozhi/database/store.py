@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
@@ -222,6 +223,9 @@ class HFJsonStore:
             "role": str(user.get("role") or "user").lower(),
             "session_version": max(1, int(user.get("session_version", 1) or 1)),
             "ui_theme": str(user.get("ui_theme") or DEFAULT_UI_THEME) if str(user.get("ui_theme") or DEFAULT_UI_THEME) in UI_THEMES else DEFAULT_UI_THEME,
+            "google_id": user.get("google_id"),
+            "google_email": user.get("google_email"),
+            "created_at": user.get("created_at"),
         }
 
     @staticmethod
@@ -601,6 +605,77 @@ class HFJsonStore:
         with self._lock:
             data = self._load()
             return next((user for user in data["users"] if user.get("username") == username), None)
+
+    def get_user_by_google_id(self, google_id: str) -> Optional[Dict[str, Any]]:
+        if not google_id:
+            return None
+        with self._lock:
+            data = self._load()
+            user = next((u for u in data["users"] if str(u.get("google_id") or "") == str(google_id)), None)
+            return dict(user) if user else None
+
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        if not email:
+            return None
+        target = email.strip().lower()
+        with self._lock:
+            data = self._load()
+            user = next((u for u in data["users"] if str(u.get("google_email") or "").strip().lower() == target), None)
+            return dict(user) if user else None
+
+    def link_google_account(self, user_id: int, google_id: str, google_email: str) -> None:
+        with self._lock:
+            data = self._load()
+            existing = next(
+                (u for u in data["users"] if str(u.get("google_id") or "") == str(google_id) and int(u.get("id", 0)) != int(user_id)),
+                None,
+            )
+            if existing:
+                raise ValueError("Akun Google ini sudah tertaut dengan akun lain.")
+            user = next((u for u in data["users"] if int(u.get("id", 0)) == int(user_id)), None)
+            if not user:
+                raise ValueError("Pengguna tidak ditemukan.")
+            user["google_id"] = str(google_id)
+            user["google_email"] = str(google_email).strip().lower()
+            user["updated_at"] = utc_now()
+            self._commit(data, "Link Google account")
+
+    def unlink_google_account(self, user_id: int) -> None:
+        with self._lock:
+            data = self._load()
+            user = next((u for u in data["users"] if int(u.get("id", 0)) == int(user_id)), None)
+            if not user:
+                raise ValueError("Pengguna tidak ditemukan.")
+            user["google_id"] = None
+            user["google_email"] = None
+            user["updated_at"] = utc_now()
+            self._commit(data, "Unlink Google account")
+
+    def create_google_user(self, username: str, google_id: str, google_email: str) -> Dict[str, Any]:
+        username = normalize_username(username)
+        random_pwd = secrets.token_urlsafe(32)
+        password_hash = hash_password(random_pwd)
+        with self._lock:
+            data = self._load()
+            if any(user.get("username") == username for user in data["users"]):
+                raise ValueError("Username sudah digunakan.")
+            if any(str(user.get("google_id") or "") == str(google_id) for user in data["users"]):
+                raise ValueError("Akun Google ini sudah terdaftar.")
+            user = {
+                "id": self._next_id(data, "users"),
+                "username": username,
+                "password_hash": password_hash,
+                "role": "user",
+                "session_version": 1,
+                "ui_theme": DEFAULT_UI_THEME,
+                "google_id": str(google_id),
+                "google_email": str(google_email).strip().lower(),
+                "created_at": utc_now(),
+            }
+            data["users"].append(user)
+            self._seed_default_categories(data, int(user["id"]))
+            self._commit(data, "Create Google EduSmart user")
+            return self._public_user(user)
 
     def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         with self._lock:

@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import secrets
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -278,6 +279,15 @@ class SQLiteStore:
             );
             CREATE INDEX IF NOT EXISTS idx_mcp_toggles_user ON mcp_tool_toggles(user_id);
         """)
+
+        # Migration check: Ensure google_id and google_email exist in users table
+        user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "google_id" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN google_id TEXT")
+        if "google_email" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN google_email TEXT")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL")
+
         conn.commit()
 
     # ── User Management ────────────────────────────────────────────────────
@@ -303,12 +313,16 @@ class SQLiteStore:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row:
             return None
+        keys = row.keys()
         return {
             "id": row["id"],
             "username": row["username"],
             "role": row["role"],
             "session_version": row["session_version"],
             "ui_theme": row["ui_theme"],
+            "google_id": row["google_id"] if "google_id" in keys else None,
+            "google_email": row["google_email"] if "google_email" in keys else None,
+            "created_at": row["created_at"] if "created_at" in keys else None,
         }
 
     def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
@@ -316,6 +330,70 @@ class SQLiteStore:
         conn = self._get_conn()
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         return dict(row) if row else None
+
+    def get_user_by_google_id(self, google_id: str) -> Optional[Dict[str, Any]]:
+        if not google_id:
+            return None
+        conn = self._get_conn()
+        row = conn.execute("SELECT * FROM users WHERE google_id = ?", (str(google_id),)).fetchone()
+        return dict(row) if row else None
+
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        if not email:
+            return None
+        conn = self._get_conn()
+        row = conn.execute("SELECT * FROM users WHERE LOWER(google_email) = LOWER(?)", (email.strip(),)).fetchone()
+        return dict(row) if row else None
+
+    def link_google_account(self, user_id: int, google_id: str, google_email: str) -> None:
+        conn = self._get_conn()
+        existing = conn.execute(
+            "SELECT id FROM users WHERE google_id = ? AND id != ?",
+            (str(google_id), user_id)
+        ).fetchone()
+        if existing:
+            raise ValueError("Akun Google ini sudah tertaut dengan akun lain.")
+        conn.execute(
+            "UPDATE users SET google_id = ?, google_email = ?, updated_at = ? WHERE id = ?",
+            (str(google_id), str(google_email).strip().lower(), utc_now(), user_id)
+        )
+        conn.commit()
+
+    def unlink_google_account(self, user_id: int) -> None:
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE users SET google_id = NULL, google_email = NULL, updated_at = ? WHERE id = ?",
+            (utc_now(), user_id)
+        )
+        conn.commit()
+
+    def create_google_user(self, username: str, google_id: str, google_email: str) -> Dict[str, Any]:
+        username = normalize_username(username)
+        random_pwd = secrets.token_urlsafe(32)
+        password_hash = hash_password(random_pwd)
+        conn = self._get_conn()
+        try:
+            cursor = conn.execute(
+                "INSERT INTO users (username, password_hash, role, google_id, google_email, created_at) VALUES (?, ?, 'user', ?, ?, ?)",
+                (username, password_hash, str(google_id), str(google_email).strip().lower(), utc_now())
+            )
+            conn.commit()
+            user_id = cursor.lastrowid
+            self._seed_default_categories(user_id)
+            return {
+                "id": user_id,
+                "username": username,
+                "role": "user",
+                "session_version": 1,
+                "ui_theme": DEFAULT_UI_THEME,
+                "google_id": str(google_id),
+                "google_email": str(google_email).strip().lower(),
+                "created_at": utc_now(),
+            }
+        except sqlite3.IntegrityError as e:
+            if "google_id" in str(e):
+                raise ValueError("Akun Google ini sudah terdaftar.")
+            raise ValueError("Username sudah digunakan.")
 
     def search_users_by_prefix(self, prefix: str, limit: int = 8) -> List[Dict[str, str]]:
         prefix = normalize_username_prefix(prefix)

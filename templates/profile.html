@@ -149,6 +149,14 @@
         </div>
     </header>
 
+    <!-- Alerts -->
+    {% if request.query_params.get("error") %}
+    <div class="app-alert app-alert-danger mb-5">{{ request.query_params.get("error") }}</div>
+    {% endif %}
+    {% if request.query_params.get("message") %}
+    <div class="app-alert app-alert-success mb-5">{{ request.query_params.get("message") }}</div>
+    {% endif %}
+
     <!-- Profile Header -->
     <div class="profile-header">
         <div class="profile-avatar">{{ user.username[0]|upper }}</div>
@@ -158,6 +166,58 @@
             {% if user.created_at %}
             <div class="profile-joined">Bergabung: {{ user.created_at[:10] }}</div>
             {% endif %}
+        </div>
+    </div>
+
+    <!-- Google Account Integration -->
+    <div class="profile-section">
+        <div class="profile-section-title">
+            <span>🔗</span> Akun Google
+        </div>
+        <div class="app-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 44px; height: 44px; border-radius: var(--app-radius); background: var(--app-soft); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid var(--app-border);">
+                        <svg class="google-icon" style="width: 22px; height: 22px;" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+                            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        {% if user.google_id %}
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 14px; font-weight: 750; color: var(--app-text);">{{ user.google_email or 'Akun Google Tertaut' }}</span>
+                            <span class="app-chip app-chip-small app-chip-success">✓ Terhubung</span>
+                        </div>
+                        <div style="font-size: 12px; color: var(--app-muted); margin-top: 3px;">
+                            Akun Google aktif untuk login 1-klik ke sistem.
+                        </div>
+                        {% else %}
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 14px; font-weight: 750; color: var(--app-text);">Belum Tertaut</span>
+                            <span class="app-chip app-chip-small app-chip-neutral">Tidak Terhubung</span>
+                        </div>
+                        <div style="font-size: 12px; color: var(--app-muted); margin-top: 3px;">
+                            Tautkan akun Google untuk masuk lebih cepat tanpa mengetik password.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    {% if user.google_id %}
+                    <button type="button" class="app-button app-button-danger app-button-small" onclick="openUnlinkModal()">
+                        Putuskan Tautan
+                    </button>
+                    {% else %}
+                    <a href="/api/auth/google/link" class="app-button app-button-primary app-button-small" style="text-decoration:none;">
+                        Tautkan Akun Google
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 
@@ -290,5 +350,43 @@
             Chat WhatsApp
         </a>
     </div>
+
+    <!-- Modal Konfirmasi Lepas Akun Google -->
+    <div id="unlinkModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 100; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px);">
+        <div class="app-card" style="max-width: 440px; width: 100%; padding: 24px; box-shadow: var(--app-shadow);">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+                <div style="width: 40px; height: 40px; border-radius: var(--app-radius); background: #fee2e2; color: #b91c1c; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; border: 1px solid #fecaca;">
+                    ⚠️
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--app-text);">Putuskan Tautan Google?</h3>
+                    <p style="margin: 2px 0 0; font-size: 12px; color: var(--app-muted);">Konfirmasi pelepasan akun</p>
+                </div>
+            </div>
+            <p style="font-size: 13.5px; color: var(--app-text); line-height: 1.55; margin-bottom: 22px;">
+                Apakah Anda yakin ingin memutuskan tautan akun Google <strong>{{ user.google_email }}</strong>? Anda tidak akan dapat masuk menggunakan Google lagi sampai akun ini ditautkan kembali.
+            </p>
+            <form action="/api/auth/google/unlink" method="POST" style="display: flex; justify-content: flex-end; gap: 10px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="button" class="app-button app-button-small" onclick="closeUnlinkModal()">Batal</button>
+                <button type="submit" class="app-button app-button-danger app-button-small">Ya, Putuskan Tautan</button>
+            </form>
+        </div>
+    </div>
 </div>
+
+<script>
+    function openUnlinkModal() {
+        const m = document.getElementById("unlinkModal");
+        if (m) m.style.display = "flex";
+    }
+    function closeUnlinkModal() {
+        const m = document.getElementById("unlinkModal");
+        if (m) m.style.display = "none";
+    }
+    window.addEventListener("click", function(e) {
+        const m = document.getElementById("unlinkModal");
+        if (e.target === m) closeUnlinkModal();
+    });
+</script>
 {% endblock %}
