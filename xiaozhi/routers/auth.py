@@ -14,6 +14,7 @@ from xiaozhi.config import (
     session_serializer,
 )
 from xiaozhi.core.security import normalize_username, hash_password, verify_password
+from xiaozhi.core.rate_limiter import enforce_predefined_limit
 from xiaozhi.dependencies import (
     get_current_user,
     get_store,
@@ -76,6 +77,7 @@ async def login_post(
     csrf_token: str = Form(...),
     auth_mode: str = Form("login"),
 ):
+    enforce_predefined_limit(request, "login")
     store = get_store()
     validate_csrf(request, csrf_token, None)
     active_mode = "search" if auth_mode == "search" else "login"
@@ -142,6 +144,7 @@ async def register_post(
     password: str = Form(...),
     csrf_token: str = Form(...),
 ):
+    enforce_predefined_limit(request, "register")
     store = get_store()
     validate_csrf(request, csrf_token, None)
     try:
