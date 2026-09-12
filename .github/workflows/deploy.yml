@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 env:
-  APP_DIR: /opt/edusmart
+  APP_DIR: /opt/xiaozhi
 
 jobs:
   deploy:
@@ -33,30 +33,20 @@ jobs:
             fi
             
             # Build and restart services using production config
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose down
+            docker compose up -d --build
             
             # Wait for health check
             echo "Waiting for services to be healthy..."
             sleep 15
             
-            # Check if edusmart is running
-            if docker compose -f docker-compose.prod.yml ps | grep -q "edusmart.*Up"; then
-              echo "✅ edusmart service is running"
+            # Check if app is running
+            if docker compose ps | grep -q "xiaozhi.*Up"; then
+              echo "✅ xiaozhi service is running"
             else
-              echo "❌ edusmart service failed to start"
-              docker compose -f docker-compose.prod.yml logs edusmart
+              echo "❌ xiaozhi service failed to start"
+              docker compose logs xiaozhi
               exit 1
-            fi
-            
-            # Check if nginx is running (if configured)
-            if [ -f nginx.conf ]; then
-              if docker compose -f docker-compose.prod.yml ps | grep -q "nginx.*Up"; then
-                echo "✅ nginx service is running"
-              else
-                echo "⚠️ nginx service not running"
-                docker compose -f docker-compose.prod.yml logs nginx
-              fi
             fi
             
             # Clean up old images
