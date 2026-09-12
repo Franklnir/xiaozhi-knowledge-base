@@ -2060,3 +2060,103 @@ class HFJsonStore:
                 return exact
         ranked = rank_materials(public_rows, keyword, include_zero=False)
         return ranked[0] if ranked else None
+
+    # ── Relay Rooms (stub for HFJsonStore) ─────────────────────────────────
+
+    def list_relay_rooms(self, owner_id: int) -> List[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            rooms = [
+                r for r in data.get("relay_rooms", [])
+                if int(r.get("owner_id", 0)) == int(owner_id)
+            ]
+            result = []
+            for room in rooms:
+                result.append({
+                    "id": room.get("id"),
+                    "nama_tempat": room.get("nama_tempat", ""),
+                    "api_slug": room.get("api_slug", ""),
+                    "api_client_id": room.get("api_client_id", ""),
+                    "relays": room.get("relays", []),
+                })
+            return result
+
+    def add_relay_room(self, owner_id: int, nama_tempat: str, api_slug: str, api_token: str, api_client_id: str, relays: List[Dict]) -> int:
+        with self._lock:
+            data = self._load()
+            room_id = self._next_id(data, "relay_rooms")
+            data["relay_rooms"].append({
+                "id": room_id,
+                "owner_id": int(owner_id),
+                "nama_tempat": nama_tempat,
+                "api_slug": api_slug,
+                "api_token": api_token,
+                "api_client_id": api_client_id,
+                "relays": relays,
+                "created_at": utc_now(),
+            })
+            self._commit(data, "Add relay room")
+            return room_id
+
+    def get_relay_room(self, owner_id: int, room_id: int) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            room = next(
+                (r for r in data.get("relay_rooms", [])
+                 if int(r.get("id", 0)) == int(room_id) and int(r.get("owner_id", 0)) == int(owner_id)),
+                None,
+            )
+            return room if room else None
+
+    def update_relay_room(self, owner_id: int, room_id: int, nama_tempat: str, relays: List[Dict]) -> None:
+        with self._lock:
+            data = self._load()
+            for room in data.get("relay_rooms", []):
+                if int(room.get("id", 0)) == int(room_id) and int(room.get("owner_id", 0)) == int(owner_id):
+                    room["nama_tempat"] = nama_tempat
+                    room["relays"] = relays
+                    room["updated_at"] = utc_now()
+                    break
+            self._commit(data, "Update relay room")
+
+    def delete_relay_room(self, owner_id: int, room_id: int) -> bool:
+        with self._lock:
+            data = self._load()
+            before = len(data.get("relay_rooms", []))
+            data["relay_rooms"] = [
+                r for r in data.get("relay_rooms", [])
+                if not (int(r.get("id", 0)) == int(room_id) and int(r.get("owner_id", 0)) == int(owner_id))
+            ]
+            changed = len(data.get("relay_rooms", [])) != before
+            if changed:
+                self._commit(data, "Delete relay room")
+            return changed
+
+    def update_relay_status(self, owner_id: int, room_id: int, relay_number: int, status: str) -> None:
+        with self._lock:
+            data = self._load()
+            for room in data.get("relay_rooms", []):
+                if int(room.get("id", 0)) == int(room_id) and int(room.get("owner_id", 0)) == int(owner_id):
+                    for relay in room.get("relays", []):
+                        if int(relay.get("relay_number", 0)) == int(relay_number):
+                            relay["status"] = status
+                            break
+                    break
+            self._commit(data, "Update relay status")
+
+    def match_real_relay_command(self, owner_id: int, user_message: str) -> Optional[Dict[str, Any]]:
+        from xiaozhi.core.utils import normalize_voice_command
+        normalized_msg = normalize_voice_command(user_message)
+        rooms = self.list_relay_rooms(owner_id)
+        for room in rooms:
+            for relay in room.get("relays", []):
+                on_cmd = normalize_voice_command(relay.get("voice_command_on", ""))
+                off_cmd = normalize_voice_command(relay.get("voice_command_off", ""))
+                if on_cmd and on_cmd in normalized_msg:
+                    return {"room": room, "relay": relay, "command": "ON"}
+                if off_cmd and off_cmd in normalized_msg:
+                    return {"room": room, "relay": relay, "command": "OFF"}
+        return None
+
+    def get_pending_relay_commands(self, owner_id: int, room_id: int) -> List[Dict[str, Any]]:
+        return []
