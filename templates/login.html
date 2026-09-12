@@ -2,22 +2,19 @@
 
 {% block content_login %}
 <style>
+    .auth-layout {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
     .auth-card {
-        height: 480px;
-        overflow: hidden;
+        width: 100%;
+        max-width: 420px;
+        padding: 32px;
     }
     .auth-panel {
-        height: 320px;
-        overflow-y: auto;
-    }
-    .auth-panel > form,
-    .auth-panel > div {
-        display: none;
-    }
-    .auth-panel > form.active,
-    .auth-panel > div.active {
-        display: block;
-        height: 100%;
+        min-height: 280px;
     }
 </style>
 
@@ -136,7 +133,7 @@
 
     function setMode(mode) {
         Object.entries(panels).forEach(([name, panel]) => {
-            panel.classList.toggle("active", name === mode);
+            panel.classList.toggle("hidden", name !== mode);
         });
         authMode.value = mode;
         const url = new URL(window.location.href);
