@@ -545,3 +545,59 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             if owner_id:
                 record_mcp_tool_history(owner_id, "search_news", query, {"query": query}, response)
             return response
+
+    # ── New Tools ──────────────────────────────────────────────────────
+
+    @mcp_server.tool()
+    def set_reminder(text: str) -> dict:
+        """
+        Set pengingat/alarm via perintah suara.
+        Gunakan tool ini saat user ingin diingatkan sesuatu pada waktu tertentu.
+        Format: "ingatkan saya jam 3 sore untuk minum obat" atau "dalam 30 menit ingatkan saya meeting"
+
+        Args:
+            text: Kalimat lengkap berisi waktu dan pesan pengingat.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif."}
+        from xiaozhi.services.reminder_service import add_reminder
+        result = add_reminder(owner_id, text)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "set_reminder", text, {"text": text}, result)
+        return result
+
+    @mcp_server.tool()
+    def calculate(expression: str) -> dict:
+        """
+        Hitung ekspresi matematika.
+        Gunakan tool ini saat user bertanya hitung-hitungan, konversi, atau operasi matematika.
+        Contoh: "berapa 15% dari 250000", "akar dari 144", "konversi 100 fahrenheit ke celsius"
+
+        Args:
+            expression: Ekspresi matematika atau pertanyaan hitungan.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.calculator_service import safe_eval
+        result = safe_eval(expression)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "calculate", expression, {"expression": expression}, result)
+        return result
+
+    @mcp_server.tool()
+    def translate_text(text: str, target_lang: str = "en") -> dict:
+        """
+        Terjemahkan teks ke bahasa lain.
+        Gunakan tool ini saat user minta terjemahan.
+        Contoh: "terjemahkan good morning ke Indonesia", "translate selamat pagi to English"
+
+        Args:
+            text: Teks yang akan diterjemahkan.
+            target_lang: Bahasa target (id/en/ja/ko/zh/ar/fr/de/es/ru). Default: en.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.translator_service import translate_text as do_translate
+        result = do_translate(text, target_lang)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "translate_text", text, {"text": text, "target": target_lang}, result)
+        return result

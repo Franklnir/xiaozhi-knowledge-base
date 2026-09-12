@@ -242,3 +242,191 @@ async def admin_api_mcp_health(request: Request):
             "bridge_tasks": len(mcp_bridge_tasks),
         },
     }
+
+
+# ── User Analytics ─────────────────────────────────────────────────────────
+
+@router.get("/admin/analytics", response_class=HTMLResponse)
+async def admin_analytics(request: Request):
+    admin = require_admin(request)
+    store = get_store()
+
+    managed_users = store.list_admin_manageable_users()
+    total_users = len(managed_users)
+    total_materials = sum(u["usage"]["materials"] for u in managed_users)
+    total_apis = sum(u["usage"]["live_apis"] for u in managed_users)
+    total_relays = sum(u["usage"]["relay_rooms"] for u in managed_users)
+
+    # Per-user stats
+    user_stats = []
+    for u in managed_users:
+        user_stats.append({
+            "id": u["id"],
+            "username": u["username"],
+            "materials": u["usage"]["materials"],
+            "apis": u["usage"]["live_apis"],
+            "relays": u["usage"]["relay_rooms"],
+            "mcp_status": u.get("mcp_status", {}).get("connected", False),
+        })
+
+    return render(
+        request,
+        "admin_analytics.html",
+        {
+            "user": admin,
+            "total_users": total_users,
+            "total_materials": total_materials,
+            "total_apis": total_apis,
+            "total_relays": total_relays,
+            "user_stats": user_stats,
+            "active_page": "admin_analytics",
+        },
+    )
+
+
+@router.get("/admin/api/analytics")
+async def admin_api_analytics(request: Request):
+    admin = require_admin(request)
+    store = get_store()
+
+    managed_users = store.list_admin_manageable_users()
+    return {
+        "success": True,
+        "analytics": {
+            "total_users": len(managed_users),
+            "total_materials": sum(u["usage"]["materials"] for u in managed_users),
+            "total_apis": sum(u["usage"]["live_apis"] for u in managed_users),
+            "total_relays": sum(u["usage"]["relay_rooms"] for u in managed_users),
+            "users": [
+                {
+                    "id": u["id"],
+                    "username": u["username"],
+                    "usage": u["usage"],
+                    "mcp_connected": u.get("mcp_status", {}).get("connected", False),
+                }
+                for u in managed_users
+            ],
+        },
+    }
+
+
+# ── Broadcast ──────────────────────────────────────────────────────────────
+
+@router.post("/admin/broadcast")
+async def admin_broadcast(
+    request: Request,
+    message: str = Form(...),
+    csrf_token: str = Form(...),
+):
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    if not message.strip():
+        return redirect_with_message("/admin", "Pesan tidak boleh kosong.")
+
+    # Store broadcast message
+    managed_users = store.list_admin_manageable_users()
+    sent_count = 0
+    for u in managed_users:
+        try:
+            store.add_chat_history(
+                u["id"],
+                source="broadcast",
+                tool_name="admin_broadcast",
+                user_message="",
+                xiaozhi_answer=f"[Broadcast dari Admin] {message}",
+            )
+            sent_count += 1
+        except Exception:
+            pass
+
+    return redirect_with_message("/admin", f"Pesan broadcast terkirim ke {sent_count} user.")
+
+
+@router.get("/admin/api/broadcast")
+async def admin_api_broadcast_status(request: Request):
+    admin = require_admin(request)
+    store = get_store()
+
+    # Get recent broadcasts
+    managed_users = store.list_admin_manageable_users()
+    return {
+        "success": True,
+        "total_users": len(managed_users),
+        "message": "Gunakan POST /admin/broadcast untuk mengirim pesan.",
+    }
+
+
+# ── PDF Upload ─────────────────────────────────────────────────────────────
+
+@router.post("/admin/upload-pdf")
+async def admin_upload_pdf(
+    request: Request,
+    title: str = Form(...),
+    category: str = Form(...),
+    csrf_token: str = Form(...),
+):
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    try:
+        form = await request.form()
+        pdf_file = form.get("pdf_file")
+        if not pdf_file:
+            return redirect_with_message("/dashboard", "File PDF tidak ditemukan.")
+
+        pdf_bytes = await pdf_file.read()
+
+        from xiaozhi.services.pdf_service import create_material_from_pdf
+        result = create_material_from_pdf(pdf_bytes, title, category, admin["id"])
+
+        if not result["success"]:
+            return redirect_with_message("/dashboard", f"Gagal: {result['error']}")
+
+        store.add_material(
+            admin["id"],
+            result["title"],
+            result["category"],
+            result["content"],
+            f"PDF: {result['pages']} halaman",
+        )
+        signal_mcp_reload()
+        return redirect_with_message("/dashboard", f"PDF berhasil diupload ({result['pages']} halaman).")
+    except Exception as e:
+        return redirect_with_message("/dashboard", f"Gagal upload PDF: {str(e)[:100]}")
+
+
+# ── URL Scraper ────────────────────────────────────────────────────────────
+
+@router.post("/admin/scrape-url")
+async def admin_scrape_url(
+    request: Request,
+    url: str = Form(...),
+    title: str = Form(""),
+    category: str = Form(""),
+    csrf_token: str = Form(...),
+):
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    try:
+        from xiaozhi.services.scraper_service import create_material_from_url
+        result = create_material_from_url(url, title, category)
+
+        if not result["success"]:
+            return redirect_with_message("/dashboard", f"Gagal: {result['error']}")
+
+        store.add_material(
+            admin["id"],
+            result["title"],
+            result.get("category", "Materi Perkuliahan"),
+            result["content"],
+            f"URL: {url}",
+        )
+        signal_mcp_reload()
+        return redirect_with_message("/dashboard", f"URL berhasil di-scrape: {result['title'][:50]}")
+    except Exception as e:
+        return redirect_with_message("/dashboard", f"Gagal scrape URL: {str(e)[:100]}")
