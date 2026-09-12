@@ -83,15 +83,17 @@ def generate_unique_username(email: str, name: str, store) -> str:
 
 
 @router.get("/login")
-async def google_login(request: Request):
-    """Initiate Google OAuth flow for Login / Register."""
+async def google_login(request: Request, intent: str = Query("login")):
+    """Initiate Google OAuth flow for Login or Register."""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         logger.error("Google OAuth credentials not configured.")
         return redirect_with_message("/login", "Integrasi Google belum dikonfigurasi di server.")
 
+    valid_intent = "register" if intent == "register" else "login"
+
     # State payload signed with secret key and salt
     state = google_oauth_serializer.dumps({
-        "action": "login",
+        "action": valid_intent,
         "nonce": secrets.token_urlsafe(16),
     })
 
@@ -179,13 +181,13 @@ async def google_callback(
         token_data = token_resp.json()
     except Exception as exc:
         logger.error("Failed to exchange code with Google: %s", exc)
-        target = "/profil" if action == "link" else "/login"
+        target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
         return redirect_with_message(target, "Gagal menghubungi server Google. Coba lagi.")
 
     if not token_resp.ok or "access_token" not in token_data:
         err_msg = token_data.get("error_description") or token_data.get("error") or "Gagal menukar token Google."
         logger.error("Google token exchange error: %s", token_data)
-        target = "/profil" if action == "link" else "/login"
+        target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
         return redirect_with_message(target, f"Error Google: {err_msg}")
 
     access_token = token_data["access_token"]
@@ -200,11 +202,11 @@ async def google_callback(
         userinfo = userinfo_resp.json()
     except Exception as exc:
         logger.error("Failed to fetch userinfo from Google: %s", exc)
-        target = "/profil" if action == "link" else "/login"
+        target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
         return redirect_with_message(target, "Gagal mengambil data profil Google.")
 
     if not userinfo_resp.ok:
-        target = "/profil" if action == "link" else "/login"
+        target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
         return redirect_with_message(target, "Gagal memverifikasi akun Google.")
 
     google_id = str(userinfo.get("id") or "").strip()
@@ -212,7 +214,7 @@ async def google_callback(
     google_name = str(userinfo.get("name") or "").strip()
 
     if not google_id or not google_email:
-        target = "/profil" if action == "link" else "/login"
+        target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
         return redirect_with_message(target, "Data akun Google tidak memiliki ID atau Email.")
 
     store = get_store()
@@ -230,51 +232,65 @@ async def google_callback(
         except ValueError as exc:
             return redirect_with_message("/profil", str(exc))
 
-    # ── Action: LOGIN / REGISTER ───────────────────────────────────────────
-    # 1. Check if user already exists with this google_id
+    # ── Action: REGISTER DENGAN GOOGLE ─────────────────────────────────────
+    if action == "register":
+        # Check if already registered by google_id or email
+        existing_user = store.get_user_by_google_id(google_id)
+        if not existing_user and google_email:
+            existing_user = store.get_user_by_email(google_email)
+
+        if existing_user:
+            return redirect_with_message("/login", f"Akun Google ({google_email}) sudah terdaftar. Silakan langsung masuk.")
+
+        username = generate_unique_username(google_email, google_name, store)
+        try:
+            new_user = store.create_google_user(username, google_id, google_email)
+            user = {
+                "id": int(new_user["id"]),
+                "username": new_user["username"],
+                "role": "user",
+                "session_version": 1,
+                "ui_theme": DEFAULT_UI_THEME,
+            }
+            redirect = RedirectResponse(url="/dashboard", status_code=303)
+            set_session_cookie(redirect, request, user)
+            return redirect
+        except ValueError as exc:
+            return redirect_with_message("/register", str(exc))
+
+    # ── Action: LOGIN DENGAN GOOGLE ────────────────────────────────────────
+    # 1. Check if user exists by google_id
     user_record = store.get_user_by_google_id(google_id)
 
-    # 2. If not found by google_id, check if user exists with matching email
+    # 2. Check if user exists by matching email
     if not user_record and google_email:
         user_record = store.get_user_by_email(google_email)
         if user_record:
-            # Auto-link this Google account to the existing user
             try:
                 store.link_google_account(int(user_record["id"]), google_id, google_email)
             except Exception as exc:
                 logger.warning("Could not auto-link Google account: %s", exc)
 
-    # 3. If user exists, log in
-    if user_record:
-        role = str(user_record.get("role") or "user").lower()
-        user = {
-            "id": int(user_record["id"]),
-            "username": user_record["username"],
-            "role": role,
-            "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
-            "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
-        }
-        redirect_url = "/admin" if role == "admin" else "/dashboard"
-        redirect = RedirectResponse(url=redirect_url, status_code=303)
-        set_session_cookie(redirect, request, user)
-        return redirect
+    # 3. If user is NOT registered, do NOT log in! Tell them to register first.
+    if not user_record:
+        return redirect_with_message(
+            "/login",
+            f"Akun Google ({google_email}) belum terdaftar. Silakan daftar terlebih dahulu melalui menu Register.",
+        )
 
-    # 4. If no existing user, register a new user
-    username = generate_unique_username(google_email, google_name, store)
-    try:
-        new_user = store.create_google_user(username, google_id, google_email)
-        user = {
-            "id": int(new_user["id"]),
-            "username": new_user["username"],
-            "role": "user",
-            "session_version": 1,
-            "ui_theme": DEFAULT_UI_THEME,
-        }
-        redirect = RedirectResponse(url="/dashboard", status_code=303)
-        set_session_cookie(redirect, request, user)
-        return redirect
-    except ValueError as exc:
-        return redirect_with_message("/login", str(exc))
+    # 4. User is registered, proceed with login
+    role = str(user_record.get("role") or "user").lower()
+    user = {
+        "id": int(user_record["id"]),
+        "username": user_record["username"],
+        "role": role,
+        "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
+        "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
+    }
+    redirect_url = "/admin" if role == "admin" else "/dashboard"
+    redirect = RedirectResponse(url=redirect_url, status_code=303)
+    set_session_cookie(redirect, request, user)
+    return redirect
 
 
 @router.post("/unlink")
