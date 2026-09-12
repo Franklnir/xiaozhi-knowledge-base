@@ -159,18 +159,29 @@ async def check_reminders_periodically(store):
                 message = reminder["message"]
                 logger.info(f"Reminder triggered for user {owner_id}: {message}")
 
-                # Queue audio notification if ESP32 connected
+                # Send reminder as chat message to trigger XiaoZhi voice response
                 try:
+                    # Add to chat history so XiaoZhi can respond
+                    store.add_chat_history(
+                        owner_id,
+                        source="reminder",
+                        tool_name="system_reminder",
+                        user_message=f"[Pengingat] {message}",
+                        xiaozhi_answer="",
+                    )
+
+                    # Also queue audio with spoken text
+                    reminder_text = f"Pengingat: {message}"
                     store.queue_audio_command(
                         owner_id,
-                        title=f"Pengingat: {message}",
+                        title=reminder_text,
                         stream_url="",
                         video_url="",
                         duration="",
                         video_id="",
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to send reminder to user {owner_id}: {e}")
 
                 # Mark as sent
                 reminder["status"] = "sent"
