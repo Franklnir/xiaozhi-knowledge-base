@@ -89,6 +89,8 @@ async def check_mcp_endpoint(request: Request):
     if not token or not token.startswith("wss://"):
         raise HTTPException(status_code=400, detail="Endpoint harus diawali wss://")
     store = get_store()
+
+    # Try exact match first
     owner = store.find_user_by_mcp_token(token)
     if owner:
         return {
@@ -102,9 +104,32 @@ async def check_mcp_endpoint(request: Request):
             },
             "message": f"Endpoint ini milik user: {owner['username']} (ID: {owner['user_id']})",
         }
+
+    # If not found, check all stored tokens for partial match (for debugging)
+    all_tokens = store.list_xiaozhi_tokens()
+    token_base = token.split("?")[0] if "?" in token else token
+
+    similar_tokens = []
+    for t in all_tokens:
+        stored_token = t.get("token", "")
+        if stored_token and stored_token.startswith(token_base[:30]):
+            similar_tokens.append({
+                "user_id": t["user_id"],
+                "token_preview": stored_token[:50] + "..." if len(stored_token) > 50 else stored_token,
+            })
+
+    if similar_tokens:
+        return {
+            "success": True,
+            "found": False,
+            "similar": similar_tokens,
+            "message": "Endpoint tidak cocok persis, tapi ditemukan token mirip. Pastikan URL lengkap benar.",
+        }
+
     return {
         "success": True,
         "found": False,
+        "total_endpoints": len(all_tokens),
         "message": "Endpoint ini belum terdaftar di user manapun.",
     }
 
