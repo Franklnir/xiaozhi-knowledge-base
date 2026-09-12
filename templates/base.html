@@ -360,6 +360,77 @@
         .app-button-small { min-height: 32px; padding: 6px 10px; font-size: 12px; }
         .app-icon-button { width: 32px; min-height: 32px; padding: 0; font-size: 18px; line-height: 1; }
         .app-button-full { width: 100%; }
+
+        /* GOOGLE AUTH BUTTON & DIVIDER */
+        .app-google-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            min-height: 42px;
+            padding: 9px 16px;
+            background: var(--app-surface);
+            color: var(--app-text);
+            border: 1px solid var(--app-border-strong);
+            border-radius: var(--app-radius);
+            font-size: 13.5px;
+            font-weight: 750;
+            text-decoration: none;
+            cursor: pointer;
+            box-shadow: var(--app-shadow);
+            transition: background-color .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+        }
+        .app-google-btn:hover {
+            background: var(--app-surface-muted);
+            border-color: var(--app-text);
+            transform: translateY(-1px);
+        }
+        :root[data-theme="neo"] .app-google-btn {
+            border: 2px solid #111;
+            box-shadow: 3px 3px 0 #111;
+        }
+        :root[data-theme="neo"] .app-google-btn:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 4px 4px 0 #111;
+        }
+        :root[data-theme="dark"] .app-google-btn {
+            background: #202020;
+            border-color: #404040;
+            color: #f8fafc;
+        }
+        :root[data-theme="dark"] .app-google-btn:hover {
+            background: #2a2a2a;
+            border-color: #555555;
+        }
+        .google-icon {
+            width: 19px;
+            height: 19px;
+            flex-shrink: 0;
+        }
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 18px 0;
+            color: var(--app-muted);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        .auth-divider::before, .auth-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--app-border);
+        }
+        .auth-divider:not(:empty)::before {
+            margin-right: 12px;
+        }
+        .auth-divider:not(:empty)::after {
+            margin-left: 12px;
+        }
+
         .app-muted-panel {
             border: 1px solid var(--app-border);
             border-radius: var(--app-radius);

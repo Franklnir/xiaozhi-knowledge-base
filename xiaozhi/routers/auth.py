@@ -62,10 +62,12 @@ async def login_page(request: Request, mode: str = Query("login")):
     if user:
         return RedirectResponse(url="/dashboard")
     active_mode = mode if mode in {"login", "search", "register"} else "login"
+    error = request.query_params.get("error")
+    success = request.query_params.get("message") or request.query_params.get("success")
     return render(
         request,
         "login.html",
-        {"user": None, "error": None, "success": None, "active_mode": active_mode},
+        {"user": None, "error": error, "success": success, "active_mode": active_mode},
     )
 
 
@@ -130,10 +132,12 @@ async def register_page(request: Request):
     user = get_current_user(request)
     if user:
         return RedirectResponse(url="/dashboard")
+    error = request.query_params.get("error")
+    success = request.query_params.get("message") or request.query_params.get("success")
     return render(
         request,
         "register.html",
-        {"user": None, "error": None, "success": None},
+        {"user": None, "error": error, "success": success},
     )
 
 

@@ -140,6 +140,7 @@ from xiaozhi.routers import (
     chat,
     dashboard,
     devices,
+    google_auth,
     mcp_endpoints,
     relay_nyata,
     search,
@@ -149,6 +150,7 @@ from xiaozhi.routers import (
 from xiaozhi.routers import api_v1_auth, api_v1_materials, api_v1_smarthome
 
 app.include_router(auth.router)
+app.include_router(google_auth.router)
 app.include_router(dashboard.router)
 app.include_router(admin.router)
 app.include_router(chat.router)
