@@ -8,10 +8,109 @@
     .limit-badge-ok { background: #ecfdf5; color: #047857; }
     .limit-badge-warn { background: #fef3c7; color: #b45309; }
     .limit-badge-full { background: #fee2e2; color: #dc2626; }
-    .edit-limits-panel { display: none; margin-top: 12px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
-    .edit-limits-panel.active { display: block; }
-    .limit-edit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-    @media (max-width: 768px) { .limit-edit-grid { grid-template-columns: repeat(2, 1fr); } }
+
+    /* Overlay styles */
+    .overlay-backdrop {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+    .overlay-backdrop.active { display: flex; }
+    .overlay-panel {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    .overlay-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .overlay-title { font-size: 18px; font-weight: 600; color: #1e293b; }
+    .overlay-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #64748b;
+        padding: 4px;
+        line-height: 1;
+    }
+    .overlay-close:hover { color: #1e293b; }
+    .overlay-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 20px;
+        padding-top: 12px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    /* MCP Tools Grid */
+    .mcp-tools-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    @media (max-width: 480px) { .mcp-tools-grid { grid-template-columns: 1fr; } }
+    .mcp-tool-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        transition: background 0.2s;
+    }
+    .mcp-tool-item:hover { background: #f1f5f9; }
+    .mcp-tool-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #047857;
+    }
+    .mcp-tool-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: #334155;
+    }
+    .mcp-tool-status {
+        margin-left: auto;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+    .mcp-tool-status.active { background: #ecfdf5; color: #047857; }
+    .mcp-tool-status.inactive { background: #fee2e2; color: #dc2626; }
+
+    /* Block status */
+    .block-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .block-badge-blocked { background: #fee2e2; color: #dc2626; }
+    .block-badge-allowed { background: #ecfdf5; color: #047857; }
+
+    /* Limit edit grid */
+    .limit-edit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 </style>
 
 <div class="app-page">
@@ -62,12 +161,12 @@
                     <tr>
                         <th style="width:40px">ID</th>
                         <th>Username</th>
-                        <th>MCP</th>
+                        <th>MCP Status</th>
                         <th>Materi</th>
                         <th>API</th>
                         <th>Relay</th>
                         <th>Fitur</th>
-                        <th style="width:100px">Aksi</th>
+                        <th style="width:140px">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -114,36 +213,10 @@
                             </label>
                         </td>
                         <td>
-                            <button type="button" class="app-button app-button-small" onclick="toggleEdit({{ item.id }})">Edit</button>
-                        </td>
-                    </tr>
-                    <tr id="edit-{{ item.id }}" class="edit-limits-row" style="display:none">
-                        <td colspan="8">
-                            <form action="/admin/users/{{ item.id }}/limits" method="POST" style="padding:8px 0">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <div class="limit-edit-grid">
-                                    <label>
-                                        <span class="app-label">Total Materi</span>
-                                        <input class="app-input" type="number" name="max_materials" min="0" value="{{ item.limits.max_materials }}">
-                                    </label>
-                                    <label>
-                                        <span class="app-label">Kata/Materi</span>
-                                        <input class="app-input" type="number" name="max_words_per_material" min="0" value="{{ item.limits.max_words_per_material }}">
-                                    </label>
-                                    <label>
-                                        <span class="app-label">API Realtime</span>
-                                        <input class="app-input" type="number" name="max_live_apis" min="0" value="{{ item.limits.max_live_apis }}">
-                                    </label>
-                                    <label>
-                                        <span class="app-label">Perangkat Relay</span>
-                                        <input class="app-input" type="number" name="max_relay_rooms" min="0" value="{{ item.limits.max_relay_rooms }}">
-                                    </label>
-                                </div>
-                                <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
-                                    <button type="button" class="app-button app-button-small" onclick="toggleEdit({{ item.id }})">Batal</button>
-                                    <button type="submit" class="app-button app-button-primary app-button-small">Simpan</button>
-                                </div>
-                            </form>
+                            <div style="display:flex;gap:4px;flex-wrap:wrap">
+                                <button type="button" class="app-button app-button-small" onclick="openEditOverlay({{ item.id }}, '{{ item.username }}')">Edit</button>
+                                <button type="button" class="app-button app-button-small" onclick="openToolsOverlay({{ item.id }}, '{{ item.username }}')">Tools</button>
+                            </div>
                         </td>
                     </tr>
                     {% else %}
@@ -162,16 +235,236 @@
     </section>
 </div>
 
+<!-- Edit User Overlay -->
+<div id="editOverlay" class="overlay-backdrop">
+    <div class="overlay-panel">
+        <div class="overlay-header">
+            <span class="overlay-title">Edit User: <span id="editUsername"></span></span>
+            <button class="overlay-close" onclick="closeEditOverlay()">&times;</button>
+        </div>
+        <form id="editForm" action="" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="limit-edit-grid">
+                <label>
+                    <span class="app-label">Total Materi</span>
+                    <input class="app-input" type="number" name="max_materials" min="0" value="">
+                </label>
+                <label>
+                    <span class="app-label">Kata/Materi</span>
+                    <input class="app-input" type="number" name="max_words_per_material" min="0" value="">
+                </label>
+                <label>
+                    <span class="app-label">API Realtime</span>
+                    <input class="app-input" type="number" name="max_live_apis" min="0" value="">
+                </label>
+                <label>
+                    <span class="app-label">Perangkat Relay</span>
+                    <input class="app-input" type="number" name="max_relay_rooms" min="0" value="">
+                </label>
+            </div>
+
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0">
+                <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;color:#334155">Koneksi MCP</h3>
+                <div id="mcpBlockStatus" style="margin-bottom:12px"></div>
+                <div style="display:flex;gap:8px">
+                    <button type="button" id="btnBlockMcp" class="app-button app-button-small" style="background:#dc2626;color:white" onclick="blockMcp()">Blokir MCP</button>
+                    <button type="button" id="btnUnblockMcp" class="app-button app-button-small app-button-primary" onclick="unblockMcp()">Aktifkan MCP</button>
+                </div>
+            </div>
+
+            <div class="overlay-actions">
+                <button type="button" class="app-button app-button-small" onclick="closeEditOverlay()">Batal</button>
+                <button type="submit" class="app-button app-button-primary app-button-small">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MCP Tools Overlay -->
+<div id="toolsOverlay" class="overlay-backdrop">
+    <div class="overlay-panel">
+        <div class="overlay-header">
+            <span class="overlay-title">MCP Tools: <span id="toolsUsername"></span></span>
+            <button class="overlay-close" onclick="closeToolsOverlay()">&times;</button>
+        </div>
+        <p style="font-size:13px;color:#64748b;margin-bottom:16px">Centang tools yang ingin diaktifkan untuk user ini. Default: semua aktif.</p>
+        <div id="mcpToolsGrid" class="mcp-tools-grid">
+            <!-- Tools will be loaded here -->
+        </div>
+        <div class="overlay-actions">
+            <button type="button" class="app-button app-button-small" onclick="closeToolsOverlay()">Tutup</button>
+        </div>
+    </div>
+</div>
+
 <script>
-    function toggleEdit(userId) {
-        const row = document.getElementById('edit-' + userId);
-        if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+    const csrfToken = '{{ csrf_token }}';
+    let currentEditUserId = null;
+    let currentToolsUserId = null;
+
+    // User data for editing
+    const userData = {
+        {% for item in managed_users %}
+        {{ item.id }}: {
+            max_materials: {{ item.limits.max_materials }},
+            max_words_per_material: {{ item.limits.max_words_per_material }},
+            max_live_apis: {{ item.limits.max_live_apis }},
+            max_relay_rooms: {{ item.limits.max_relay_rooms }},
+        },
+        {% endfor %}
+    };
+
+    // ── Edit Overlay ─────────────────────────────────────────────────────
+
+    function openEditOverlay(userId, username) {
+        currentEditUserId = userId;
+        document.getElementById('editUsername').textContent = username;
+        document.getElementById('editForm').action = `/admin/users/${userId}/limits`;
+
+        const data = userData[userId];
+        if (data) {
+            const form = document.getElementById('editForm');
+            form.max_materials.value = data.max_materials;
+            form.max_words_per_material.value = data.max_words_per_material;
+            form.max_live_apis.value = data.max_live_apis;
+            form.max_relay_rooms.value = data.max_relay_rooms;
+        }
+
+        // Load MCP block status
+        loadMcpBlockStatus(userId);
+        document.getElementById('editOverlay').classList.add('active');
     }
 
-    async function toggleFeature(userId, feature, enabled) {
-        const csrf = document.querySelector('input[name="csrf_token"]').value;
+    function closeEditOverlay() {
+        document.getElementById('editOverlay').classList.remove('active');
+        currentEditUserId = null;
+    }
+
+    async function loadMcpBlockStatus(userId) {
+        try {
+            const r = await fetch('/admin/api/mcp/settings');
+            const d = await r.json();
+            const userSetting = d.settings.find(s => s.user_id === userId);
+            const statusDiv = document.getElementById('mcpBlockStatus');
+
+            if (userSetting && userSetting.mcp_blocked) {
+                statusDiv.innerHTML = `<span class="block-badge block-badge-blocked">DIBLOKIR</span> <span style="font-size:12px;color:#64748b">${userSetting.blocked_reason || ''}</span>`;
+                document.getElementById('btnBlockMcp').style.display = 'none';
+                document.getElementById('btnUnblockMcp').style.display = '';
+            } else {
+                statusDiv.innerHTML = `<span class="block-badge block-badge-allowed">AKTIF</span>`;
+                document.getElementById('btnBlockMcp').style.display = '';
+                document.getElementById('btnUnblockMcp').style.display = 'none';
+            }
+        } catch(e) {
+            console.error('Error loading MCP settings:', e);
+        }
+    }
+
+    async function blockMcp() {
+        if (!currentEditUserId) return;
+        const reason = prompt('Alasan pemblokiran (opsional):');
         const fd = new FormData();
-        fd.append("csrf_token", csrf);
+        fd.append('csrf_token', csrfToken);
+        fd.append('reason', reason || '');
+        try {
+            const r = await fetch(`/admin/api/mcp/block/${currentEditUserId}`, {method: 'POST', body: fd});
+            const d = await r.json();
+            if (d.success) {
+                loadMcpBlockStatus(currentEditUserId);
+            } else {
+                alert(d.detail || 'Gagal blokir MCP');
+            }
+        } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    async function unblockMcp() {
+        if (!currentEditUserId) return;
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        try {
+            const r = await fetch(`/admin/api/mcp/unblock/${currentEditUserId}`, {method: 'POST', body: fd});
+            const d = await r.json();
+            if (d.success) {
+                loadMcpBlockStatus(currentEditUserId);
+            } else {
+                alert(d.detail || 'Gagal aktifkan MCP');
+            }
+        } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    // ── MCP Tools Overlay ────────────────────────────────────────────────
+
+    async function openToolsOverlay(userId, username) {
+        currentToolsUserId = userId;
+        document.getElementById('toolsUsername').textContent = username;
+
+        try {
+            const r = await fetch(`/admin/api/mcp/tools/${userId}`);
+            const d = await r.json();
+
+            if (d.success) {
+                const grid = document.getElementById('mcpToolsGrid');
+                grid.innerHTML = d.tools.map(tool => `
+                    <div class="mcp-tool-item">
+                        <input type="checkbox"
+                            id="tool-${tool.name}"
+                            ${tool.enabled ? 'checked' : ''}
+                            onchange="toggleTool('${tool.name}', this.checked)">
+                        <span class="mcp-tool-name">${formatToolName(tool.name)}</span>
+                        <span class="mcp-tool-status ${tool.enabled ? 'active' : 'inactive'}">${tool.enabled ? 'ON' : 'OFF'}</span>
+                    </div>
+                `).join('');
+            }
+        } catch(e) {
+            console.error('Error loading tools:', e);
+        }
+
+        document.getElementById('toolsOverlay').classList.add('active');
+    }
+
+    function closeToolsOverlay() {
+        document.getElementById('toolsOverlay').classList.remove('active');
+        currentToolsUserId = null;
+    }
+
+    async function toggleTool(toolName, enabled) {
+        if (!currentToolsUserId) return;
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        fd.append('tool_name', toolName);
+        fd.append('enabled', enabled ? 'true' : 'false');
+        try {
+            const r = await fetch(`/admin/api/mcp/tools/${currentToolsUserId}/toggle`, {method: 'POST', body: fd});
+            const d = await r.json();
+            if (d.success) {
+                // Update status badge
+                const statusEl = document.querySelector(`#tool-${toolName}`).parentElement.querySelector('.mcp-tool-status');
+                if (statusEl) {
+                    statusEl.textContent = enabled ? 'ON' : 'OFF';
+                    statusEl.className = `mcp-tool-status ${enabled ? 'active' : 'inactive'}`;
+                }
+            }
+        } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    function formatToolName(name) {
+        return name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    // Close overlays on backdrop click
+    document.getElementById('editOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeEditOverlay();
+    });
+    document.getElementById('toolsOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeToolsOverlay();
+    });
+
+    // ── Feature Toggle ───────────────────────────────────────────────────
+
+    async function toggleFeature(userId, feature, enabled) {
+        const fd = new FormData();
+        fd.append("csrf_token", csrfToken);
         fd.append("feature", feature);
         fd.append("enabled", enabled ? "true" : "false");
         try {
@@ -181,20 +474,18 @@
         } catch(e) { alert("Error: " + e.message); }
     }
 
+    // ── Search Filter ────────────────────────────────────────────────────
+
     const searchInput = document.getElementById("adminUserSearch");
     const userRows = Array.from(document.querySelectorAll(".admin-user-row"));
-    const editRows = Array.from(document.querySelectorAll(".edit-limits-row"));
     const noMatchRow = document.getElementById("adminNoMatchRow");
 
     function filterUsers() {
         const q = (searchInput?.value || "").trim().toLowerCase();
         let visible = 0;
         userRows.forEach((row) => {
-            const userId = row.dataset.userId;
             const match = !q || row.dataset.search.includes(q);
             row.style.display = match ? "" : "none";
-            const editRow = document.getElementById("edit-" + userId);
-            if (editRow && !match) editRow.style.display = "none";
             if (match) visible++;
         });
         if (noMatchRow) noMatchRow.classList.toggle("hidden", visible !== 0);

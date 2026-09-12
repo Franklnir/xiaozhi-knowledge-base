@@ -253,6 +253,30 @@ class SQLiteStore:
             );
             CREATE INDEX IF NOT EXISTS idx_reminders_owner ON reminders(owner_id, status);
             CREATE INDEX IF NOT EXISTS idx_reminders_scheduled ON reminders(scheduled_at, status);
+
+            -- MCP User Settings (block status and tool toggles)
+            CREATE TABLE IF NOT EXISTS mcp_user_settings (
+                user_id INTEGER PRIMARY KEY,
+                mcp_blocked INTEGER NOT NULL DEFAULT 0,
+                blocked_at TEXT,
+                blocked_reason TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            -- MCP Tool Toggles per user
+            CREATE TABLE IF NOT EXISTS mcp_tool_toggles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                tool_name TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, tool_name)
+            );
+            CREATE INDEX IF NOT EXISTS idx_mcp_toggles_user ON mcp_tool_toggles(user_id);
         """)
         conn.commit()
 
@@ -1030,3 +1054,88 @@ class SQLiteStore:
             (utc_now(), reminder_id)
         )
         conn.commit()
+
+    # ── MCP User Settings ─────────────────────────────────────────────────
+
+    def get_mcp_settings(self, user_id: int) -> Dict[str, Any]:
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM mcp_user_settings WHERE user_id = ?",
+            (user_id,)
+        ).fetchone()
+        if not row:
+            return {"user_id": user_id, "mcp_blocked": False, "blocked_at": None, "blocked_reason": None}
+        return {
+            "user_id": row["user_id"],
+            "mcp_blocked": bool(row["mcp_blocked"]),
+            "blocked_at": row["blocked_at"],
+            "blocked_reason": row["blocked_reason"],
+        }
+
+    def set_mcp_blocked(self, user_id: int, blocked: bool, reason: str = "") -> None:
+        conn = self._get_conn()
+        now = utc_now()
+        conn.execute("""
+            INSERT INTO mcp_user_settings (user_id, mcp_blocked, blocked_at, blocked_reason, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                mcp_blocked=excluded.mcp_blocked,
+                blocked_at=excluded.blocked_at,
+                blocked_reason=excluded.blocked_reason,
+                updated_at=excluded.updated_at
+        """, (user_id, int(blocked), now if blocked else None, reason if blocked else "", now, now))
+        conn.commit()
+
+    def is_mcp_blocked(self, user_id: int) -> bool:
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT mcp_blocked FROM mcp_user_settings WHERE user_id = ?",
+            (user_id,)
+        ).fetchone()
+        return bool(row["mcp_blocked"]) if row else False
+
+    # ── MCP Tool Toggles ──────────────────────────────────────────────────
+
+    def get_mcp_tool_toggles(self, user_id: int) -> Dict[str, bool]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT tool_name, enabled FROM mcp_tool_toggles WHERE user_id = ?",
+            (user_id,)
+        ).fetchall()
+        return {row["tool_name"]: bool(row["enabled"]) for row in rows}
+
+    def set_mcp_tool_toggle(self, user_id: int, tool_name: str, enabled: bool) -> None:
+        conn = self._get_conn()
+        now = utc_now()
+        conn.execute("""
+            INSERT INTO mcp_tool_toggles (user_id, tool_name, enabled, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, tool_name) DO UPDATE SET
+                enabled=excluded.enabled,
+                updated_at=excluded.updated_at
+        """, (user_id, tool_name, int(enabled), now, now))
+        conn.commit()
+
+    def is_mcp_tool_enabled(self, user_id: int, tool_name: str) -> bool:
+        """Check if a specific MCP tool is enabled for a user. Default: True."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT enabled FROM mcp_tool_toggles WHERE user_id = ? AND tool_name = ?",
+            (user_id, tool_name)
+        ).fetchone()
+        # Default is True (enabled) if no record exists
+        return bool(row["enabled"]) if row else True
+
+    def get_all_mcp_settings_for_admin(self) -> List[Dict[str, Any]]:
+        """Get MCP settings for all users (admin view)."""
+        conn = self._get_conn()
+        rows = conn.execute("""
+            SELECT u.id as user_id, u.username,
+                   COALESCE(s.mcp_blocked, 0) as mcp_blocked,
+                   s.blocked_at, s.blocked_reason
+            FROM users u
+            LEFT JOIN mcp_user_settings s ON u.id = s.user_id
+            WHERE u.role != 'admin'
+            ORDER BY u.username
+        """).fetchall()
+        return [dict(row) for row in rows]

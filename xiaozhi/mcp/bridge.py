@@ -74,6 +74,12 @@ async def mcp_background_task(store, mcp_server):
                 user_id = int(token_info["user_id"])
                 if user_id in mcp_bridge_tasks and not mcp_bridge_tasks[user_id].done():
                     continue  # Already running
+
+                # Check if user MCP is blocked by admin
+                if store.is_mcp_blocked(user_id):
+                    logger.info("MCP blocked for user_id=%s, skipping", user_id)
+                    continue
+
                 url = token_info["token"]
                 if not url.startswith("wss://"):
                     logger.warning("Token bukan wss://: user_id=%s", user_id)
