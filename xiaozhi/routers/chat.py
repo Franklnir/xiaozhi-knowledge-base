@@ -111,3 +111,30 @@ async def documentation_page(request: Request):
             "active_page": "documentation",
         },
     )
+
+
+@router.get("/profil", response_class=HTMLResponse)
+async def profile_page(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
+    store = get_store()
+    token_info = store.get_xiaozhi_token_info(user["id"])
+    token_hash = token_info.get("token_hash", "") if token_info else ""
+    features = store.get_user_features(user["id"])
+    mcp_status = mcp_status_payload(
+        user["id"],
+        token_saved=bool(token_info),
+        token_preview=token_info.get("preview", "") if token_info else "",
+        token_hash=token_hash,
+    )
+    return render(
+        request,
+        "profile.html",
+        {
+            "user": user,
+            "features": features,
+            "mcp_status": mcp_status,
+            "active_page": "profile",
+        },
+    )
