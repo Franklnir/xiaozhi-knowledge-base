@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -44,6 +45,14 @@ async def lifespan(app: FastAPI):
     # Initialize task queue
     await init_task_queue(max_workers=3)
     logger.info("Task queue initialized")
+
+    # Start reminder checker
+    try:
+        from xiaozhi.services.reminder_service import check_reminders_periodically
+        asyncio.create_task(check_reminders_periodically(store))
+        logger.info("Reminder checker started")
+    except Exception:
+        logger.warning("Reminder checker not available")
 
     # Start MCP background task
     try:
