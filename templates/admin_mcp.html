@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .mcp-status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+    }
+    .mcp-request-id {
+        font-family: monospace;
+        font-size: 11px;
+        color: #6b7280;
+        word-break: break-all;
+    }
+</style>
+
+<div class="app-page">
+    <header class="app-page-header">
+        <div>
+            <p class="app-eyebrow">Panel Admin</p>
+            <h1 class="app-title">Monitor MCP</h1>
+            <p class="app-subtitle">Pantau semua koneksi MCP XiaoZhi secara real-time.</p>
+        </div>
+        <div class="app-status-pill is-online">
+            <span class="app-status-dot"></span>
+            {{ total_active }} aktif
+        </div>
+    </header>
+
+    {% if message %}
+    <div class="app-alert app-alert-info">{{ message }}</div>
+    {% endif %}
+
+    <section class="mcp-status-grid">
+        <div class="app-stat-card">
+            <p class="app-stat-label">Koneksi Aktif</p>
+            <p class="app-stat-value">{{ total_active }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Endpoint Tersimpan</p>
+            <p class="app-stat-value">{{ total_stored }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Error</p>
+            <p class="app-stat-value" style="color: {% if total_errors > 0 %}#dc2626{% else %}#047857{% endif %}">{{ total_errors }}</p>
+        </div>
+    </section>
+
+    <section class="app-card">
+        <div class="app-card-header">
+            <h2 class="app-section-title">Semua Koneksi MCP</h2>
+            <button onclick="location.reload()" class="app-button app-button-small">Refresh</button>
+        </div>
+
+        <div class="app-table-wrap">
+            <table class="app-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Status</th>
+                        <th>Request ID</th>
+                        <th>Pesan</th>
+                        <th>Terakhir Update</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for conn in connections %}
+                    <tr>
+                        <td>
+                            <span class="app-table-title">{{ conn.username }}</span>
+                            <span class="app-table-subtext">ID {{ conn.user_id }}</span>
+                        </td>
+                        <td>
+                            {% if conn.connected %}
+                            <span class="app-chip app-chip-small app-chip-success">
+                                <span class="app-status-dot" style="width:6px;height:6px;border-radius:999px;background:#047857;display:inline-block"></span>
+                                Terhubung
+                            </span>
+                            {% elif conn.bridge_running %}
+                            <span class="app-chip app-chip-small app-chip-warning">
+                                <span class="app-status-dot" style="width:6px;height:6px;border-radius:999px;background:#d97706;display:inline-block"></span>
+                                Menghubungkan
+                            </span>
+                            {% else %}
+                            <span class="app-chip app-chip-small app-chip-neutral">
+                                <span class="app-status-dot" style="width:6px;height:6px;border-radius:999px;background:#6b7280;display:inline-block"></span>
+                                Tidak aktif
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="mcp-request-id">{{ conn.request_id or '-' }}</span>
+                        </td>
+                        <td>
+                            <span class="app-table-subtext">{{ conn.message[:60] }}</span>
+                        </td>
+                        <td>
+                            <span class="app-table-subtext">{{ conn.updated_at[:19] if conn.updated_at else '-' }}</span>
+                        </td>
+                        <td>
+                            <div style="display:flex;gap:6px">
+                                {% if conn.connected or conn.bridge_running %}
+                                <form action="/admin/api/mcp/disconnect/{{ conn.user_id }}" method="POST" style="display:inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="app-button app-button-small" style="background:#dc2626;color:white" onclick="return confirm('Putuskan koneksi MCP user ini?')">Putus</button>
+                                </form>
+                                {% else %}
+                                <form action="/admin/api/mcp/reconnect/{{ conn.user_id }}" method="POST" style="display:inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="app-button app-button-small app-button-primary">Hubungkan</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="py-10 text-center text-sm text-slate-500">Belum ada koneksi MCP.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<script>
+    // Auto-refresh every 10 seconds
+    setTimeout(() => location.reload(), 10000);
+</script>
+{% endblock %}

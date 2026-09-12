@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block content_login %}
+<style>
+    .auth-card {
+        min-height: 380px;
+        display: flex;
+        flex-direction: column;
+    }
+    .auth-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+</style>
+
+<section class="auth-layout">
+    <div class="auth-card">
+        <div class="mb-6">
+            <p class="app-eyebrow">Dashboard Admin</p>
+            <h1 class="app-title text-2xl">Xiaozhi Indonesia</h1>
+        </div>
+
+        {% if error %}
+        <div class="app-alert app-alert-danger mb-5">{{ error }}</div>
+        {% endif %}
+        {% if success %}
+        <div class="app-alert app-alert-success mb-5">{{ success }}</div>
+        {% endif %}
+
+        <div class="mb-5">
+            <label for="authMode" class="app-label">Pilih akses</label>
+            <select id="authMode" class="app-select">
+                <option value="login">Login</option>
+                <option value="search">Cari akun</option>
+                <option value="register">Register</option>
+                <option value="cek_mcp">Cek MCP Endpoint</option>
+            </select>
+        </div>
+
+        <div class="auth-panel">
+            <form id="loginPanel" action="/login" method="POST" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="auth_mode" value="login">
+                <div>
+                    <label for="login_username" class="app-label">Username</label>
+                    <input id="login_username" type="text" name="username" required autocomplete="username" value="{{ login_username or '' }}" class="app-input">
+                </div>
+                <div>
+                    <label for="login_password" class="app-label">Password</label>
+                    <input id="login_password" type="password" name="password" required autocomplete="current-password" class="app-input">
+                </div>
+                <button type="submit" class="app-button app-button-primary app-button-full">
+                    Masuk
+                </button>
+            </form>
+
+            <div id="searchPanel" class="hidden space-y-4">
+                <div>
+                    <label for="accountSearch" class="app-label">Cari username</label>
+                    <input id="accountSearch" type="search" autocomplete="off" placeholder="irs" value="{{ search_username or '' }}" class="app-input">
+                </div>
+                <div id="accountResults" class="hidden overflow-hidden rounded-lg border border-slate-200"></div>
+                <form id="searchLoginForm" action="/login" method="POST" class="hidden space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="auth_mode" value="search">
+                    <input id="selectedUsername" type="hidden" name="username" value="{{ search_username or '' }}">
+                    <div>
+                        <p class="text-xs font-semibold uppercase text-slate-500">Akun</p>
+                        <p id="selectedUsernameLabel" class="mt-1 text-sm font-bold text-slate-950">{{ search_username or '' }}</p>
+                    </div>
+                    <div>
+                        <label for="search_password" class="app-label">Password</label>
+                        <input id="search_password" type="password" name="password" required autocomplete="current-password" class="app-input">
+                    </div>
+                    <button type="submit" class="app-button app-button-primary app-button-full">
+                        Masuk
+                    </button>
+                </form>
+            </div>
+
+            <form id="registerPanel" action="/register" method="POST" class="hidden space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div>
+                    <label for="register_username" class="app-label">Username</label>
+                    <input id="register_username" type="text" name="username" required pattern="[a-z0-9_]{3,32}" autocomplete="username" value="{{ register_username or '' }}" class="app-input">
+                    <p class="mt-1 text-xs text-slate-500">Huruf kecil, angka, underscore. Minimal 3 karakter.</p>
+                </div>
+                <div>
+                    <label for="register_password" class="app-label">Password</label>
+                    <input id="register_password" type="password" name="password" required minlength="8" autocomplete="new-password" class="app-input">
+                    <p class="mt-1 text-xs text-slate-500">Minimal 8 karakter.</p>
+                </div>
+                <button type="submit" class="app-button app-button-success app-button-full">
+                    Daftar
+                </button>
+            </form>
+
+            <div id="cek_mcpPanel" class="hidden space-y-4">
+                <div>
+                    <label for="mcpEndpointInput" class="app-label">Endpoint MCP</label>
+                    <input id="mcpEndpointInput" type="text" placeholder="wss://api.xiaozhi.me/mcp/?token=..." class="app-input" autocomplete="off">
+                    <p class="mt-1 text-xs text-slate-500">Tempel endpoint wss:// untuk cek status kepemilikan.</p>
+                </div>
+                <button type="button" id="cekMcpBtn" class="app-button app-button-primary app-button-full">
+                    Cek Endpoint
+                </button>
+                <div id="mcpResult" class="hidden"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+    const authMode = document.getElementById("authMode");
+    const panels = {
+        login: document.getElementById("loginPanel"),
+        search: document.getElementById("searchPanel"),
+        register: document.getElementById("registerPanel"),
+        cek_mcp: document.getElementById("cek_mcpPanel"),
+    };
+    const accountSearch = document.getElementById("accountSearch");
+    const accountResults = document.getElementById("accountResults");
+    const searchLoginForm = document.getElementById("searchLoginForm");
+    const selectedUsername = document.getElementById("selectedUsername");
+    const selectedUsernameLabel = document.getElementById("selectedUsernameLabel");
+    const searchPassword = document.getElementById("search_password");
+    let searchTimer = null;
+
+    function setMode(mode) {
+        Object.entries(panels).forEach(([name, panel]) => {
+            panel.classList.toggle("hidden", name !== mode);
+        });
+        authMode.value = mode;
+        const url = new URL(window.location.href);
+        url.searchParams.set("mode", mode);
+        window.history.replaceState({}, "", url);
+    }
+
+    function selectAccount(username) {
+        selectedUsername.value = username;
+        selectedUsernameLabel.textContent = username;
+        searchLoginForm.classList.remove("hidden");
+        accountResults.classList.add("hidden");
+        searchPassword.focus();
+    }
+
+    function renderAccounts(accounts) {
+        accountResults.innerHTML = "";
+        if (!accounts.length) {
+            accountResults.classList.remove("hidden");
+            accountResults.innerHTML = '<div class="px-3 py-2 text-sm text-slate-500">Tidak ada akun.</div>';
+            return;
+        }
+        accounts.forEach((account) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "block w-full px-3 py-2 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50";
+            button.textContent = account.username;
+            button.addEventListener("click", () => selectAccount(account.username));
+            accountResults.appendChild(button);
+        });
+        accountResults.classList.remove("hidden");
+    }
+
+    async function searchAccounts() {
+        const query = accountSearch.value.trim().toLowerCase();
+        searchLoginForm.classList.add("hidden");
+        selectedUsername.value = "";
+        selectedUsernameLabel.textContent = "";
+        if (query.length < 3 || !/^[a-z0-9_]+$/.test(query)) {
+            accountResults.classList.add("hidden");
+            accountResults.innerHTML = "";
+            return;
+        }
+        const response = await fetch(`/accounts/search?q=${encodeURIComponent(query)}`, {
+            headers: { "Accept": "application/json" },
+        });
+        if (!response.ok) {
+            renderAccounts([]);
+            return;
+        }
+        const data = await response.json();
+        renderAccounts(data.accounts || []);
+    }
+
+    authMode.addEventListener("change", () => setMode(authMode.value));
+    accountSearch.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(searchAccounts, 180);
+    });
+
+    setMode("{{ active_mode or 'login' }}");
+    if (selectedUsername.value) {
+        searchLoginForm.classList.remove("hidden");
+    }
+    if (authMode.value === "search" && accountSearch.value.trim().length >= 3) {
+        searchAccounts();
+    }
+
+    // MCP Check
+    const mcpInput = document.getElementById("mcpEndpointInput");
+    const cekMcpBtn = document.getElementById("cekMcpBtn");
+    const mcpResult = document.getElementById("mcpResult");
+
+    cekMcpBtn.addEventListener("click", async function() {
+        const token = mcpInput.value.trim();
+        if (!token || !token.startsWith("wss://")) {
+            mcpResult.className = "app-alert app-alert-danger";
+            mcpResult.textContent = "Endpoint harus diawali wss://";
+            mcpResult.classList.remove("hidden");
+            return;
+        }
+        cekMcpBtn.disabled = true;
+        cekMcpBtn.textContent = "Mengecek...";
+        mcpResult.classList.add("hidden");
+        try {
+            const resp = await fetch("/api/mcp/check", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({token}),
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                mcpResult.className = "app-alert app-alert-danger";
+                mcpResult.textContent = data.detail || "Gagal mengecek endpoint.";
+            } else if (data.found) {
+                mcpResult.className = "app-alert app-alert-success";
+                mcpResult.innerHTML = '<div style="margin-bottom:8px"><strong>Endpoint ditemukan!</strong></div>'
+                    + '<div style="font-size:13px">User: <strong>' + escapeHtml(data.owner.username) + '</strong> (ID: ' + data.owner.user_id + ')</div>'
+                    + '<div style="font-size:13px">Role: ' + escapeHtml(data.owner.role) + '</div>'
+                    + '<div style="font-size:13px;margin-bottom:10px">Terdaftar: ' + (data.owner.created_at || '-') + '</div>'
+                    + '<button type="button" id="hapusMcpBtn" class="app-button app-button-danger app-button-small" style="width:100%">Hapus Endpoint Ini</button>';
+                document.getElementById("hapusMcpBtn").addEventListener("click", async function() {
+                    if (!confirm("Hapus endpoint MCP milik " + data.owner.username + "?")) return;
+                    this.disabled = true;
+                    this.textContent = "Menghapus...";
+                    const delResp = await fetch("/api/mcp/delete-by-token", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({token}),
+                    });
+                    const delData = await delResp.json();
+                    mcpResult.className = "app-alert " + (delData.success ? "app-alert-success" : "app-alert-danger");
+                    mcpResult.innerHTML = escapeHtml(delData.message);
+                });
+            } else {
+                mcpResult.className = "app-alert app-alert-warning";
+                mcpResult.textContent = data.message;
+            }
+            mcpResult.classList.remove("hidden");
+        } catch (e) {
+            mcpResult.className = "app-alert app-alert-danger";
+            mcpResult.textContent = "Error: " + e.message;
+            mcpResult.classList.remove("hidden");
+        } finally {
+            cekMcpBtn.disabled = false;
+            cekMcpBtn.textContent = "Cek Endpoint";
+        }
+    });
+
+    function escapeHtml(s) {
+        return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+</script>
+{% endblock %}

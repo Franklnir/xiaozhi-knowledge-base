@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  edusmart:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: edusmart
+    restart: unless-stopped
+    ports:
+      - "80:7860"
+    environment:
+      - ENVIRONMENT=production
+      - COOKIE_SECURE=true
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_DATASET_REPO=${HF_DATASET_REPO}
+      - APP_SECRET_KEY=${APP_SECRET_KEY}
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY}
+      - ALLOWED_HOSTS=*
+    mem_limit: 512m
+    memswap_limit: 1g
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"

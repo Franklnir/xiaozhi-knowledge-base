@@ -1,0 +1,685 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .dashboard-edit-panel {
+        max-height: calc(100vh - 32px);
+        overflow-y: auto;
+    }
+    .dashboard-edit-footer {
+        position: sticky;
+        bottom: -1px;
+        background: var(--app-surface);
+        padding-top: 10px;
+    }
+</style>
+
+<div class="app-page">
+    <header class="app-page-header">
+        <div>
+            <p class="app-eyebrow">Halo, {{ user.username }}</p>
+            <h1 class="app-title">Dashboard Xiaozhi Indonesia</h1>
+            <p class="app-subtitle">Kelola materi, catatan, dan data API realtime yang akan dibaca Xiaozhi saat menjawab pertanyaan.</p>
+        </div>
+        <div class="app-status-pill is-online">
+            <span class="app-status-dot"></span>
+            Knowledge base aktif
+        </div>
+    </header>
+
+    {% if message %}
+    <div class="app-alert app-alert-info">
+        {{ message }}
+    </div>
+    {% endif %}
+
+    {% if quota.alerts %}
+    <div class="app-alert app-alert-warning">
+        {{ quota.alerts|join(" ") }} Hubungi admin jika membutuhkan kapasitas tambahan.
+    </div>
+    {% endif %}
+
+    <section class="app-stat-grid">
+        <div class="app-stat-card">
+            <p class="app-stat-label">Total Materi</p>
+            <p class="app-stat-value">{{ stats.total }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Tugas</p>
+            <p class="app-stat-value">{{ stats.tugas }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Pengumuman</p>
+            <p class="app-stat-value">{{ stats.pengumuman }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Materi</p>
+            <p class="app-stat-value">{{ stats.materi }}</p>
+        </div>
+    </section>
+
+    <section class="app-card">
+        <div class="app-card-header is-compact">
+            <div>
+                <h2 class="app-section-title">Batas Akun</h2>
+                <p class="app-section-subtitle">Kuota yang ditetapkan admin untuk akun ini.</p>
+            </div>
+        </div>
+        <div class="app-meta-row">
+            <span class="app-chip app-chip-small {% if quota.materials.reached %}app-chip-info{% else %}app-chip-neutral{% endif %}">
+                Total Materi: {{ quota.materials.label }}
+            </span>
+            <span class="app-chip app-chip-small app-chip-neutral">
+                Kata / Materi: {% if quota.words_per_material.unlimited %}Tanpa batas{% else %}{{ quota.words_per_material.limit }}{% endif %}
+            </span>
+            <span class="app-chip app-chip-small {% if quota.live_apis.reached %}app-chip-info{% else %}app-chip-neutral{% endif %}">
+                API Realtime: {{ quota.live_apis.label }}
+            </span>
+            <span class="app-chip app-chip-small {% if quota.relay_rooms.reached %}app-chip-info{% else %}app-chip-neutral{% endif %}">
+                Perangkat Relay: {{ quota.relay_rooms.label }}
+            </span>
+        </div>
+    </section>
+
+    <section class="app-content-grid">
+        <div class="app-card">
+            <div class="app-card-header">
+                <div>
+                    <h2 class="app-section-title">Database Materi</h2>
+                    <p class="app-section-subtitle">Semua data di sini menjadi sumber jawaban Xiaozhi. Repo: {{ hf_repo_id }}</p>
+                </div>
+                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    <select id="filterCategory" onchange="filterTable()" class="app-select sm:w-56">
+                        <option value="all">Semua kategori</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.name }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="search" id="searchInput" oninput="filterTable()" placeholder="Cari data..." class="app-input sm:w-72">
+                </div>
+            </div>
+
+            <div class="app-table-wrap">
+                <table class="app-table" id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>Kategori</th>
+                            <th>Judul</th>
+                            <th>Isi Data</th>
+                            <th class="text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in materials %}
+                        <tr class="data-row hover:bg-slate-50" data-category="{{ item.category }}" data-material-id="{{ item.id }}" data-live-api="{% if item.source_type == 'api_live' %}true{% else %}false{% endif %}" data-search="{{ (item.title ~ ' ' ~ item.category ~ ' ' ~ item.content ~ ' ' ~ item.keywords ~ ' ' ~ (item.api_label or ''))|lower|e }}">
+                            <td>
+                                <div class="app-meta-row">
+                                    <span class="app-chip app-chip-success app-chip-small">{{ item.category }}</span>
+                                    {% if item.source_type == 'api_live' %}
+                                    <span class="app-chip app-chip-info app-chip-small">Realtime</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="app-table-title">{{ item.title }}</span>
+                                <span class="app-table-subtext">ID {{ item.id }}{% if item.keywords %} · {{ item.keywords[:70] }}{% if item.keywords|length > 70 %}...{% endif %}{% endif %}</span>
+                            </td>
+                            <td class="max-w-xl text-slate-600">
+                                {% if item.source_type == 'api_live' %}
+                                <span class="mb-1 block text-xs font-bold text-sky-700">Endpoint: {{ item.api_label }}</span>
+                                {% endif %}
+                                <span class="app-content-preview" id="materialContent{{ item.id }}">{{ item.content[:180] }}{% if item.content|length > 180 %}...{% endif %}</span>
+                                {% if item.source_type == 'api_live' %}
+                                <span class="mt-2 block text-xs font-semibold text-emerald-700" id="liveApiRowStatus{{ item.id }}">Mengecek update... | Size tersimpan: {{ item.content_size_label or '0.00 MB' }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-right">
+                                <div class="app-inline-actions">
+                                    <button type="button" onclick="editData(this)" data-item='{{ item|tojson }}' class="app-button app-button-ghost app-button-small app-button-link">Edit</button>
+                                    <form action="/delete_material/{{ item.id }}" method="POST" class="inline" onsubmit="return confirm('Hapus data ini?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                        <button type="submit" class="app-button app-button-ghost app-button-small app-button-text-danger">Hapus</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="py-10 text-center text-sm text-slate-500">Belum ada data materi.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <aside class="app-sidebar">
+            <style>
+                @keyframes mcpPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+                @keyframes mcpSpin { to{transform:rotate(360deg)} }
+                @keyframes mcpShimmer { to{background-position:-200% 0} }
+                .mcp-loading { animation: mcpPulse 1.5s ease-in-out infinite; }
+                .mcp-spinner { display:inline-block; width:14px; height:14px; border:2px solid #e5e7eb; border-top-color:#0369a1; border-radius:50%; animation:mcpSpin .8s linear infinite; vertical-align:middle; margin-right:6px }
+                .mcp-bar { height:4px; border-radius:2px; background:#e5e7eb; overflow:hidden; margin-top:8px }
+                .mcp-bar-fill { height:100%; border-radius:2px; transition:width .5s ease }
+                .mcp-bar-fill.connecting { width:60%; background:linear-gradient(90deg,#0369a1,#38bdf8,#0369a1); background-size:200%; animation:mcpShimmer 1.5s linear infinite }
+                .mcp-bar-fill.connected { width:100%; background:#047857 }
+                .mcp-bar-fill.idle { width:0%; background:#b91c1c }
+            </style>
+            <div class="app-card">
+                <div class="app-card-header is-compact">
+                    <div>
+                        <h2 class="app-section-title">Koneksi XiaoZhi</h2>
+                        <p class="app-section-subtitle">Endpoint MCP yang dipakai XiaoZhi untuk membaca materi.</p>
+                    </div>
+                    <span id="mcpChip" class="app-chip app-chip-small {% if mcp_connected %}app-chip-success{% elif mcp_token_saved %}app-chip-info{% else %}app-chip-neutral{% endif %}">
+                        {% if mcp_connected %}Terhubung{% elif mcp_token_saved %}Menunggu{% else %}Belum aktif{% endif %}
+                    </span>
+                </div>
+                <div id="mcpAlert" class="app-alert {% if mcp_connected %}app-alert-success{% elif mcp_token_saved %}app-alert-info{% else %}app-alert-warning{% endif %}">
+                    {% if mcp_token_saved %}{{ mcp_status.statusText }}{% else %}Endpoint belum tersimpan.{% endif %}
+                </div>
+                <div class="mcp-bar"><div id="mcpBar" class="mcp-bar-fill {% if mcp_connected %}connected{% elif mcp_token_saved %}connecting{% else %}idle{% endif %}"></div></div>
+                <div class="mt-4 space-y-3">
+                    <input type="hidden" id="mcpCsrf" value="{{ csrf_token }}">
+                    <div>
+                        <label for="mcp_token" class="app-label">Endpoint MCP</label>
+                        <input id="mcp_token" type="password" placeholder="wss://api.xiaozhi.me/mcp/?token=..." autocomplete="off" class="app-input">
+                        <p class="app-field-hint">Endpoint wss:// dari XiaoZhi disimpan terenkripsi.</p>
+                    </div>
+                    <button id="saveMcpBtn" class="app-button app-button-primary app-button-full">{% if mcp_token_saved %}Update Endpoint{% else %}Simpan Endpoint{% endif %}</button>
+                </div>
+                {% if mcp_token_saved %}
+                <div class="mt-3">
+                    <button id="reconnectBtn" class="app-button app-button-full">Reconnect XiaoZhi</button>
+                </div>
+                <div class="mt-3">
+                    <button id="deleteBtn" class="app-button app-button-danger app-button-full">Hapus Koneksi</button>
+                </div>
+                <a href="/riwayat-chat" class="app-button app-button-full mt-3">Buka Riwayat Chat</a>
+                <div id="mcpStatusDetail" class="mt-3 app-field-hint">Memuat status...</div>
+                {% endif %}
+            </div>
+
+            <div class="app-card">
+                <div class="app-card-header is-compact">
+                    <div>
+                        <h2 class="app-section-title">Tambah Materi</h2>
+                        <p class="app-section-subtitle">Simpan materi manual atau hubungkan endpoint API realtime.</p>
+                    </div>
+                </div>
+                <form action="/add_material" method="POST" class="app-form-section">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div>
+                        <label for="title" class="app-label">Judul</label>
+                        <input id="title" type="text" name="title" required maxlength="160" placeholder="Contoh: Catatan pertemuan 6" class="app-input">
+                    </div>
+                    <div>
+                        <label for="category" class="app-label">Kategori</label>
+                        <select id="category" name="category" required class="app-select">
+                            {% for cat in categories %}
+                            <option value="{{ cat.name }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="liveApiFields" class="app-muted-panel hidden border-sky-100 bg-sky-50">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-950">Sumber API Realtime</h3>
+                                <p class="app-section-subtitle">Raw JSON terbaru disiapkan untuk Xiaozhi.</p>
+                            </div>
+                            <span class="app-chip app-chip-info app-chip-small">Live</span>
+                        </div>
+                        <div class="mt-3">
+                            <label for="api_url" class="app-label">Endpoint API</label>
+                            <input id="api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input">
+                        </div>
+                        <div class="mt-3 flex items-center justify-between gap-2">
+                            <span class="text-xs font-semibold text-slate-500" id="liveApiStatus">Data API akan tampil di Isi Data.</span>
+                            <button type="button" class="app-button app-button-small" id="liveApiRefreshButton">Refresh</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="content" class="app-label">Isi Data</label>
+                        <textarea id="content" name="content" rows="7" placeholder="Tulis isi materi secara lengkap dan terstruktur." class="app-textarea"></textarea>
+                        <p class="app-field-hint">
+                            Batas kata per materi: {% if quota.words_per_material.unlimited %}tanpa batas{% else %}{{ quota.words_per_material.limit }} kata{% endif %}.
+                        </p>
+                    </div>
+                    <div>
+                        <label for="keywords" class="app-label">Kata Kunci</label>
+                        <input id="keywords" type="text" name="keywords" maxlength="300" placeholder="Contoh: analisis bisnis, tugas, penjualan" class="app-input">
+                    </div>
+                    <button type="submit" class="app-button app-button-success app-button-full" {% if quota.materials.reached %}disabled{% endif %}>
+                        {% if quota.materials.reached %}Batas Materi Tercapai{% else %}Simpan Materi{% endif %}
+                    </button>
+                </form>
+            </div>
+
+            <div class="app-card">
+                <div class="app-card-header is-compact">
+                    <div>
+                        <h2 class="app-section-title">Kategori</h2>
+                        <p class="app-section-subtitle">Kelompokkan materi agar mudah dicari.</p>
+                    </div>
+                    <span class="app-chip app-chip-neutral app-chip-small">{{ categories|length }} item</span>
+                </div>
+                <form action="/add_category" method="POST" class="flex gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="text" name="name" required maxlength="80" placeholder="Nama kategori" class="app-input min-w-0 flex-1">
+                    <button type="submit" class="app-button app-button-primary">Tambah</button>
+                </form>
+                <div class="app-list-panel mt-4 max-h-72 overflow-y-auto">
+                    {% for cat in categories %}
+                    <div class="app-list-row">
+                        <span class="text-sm font-semibold text-slate-700">{{ cat.name }}</span>
+                        {% if cat.name|lower != 'data dari api' %}
+                        <form action="/delete_category/{{ cat.id }}" method="POST" onsubmit="return confirm('Hapus kategori ini?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="app-button app-button-ghost app-button-small app-button-text-danger">Hapus</button>
+                        </form>
+                        {% else %}
+                        <span class="app-chip app-chip-small app-chip-neutral">Permanent</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </aside>
+    </section>
+</div>
+
+<div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto bg-slate-950/50 p-4">
+    <div class="app-card dashboard-edit-panel w-full max-w-2xl shadow-xl">
+        <div class="mb-4 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="app-section-title">Edit Materi</h3>
+                <p class="app-section-subtitle">Perbarui sumber data yang dipakai Xiaozhi.</p>
+            </div>
+            <button type="button" onclick="closeModal()" class="app-button app-button-ghost app-icon-button app-button-muted" aria-label="Tutup">&times;</button>
+        </div>
+        <form id="editForm" method="POST" class="app-form-section">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div>
+                <label for="edit_title" class="app-label">Judul</label>
+                <input id="edit_title" type="text" name="title" required maxlength="160" class="app-input">
+            </div>
+            <div>
+                <label for="edit_category" class="app-label">Kategori</label>
+                <select id="edit_category" name="category" required class="app-select">
+                    {% for cat in categories %}
+                    <option value="{{ cat.name }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div id="editLiveApiFields" class="app-muted-panel hidden border-sky-100 bg-sky-50">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-950">Sumber API Realtime</h3>
+                        <p class="app-section-subtitle">Raw JSON terbaru disiapkan untuk Xiaozhi.</p>
+                    </div>
+                    <span class="app-chip app-chip-info app-chip-small">Live</span>
+                </div>
+                <div class="mt-3">
+                    <label for="edit_api_url" class="app-label">Endpoint API</label>
+                    <input id="edit_api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input">
+                </div>
+                <div class="mt-3 flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold text-slate-500" id="editLiveApiStatus">Data API akan tampil di Isi Data.</span>
+                    <button type="button" class="app-button app-button-small" id="editLiveApiRefreshButton">Refresh</button>
+                </div>
+            </div>
+            <div>
+                <label for="edit_content" class="app-label">Isi Data</label>
+                <textarea id="edit_content" name="content" rows="8" class="app-textarea"></textarea>
+            </div>
+            <div>
+                <label for="edit_keywords" class="app-label">Kata Kunci</label>
+                <input id="edit_keywords" type="text" name="keywords" maxlength="300" class="app-input">
+            </div>
+            <div class="dashboard-edit-footer flex justify-end gap-2">
+                <button type="button" onclick="closeModal()" class="app-button">Batal</button>
+                <button type="submit" class="app-button app-button-primary">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const DASHBOARD_CSRF_TOKEN = {{ csrf_token|tojson }};
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function previewText(value, maxLength = 130) {
+        const text = String(value ?? "").replace(/\s+/g, " ").trim();
+        if (text.length <= maxLength) return text;
+        return `${text.slice(0, maxLength - 3).trim()}...`;
+    }
+
+    function formatLiveTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "-";
+        return date.toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+        });
+    }
+
+    function formatSizeLabel(payload) {
+        if (payload.content_size_label) return payload.content_size_label;
+        const sizeBytes = Number(payload.content_size_bytes || 0);
+        return `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    function liveApiMetaText(payload) {
+        const total = payload.live_total_items ?? payload.total_items ?? 0;
+        const updatedAt = payload.live_updated_at || payload.updated_at;
+        return `Update ${formatLiveTime(updatedAt)} | Size ${formatSizeLabel(payload)} | ${total} record`;
+    }
+
+    function flashElement(element) {
+        if (!element) return;
+        element.classList.remove("app-live-flash");
+        void element.offsetWidth;
+        element.classList.add("app-live-flash");
+    }
+
+    function filterTable() {
+        const input = document.getElementById("searchInput").value.toLowerCase();
+        const filterCat = document.getElementById("filterCategory").value;
+        document.querySelectorAll(".data-row").forEach((row) => {
+            const matchSearch = row.dataset.search.includes(input);
+            const matchCat = filterCat === "all" || row.dataset.category === filterCat;
+            row.style.display = matchSearch && matchCat ? "" : "none";
+        });
+    }
+
+    function editData(button) {
+        const item = JSON.parse(button.dataset.item);
+        liveApiContexts.edit.lastHash = "";
+        liveApiContexts.edit.lastContent = "";
+        document.getElementById("edit_title").value = item.title || "";
+        document.getElementById("edit_category").value = item.category || "";
+        document.getElementById("edit_content").value = item.content || "";
+        document.getElementById("edit_keywords").value = item.keywords || "";
+        document.getElementById("edit_api_url").value = item.api_url || "";
+        document.getElementById("editForm").action = "/update_material/" + encodeURIComponent(item.id);
+        syncLiveApiFields("edit");
+        const modal = document.getElementById("editModal");
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+    }
+
+    function closeModal() {
+        const modal = document.getElementById("editModal");
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+        clearLiveApiTimer("edit");
+    }
+
+    async function postJson(url, body) {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-CSRF-Token": DASHBOARD_CSRF_TOKEN,
+            },
+            credentials: "same-origin",
+            body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || "Request gagal.");
+        return data;
+    }
+
+    const liveApiCategoryName = "data dari api";
+    const liveApiContexts = {
+        add: {
+            category: document.getElementById("category"),
+            fields: document.getElementById("liveApiFields"),
+            apiUrl: document.getElementById("api_url"),
+            content: document.getElementById("content"),
+            status: document.getElementById("liveApiStatus"),
+            refresh: document.getElementById("liveApiRefreshButton"),
+            lastContent: "",
+            lastHash: "",
+            timer: null,
+            debounce: null,
+        },
+        edit: {
+            category: document.getElementById("edit_category"),
+            fields: document.getElementById("editLiveApiFields"),
+            apiUrl: document.getElementById("edit_api_url"),
+            content: document.getElementById("edit_content"),
+            status: document.getElementById("editLiveApiStatus"),
+            refresh: document.getElementById("editLiveApiRefreshButton"),
+            lastContent: "",
+            lastHash: "",
+            timer: null,
+            debounce: null,
+        },
+    };
+
+    function isLiveApiCategory(value) {
+        return String(value || "").trim().toLowerCase() === liveApiCategoryName;
+    }
+
+    function clearLiveApiTimer(mode) {
+        const ctx = liveApiContexts[mode];
+        if (ctx.timer) window.clearInterval(ctx.timer);
+        ctx.timer = null;
+        if (ctx.debounce) window.clearTimeout(ctx.debounce);
+        ctx.debounce = null;
+    }
+
+    function setLiveApiStatus(mode, message, isError = false) {
+        const ctx = liveApiContexts[mode];
+        ctx.status.textContent = message;
+        ctx.status.className = isError
+            ? "text-xs font-semibold text-red-700"
+            : "text-xs font-semibold text-slate-500";
+    }
+
+    async function refreshLiveApiPreview(mode, showChecking = false) {
+        const ctx = liveApiContexts[mode];
+        const apiUrl = ctx.apiUrl.value.trim();
+        if (!apiUrl || !isLiveApiCategory(ctx.category.value)) return;
+        ctx.refresh.disabled = true;
+        if (!ctx.lastHash || showChecking) {
+            setLiveApiStatus(mode, "Mengecek perubahan API...");
+        }
+        try {
+            const previousHash = ctx.lastHash;
+            const payload = await postJson("/api/materials/live-api/preview", {
+                api_url: apiUrl,
+                previous_hash: previousHash,
+            });
+            if (!payload.changed) {
+                return;
+            }
+            ctx.lastHash = payload.content_hash || "";
+            if (payload.content && payload.content !== ctx.lastContent) {
+                ctx.lastContent = payload.content;
+                if (previousHash) {
+                    flashElement(ctx.fields);
+                    flashElement(ctx.content);
+                }
+            }
+            ctx.content.value = payload.content || "";
+            setLiveApiStatus(mode, liveApiMetaText(payload));
+        } catch (error) {
+            setLiveApiStatus(mode, error.message || "Gagal membaca API.", true);
+        } finally {
+            ctx.refresh.disabled = false;
+        }
+    }
+
+    function scheduleLiveApiPreview(mode) {
+        const ctx = liveApiContexts[mode];
+        if (ctx.debounce) window.clearTimeout(ctx.debounce);
+        ctx.debounce = window.setTimeout(() => refreshLiveApiPreview(mode), 450);
+    }
+
+    function syncLiveApiFields(mode) {
+        const ctx = liveApiContexts[mode];
+        const live = isLiveApiCategory(ctx.category.value);
+        ctx.fields.classList.toggle("hidden", !live);
+        ctx.apiUrl.required = live;
+        ctx.content.required = !live;
+        ctx.content.readOnly = live;
+        ctx.content.placeholder = live
+            ? "Data dari API akan tampil otomatis dan diperbarui realtime."
+            : "";
+        if (!live) {
+            clearLiveApiTimer(mode);
+            ctx.lastHash = "";
+            ctx.lastContent = "";
+            return;
+        }
+        if (!ctx.content.value) {
+            ctx.content.value = "Data realtime dari API akan muncul setelah endpoint terbaca.";
+        }
+        if (!ctx.timer) {
+            ctx.timer = window.setInterval(() => refreshLiveApiPreview(mode), 1000);
+        }
+        if (ctx.apiUrl.value.trim()) scheduleLiveApiPreview(mode);
+    }
+
+    Object.entries(liveApiContexts).forEach(([mode, ctx]) => {
+        ctx.category.addEventListener("change", () => syncLiveApiFields(mode));
+        ctx.apiUrl.addEventListener("input", () => {
+            ctx.lastHash = "";
+            ctx.lastContent = "";
+            scheduleLiveApiPreview(mode);
+        });
+        ctx.refresh.addEventListener("click", () => refreshLiveApiPreview(mode, true));
+    });
+
+    syncLiveApiFields("add");
+
+    const liveMaterialRows = Array.from(document.querySelectorAll('[data-live-api="true"]'));
+    const liveMaterialState = new Map();
+    const liveMaterialInflight = new Set();
+
+    async function refreshSavedLiveMaterial(row) {
+        if (document.hidden) return;
+        const materialId = row.dataset.materialId;
+        if (!materialId || liveMaterialInflight.has(materialId)) return;
+        liveMaterialInflight.add(materialId);
+        try {
+            const previousHash = liveMaterialState.get(materialId) || "";
+            const query = previousHash ? `?last_hash=${encodeURIComponent(previousHash)}` : "";
+            const response = await fetch(`/api/materials/live-api/${encodeURIComponent(materialId)}${query}`, {
+                headers: { "Accept": "application/json" },
+                credentials: "same-origin",
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.detail || "Gagal membaca live API.");
+            if (!payload.changed) {
+                return;
+            }
+            liveMaterialState.set(materialId, payload.content_hash);
+
+            const contentEl = document.getElementById(`materialContent${materialId}`);
+            const statusEl = document.getElementById(`liveApiRowStatus${materialId}`);
+            if (contentEl) contentEl.textContent = previewText(payload.content);
+            if (statusEl) {
+                statusEl.textContent = liveApiMetaText(payload);
+                statusEl.className = "mt-1 block text-xs font-semibold text-emerald-700";
+            }
+            if (previousHash && previousHash !== payload.content_hash) {
+                flashElement(row);
+                if (contentEl) flashElement(contentEl);
+            }
+        } catch (error) {
+            const statusEl = document.getElementById(`liveApiRowStatus${materialId}`);
+            if (statusEl) {
+                statusEl.textContent = error.message || "Live API gagal dibaca.";
+                statusEl.className = "mt-1 block text-xs font-semibold text-red-700";
+            }
+        } finally {
+            liveMaterialInflight.delete(materialId);
+        }
+    }
+
+    function refreshAllSavedLiveMaterials() {
+        liveMaterialRows.forEach((row) => refreshSavedLiveMaterial(row));
+    }
+
+    if (liveMaterialRows.length) {
+        refreshAllSavedLiveMaterials();
+        window.setInterval(refreshAllSavedLiveMaterials, 1000);
+    }
+</script>
+<script>
+let mcpPoll = null, mcpBusy = false;
+function mcpUI(s) {
+    const chip = document.getElementById("mcpChip"), alert = document.getElementById("mcpAlert"), bar = document.getElementById("mcpBar"), detail = document.getElementById("mcpStatusDetail");
+    if (chip) {
+        if (s.connected) { chip.className = "app-chip app-chip-small app-chip-success"; chip.innerHTML = "Terhubung"; }
+        else if (s.tokenSaved) { chip.className = "app-chip app-chip-small app-chip-info" + (mcpBusy ? " mcp-loading" : ""); chip.innerHTML = (mcpBusy ? '<span class="mcp-spinner"></span>' : '') + "Menghubungkan..."; }
+        else { chip.className = "app-chip app-chip-small app-chip-neutral"; chip.innerHTML = "Belum aktif"; }
+    }
+    if (alert) { alert.className = "app-alert " + (s.connected ? "app-alert-success" : s.tokenSaved ? "app-alert-info" : "app-alert-warning"); alert.textContent = s.connected ? s.statusText : s.tokenSaved ? (s.statusText || "Menghubungkan...") : "Endpoint belum tersimpan."; }
+    if (bar) bar.className = "mcp-bar-fill " + (s.connected ? "connected" : s.tokenSaved ? "connecting" : "idle");
+    if (detail) { detail.textContent = s.statusText + " | " + (s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("id-ID") : "-"); detail.style.color = s.connected ? "#047857" : mcpBusy ? "#0369a1" : "#64748b"; }
+    if (s.connected) mcpBusy = false;
+    const sb = document.getElementById("saveMcpBtn"), rb = document.getElementById("reconnectBtn"), db = document.getElementById("deleteBtn");
+    if (sb) sb.disabled = mcpBusy; if (rb) rb.disabled = mcpBusy; if (db) db.disabled = mcpBusy;
+}
+function pollMcp() { fetch("/api/mcp/status",{credentials:"same-origin"}).then(r=>r.json()).then(d=>{if(d.success)mcpUI(d.status)}).catch(()=>{}) }
+function startConnect() {
+    mcpBusy = true; mcpUI({connected:false,tokenSaved:true,statusText:"Menghubungkan ke XiaoZhi..."});
+    if (mcpPoll) clearInterval(mcpPoll); mcpPoll = setInterval(pollMcp, 1000);
+    setTimeout(() => { if(mcpPoll) clearInterval(mcpPoll); mcpBusy=false; mcpPoll=setInterval(pollMcp,5000); pollMcp(); }, 30000);
+}
+async function ajaxMcp(url, body) {
+    const csrf = document.getElementById("mcpCsrf").value;
+    const fd = new FormData();
+    fd.append("csrf_token", csrf);
+    for (const k in body) fd.append(k, body[k]);
+    const resp = await fetch(url, {method:"POST", body:fd, credentials:"same-origin", redirect:"manual"});
+    return resp;
+}
+document.addEventListener("DOMContentLoaded", function() {
+    // Save button - AJAX
+    const saveBtn = document.getElementById("saveMcpBtn");
+    if (saveBtn) saveBtn.addEventListener("click", async function() {
+        const token = document.getElementById("mcp_token").value.trim();
+        if (!token || !token.startsWith("wss://")) { alert("Endpoint harus diawali wss://"); return; }
+        startConnect();
+        await ajaxMcp("/save_mcp", {mcp_token: token});
+        pollMcp();
+    });
+    // Reconnect button - AJAX
+    const reconnectBtn = document.getElementById("reconnectBtn");
+    if (reconnectBtn) reconnectBtn.addEventListener("click", async function() {
+        startConnect();
+        await ajaxMcp("/reconnect_mcp", {});
+        pollMcp();
+    });
+    // Delete button - AJAX
+    const deleteBtn = document.getElementById("deleteBtn");
+    if (deleteBtn) deleteBtn.addEventListener("click", async function() {
+        if (!confirm("Hapus endpoint? Koneksi akan diputus.")) return;
+        mcpBusy = true;
+        await ajaxMcp("/delete_mcp", {});
+        mcpBusy = false;
+        pollMcp();
+    });
+    // Start polling immediately
+    pollMcp();
+    mcpPoll = setInterval(pollMcp, 5000);
+});
+</script>
+{% endblock %}
