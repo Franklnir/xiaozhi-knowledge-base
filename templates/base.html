@@ -408,8 +408,8 @@
         .app-list-panel { overflow: hidden; border: 1px solid var(--app-border); border-radius: var(--app-radius); background: var(--app-surface); }
         .app-list-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-top: 1px solid #eef2f7; }
         .app-list-row:first-child { border-top: 0; }
-        .auth-layout { display: grid; min-height: 100vh; place-items: center; }
-        .auth-card { width: min(100%, 480px); padding: clamp(22px, 3vw, 32px); }
+        .auth-layout { display: grid; min-height: 100vh; place-items: center; width: 100%; }
+        .auth-card { width: 480px; max-width: 100%; padding: 32px; min-height: 420px; display: flex; flex-direction: column; }
         .auth-card .app-title { font-size: 24px; }
 
         /* THEME OVERRIDES */
@@ -472,6 +472,8 @@
         }
         @media (max-width: 560px) {
             .app-stat-grid { grid-template-columns: 1fr; }
+            .auth-card { width: 100%; padding: 20px 16px; min-height: auto; }
+            .auth-layout { padding: 16px; }
         }
     </style>
 </head>
@@ -551,7 +553,7 @@
     </div>
     {% else %}
     <!-- No user (login page) -->
-    <div style="flex:1; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px">
+    <div style="flex:1; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; width:100%">
         {% block content_login %}{% endblock %}
     </div>
     {% endif %}
