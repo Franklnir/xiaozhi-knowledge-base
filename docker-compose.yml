@@ -1,0 +1,36 @@
+services:
+  xiaozhi:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: xiaozhi
+    restart: unless-stopped
+    ports:
+      - "80:7860"
+    environment:
+      - APP_SECRET_KEY=Zb6fyD2dkYd7pSSGNk1RBqTt+DQXf18elJ7euA0r5qw=
+      - DATA_ENCRYPTION_KEY=dbaxtyENVdPRoCcRhWEArO2UhWWhx14nh6XE3+xQh0o=
+      - ADMIN_USERNAME=irsyad03
+      - ADMIN_PASSWORD=irsyad031226
+      - RESTORED_USER_USERNAME=irsyad26
+      - RESTORED_USER_PASSWORD=irsyad261203
+      - DB_BACKEND=sqlite
+      - SQLITE_DB_PATH=/app/data/xiaozhi.db
+      - ENVIRONMENT=production
+      - ALLOWED_HOSTS=163.61.58.235,localhost
+    volumes:
+      - ./data:/app/data
+    mem_limit: 512m
+    memswap_limit: 1g
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
