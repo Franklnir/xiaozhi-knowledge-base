@@ -1,3 +1,4 @@
+import os
 import secrets
 from typing import Optional
 from urllib.parse import urlencode
@@ -30,7 +31,12 @@ def set_session_cookie(response: RedirectResponse, request: Request, user: dict)
         "username": user["username"],
         "session_version": user.get("session_version", 1),
     })
-    secure = request.url.scheme == "https"
+    # Check if HTTPS (consider proxy headers for HuggingFace/VPS)
+    secure = (
+        request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto") == "https"
+        or os.getenv("COOKIE_SECURE", "").lower() in {"1", "true", "yes"}
+    )
     response.set_cookie(
         SESSION_COOKIE,
         token,
