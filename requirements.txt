@@ -14,3 +14,5 @@ websockets
 requests
 PyJWT>=2.8.0
 psutil>=5.9.0
+PyMuPDF>=1.23.0
+beautifulsoup4>=4.12.0
