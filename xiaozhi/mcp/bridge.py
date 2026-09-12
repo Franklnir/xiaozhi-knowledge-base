@@ -85,11 +85,14 @@ async def mcp_background_task(store, mcp_server):
                 task = asyncio.create_task(run_mcp_bridge(store, mcp_server, user_id, url, token_hash))
                 mcp_bridge_tasks[user_id] = task
 
-            # Wait for reload signal - interruptible sleep
+            # Wait for reload signal OR timeout (check for new users every 30s)
             if mcp_reload_event:
                 mcp_reload_event.clear()
-                await mcp_reload_event.wait()
-                logger.info("MCP reload signal received. Restarting affected bridges.")
+                try:
+                    await asyncio.wait_for(mcp_reload_event.wait(), timeout=30)
+                    logger.info("MCP reload signal received. Checking for new bridges.")
+                except asyncio.TimeoutError:
+                    pass  # Timeout is normal - just loop to check for new users
             else:
                 await asyncio.sleep(30)
         except Exception:
