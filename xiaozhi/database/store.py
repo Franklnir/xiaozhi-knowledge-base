@@ -65,6 +65,7 @@ from xiaozhi.core.utils import (
     validate_external_api_url,
 )
 from xiaozhi.database.helpers import empty_database, normalize_database
+from xiaozhi.services.mcp_service import mcp_connection_states
 
 logger = logging.getLogger("xiaozhi.store")
 
