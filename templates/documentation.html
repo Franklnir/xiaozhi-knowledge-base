@@ -274,7 +274,31 @@
 
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>⚙️</span> Cara Kerja Teknis
+                    <span>🔄</span> Arsitektur Sistem
+                </div>
+
+                <div class="doc-code" style="white-space: pre; font-size: 11px; line-height: 1.6;">
+┌─────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────┐
+│   User      │────▶│   XiaoZhi API   │────▶│  Xiaozhi Indo   │────▶│   YouTube   │
+│  (Suara)    │     │   (xiaozhi.me)  │     │   (Server)      │     │   (yt-dlp)  │
+└─────────────┘     └─────────────────┘     └─────────────────┘     └─────────────┘
+                                              │           ▲
+                                              │           │
+                                              ▼           │
+                                        ┌─────────────────┐
+                                        │    ESP32        │
+                                        │  (Audio Player) │
+                                        └─────────────────┘
+                                              │
+                                              ▼
+                                        ┌─────────────────┐
+                                        │    Speaker      │
+                                        └─────────────────┘</div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>⚙️</span> Alur Kerja Detail
                 </div>
 
                 <div class="doc-step">
@@ -282,7 +306,8 @@
                     <div class="doc-step-content">
                         <div class="doc-step-title">User Minta Lagu via Suara</div>
                         <div class="doc-step-desc">
-                            Kamu katakan ke XiaoZhi: <em>"Putar lagu Bohemian Rhapsody"</em>
+                            Kamu katakan ke XiaoZhi: <em>"Putar lagu Bohemian Rhapsody"</em><br>
+                            XiaoZhi (di xiaozhi.me) akan mengirim permintaan ke server Xiaozhi Indonesia melalui MCP.
                         </div>
                     </div>
                 </div>
@@ -290,9 +315,14 @@
                 <div class="doc-step">
                     <div class="doc-step-number">2</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">XiaoZhi Panggil Tool MCP</div>
+                        <div class="doc-step-title">Server Xiaozhi Indonesia Menerima Request</div>
                         <div class="doc-step-desc">
-                            XiaoZhi akan memanggil tool <code>play_youtube_song</code> dengan query pencarian.
+                            Server menerima request MCP dan memanggil tool <code>play_youtube_song</code>.<br>
+                            Tool ini menggunakan library <code>yt-dlp</code> untuk mencari lagu di YouTube.
+                        </div>
+                        <div class="doc-code">
+                            # Dipanggil otomatis oleh MCP:<br>
+                            play_youtube_song(query="Bohemian Rhapsody")
                         </div>
                     </div>
                 </div>
@@ -300,9 +330,12 @@
                 <div class="doc-step">
                     <div class="doc-step-number">3</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Sistem Cari di YouTube</div>
+                        <div class="doc-step-title">yt-dlp Mencari & Mengambil Audio Stream</div>
                         <div class="doc-step-desc">
-                            Sistem menggunakan <code>yt-dlp</code> untuk mencari lagu dan mendapatkan URL audio stream.
+                            <code>yt-dlp</code> akan:<br>
+                            • Mencari video di YouTube berdasarkan query<br>
+                            • Mengambil URL audio stream (format m4a/webm)<br>
+                            • Mengembalikan title, duration, dan stream_url
                         </div>
                     </div>
                 </div>
@@ -310,13 +343,13 @@
                 <div class="doc-step">
                     <div class="doc-step-number">4</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Audio Di-queue ke ESP32</div>
+                        <div class="doc-step-title">Server Menyimpan ke Audio Queue</div>
                         <div class="doc-step-desc">
-                            URL audio stream dikirim ke ESP32 melalui endpoint API polling.
-                        </div>
-                        <div class="doc-code">
-                            Endpoint: GET /api/audio/commands/{device_id}<br>
-                            Response: { "title": "...", "stream_url": "https://..." }
+                            Server menyimpan perintah audio ke database (tabel <code>audio_queue</code>):<br>
+                            • title: Judul lagu<br>
+                            • stream_url: URL audio stream<br>
+                            • video_url: URL video YouTube<br>
+                            • status: pending
                         </div>
                     </div>
                 </div>
@@ -324,9 +357,39 @@
                 <div class="doc-step">
                     <div class="doc-step-number">5</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">ESP32 Putar Audio</div>
+                        <div class="doc-step-title">ESP32 Polling ke Server</div>
                         <div class="doc-step-desc">
-                            ESP32 mengambil audio dari URL stream dan memutarnya melalui speaker.
+                            ESP32 secara berkala (setiap 2-5 detik) melakukan polling ke server untuk mengecek apakah ada perintah audio baru.
+                        </div>
+                        <div class="doc-code">
+                            GET https://xiaozhiscig.biz.id/api/audio/commands/{device_id}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">6</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">ESP32 Menerima & Memutar Audio</div>
+                        <div class="doc-step-desc">
+                            ESP32 menerima response berisi stream_url, lalu:<br>
+                            • Download audio dari stream_url<br>
+                            • Decode audio (m4a/webm → PCM)<br>
+                            • Putar melalui speaker via I2S/DAC
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">7</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">ESP32 Kirim Konfirmasi</div>
+                        <div class="doc-step-desc">
+                            Setelah audio selesai diputar, ESP32 mengirim konfirmasi ke server bahwa perintah sudah dieksekusi.
+                        </div>
+                        <div class="doc-code">
+                            POST https://xiaozhiscig.biz.id/api/audio/ack/{command_id}<br>
+                            Body: { "device_id": "esp32-xxx" }
                         </div>
                     </div>
                 </div>
@@ -336,42 +399,132 @@
                 <div class="doc-section-title">
                     <span>📡</span> Endpoint API untuk Firmware ESP32
                 </div>
+                <p class="doc-step-desc">
+                    Berikut adalah endpoint yang perlu diimplementasikan di firmware ESP32. Copy URL ini ke kode firmware.
+                </p>
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Polling Perintah Audio</div>
-                        <div class="doc-desc">
-                            ESP32 harus melakukan polling ke endpoint ini untuk mengecek apakah ada perintah audio baru:
-                        </div>
-                        <div class="doc-code">
-                            GET /api/audio/commands/{device_id}<br><br>
-                            Response:<br>
-                            {<br>
-                            &nbsp;&nbsp;"commands": [<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;{<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 123,<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"title": "Lagu Title",<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"stream_url": "https://...",<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"video_url": "https://youtube.com/...",<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"duration": "3:45"<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;}<br>
-                            &nbsp;&nbsp;]<br>
-                            }
+                        <div class="doc-step-title">Base URL</div>
+                        <div class="doc-code" style="background: #ecfdf5; border-color: #a7f3d0;">
+https://xiaozhiscig.biz.id
                         </div>
                     </div>
                 </div>
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Konfirmasi Audio Diputar</div>
-                        <div class="doc-desc">
-                            Setelah audio diputar, ESP32 harus mengirim konfirmasi:
+                        <div class="doc-step-title">1. Polling Perintah Audio</div>
+                        <div class="doc-step-desc">
+                            ESP32 harus melakukan polling ke endpoint ini setiap 2-5 detik untuk mengecek perintah audio baru.
+                        </div>
+                        <div class="doc-code" style="background: #ecfdf5; border-color: #a7f3d0;">
+GET https://xiaozhiscig.biz.id/api/audio/commands/{device_id}
                         </div>
                         <div class="doc-code">
-                            POST /api/audio/ack/{command_id}<br><br>
-                            Body: { "device_id": "esp32-xxx" }
+Response (200 OK):<br>
+{<br>
+&nbsp;&nbsp;"commands": [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 123,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"title": "Bohemian Rhapsody - Queen",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"stream_url": "https://rr3---sn-a5mlrned.googlevideo.com/...",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"video_url": "https://www.youtube.com/watch?v=...",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"duration": "5:55"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;]<br>
+}
+                        </div>
+                        <div class="doc-tip">
+                            <strong>💡 Tips:</strong> Jika <code>commands</code> kosong, berarti tidak ada perintah audio baru. Lanjutkan polling.
                         </div>
                     </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">2. Konfirmasi Audio Diputar</div>
+                        <div class="doc-step-desc">
+                            Setelah audio berhasil diputar, ESP32 harus mengirim konfirmasi agar tidak diputar ulang.
+                        </div>
+                        <div class="doc-code" style="background: #ecfdf5; border-color: #a7f3d0;">
+POST https://xiaozhiscig.biz.id/api/audio/ack/{command_id}
+                        </div>
+                        <div class="doc-code">
+Request Body:<br>
+{<br>
+&nbsp;&nbsp;"device_id": "esp32-xxx"<br>
+}<br><br>
+Response (200 OK):<br>
+{<br>
+&nbsp;&nbsp;"success": true,<br>
+&nbsp;&nbsp;"message": "Audio command acknowledged"<br>
+}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">3. Registrasi Device (Opsional)</div>
+                        <div class="doc-step-desc">
+                            ESP32 bisa mendaftarkan diri ke server untuk monitoring.
+                        </div>
+                        <div class="doc-code" style="background: #ecfdf5; border-color: #a7f3d0;">
+POST https://xiaozhiscig.biz.id/api/devices/register
+                        </div>
+                        <div class="doc-code">
+Request Body:<br>
+{<br>
+&nbsp;&nbsp;"device_id": "esp32-living-room",<br>
+&nbsp;&nbsp;"device_name": "Speaker Ruang Tamu",<br>
+&nbsp;&nbsp;"device_type": "audio_player"<br>
+}<br><br>
+Response (200 OK):<br>
+{<br>
+&nbsp;&nbsp;"success": true,<br>
+&nbsp;&nbsp;"device": { "id": 1, "device_id": "esp32-living-room" }<br>
+}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>💻</span> Contoh Kode Firmware ESP32
+                </div>
+
+                <div class="doc-code" style="font-size: 11px; line-height: 1.5;">
+// Konfigurasi
+const char* SERVER_URL = "https://xiaozhiscig.biz.id";
+const char* DEVICE_ID = "esp32-living-room";
+const int POLL_INTERVAL = 3000; // 3 detik
+
+// Polling audio commands
+void pollAudioCommands() {
+    String url = String(SERVER_URL) + "/api/audio/commands/" + DEVICE_ID;
+    HTTPClient http;
+    http.begin(url);
+    int httpCode = http.GET();
+    
+    if (httpCode == 200) {
+        String payload = http.getString();
+        // Parse JSON dan ambil stream_url
+        // Putar audio dari stream_url
+    }
+    http.end();
+}
+
+// Konfirmasi audio diputar
+void acknowledgeAudio(int commandId) {
+    String url = String(SERVER_URL) + "/api/audio/ack/" + String(commandId);
+    HTTPClient http;
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+    http.POST("{\"device_id\": \"" + String(DEVICE_ID) + "\"}");
+    http.end();
+}
                 </div>
             </div>
 
@@ -389,9 +542,10 @@
                     <strong>💡 Tips:</strong>
                     <ul style="margin:8px 0 0 20px">
                         <li>Pastikan MCP dalam status <strong>Online</strong></li>
-                        <li>Pastikan ESP32 terdaftar dan terhubung</li>
+                        <li>Pastikan ESP32 terdaftar dan terhubung ke WiFi</li>
                         <li>Pastikan speaker terhubung ke ESP32</li>
                         <li>Gunakan perintah yang jelas: <em>"Putar lagu [judul]"</em></li>
+                        <li>ESP32 harus support HTTPS untuk koneksi ke server</li>
                     </ul>
                 </div>
             </div>

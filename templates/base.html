@@ -527,13 +527,13 @@
         </nav>
 
         <div class="app-sidebar-footer">
-            <div class="app-sidebar-user">
+            <a href="/profil" class="app-sidebar-user" style="text-decoration:none;cursor:pointer">
                 <div class="app-sidebar-avatar">{{ user.username[0]|upper }}</div>
                 <div>
                     <div class="app-sidebar-username">{{ user.username }}</div>
                     <div class="app-sidebar-role">{{ user.role|capitalize }}</div>
                 </div>
-            </div>
+            </a>
             <select id="themeSelect" class="app-input" style="font-size:12px; padding:6px 8px; min-height:32px" aria-label="Tema">
                 <option value="neo">Neo Brutalism</option>
                 <option value="dark">Dark</option>
