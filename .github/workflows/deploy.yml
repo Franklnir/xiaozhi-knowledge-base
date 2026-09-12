@@ -4,9 +4,14 @@ on:
   push:
     branches: [main]
 
+env:
+  APP_DIR: /opt/edusmart
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -15,8 +20,46 @@ jobs:
           username: irsyad
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /opt/xiaozhi
+            cd ${{ env.APP_DIR }}
+            
+            # Pull latest changes
             git pull origin main
-            docker compose down
-            docker compose up -d --build
+            
+            # Check if .env exists
+            if [ ! -f .env ]; then
+              echo "ERROR: .env file not found!"
+              echo "Please create .env from .env.example"
+              exit 1
+            fi
+            
+            # Build and restart services using production config
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up -d --build
+            
+            # Wait for health check
+            echo "Waiting for services to be healthy..."
+            sleep 15
+            
+            # Check if edusmart is running
+            if docker compose -f docker-compose.prod.yml ps | grep -q "edusmart.*Up"; then
+              echo "✅ edusmart service is running"
+            else
+              echo "❌ edusmart service failed to start"
+              docker compose -f docker-compose.prod.yml logs edusmart
+              exit 1
+            fi
+            
+            # Check if nginx is running (if configured)
+            if [ -f nginx.conf ]; then
+              if docker compose -f docker-compose.prod.yml ps | grep -q "nginx.*Up"; then
+                echo "✅ nginx service is running"
+              else
+                echo "⚠️ nginx service not running"
+                docker compose -f docker-compose.prod.yml logs nginx
+              fi
+            fi
+            
+            # Clean up old images
             docker system prune -f
+            
+            echo "✅ Deployment complete!"

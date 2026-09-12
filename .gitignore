@@ -8,3 +8,16 @@ data/
 *.db
 *.db-shm
 *.db-wal
+
+# SSL certificates
+certs/
+certbot/
+
+# Nginx logs
+nginx_logs/
+
+# Temporary files
+nginx-temp.conf
+
+# Docker compose with secrets (use docker-compose.prod.yml instead)
+docker-compose.yml

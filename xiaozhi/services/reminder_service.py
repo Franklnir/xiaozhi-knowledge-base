@@ -1,18 +1,12 @@
 """Reminder/alarm service for voice-based scheduling."""
 import asyncio
 import logging
-import time
+import re
 import uuid
 from datetime import datetime, timedelta
-from threading import Lock
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("xiaozhi.reminder")
-
-# In-memory reminder storage (in production, use database)
-_reminders: Dict[int, List[Dict[str, Any]]] = {}
-_lock = Lock()
-_check_task = None
 
 
 def parse_time_from_text(text: str) -> Optional[datetime]:
@@ -21,7 +15,6 @@ def parse_time_from_text(text: str) -> Optional[datetime]:
     now = datetime.now()
 
     # Pattern: "jam 3 sore", "jam 15:00", "pukul 3"
-    import re
     time_match = re.search(r'(?:jam|pukul)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(pagi|siang|sore|malam)?', text)
     if time_match:
         hour = int(time_match.group(1))
@@ -67,7 +60,6 @@ def parse_reminder_text(text: str) -> Dict[str, Any]:
     target_time = parse_time_from_text(text)
 
     # Extract the reminder message (everything after the time)
-    import re
     # Remove time-related words
     message = re.sub(r'(?:ingatkan\s*(?:saya)?|ingat|alarm|reminder)\s*', '', text, flags=re.IGNORECASE)
     message = re.sub(r'(?:jam|pukul)\s*\d{1,2}(?:[:.]\d{2})?\s*(?:pagi|siang|sore|malam)?', '', message, flags=re.IGNORECASE)
@@ -85,7 +77,7 @@ def parse_reminder_text(text: str) -> Dict[str, Any]:
     }
 
 
-def add_reminder(owner_id: int, text: str) -> Dict[str, Any]:
+def add_reminder(store, owner_id: int, text: str) -> Dict[str, Any]:
     """Add a new reminder for a user."""
     parsed = parse_reminder_text(text)
 
@@ -95,19 +87,13 @@ def add_reminder(owner_id: int, text: str) -> Dict[str, Any]:
             "message": "Tidak bisa memahami waktu dari kalimat. Coba: 'ingatkan saya jam 3 sore untuk minum obat'",
         }
 
-    reminder = {
-        "id": uuid.uuid4().hex[:12],
-        "owner_id": owner_id,
-        "message": parsed["message"],
-        "scheduled_at": parsed["time"].isoformat(),
-        "status": "pending",
-        "created_at": datetime.now().isoformat(),
-    }
-
-    with _lock:
-        if owner_id not in _reminders:
-            _reminders[owner_id] = []
-        _reminders[owner_id].append(reminder)
+    reminder_id = uuid.uuid4().hex[:12]
+    reminder = store.add_reminder(
+        owner_id=owner_id,
+        reminder_id=reminder_id,
+        message=parsed["message"],
+        scheduled_at=parsed["time"].isoformat(),
+    )
 
     time_str = parsed["time"].strftime("%H:%M")
     return {
@@ -117,46 +103,25 @@ def add_reminder(owner_id: int, text: str) -> Dict[str, Any]:
     }
 
 
-def list_reminders(owner_id: int) -> List[Dict[str, Any]]:
+def list_reminders(store, owner_id: int) -> List[Dict[str, Any]]:
     """List all reminders for a user."""
-    with _lock:
-        return list(_reminders.get(owner_id, []))
+    return store.list_reminders(owner_id)
 
 
-def delete_reminder(owner_id: int, reminder_id: str) -> bool:
+def delete_reminder(store, owner_id: int, reminder_id: str) -> bool:
     """Delete a reminder."""
-    with _lock:
-        reminders = _reminders.get(owner_id, [])
-        for i, r in enumerate(reminders):
-            if r["id"] == reminder_id:
-                reminders.pop(i)
-                return True
-    return False
-
-
-def get_due_reminders() -> List[Dict[str, Any]]:
-    """Get all reminders that are due now."""
-    now = datetime.now()
-    due = []
-    with _lock:
-        for owner_id, reminders in _reminders.items():
-            for r in reminders:
-                if r["status"] == "pending":
-                    scheduled = datetime.fromisoformat(r["scheduled_at"])
-                    if scheduled <= now:
-                        r["status"] = "triggered"
-                        due.append(r)
-    return due
+    return store.delete_reminder(owner_id, reminder_id)
 
 
 async def check_reminders_periodically(store):
     """Background task to check for due reminders."""
     while True:
         try:
-            due = get_due_reminders()
+            due = store.get_due_reminders()
             for reminder in due:
                 owner_id = reminder["owner_id"]
                 message = reminder["message"]
+                reminder_id = reminder["id"]
                 logger.info(f"Reminder triggered for user {owner_id}: {message}")
 
                 # Send reminder as chat message to trigger XiaoZhi voice response
@@ -184,8 +149,7 @@ async def check_reminders_periodically(store):
                     logger.warning(f"Failed to send reminder to user {owner_id}: {e}")
 
                 # Mark as sent
-                reminder["status"] = "sent"
-                reminder["sent_at"] = datetime.now().isoformat()
+                store.mark_reminder_sent(reminder_id)
 
         except Exception:
             logger.exception("Error checking reminders")

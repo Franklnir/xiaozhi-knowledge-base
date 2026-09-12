@@ -7,16 +7,20 @@ services:
       dockerfile: Dockerfile.prod
     container_name: edusmart
     restart: unless-stopped
-    ports:
-      - "80:7860"
+    expose:
+      - "7860"
     environment:
       - ENVIRONMENT=production
       - COOKIE_SECURE=true
       - HF_TOKEN=${HF_TOKEN}
       - HF_DATASET_REPO=${HF_DATASET_REPO}
       - APP_SECRET_KEY=${APP_SECRET_KEY}
+      - JWT_SECRET=${JWT_SECRET}
       - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY}
       - ALLOWED_HOSTS=*
+      - LOG_LEVEL=INFO
+    volumes:
+      - app_data:/app/data
     mem_limit: 512m
     memswap_limit: 1g
     cpus: 1.0
@@ -31,3 +35,51 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      edusmart:
+        condition: service_healthy
+    mem_limit: 128m
+    memswap_limit: 256m
+    cpus: 0.25
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    networks:
+      - app-network
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./certs:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - app-network
+
+volumes:
+  app_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

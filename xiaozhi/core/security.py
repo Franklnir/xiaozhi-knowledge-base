@@ -9,10 +9,9 @@ from urllib.parse import urlparse
 import jwt
 from cryptography.fernet import InvalidToken
 
-from xiaozhi.config import MCP_TOKEN_HASH_LENGTH, fernet
+from xiaozhi.config import JWT_SECRET, MCP_TOKEN_HASH_LENGTH, fernet
 
 # JWT Configuration
-JWT_SECRET = secrets.token_urlsafe(64)  # In production, use env var
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_EXPIRE = 3600  # 1 hour
 JWT_REFRESH_TOKEN_EXPIRE = 604800  # 7 days
