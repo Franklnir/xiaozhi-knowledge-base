@@ -99,13 +99,25 @@ def redirect_with_message(url: str, message: str, status_code: int = 303) -> Red
 def require_user(request: Request) -> Dict[str, Any]:
     user = get_current_user(request)
     if not user:
+        # Check if browser request (Accept HTML) or API request (Accept JSON)
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept:
+            raise HTTPException(status_code=303, headers={"Location": "/login?message=Silakan+masuk+terlebih+dahulu."})
         raise HTTPException(status_code=401, detail="Login diperlukan.")
     return user
 
 
 def require_admin(request: Request) -> Dict[str, Any]:
-    user = require_user(request)
+    user = get_current_user(request)
+    if not user:
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept:
+            raise HTTPException(status_code=303, headers={"Location": "/login?message=Silakan+masuk+terlebih+dahulu."})
+        raise HTTPException(status_code=401, detail="Login diperlukan.")
     if user.get("role") != "admin":
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept:
+            raise HTTPException(status_code=303, headers={"Location": "/dashboard"})
         raise HTTPException(status_code=403, detail="Akses admin diperlukan.")
     return user
 
