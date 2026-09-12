@@ -876,7 +876,7 @@ class SQLiteStore:
         row = conn.execute("SELECT * FROM user_limits WHERE user_id = ?", (owner_id,)).fetchone()
         limits = dict(USER_LIMIT_DEFAULTS)
         if row:
-            limits = {k: row.get(k, v) for k, v in USER_LIMIT_DEFAULTS.items()}
+            limits = {k: dict(row).get(k, v) for k, v in USER_LIMIT_DEFAULTS.items()}
         usage = {
             "materials": conn.execute("SELECT COUNT(*) FROM materials WHERE owner_id = ?", (owner_id,)).fetchone()[0],
             "live_apis": conn.execute("SELECT COUNT(*) FROM materials WHERE owner_id = ? AND source_type = ?", (owner_id, LIVE_API_SOURCE_TYPE)).fetchone()[0],
