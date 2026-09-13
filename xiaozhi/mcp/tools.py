@@ -1,4 +1,5 @@
-import logging
+﻿import logging
+import os
 import re
 from typing import Any, Dict, Optional
 
@@ -443,7 +444,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     return response
                 np = results[0]
                 try:
-                    base = "http://localhost:7860"
+                    base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
                     full_stream = f"{base}{np['stream_url']}" if np.get("stream_url", "").startswith("/") else np.get("stream_url", "")
                     store.queue_audio_command(owner_id, title=np.get("title", ""), stream_url=full_stream, video_url=np.get("video_url", ""), duration=np.get("duration", ""), video_id=np.get("video_id", ""))
                 except Exception:
@@ -546,7 +547,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 record_mcp_tool_history(owner_id, "search_news", query, {"query": query}, response)
             return response
 
-    # ── New Tools ──────────────────────────────────────────────────────
+    # â”€â”€ New Tools â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @mcp_server.tool()
     def set_reminder(text: str) -> dict:
