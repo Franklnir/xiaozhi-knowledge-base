@@ -51,6 +51,47 @@ Tanpa `HF_TOKEN`, app memakai cache lokal `.hf_db_cache/app_data.json` hanya unt
 - Endpoint MCP bisa diperbarui dari dashboard; nilai lama akan diganti dan disimpan terenkripsi.
 - Halaman auth menyediakan pilihan Login, Cari akun, dan Register. Pencarian akun dibatasi prefix minimal 2 karakter dan memakai rate limit dasar.
 - Relay Nyata memakai API polling dari ESP32/8266 dll, bukan broker MQTT. ESP32/8266 dll membaca perintah dari endpoint `/api/device/relay/{slug}/commands` dan mengirim status terbaru ke `/api/device/relay/{slug}/status` memakai token perangkat.
-"# Xiaozhi Knowledge Base - Updated $(date)"  
-"# CI/CD test $(Get-Date)"  
-"# CI/CD test 2 $(Get-Date)"  
+## Daftar 35 Tools MCP Xiaozhi
+
+Server MCP Xiaozhi menyediakan 35 tools siap pakai yang dipanggil secara otomatis oleh AI berdasarkan percakapan suara atau teks:
+
+### 1. Pembelajaran & Akademik (Study Suite)
+* `solve_study_problem`: Pemecah soal bertahap (Diketahui, Ditanyakan, Rumus, Perhitungan, Tips jebakan).
+* `explain_concept`: Penjelas konsep 2 level (Definisi Akademik Resmi + Analogi Dunia Nyata ELI5).
+* `quiz_me`: Latihan soal dan kuis interaktif berdasarkan topik/materi.
+* `lookup_formula`: Kamus rumus cepat Matematika, Fisika, Kimia, dan Ekonomi.
+* `academic_english_helper`: Proofreading grammar, parafrase akademik, dan kosakata abstrak/jurnal.
+* `lookup_kbbi`: Pengecekan ejaan baku, bentuk tidak baku, kelas kata, dan arti resmi menurut KBBI.
+* `search_wikipedia`: Ringkasan ensiklopedia faktual dari Wikipedia bahasa Indonesia.
+
+### 2. Analisis Spesialis (Filsafat, Psikologi & IT)
+* `detect_logical_fallacy`: Deteksi cacat logika (Ad Hominem, Straw Man, False Dilemma, Slippery Slope, dll) & cara rekonstruksi argumen.
+* `identify_cognitive_bias`: Analisis bias pikiran (Confirmation Bias, Sunk Cost Fallacy, Dunning-Kruger), Pertanyaan Sokratik, dan teknik CBT Cognitive Reframing.
+* `it_code_and_architecture_helper`: Konsultasi Senior Software Engineer: debugging kode, Big-O, GoF Design Patterns, Clean Architecture, SQL/NoSQL indexing, Docker & Linux CLI.
+
+### 3. Doa & Ibadah Lintas Agama (Multifaith Guide)
+* `lookup_scripture_and_verse`: Pencarian nama surat/kitab/ayat untuk 7 tradisi agama (Islam, Kristen, Katolik, Hindu, Buddha, Konghucu, Yahudi) dengan lafal transliterasi fonetik & terjemahan Indonesia.
+* `get_prayer_and_worship_guide`: Panduan doa harian & ibadah langkah-demi-langkah (Sholat 5 waktu & wudhu, Doa Bapa Kami & Salam Maria, Misa Katolik, Puja Tri Sandhya Hindu, Meditasi Metta Buddhis, Sembahyang Tian Konghucu, Shabbat Yahudi).
+
+### 4. Realtime Cuaca, Gempa BMKG & Kurs
+* `get_weather`: Data realtime suhu (°C), kelembapan, angin, dan prakiraan cuaca per kota di Indonesia.
+* `get_earthquake_info`: Informasi resmi gempa bumi terkini & dirasakan langsung dari BMKG Indonesia.
+* `convert_currency`: Konversi nilai tukar mata uang dunia (USD, IDR, EUR, JPY, SGD, dll) terkini.
+
+### 5. Knowledge Base Pribadi
+* `search_course_materials`: Pencarian materi perkuliahan/catatan di database.
+* `read_live_api_data`: Membaca data API realtime kustom.
+* `read_material_database`: Membaca daftar materi yang tersimpan.
+* `read_material_detail`: Membaca satu dokumen/materi secara lengkap.
+
+### 6. Smart Home Virtual & Relay Fisik ESP32
+* `control_relay`, `control_smart_home_room`, `get_relay_status`, `all_relays_on`, `all_relays_off`: Kontrol perangkat rumah pintar virtual.
+* `control_real_relay_by_voice`, `get_real_relay_status`, `all_real_relays_on`, `all_real_relays_off`: Kontrol relay fisik nyata via polling ESP32.
+
+### 7. Multimedia & Utilitas
+* `play_youtube_song`: Pencarian lagu dan streaming audio YouTube ke speaker ESP32.
+* `search_web`, `search_news`: Pencarian web dan berita terkini.
+* `calculate`: Perhitungan matematika dan kalkulator ekspresi.
+* `translate_text`: Penerjemah multi-bahasa.
+* `set_reminder`: Pembuatan pengingat/jadwal.
+* `save_chat_history`: Penyimpanan riwayat percakapan otomatis.

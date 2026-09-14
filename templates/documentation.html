@@ -678,158 +678,277 @@ void acknowledgeAudio(int commandId) {
         <div class="app-card">
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🔧</span> Daftar Tools MCP
+                    <span>🔧</span> Daftar 35 Tools MCP Xiaozhi
                 </div>
                 <p class="doc-step-desc">
-                    Berikut adalah daftar tools yang tersedia di MCP. Tools ini dipanggil oleh XiaoZhi saat menjawab pertanyaan kamu.
+                    Xiaozhi terhubung dengan <strong>35 Tools MCP</strong> berstandar ilmiah dan realtime. Tools ini otomatis dipanggil oleh Xiaozhi saat mendengarkan pertanyaan atau instruksi suara kamu.
                 </p>
             </div>
 
+            <!-- 1. Pembelajaran & Akademik -->
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>📚</span> Tools Knowledge Base
+                    <span>🎓</span> 1. Pembelajaran & Akademik (Study Suite)
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">solve_study_problem</div>
+                    <div class="tool-desc">
+                        Menyelesaikan soal latihan/ujian secara bertahap: Identifikasi data (Diketahui/Ditanya), Teori/Rumus dasar, Langkah kalkulasi step-by-step, Jawaban akhir, dan Tips agar tidak terjebak di soal serupa.<br>
+                        <em>Contoh suara: "Xiaozhi, bantu selesaikan soal bola dilempar ke atas dengan kecepatan awal 20 m/s, berapa tinggi maksimumnya?"</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">explain_concept</div>
+                    <div class="tool-desc">
+                        Menjelaskan konsep rumit dengan 2 tingkat penjelasan: Definisi Akademik Resmi (cocok untuk ujian/tugas) dan Analogi Sederhana Dunia Nyata (ELI5 - Explain Like I'm 5) agar otak langsung paham logikanya.<br>
+                        <em>Contoh suara: "Jelaskan apa itu Polymorphism dalam pemrograman dengan analogi sederhana."</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">quiz_me</div>
+                    <div class="tool-desc">
+                        Membuat kuis latihan interaktif (pilihan ganda atau esai singkat) berdasarkan topik yang sedang dipelajari lengkap dengan kunci jawaban dan pembahasan.<br>
+                        <em>Contoh suara: "Xiaozhi, uji saya dengan 3 soal kuis tentang Hukum Termodinamika."</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">lookup_formula</div>
+                    <div class="tool-desc">
+                        Mencari rumus cepat, unit satuan SI, dan variabel untuk Matematika, Fisika, Kimia, atau Ekonomi.<br>
+                        <em>Contoh suara: "Apa rumus menghitung gaya gravitasi Newton?"</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">academic_english_helper</div>
+                    <div class="tool-desc">
+                        Membantu penulisan akademik bahasa Inggris: proofreading grammar, pemilihan kata formal untuk abstrak/skripsi, dan parafrase anti-plagiarisme.<br>
+                        <em>Contoh suara: "Perbaiki kalimat abstrak bahasa Inggris ini agar lebih formal dan akademis."</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">lookup_kbbi</div>
+                    <div class="tool-desc">
+                        Mengecek ejaan baku, bentuk tidak baku, kelas kata (nomina, verba, adjektiva), dan definisi resmi bahasa Indonesia menurut KBBI.<br>
+                        <em>Contoh suara: "Kata yang baku itu mempesona atau memukau menurut KBBI?"</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">search_wikipedia</div>
+                    <div class="tool-desc">
+                        Mengambil informasi ensiklopedia faktual resmi dari Wikipedia bahasa Indonesia secara ringkas dan bebas halusinasi.<br>
+                        <em>Contoh suara: "Siapa itu Alan Turing dan apa pengaruhnya bagi dunia komputer menurut Wikipedia?"</em>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Spesialis: Filsafat, Psikologi & IT -->
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🧠</span> 2. Analisis Spesialis (Filsafat, Psikologi & IT)
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">detect_logical_fallacy</div>
+                    <div class="tool-desc">
+                        Membedah argumen, opini, atau teks debat untuk mendeteksi cacat logika (Ad Hominem, Straw Man, False Dilemma, Slippery Slope, Circular Reasoning, dll) serta memberikan cara merekonstruksi argumen (steel-manning).<br>
+                        <em>Contoh suara: "Bedah argumen ini apakah ada sesat pikirnya: 'Kamu masih bocah tahu apa tentang negara ini!'."</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">identify_cognitive_bias</div>
+                    <div class="tool-desc">
+                        Menganalisis distorsi pola pikir dan bias kognitif (Confirmation Bias, Sunk Cost Fallacy, Dunning-Kruger, Catastrophizing), dilengkapi pertanyaan sokratik untuk refleksi dan teknik pembingkaian ulang (CBT Cognitive Reframing).<br>
+                        <em>Contoh suara: "Saya takut gagal terus sampai tidak mau mulai kerjaan baru, bias kognitif apa yang terjadi pada saya?"</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">it_code_and_architecture_helper</div>
+                    <div class="tool-desc">
+                        Panduan berstandar Senior Software Engineer untuk debugging kode (root cause & Big-O), GoF Design Patterns, arsitektur Clean/Microservices, optimasi SQL/NoSQL & indexing, hingga DevOps (Docker & Git CLI).<br>
+                        <em>Contoh suara: "Kapan saya harus memakai Repository Pattern dibanding arsitektur MVC sederhana?"</em>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Doa & Ibadah Lintas Agama -->
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🕊️</span> 3. Kitab Suci, Doa & Tata Cara Ibadah Lintas Agama
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">lookup_scripture_and_verse</div>
+                    <div class="tool-desc">
+                        Mencari nama surat, kitab suci, pasal, dan nomor ayat untuk 7 tradisi agama (Islam, Kristen, Katolik, Hindu, Buddha, Konghucu, Yahudi). Menyajikan teks asli, transliterasi fonetik latin (agar suara speaker lancar), terjemahan resmi Indonesia, dan hikmah spiritualnya.<br>
+                        <em>Contoh suara: "Xiaozhi, bacakan surat Al-Ikhlas beserta arti dan transliterasinya", atau "Bacakan Mazmur 23".</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">get_prayer_and_worship_guide</div>
+                    <div class="tool-desc">
+                        Bimbingan doa harian dan tata cara ibadah langkah-demi-langkah (Sholat 5 waktu & wudhu, Doa Bapa Kami & Salam Maria, Liturgi Misa Katolik, Puja Tri Sandhya Hindu, Meditasi Metta Buddhis, Sembahyang Tian Konghucu, Doa Shabbat Yahudi).<br>
+                        <em>Contoh suara: "Pandu saya tata cara Sholat Subuh lengkap dengan niat dan doanya", atau "Bagaimana lafal doa Bapa Kami?"</em>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Cuaca, Gempa & Valuta -->
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🌍</span> 4. Realtime Cuaca, Gempa BMKG & Kurs
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">get_weather</div>
+                    <div class="tool-desc">
+                        Mengecek kondisi cuaca, suhu (°C), kelembapan, dan prakiraan cuaca realtime untuk kota/kabupaten di seluruh Indonesia.<br>
+                        <em>Contoh suara: "Xiaozhi, bagaimana cuaca di Jakarta hari ini?"</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">get_earthquake_info</div>
+                    <div class="tool-desc">
+                        Mengambil data resmi BMKG Indonesia tentang gempa bumi terkini (magnitudo, kedalaman, koordinat pusat gempa, potensi tsunami, dan daftar wilayah yang merasakan).<br>
+                        <em>Contoh suara: "Apakah ada info gempa terkini dari BMKG hari ini?"</em>
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">convert_currency</div>
+                    <div class="tool-desc">
+                        Mengonversi nilai tukar mata uang global (USD, IDR, EUR, JPY, SGD, MYR, dll) menggunakan kurs pasar terbaru.<br>
+                        <em>Contoh suara: "Berapa rupiah untuk 50 dolar Amerika saat ini?"</em>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Knowledge Base & Materi -->
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>📚</span> 5. Knowledge Base Pribadi
                 </div>
 
                 <div class="tool-card">
                     <div class="tool-name">search_course_materials</div>
                     <div class="tool-desc">
-                        Mencari materi berdasarkan kata kunci. Digunakan saat kamu bertanya tentang materi perkuliahan, tugas, jadwal, atau data API realtime.
+                        Mencari materi perkuliahan, catatan tugas, atau jadwal ujian di database materi akun kamu.
                     </div>
                 </div>
 
                 <div class="tool-card">
                     <div class="tool-name">read_live_api_data</div>
                     <div class="tool-desc">
-                        Membaca data API realtime terbaru (cuaca, suhu, sensor, dll). Digunakan saat kamu bertanya tentang data yang berubah-ubah.
+                        Membaca data API realtime dinamis yang dikonfigurasi di dashboard.
                     </div>
                 </div>
 
                 <div class="tool-card">
                     <div class="tool-name">read_material_database</div>
                     <div class="tool-desc">
-                        Membaca daftar materi dari database. Digunakan untuk melihat semua materi yang tersimpan.
+                        Membaca daftar seluruh materi kuliah/dokumen yang tersimpan.
                     </div>
                 </div>
 
                 <div class="tool-card">
                     <div class="tool-name">read_material_detail</div>
                     <div class="tool-desc">
-                        Membaca satu materi secara lengkap berdasarkan ID atau judul. Digunakan saat kamu ingin tahu detail isi materi.
+                        Membaca satu materi secara mendalam berdasarkan ID atau judul materi.
                     </div>
                 </div>
             </div>
 
+            <!-- 6. Smart Home & Relay -->
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🏠</span> Tools Smart Home
+                    <span>🏠</span> 6. Smart Home Virtual & Relay Fisik ESP32
                 </div>
 
                 <div class="tool-card">
-                    <div class="tool-name">control_relay</div>
+                    <div class="tool-name">control_relay & control_smart_home_room</div>
                     <div class="tool-desc">
-                        Mengontrol relay berdasarkan nomor channel (1-8). Digunakan untuk menyalakan/mematikan perangkat tertentu.
+                        Mengontrol relay virtual berdasarkan nomor channel (1-8) atau nama ruangan (Ruang Tamu, Kamar Tidur, Dapur, dll).
                     </div>
                 </div>
 
                 <div class="tool-card">
-                    <div class="tool-name">control_smart_home_room</div>
+                    <div class="tool-name">get_relay_status & all_relays_on / all_relays_off</div>
                     <div class="tool-desc">
-                        Mengontrol perangkat berdasarkan nama ruangan. Lebih mudah digunakan karena tidak perlu tahu nomor channel.
+                        Membaca status semua saklar virtual atau menyalakan/mematikan semua perangkat sekaligus.
                     </div>
                 </div>
 
                 <div class="tool-card">
-                    <div class="tool-name">get_relay_status</div>
+                    <div class="tool-name">control_real_relay_by_voice & get_real_relay_status</div>
                     <div class="tool-desc">
-                        Membaca status semua relay. Digunakan untuk mengetahui perangkat mana yang sedang menyala atau mati.
+                        Mengontrol modul relay fisik nyata yang terhubung ke mikrokontroler ESP32 via polling HTTP token perangkat.
                     </div>
                 </div>
 
                 <div class="tool-card">
-                    <div class="tool-name">all_relays_on / all_relays_off</div>
+                    <div class="tool-name">all_real_relays_on / all_real_relays_off</div>
                     <div class="tool-desc">
-                        Menyalakan atau mematikan semua perangkat sekaligus.
+                        Menyalakan atau mematikan seluruh saluran relay nyata ESP32 secara bersamaan.
                     </div>
                 </div>
             </div>
 
+            <!-- 7. Multimedia & Utilitas -->
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>⚡</span> Tools Relay Nyata (ESP32)
-                </div>
-
-                <div class="tool-card">
-                    <div class="tool-name">control_real_relay_by_voice</div>
-                    <div class="tool-desc">
-                        Mengontrol relay fisik ESP32 berdasarkan perintah suara. Digunakan untuk perangkat nyata yang terhubung ke ESP32.
-                    </div>
-                </div>
-
-                <div class="tool-card">
-                    <div class="tool-name">get_real_relay_status</div>
-                    <div class="tool-desc">
-                        Membaca status relay fisik ESP32.
-                    </div>
-                </div>
-            </div>
-
-            <div class="doc-section">
-                <div class="doc-section-title">
-                    <span>🎵</span> Tools Multimedia
+                    <span>🎵</span> 7. Multimedia & Utilitas Tambahan
                 </div>
 
                 <div class="tool-card">
                     <div class="tool-name">play_youtube_song</div>
                     <div class="tool-desc">
-                        Mencari lagu di YouTube dan mengirim audio stream ke ESP32. Digunakan saat kamu minta diputar lagu.
-                    </div>
-                </div>
-            </div>
-
-            <div class="doc-section">
-                <div class="doc-section-title">
-                    <span>🌐</span> Tools Web & Utilitas
-                </div>
-
-                <div class="tool-card">
-                    <div class="tool-name">search_web</div>
-                    <div class="tool-desc">
-                        Mencari informasi dari internet menggunakan Google News. Digunakan untuk pertanyaan umum yang butuh data terkini.
+                        Mencari lagu di YouTube dan mengirim streaming audio ke speaker perangkat ESP32.<br>
+                        <em>Contoh suara: "Xiaozhi, putar lagu Indonesia Raya di YouTube."</em>
                     </div>
                 </div>
 
                 <div class="tool-card">
-                    <div class="tool-name">search_news</div>
+                    <div class="tool-name">search_web & search_news</div>
                     <div class="tool-desc">
-                        Mencari berita terkini dari Indonesia. Digunakan saat kamu ingin tahu berita terbaru.
-                    </div>
-                </div>
-
-                <div class="tool-card">
-                    <div class="tool-name">set_reminder</div>
-                    <div class="tool-desc">
-                        Membuat pengingat/alarm. Digunakan saat kamu minta diingatkan sesuatu pada waktu tertentu.
+                        Mencari informasi artikel umum dan berita terkini dari media terpercaya.
                     </div>
                 </div>
 
                 <div class="tool-card">
                     <div class="tool-name">calculate</div>
                     <div class="tool-desc">
-                        Menghitung ekspresi matematika. Digunakan untuk hitung-hitungan, konversi, atau operasi matematika.
+                        Menghitung ekspresi matematika kompleks, persentase, atau konversi satuan.
                     </div>
                 </div>
 
                 <div class="tool-card">
                     <div class="tool-name">translate_text</div>
                     <div class="tool-desc">
-                        Menerjemahkan teks ke bahasa lain. Digunakan saat kamu minta terjemahan.
+                        Menerjemahkan kalimat ke berbagai bahasa asing dengan tata bahasa yang natural.
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-name">set_reminder</div>
+                    <div class="tool-desc">
+                        Membuat pengingat alarm atau pengingat jadwal kegiatan tertentu.
                     </div>
                 </div>
 
                 <div class="tool-card">
                     <div class="tool-name">save_chat_history</div>
                     <div class="tool-desc">
-                        Menyimpan riwayat chat. Dipanggil otomatis untuk menyimpan percakapan.
+                        Menyimpan catatan riwayat percakapan penting secara otomatis ke dashboard akun.
                     </div>
                 </div>
             </div>
