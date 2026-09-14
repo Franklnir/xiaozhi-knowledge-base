@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import os
 import re
 from typing import Any, Dict, Optional
@@ -602,3 +602,294 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         if owner_id:
             record_mcp_tool_history(owner_id, "translate_text", text, {"text": text, "target": target_lang}, result)
         return result
+
+    # ── Educational & Study Tools ──────────────────────────────────────────
+
+    @mcp_server.tool()
+    def solve_study_problem(problem_statement: str, subject: str = "") -> dict:
+        """
+        Selesaikan soal pelajaran sekolah atau tugas kuliah secara sistematis dan mendidik (step-by-step).
+        Gunakan tool ini saat user memberikan soal matematika, fisika, kimia, ekonomi, logika, atau algoritma.
+        Tool ini memberikan kerangka kerja bertahap:
+        1. Identifikasi Diketahui & Ditanyakan
+        2. Rumus/Teori Dasar
+        3. Langkah Pengerjaan dan Perhitungan Bertahap
+        4. Jawaban Akhir (dengan satuan SI)
+        5. Tips agar tidak keliru di soal serupa
+
+        Args:
+            problem_statement: Pernyataan soal atau teks pertanyaan lengkap.
+            subject: Bidang ilmu/mata kuliah opsional (misal: "Fisika", "Matematika", "Kimia", "Ekonomi").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.study_service import solve_study_problem_handler
+        result = solve_study_problem_handler(problem_statement, subject)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "solve_study_problem", problem_statement, {"problem_statement": problem_statement, "subject": subject}, result)
+        return result
+
+    @mcp_server.tool()
+    def explain_concept(concept: str, subject: str = "") -> dict:
+        """
+        Jelaskan konsep rumit atau istilah abstrak dengan 2 tingkat pemahaman:
+        1. Definisi Akademik Resmi (cocok untuk ujian/tugas/skripsi)
+        2. Analogi Sederhana Dunia Nyata (ELI5 - Explain Like I'm 5)
+        3. Contoh Penerapan Nyata
+
+        Args:
+            concept: Nama konsep atau topik yang ingin dipahami (misal: "Polymorphism", "Hukum Termodinamika 2", "Inflasi").
+            subject: Bidang keilmuan opsional (misal: "Informatika", "Fisika", "Ekonomi").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.study_service import explain_concept_handler
+        result = explain_concept_handler(concept, subject)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "explain_concept", concept, {"concept": concept, "subject": subject}, result)
+        return result
+
+    @mcp_server.tool()
+    def quiz_me(topic: str, action: str = "get_question", user_answer: str = "", question_id: str = "") -> dict:
+        """
+        Partner belajar interaktif untuk menguji pemahaman materi kuliah atau sekolah.
+        Gunakan tool ini saat user minta dites/kuis, atau saat user menjawab pertanyaan kuis sebelumnya.
+
+        Args:
+            topic: Topik atau bab materi (misal: "Hukum Newton", "Struktur Sel", "Basis Data").
+            action: "get_question" untuk meminta soal baru, atau "check_answer" untuk mengevaluasi jawaban user.
+            user_answer: Jawaban yang diucapkan user jika action="check_answer".
+            question_id: ID atau ringkasan soal terkait opsional.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.study_service import quiz_me_handler
+        result = quiz_me_handler(topic, action, user_answer, question_id)
+        if owner_id:
+            query = f"{topic} ({action})"
+            record_mcp_tool_history(owner_id, "quiz_me", query, {"topic": topic, "action": action, "user_answer": user_answer}, result)
+        return result
+
+    @mcp_server.tool()
+    def lookup_formula(topic_or_keyword: str) -> dict:
+        """
+        Kamus cepat rumus sains (Fisika, Matematika, Kimia, Ekonomi) beserta lambang variabel dan satuan internasional (SI).
+        Gunakan tool ini saat user menanyakan rumus tertentu. Contoh: "rumus gaya lorentz", "rumus elastisitas permintaan", "rumus abc".
+
+        Args:
+            topic_or_keyword: Nama rumus, fenomena, atau kata kunci terkait.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.study_service import lookup_formula_handler
+        result = lookup_formula_handler(topic_or_keyword)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "lookup_formula", topic_or_keyword, {"topic_or_keyword": topic_or_keyword}, result)
+        return result
+
+    @mcp_server.tool()
+    def academic_english_helper(text: str, mode: str = "all") -> dict:
+        """
+        Pengecek tata bahasa (grammar) dan peningkatan kosa kata akademik (academic vocabulary) untuk tugas/paper bahasa Inggris.
+        Gunakan tool ini saat user ingin mengecek apakah kalimatnya benar secara grammar atau meminta sinonim yang lebih formal/akademis.
+
+        Args:
+            text: Kalimat bahasa Inggris yang ingin diperiksa.
+            mode: "all", "grammar_check", atau "vocab_upgrade".
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.study_service import academic_english_helper_handler
+        result = academic_english_helper_handler(text, mode)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "academic_english_helper", text, {"text": text, "mode": mode}, result)
+        return result
+
+    # ── Realtime Utility & Public Info Tools ───────────────────────────────
+
+    @mcp_server.tool()
+    def convert_currency(amount: float, from_currency: str = "USD", to_currency: str = "IDR") -> dict:
+        """
+        Konversi nilai mata uang asing ke Rupiah (IDR) atau mata uang lainnya secara realtime.
+        Contoh: "150 dollar berapa rupiah", "1000 yen ke idr", "50 euro ke usd".
+
+        Args:
+            amount: Jumlah uang numerik (misal: 100, 25000).
+            from_currency: Kode mata uang asal (misal: USD, EUR, JPY, SGD, MYR, SAR). Default: USD.
+            to_currency: Kode mata uang tujuan (misal: IDR, USD). Default: IDR.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.external_info_service import convert_currency_data
+        result = convert_currency_data(amount, from_currency, to_currency)
+        if owner_id:
+            query = f"{amount} {from_currency} ke {to_currency}"
+            record_mcp_tool_history(owner_id, "convert_currency", query, {"amount": amount, "from_currency": from_currency, "to_currency": to_currency}, result)
+        return result
+
+    @mcp_server.tool()
+    def lookup_kbbi(word: str) -> dict:
+        """
+        Cari arti kata baku, definisi resmi, atau ejaan kata dalam Kamus Besar Bahasa Indonesia (KBBI).
+        Contoh: "apa arti kata resiliensi", "definisi pragmatis menurut kbbi".
+
+        Args:
+            word: Kata bahasa Indonesia yang ingin dicari artinya.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.external_info_service import lookup_kbbi_data
+        result = lookup_kbbi_data(word)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "lookup_kbbi", word, {"word": word}, result)
+        return result
+
+    @mcp_server.tool()
+    def search_wikipedia(query: str, lang: str = "id") -> dict:
+        """
+        Cari ringkasan ensiklopedis resmi dari Wikipedia (tokoh, peristiwa sejarah, konsep sains, geografi, dll).
+        Gunakan tool ini saat user bertanya "siapa itu ...", "sejarah ...", atau meminta penjelasan ensiklopedia terverifikasi.
+
+        Args:
+            query: Topik atau entitas yang dicari (misal: "B. J. Habibie", "Lubang hitam", "Revolusi Industri").
+            lang: Bahasa artikel Wikipedia ("id" untuk Indonesia, "en" untuk Inggris). Default: "id".
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.external_info_service import search_wikipedia_data
+        result = search_wikipedia_data(query, lang)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "search_wikipedia", query, {"query": query, "lang": lang}, result)
+        return result
+
+    @mcp_server.tool()
+    def get_earthquake_info() -> dict:
+        """
+        Dapatkan informasi gempa bumi terkini (magnitudo 5.0 ke atas) resmi dari BMKG Indonesia.
+        Menyajikan data: tanggal, jam, magnitudo, kedalaman, pusat gempa, wilayah dirasakan, dan potensi tsunami.
+        Gunakan tool ini saat user bertanya tentang info gempa bumi terbaru di Indonesia.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.external_info_service import get_earthquake_data
+        result = get_earthquake_data()
+        if owner_id:
+            record_mcp_tool_history(owner_id, "get_earthquake_info", "gempa bumi terkini", {}, result)
+        return result
+
+    @mcp_server.tool()
+    def get_weather(city: str) -> dict:
+        """
+        Cek cuaca realtime dan prakiraan suhu hari ini untuk kota atau wilayah tertentu.
+        Menyajikan: suhu saat ini (°C), kondisi cuaca (cerah, berawan, hujan), kecepatan angin, dan estimasi suhu min/max.
+        Contoh: "cuaca di Jakarta hari ini", "bagaimana cuaca di Bandung", "apakah Surabaya hujan".
+
+        Args:
+            city: Nama kota atau kabupaten (misal: "Jakarta", "Bandung", "Surabaya", "Yogyakarta", "Medan").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.external_info_service import get_weather_data
+        result = get_weather_data(city)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "get_weather", city, {"city": city}, result)
+        return result
+
+    # ── Advanced Philosophical, Psychological, & IT Specialist Tools ───────
+
+    @mcp_server.tool()
+    def detect_logical_fallacy(argument: str, context: str = "") -> dict:
+        """
+        Deteksi cacat logika (logical fallacy) dan analisis kesesatan berpikir dalam argumen, opini, debat, atau tulisan.
+        Mengidentifikasi Ad Hominem, Straw Man, False Dilemma, Slippery Slope, Circular Reasoning, Post Hoc, Bandwagon, Whataboutism, dll.
+        Gunakan tool ini saat user meminta analisis logika, debat, menguji argumen seseorang, atau bertanya apakah suatu pernyataan itu sesat pikir.
+
+        Args:
+            argument: Kalimat, kutipan argumen, atau premis yang ingin diuji logikanya.
+            context: Topik debat atau latar belakang pembicaraan opsional.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.study_service import detect_logical_fallacy_handler
+        result = detect_logical_fallacy_handler(argument, context)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "detect_logical_fallacy", argument, {"argument": argument, "context": context}, result)
+        return result
+
+    @mcp_server.tool()
+    def identify_cognitive_bias(statement_or_scenario: str, context: str = "") -> dict:
+        """
+        Identifikasi bias kognitif dan distorsi pola pikir psikologis dalam situasi, keputusan, atau perasaan seseorang.
+        Menganalisis Confirmation Bias, Dunning-Kruger, Sunk Cost Fallacy, Catastrophizing, Overgeneralization, Fundamental Attribution Error, dll.
+        Menyediakan teknik pembingkaian ulang (CBT Cognitive Reframing) dan pertanyaan refleksi diri sokratik.
+
+        Args:
+            statement_or_scenario: Cerita, keluhan, pola pikir, atau skenario pengambilan keputusan yang ingin dibedah.
+            context: Konteks situasi (misal: "Karir", "Hubungan", "Investasi", "Kecemasan Belajar").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.study_service import identify_cognitive_bias_handler
+        result = identify_cognitive_bias_handler(statement_or_scenario, context)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "identify_cognitive_bias", statement_or_scenario, {"statement": statement_or_scenario, "context": context}, result)
+        return result
+
+    @mcp_server.tool()
+    def it_code_and_architecture_helper(query_or_code: str, topic_type: str = "auto") -> dict:
+        """
+        Panduan ahli untuk dunia IT, Pemrograman, Rekayasa Perangkat Lunak, dan Arsitektur Sistem.
+        Mencakup:
+        1. Analisis error & debugging kode (root cause analysis, Big-O, fix yang aman).
+        2. Design Patterns (GoF: Singleton, Factory, Observer, Strategy, Repository Pattern, Clean Architecture).
+        3. Database & Skalabilitas (SQL vs NoSQL, Indexing, Caching Redis, Sharding).
+        4. DevOps, Terminal & Command Line (Docker, Git, Linux shell, Regex).
+
+        Args:
+            query_or_code: Potongan kode yang error, rancangan arsitektur yang ingin didiskusikan, perintah shell/regex, atau pertanyaan teknis IT.
+            topic_type: "auto", "code_debug", "architecture_patterns", "database_design", atau "cli_devops". Default: "auto".
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.study_service import it_code_and_architecture_helper_handler
+        result = it_code_and_architecture_helper_handler(query_or_code, topic_type)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "it_code_and_architecture_helper", query_or_code, {"query_or_code": query_or_code, "topic_type": topic_type}, result)
+        return result
+
+    # ── Spiritual, Prayers, & Multireligion Scripture Tools ────────────────
+
+    @mcp_server.tool()
+    def lookup_scripture_and_verse(religion: str = "", book_or_surah: str = "", verse_or_chapter: str = "", query: str = "") -> dict:
+        """
+        Cari nama surat, kitab suci, pasal, dan ayat dari agama manapun (Islam, Kristen, Katolik, Hindu, Buddha, Konghucu, Yahudi).
+        Menyajikan: nama surat/kitab, nomor ayat, teks lafal/transliterasi asli, terjemahan resmi bahasa Indonesia, dan hikmah spiritualnya.
+        Contoh: "baca ayat kursi", "ayat mazmur 23", "bhagavad gita 2.47", "bait pertama dhammapada", "sabda suci lun yu", "shema yisrael".
+
+        Args:
+            religion: Nama agama opsional ("Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu", "Yahudi").
+            book_or_surah: Nama surat atau kitab (misal: "Al-Baqarah", "Mazmur", "Bhagavad Gita", "Dhammapada", "Lun Yu", "Torah").
+            verse_or_chapter: Nomor ayat atau pasal (misal: "255", "23", "2.47", "1").
+            query: Kata kunci pencarian bebas (misal: "Ayat Kursi", "Kidung Kasih", "Karma Yoga").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.religious_service import lookup_scripture_and_verse_handler
+        result = lookup_scripture_and_verse_handler(religion, book_or_surah, verse_or_chapter, query)
+        if owner_id:
+            q_str = f"{religion} {book_or_surah} {verse_or_chapter} {query}".strip()
+            record_mcp_tool_history(owner_id, "lookup_scripture_and_verse", q_str, {"religion": religion, "book_or_surah": book_or_surah, "verse_or_chapter": verse_or_chapter, "query": query}, result)
+        return result
+
+    @mcp_server.tool()
+    def get_prayer_and_worship_guide(religion: str = "", ritual_or_prayer_name: str = "", occasion: str = "") -> dict:
+        """
+        Bimbingan doa sehari-hari dan panduan langkah demi langkah tata cara ibadah/ritual untuk semua agama (Islam, Kristen, Katolik, Hindu, Buddha, Konghucu, Yahudi).
+        Mencakup:
+        1. Islam: Tata cara Sholat 5 waktu, wudhu, doa kedua orang tua, doa sapu jagat, dzikir.
+        2. Kristen & Katolik: Doa Bapa Kami, Doa Salam Maria, Tata Ibadah Kebaktian Minggu, Liturgi Misa Kudus.
+        3. Hindu: Puja Tri Sandhya (Bait 1-6), Panca Sembah (Kramaning Sembah).
+        4. Buddha: Kebaktian Puja Bakti, penghormatan Triratna (Namo Tassa), Paritta, Meditasi Anapanasati.
+        5. Konghucu: Tata cara sembahyang Tian (memegang dupa/hio, sujud Gui/Kou), doa kebajikan.
+        6. Yahudi: Doa Shabbat (Kiddush), Modeh Ani (doa bangun pagi).
+
+        Args:
+            religion: Nama agama ("Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu", "Yahudi").
+            ritual_or_prayer_name: Nama doa atau ibadah (misal: "tata cara sholat", "doa bapa kami", "tri sandhya", "puja bakti", "sembahyang dupa", "shabbat").
+            occasion: Waktu/momen khusus opsional (misal: "pagi hari", "menjelang tidur", "makan", "ibadah mingguan").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.religious_service import get_prayer_and_worship_guide_handler
+        result = get_prayer_and_worship_guide_handler(religion, ritual_or_prayer_name, occasion)
+        if owner_id:
+            q_str = f"{religion} {ritual_or_prayer_name} {occasion}".strip()
+            record_mcp_tool_history(owner_id, "get_prayer_and_worship_guide", q_str, {"religion": religion, "ritual_or_prayer_name": ritual_or_prayer_name, "occasion": occasion}, result)
+        return result
+
+

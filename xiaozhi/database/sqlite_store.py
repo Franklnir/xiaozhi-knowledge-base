@@ -579,7 +579,58 @@ class SQLiteStore:
                 return self._public_material(rows[0])
         return None
 
+    def _is_admin(self, owner_id: int) -> bool:
+        """Check if user has admin role."""
+        conn = self._get_conn()
+        row = conn.execute("SELECT role FROM users WHERE id = ?", (owner_id,)).fetchone()
+        return bool(row and row["role"] == "admin")
+
+    def _get_user_limits_dict(self, owner_id: int) -> Dict[str, int]:
+        """Fetch limit dictionary for user with default fallbacks."""
+        conn = self._get_conn()
+        row = conn.execute("SELECT * FROM user_limits WHERE user_id = ?", (owner_id,)).fetchone()
+        limits = dict(USER_LIMIT_DEFAULTS)
+        if row:
+            limits = {k: dict(row).get(k, v) for k, v in USER_LIMIT_DEFAULTS.items()}
+        return limits
+
+    def _enforce_material_limits(self, owner_id: int, content: str = "", api_url: str = "", is_new: bool = True, material_id: int = 0) -> None:
+        """Enforce maximum material, word count, and live API limits set by admin."""
+        if self._is_admin(owner_id):
+            return
+
+        conn = self._get_conn()
+        limits = self._get_user_limits_dict(owner_id)
+
+        # 1. Batas total materi
+        if is_new:
+            max_materials = limits.get("max_materials", 3)
+            if max_materials > 0:
+                current_materials = conn.execute("SELECT COUNT(*) FROM materials WHERE owner_id = ?", (owner_id,)).fetchone()[0]
+                if current_materials >= max_materials:
+                    raise ValueError(f"Batas maksimal materi akun Anda telah tercapai ({max_materials} materi). Hapus materi yang tidak digunakan atau hubungi admin untuk menambah kuota.")
+
+        # 2. Batas kata per materi
+        max_words = limits.get("max_words_per_material", 6000)
+        if max_words > 0 and content:
+            words = count_text_words(content)
+            if words > max_words:
+                raise ValueError(f"Isi materi terlalu panjang. Maksimal {max_words} kata per materi (saat ini {words} kata).")
+
+        # 3. Batas API realtime
+        if api_url:
+            max_live_apis = limits.get("max_live_apis", 2)
+            if max_live_apis > 0:
+                if not is_new and material_id:
+                    existing = conn.execute("SELECT source_type FROM materials WHERE id = ? AND owner_id = ?", (material_id, owner_id)).fetchone()
+                    if existing and existing["source_type"] == LIVE_API_SOURCE_TYPE:
+                        return
+                current_apis = conn.execute("SELECT COUNT(*) FROM materials WHERE owner_id = ? AND source_type = ?", (owner_id, LIVE_API_SOURCE_TYPE)).fetchone()[0]
+                if current_apis >= max_live_apis:
+                    raise ValueError(f"Batas endpoint API realtime akun Anda telah tercapai ({max_live_apis} endpoint). Hapus API lama atau hubungi admin.")
+
     def add_material(self, owner_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> None:
+        self._enforce_material_limits(owner_id, content=content, api_url=api_url, is_new=True)
         conn = self._get_conn()
         api_url_ciphertext = encrypt_secret(api_url) if api_url else None
         source_type = LIVE_API_SOURCE_TYPE if api_url else None
@@ -591,6 +642,7 @@ class SQLiteStore:
         conn.commit()
 
     def update_material(self, owner_id: int, material_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> bool:
+        self._enforce_material_limits(owner_id, content=content, api_url=api_url, is_new=False, material_id=material_id)
         conn = self._get_conn()
         api_url_ciphertext = encrypt_secret(api_url) if api_url else None
         source_type = LIVE_API_SOURCE_TYPE if api_url else None
@@ -804,6 +856,15 @@ class SQLiteStore:
         return result
 
     def add_relay_room(self, owner_id: int, nama_tempat: str, api_slug: str, api_token: str, api_client_id: str, relays: List[Dict]) -> int:
+        if not self._is_admin(owner_id):
+            conn = self._get_conn()
+            limits = self._get_user_limits_dict(owner_id)
+            max_relay_rooms = limits.get("max_relay_rooms", 7)
+            if max_relay_rooms > 0:
+                current_rooms = conn.execute("SELECT COUNT(*) FROM relay_rooms WHERE owner_id = ?", (owner_id,)).fetchone()[0]
+                if current_rooms >= max_relay_rooms:
+                    raise ValueError(f"Batas perangkat Relay Nyata akun Anda telah tercapai ({max_relay_rooms} ruangan). Hubungi admin jika membutuhkan kapasitas tambahan.")
+
         conn = self._get_conn()
         cursor = conn.execute(
             "INSERT INTO relay_rooms (owner_id, nama_tempat, api_slug, api_token, api_client_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -989,16 +1050,27 @@ class SQLiteStore:
 
     def user_quota(self, owner_id: int) -> Dict[str, Any]:
         conn = self._get_conn()
-        row = conn.execute("SELECT * FROM user_limits WHERE user_id = ?", (owner_id,)).fetchone()
-        limits = dict(USER_LIMIT_DEFAULTS)
-        if row:
-            limits = {k: dict(row).get(k, v) for k, v in USER_LIMIT_DEFAULTS.items()}
+        is_admin = self._is_admin(owner_id)
         usage = {
             "materials": conn.execute("SELECT COUNT(*) FROM materials WHERE owner_id = ?", (owner_id,)).fetchone()[0],
             "live_apis": conn.execute("SELECT COUNT(*) FROM materials WHERE owner_id = ? AND source_type = ?", (owner_id, LIVE_API_SOURCE_TYPE)).fetchone()[0],
             "relay_rooms": conn.execute("SELECT COUNT(*) FROM relay_rooms WHERE owner_id = ?", (owner_id,)).fetchone()[0],
         }
-        return {
+        if is_admin:
+            return {
+                "is_admin": True,
+                "limits": {k: 0 for k in USER_LIMIT_DEFAULTS},
+                "usage": usage,
+                "materials": self._quota_item(usage["materials"], 0),
+                "words_per_material": self._quota_item(0, 0),
+                "live_apis": self._quota_item(usage["live_apis"], 0),
+                "relay_rooms": self._quota_item(usage["relay_rooms"], 0),
+                "alerts": [],
+                "features": self.get_user_features(owner_id),
+            }
+
+        limits = self._get_user_limits_dict(owner_id)
+        quota = {
             "is_admin": False,
             "limits": limits,
             "usage": usage,
@@ -1007,7 +1079,15 @@ class SQLiteStore:
             "live_apis": self._quota_item(usage["live_apis"], limits["max_live_apis"]),
             "relay_rooms": self._quota_item(usage["relay_rooms"], limits["max_relay_rooms"]),
             "alerts": [],
+            "features": self.get_user_features(owner_id),
         }
+        if quota["materials"]["reached"]:
+            quota["alerts"].append("Batas total materi sudah tercapai.")
+        if quota["live_apis"]["reached"]:
+            quota["alerts"].append("Batas API realtime sudah tercapai.")
+        if quota["relay_rooms"]["reached"]:
+            quota["alerts"].append("Batas perangkat Relay Nyata sudah tercapai.")
+        return quota
 
     @staticmethod
     def _quota_item(used: int, limit: int) -> Dict[str, Any]:
