@@ -532,19 +532,30 @@
 
         /* RESPONSIVE */
         @media (max-width: 900px) {
-            .app-nav-aside { transform: translateX(-100%); }
-            .app-nav-sidebar.is-open { transform: translateX(0); }
+            .app-nav-aside {
+                transform: translateX(-100%);
+                box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+            }
+            .app-nav-aside.is-open { transform: translateX(0); }
             .app-sidebar-toggle { display: grid; }
             .app-sidebar-overlay.is-visible { display: block; }
             .app-main-wrapper { margin-left: 0; }
-            .app-main { padding: 16px; padding-top: 60px; }
+            .app-main { padding: 16px 14px; padding-top: 68px; }
             .app-content-grid { grid-template-columns: 1fr; }
             .app-stat-grid { grid-template-columns: repeat(2, 1fr); }
+            .app-page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .app-toolbar { width: 100%; justify-content: flex-start; }
+            .app-table-wrap { -webkit-overflow-scrolling: touch; }
         }
         @media (max-width: 560px) {
             .app-stat-grid { grid-template-columns: 1fr; }
             .auth-card { width: 100%; padding: 20px 16px; min-height: auto; }
             .auth-layout { padding: 16px; }
+            .app-title { font-size: 22px; }
+            .app-section-title { font-size: 16px; }
+            .app-meta-row { gap: 6px; }
+            .app-meta-row .app-chip { font-size: 11px; padding: 4px 6px; }
+            .app-card { padding: 16px 12px; }
         }
     </style>
 </head>
@@ -631,10 +642,22 @@
 
     <script>
         // Sidebar toggle (mobile)
-        function toggleSidebar() {
-            document.getElementById('appSidebar').classList.toggle('is-open');
-            document.querySelector('.app-sidebar-overlay').classList.toggle('is-visible');
+        function toggleSidebar(forceClose) {
+            const sidebar = document.getElementById('appSidebar');
+            const overlay = document.querySelector('.app-sidebar-overlay');
+            if (!sidebar || !overlay) return;
+            if (forceClose === true) {
+                sidebar.classList.remove('is-open');
+                overlay.classList.remove('is-visible');
+            } else {
+                sidebar.classList.toggle('is-open');
+                overlay.classList.toggle('is-visible');
+            }
         }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') toggleSidebar(true);
+        });
 
         // Theme switcher
         (function () {
