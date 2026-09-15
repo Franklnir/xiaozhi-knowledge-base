@@ -556,12 +556,16 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 return response
             response = {
                 "success": True,
-                "message": f"Ditemukan {len(results)} lagu. Putar URL audio dari hasil pertama atau tawarkan pilihan ke user.",
+                "message": f"Ditemukan lagu '{results[0].get('title', '')}'. Panggil tool perangkat self.audio.play_youtube untuk memutarnya langsung di speaker.",
                 "query": query,
                 "results": results,
                 "now_playing": results[0],
-                "playback_info": {"type": "audio_stream", "message": "Audio sudah di-queue. ESP32 akan otomatis putar lagu ini."},
-                "instructions": "Mainkan audio dari URL yang diberikan. Jika user tidak menyebut lagu spesifik, tawarkan pilihan dari daftar hasil.",
+                "playback_info": {
+                    "type": "audio_stream",
+                    "video_id": results[0].get("video_id", ""),
+                    "title": results[0].get("title", ""),
+                },
+                "instructions": f"Panggil tool perangkat `self.audio.play_youtube` dengan video_id='{results[0].get('video_id', '')}' dan title='{results[0].get('title', '')}' agar speaker XiaoZhi langsung memutar lagunya.",
             }
             if owner_id:
                 features = store.get_user_features(owner_id)
