@@ -4,7 +4,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Xiaozhi Indonesia</title>
+
+    <!-- SEO Primary Meta Tags -->
+    <title>{% block title %}Xiaozhi Indonesia - Asisten Suara Cerdas IoT, AI & Knowledge Base{% endblock %}</title>
+    <meta name="title" content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT, AI & Knowledge Base">
+    <meta name="description" content="Platform resmi Xiaozhi Indonesia: asisten suara cerdas berbasis IoT ESP32, integrasi 35 MCP tools, Smart Home, dan manajemen materi edukasi.">
+    <meta name="keywords" content="Xiaozhi, Xiaozhi Indonesia, Asisten Suara AI, ESP32, Smart Home IoT, FastMCP, Knowledge Base, AI Voice Assistant, EduSmart, Model Context Protocol">
+    <meta name="author" content="Xiaozhi Indonesia Team">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="theme-color" content="#047857">
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Xiaozhi Indonesia">
+    <meta property="og:url" content="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
+    <meta property="og:title" content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT & Knowledge Base">
+    <meta property="og:description" content="Kelola materi belajar, kontrol perangkat smart home virtual & relay nyata, serta akses 35 tools cerdas terintegrasi untuk asisten suara Xiaozhi.">
+    <meta property="og:image" content="https://xiaozhiscig.biz.id/static/img/og-preview.png">
+    <meta property="og:locale" content="id_ID">
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT & AI">
+    <meta name="twitter:description" content="Platform IoT & Voice Assistant Xiaozhi dengan 35 Tools Cerdas dan integrasi Smart Home.">
+    <meta name="twitter:image" content="https://xiaozhiscig.biz.id/static/img/og-preview.png">
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
+
+    <!-- Structured Data (JSON-LD Schema) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Xiaozhi Indonesia",
+      "url": "https://xiaozhiscig.biz.id/",
+      "applicationCategory": "EducationalApplication, UtilitiesApplication",
+      "operatingSystem": "All",
+      "description": "Platform integrasi asisten suara cerdas IoT ESP32, 35 tools MCP, kontrol smart home, dan knowledge base.",
+      "inLanguage": "id-ID",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "IDR"
+      }
+    }
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -561,6 +607,12 @@
 </head>
 {% set page = active_page|default('') %}
 <body>
+    {% if not user and (self.content_login is defined and self.content_login()) %}
+    <!-- No user (login/register page) -->
+    <div style="flex:1; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; width:100%">
+        {% block content_login %}{% endblock %}
+    </div>
+    {% else %}
     {% if user %}
     <!-- Mobile toggle -->
     <button class="app-sidebar-toggle" onclick="toggleSidebar()" aria-label="Menu">&#9776;</button>
@@ -626,17 +678,33 @@
             <a href="/logout" class="app-button app-button-small" style="justify-content:center">Keluar</a>
         </div>
     </aside>
+    {% else %}
+    <!-- Public Header for Visitors & Search Engines -->
+    <header style="position:fixed; top:0; left:0; right:0; height:60px; background:var(--app-surface); border-bottom:1px solid var(--app-border); padding:0 20px; display:flex; justify-content:space-between; align-items:center; z-index:40; box-shadow:var(--app-shadow);">
+        <a href="/" class="app-brand" style="text-decoration:none;">
+            <span class="app-brand-mark">ES</span>
+            <div class="app-brand-text">
+                <span class="app-brand-name">Xiaozhi Indonesia</span>
+                <span class="app-brand-sub">Platform AI & IoT</span>
+            </div>
+        </a>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <a href="/dokumentasi" class="app-button" style="text-decoration:none;">Dokumentasi</a>
+            <a href="/login" class="app-button app-button-primary" style="text-decoration:none;">Masuk</a>
+        </div>
+    </header>
+    {% endif %}
 
-    <!-- Main -->
-    <div class="app-main-wrapper">
-        <main class="app-main">
+    <!-- Main Content (defined once) -->
+    <div class="app-main-wrapper" style="{% if not user %}margin-left:0; padding-top:60px;{% endif %}">
+        <main class="app-main" style="{% if not user %}max-width:var(--app-normal-max); margin:0 auto;{% endif %}">
             {% block content %}{% endblock %}
         </main>
-    </div>
-    {% else %}
-    <!-- No user (login page) -->
-    <div style="flex:1; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; width:100%">
-        {% block content_login %}{% endblock %}
+        {% if not user %}
+        <footer style="background:var(--app-surface); border-top:1px solid var(--app-border); padding:20px; text-align:center; font-size:12px; color:var(--app-muted);">
+            &copy; 2026 Xiaozhi Indonesia. Platform Asisten Suara Cerdas IoT & FastMCP Knowledge Base.
+        </footer>
+        {% endif %}
     </div>
     {% endif %}
 

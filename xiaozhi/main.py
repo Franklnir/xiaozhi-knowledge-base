@@ -181,3 +181,54 @@ async def mount_mcp_endpoint():
             logger.info("MCP SSE endpoint mounted at /mcp")
     except (ImportError, Exception) as e:
         logger.warning("MCP package not available. /mcp endpoint disabled: %s", e)
+
+
+# SEO Endpoints
+from fastapi.responses import PlainTextResponse, Response
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
+async def robots_txt():
+    content = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Allow: /dokumentasi\n"
+        "Allow: /login\n"
+        "Allow: /register\n"
+        "Disallow: /admin\n"
+        "Disallow: /dashboard\n"
+        "Disallow: /api/\n"
+        "Disallow: /riwayat-chat\n"
+        "Disallow: /simulasi-smarthome-virtual\n"
+        "Disallow: /relay-nyata\n\n"
+        "Sitemap: https://xiaozhiscig.biz.id/sitemap.xml\n"
+    )
+    return PlainTextResponse(content, media_type="text/plain")
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml():
+    xml_content = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://xiaozhiscig.biz.id/</loc>
+        <changefreq>daily</changefreq>
+        <priority>1.0</priority>
+    </url>
+    <url>
+        <loc>https://xiaozhiscig.biz.id/dokumentasi</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+    <url>
+        <loc>https://xiaozhiscig.biz.id/login</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
+    </url>
+    <url>
+        <loc>https://xiaozhiscig.biz.id/register</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
+    </url>
+</urlset>"""
+    return Response(content=xml_content, media_type="application/xml")
