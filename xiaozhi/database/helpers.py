@@ -6,7 +6,7 @@ from xiaozhi.config import DEFAULT_UI_THEME, UI_THEMES, USER_LIMIT_DEFAULTS
 def empty_database() -> Dict[str, Any]:
     return {
         "version": 1,
-        "next_ids": {"users": 1, "materials": 1, "categories": 1, "chat_history": 1, "relay_rooms": 1},
+        "next_ids": {"users": 1, "materials": 1, "categories": 1, "chat_history": 1, "relay_rooms": 1, "user_persona": 1},
         "users": [],
         "materials": [],
         "categories": [],
@@ -17,6 +17,7 @@ def empty_database() -> Dict[str, Any]:
         "registered_devices": [],
         "feature_settings": [],
         "user_limits": [],
+        "user_persona": [],
     }
 
 
@@ -25,7 +26,7 @@ def normalize_database(data: Dict[str, Any]) -> Dict[str, Any]:
         data = empty_database()
     data.setdefault("version", 1)
     data.setdefault("next_ids", {})
-    for bucket in ("users", "materials", "categories", "xiaozhi_tokens", "chat_history", "relay_rooms", "audio_queue", "registered_devices", "feature_settings", "user_limits"):
+    for bucket in ("users", "materials", "categories", "xiaozhi_tokens", "chat_history", "relay_rooms", "audio_queue", "registered_devices", "feature_settings", "user_limits", "user_persona"):
         data.setdefault(bucket, [])
         if not isinstance(data[bucket], list):
             data[bucket] = []

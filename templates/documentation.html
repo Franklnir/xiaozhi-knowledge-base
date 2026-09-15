@@ -749,10 +749,10 @@ void acknowledgeAudio(int commandId) {
         <div class="app-card">
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🔧</span> Daftar 36 Tools MCP Xiaozhi
+                    <span>🔧</span> Daftar 38 Tools MCP Xiaozhi
                 </div>
                 <p class="doc-step-desc">
-                    Xiaozhi terhubung dengan <strong>36 Tools MCP</strong> berstandar ilmiah, memori percakapan, dan realtime. Tools ini otomatis dipanggil oleh Xiaozhi saat mendengarkan pertanyaan atau instruksi suara kamu.
+                    Xiaozhi terhubung dengan <strong>38 Tools MCP</strong> berstandar ilmiah, memori semantik vektor, profil persona pengguna, dan realtime. Tools ini otomatis dipanggil oleh Xiaozhi saat mendengarkan pertanyaan atau instruksi suara kamu.
                 </p>
 
                 <!-- Search box for tools -->
@@ -1157,12 +1157,39 @@ void acknowledgeAudio(int commandId) {
                     <div class="tool-card">
                         <div class="tool-header">
                             <span class="tool-name">recall_chat_memory</span>
+                            <span class="badge badge-success" style="font-size: 0.65rem;">Semantic Vector AI</span>
                         </div>
                         <div class="tool-desc">
-                            Mengingat kembali riwayat obrolan masa lalu (long-term memory) berdasarkan kata kunci atau percakapan terkini. Membuat Xiaozhi memiliki daya ingat tinggi antar sesi percakapan.
+                            Mengingat kembali riwayat obrolan masa lalu (long-term memory) berbasis makna/semantik (semantic vector recall). Mampu menemukan percakapan meski menggunakan sinonim atau konsep serupa (misal: "masalah keuangan" menemukan chat tentang "biaya skripsi dan kos").
                         </div>
                         <div class="tool-sample">
-                            🗣️ <em>"Xiaozhi, tadi kita ngomongin soal apa ya?", atau "Ingat nggak kemarin saya cerita apa?"</em>
+                            🗣️ <em>"Xiaozhi, kemarin apa masalah keuanganku?", atau "Ingat nggak kita tadi bahas apa?"</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">remember_user_profile</span>
+                            <span class="badge badge-primary" style="font-size: 0.65rem;">User Persona</span>
+                        </div>
+                        <div class="tool-desc">
+                            Mencatat dan menyimpan preferensi pribadi, hobi, makanan favorit, cita-cita, nama panggilan, atau gaya bicara yang disukai pengguna ke profil jangka panjang.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, panggil aku Kak Frank ya dan hobiku main catur", atau "Aku suka kopi susu aren"</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">get_user_profile</span>
+                            <span class="badge badge-primary" style="font-size: 0.65rem;">Personalized</span>
+                        </div>
+                        <div class="tool-desc">
+                            Mengambil profil dan preferensi pengguna yang tersimpan agar gaya bicara, pendekatan, dan jawaban Xiaozhi terasa sangat akrab, intim, dan personal layaknya asisten pribadi setia.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, sesuaikan jawaban dengan gaya favoritku"</em>
                         </div>
                     </div>
                 </div>

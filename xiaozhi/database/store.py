@@ -1248,6 +1248,7 @@ class HFJsonStore:
         query: str = "",
         limit: int = CHAT_HISTORY_DEFAULT_LIMIT,
         token_hash: str = "",
+        semantic: bool = False,
     ) -> List[Dict[str, Any]]:
         query = clean_text(query, max_len=120, field="Pencarian riwayat") if query else ""
         limit = max(1, min(int(limit or CHAT_HISTORY_DEFAULT_LIMIT), 300))
@@ -1256,10 +1257,23 @@ class HFJsonStore:
             data = self._load()
             rows = [
                 dict(item)
-                for item in data["chat_history"]
+                for item in data.get("chat_history", [])
                 if int(item.get("owner_id", 0)) == int(owner_id)
                 and history_matches_token(item, token_hash)
             ]
+
+        if semantic and query.strip():
+            try:
+                from xiaozhi.services.semantic_memory_service import rank_chat_history_semantically
+                ranked = rank_chat_history_semantically(query.strip(), rows, top_k=limit)
+                for item in ranked:
+                    item["token_hash"] = normalize_token_hash(item.get("token_hash", ""))
+                    item["request_size_label"] = format_size_mb(utf8_size(item.get("request_payload", "")))
+                    item["response_size_label"] = format_size_mb(utf8_size(item.get("response_payload", "")))
+                return ranked
+            except Exception as e:
+                logger.warning("Fallback semantic search in store.py: %s", e)
+
         if query:
             term = query.lower()
             rows = [
@@ -1290,7 +1304,7 @@ class HFJsonStore:
             data = self._load()
             rows = [
                 item
-                for item in data["chat_history"]
+                for item in data.get("chat_history", [])
                 if int(item.get("owner_id", 0)) == int(owner_id)
                 and history_matches_token(item, token_hash)
             ]
@@ -1303,16 +1317,98 @@ class HFJsonStore:
     def clear_chat_history(self, owner_id: int) -> int:
         with self._lock:
             data = self._load()
-            before = len(data["chat_history"])
+            before = len(data.get("chat_history", []))
             data["chat_history"] = [
                 item
-                for item in data["chat_history"]
+                for item in data.get("chat_history", [])
                 if int(item.get("owner_id", 0)) != int(owner_id)
             ]
             removed = before - len(data["chat_history"])
             if removed:
                 self._commit(data, "Clear Xiaozhi chat history")
             return removed
+
+    # ── User Persona & Preferences ─────────────────────────────────────────
+
+    def save_user_preference(
+        self,
+        owner_id: int,
+        category: str,
+        preference_key: str,
+        preference_value: str,
+        confidence: float = 1.0,
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        cat_clean = str(category or "informasi_pribadi").strip().lower()
+        key_clean = str(preference_key or "").strip()
+        val_clean = str(preference_value or "").strip()
+        conf_val = max(0.1, min(float(confidence or 1.0), 1.0))
+
+        with self._lock:
+            data = self._load()
+            persona_list = data.setdefault("user_persona", [])
+            existing = None
+            for p in persona_list:
+                if int(p.get("owner_id", 0)) == int(owner_id) and str(p.get("preference_key", "")).strip().lower() == key_clean.lower():
+                    existing = p
+                    break
+
+            if existing:
+                existing["category"] = cat_clean
+                existing["preference_value"] = val_clean
+                existing["confidence"] = conf_val
+                existing["updated_at"] = now
+            else:
+                next_id = int(data.get("next_ids", {}).get("user_persona", 1))
+                data.setdefault("next_ids", {})["user_persona"] = next_id + 1
+                persona_list.append({
+                    "id": next_id,
+                    "owner_id": int(owner_id),
+                    "category": cat_clean,
+                    "preference_key": key_clean,
+                    "preference_value": val_clean,
+                    "confidence": conf_val,
+                    "created_at": now,
+                    "updated_at": now,
+                })
+            self._commit(data, f"Save user persona {key_clean} for user {owner_id}")
+            return {
+                "success": True,
+                "owner_id": int(owner_id),
+                "category": cat_clean,
+                "preference_key": key_clean,
+                "preference_value": val_clean,
+                "confidence": conf_val,
+                "updated_at": now,
+            }
+
+    def get_user_persona(self, owner_id: int, category: str = "") -> List[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            items = [
+                dict(p)
+                for p in data.get("user_persona", [])
+                if int(p.get("owner_id", 0)) == int(owner_id)
+            ]
+        if category:
+            cat_filter = category.strip().lower()
+            items = [p for p in items if str(p.get("category", "")).lower() == cat_filter]
+        return sorted(items, key=lambda x: str(x.get("updated_at", "")), reverse=True)
+
+    def delete_user_preference(self, owner_id: int, preference_key: str) -> bool:
+        key_target = preference_key.strip().lower()
+        with self._lock:
+            data = self._load()
+            before = len(data.get("user_persona", []))
+            data["user_persona"] = [
+                p
+                for p in data.get("user_persona", [])
+                if not (int(p.get("owner_id", 0)) == int(owner_id) and str(p.get("preference_key", "")).strip().lower() == key_target)
+            ]
+            removed = before - len(data["user_persona"])
+            if removed:
+                self._commit(data, f"Delete user persona {preference_key} for user {owner_id}")
+            return removed > 0
 
     def get_feature_settings(self, owner_id: int) -> Dict[str, Any]:
         with self._lock:
