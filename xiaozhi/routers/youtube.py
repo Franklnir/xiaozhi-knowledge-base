@@ -355,7 +355,7 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
         latest = commands[-1]
         for old in commands[:-1]:
             try:
-                store.ack_audio_command(old["id"])
+                store.ack_audio_command(owner_id, old["id"])
             except Exception:
                 pass
         commands = [latest]
