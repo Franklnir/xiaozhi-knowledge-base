@@ -172,6 +172,7 @@ async def _stream_opus_audio(video_id: str) -> AsyncGenerator[bytes, None]:
         "-c:a", "libopus",
         "-b:a", "24k",
         "-frame_duration", "60",
+        "-page_duration", "60000",
         "-f", "ogg",
         "pipe:1"
     ]
