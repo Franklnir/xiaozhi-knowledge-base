@@ -170,7 +170,8 @@ async def _stream_opus_audio(video_id: str) -> AsyncGenerator[bytes, None]:
         "-ac", "1",
         "-ar", "24000",
         "-c:a", "libopus",
-        "-b:a", "48k",
+        "-b:a", "24k",
+        "-frame_duration", "60",
         "-f", "ogg",
         "pipe:1"
     ]
@@ -350,6 +351,14 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
         return {"success": True, "commands": []}
 
     commands = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else store.get_audio_commands(owner_id)
+    if commands:
+        latest = commands[-1]
+        for old in commands[:-1]:
+            try:
+                store.ack_audio_command(old["id"])
+            except Exception:
+                pass
+        commands = [latest]
     return {"success": True, "commands": commands}
 
 
