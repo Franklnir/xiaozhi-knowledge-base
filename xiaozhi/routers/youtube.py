@@ -331,9 +331,35 @@ async def now_playing(request: Request):
     return {"success": True, "current": current}
 
 
+@router.get("/api/audio/play_direct")
+async def audio_play_direct(q: str):
+    """Direct search and stream for ESP32 instant on-demand playback."""
+    q = (q or "").strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="Query required")
+    try:
+        results = youtube_search(q, max_results=1)
+        if not results:
+            raise HTTPException(status_code=404, detail="Song not found")
+        return {
+            "success": True,
+            "video_id": results[0]["video_id"],
+            "title": results[0]["title"],
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/api/device/audio/commands")
 async def device_audio_commands(request: Request, token: str = Query(""), mac: str = Query("")):
     store = get_store()
+    conn = getattr(store, "_get_conn", lambda: None)()
+    if conn is not None:
+        try:
+            conn.execute("UPDATE audio_queue SET status='expired' WHERE status='pending' AND datetime(created_at) < datetime('now', '-30 minutes')")
+            conn.commit()
+        except Exception:
+            pass
     owner_id = None
     if token:
         owner = store.find_user_by_mcp_token(token)
