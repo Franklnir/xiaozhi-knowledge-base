@@ -20,9 +20,10 @@ async def register_device(request: Request):
     body = await request.json()
     device_name = str(body.get("name", "")).strip()
     device_type = str(body.get("type", "")).strip()
+    device_id = str(body.get("device_id", "") or body.get("mac", "") or device_name).strip()
     if not device_name:
         raise HTTPException(status_code=400, detail="Nama perangkat diperlukan.")
-    device = store.register_device(user["id"], name=device_name, device_type=device_type)
+    device = store.register_device(user["id"], device_id=device_id, name=device_name, device_type=device_type)
     return {"success": True, "device": device}
 
 

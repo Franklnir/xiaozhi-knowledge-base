@@ -52,6 +52,15 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
     conn = getattr(store, "_get_conn", lambda: None)()
     if conn is not None:
         try:
+            pending_row = conn.execute(
+                "SELECT owner_id FROM audio_queue WHERE status = 'pending' ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            if pending_row and pending_row["owner_id"]:
+                return int(pending_row["owner_id"])
+        except Exception:
+            pass
+
+        try:
             row = conn.execute(
                 "SELECT owner_id FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(device_id) = ?",
                 (device_id.lower(), raw_mac.lower())
