@@ -900,7 +900,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         return result
 
     @mcp_server.tool()
-    def get_weather(city: str) -> dict:
+    def get_weather_bmkg(city: str) -> dict:
         """
         Cek cuaca realtime dan prakiraan suhu hari ini untuk kota atau wilayah tertentu.
         Menyajikan: suhu saat ini (°C), kondisi cuaca (cerah, berawan, hujan), kecepatan angin, dan estimasi suhu min/max.
@@ -913,7 +913,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         from xiaozhi.services.external_info_service import get_weather_data
         result = get_weather_data(city)
         if owner_id:
-            record_mcp_tool_history(owner_id, "get_weather", city, {"city": city}, result)
+            record_mcp_tool_history(owner_id, "get_weather_bmkg", city, {"city": city}, result)
         return result
 
     # ── Advanced Philosophical, Psychological, & IT Specialist Tools ───────
