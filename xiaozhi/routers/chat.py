@@ -101,8 +101,6 @@ async def clear_chat_history(request: Request, csrf_token: str = Form(...)):
 @router.get("/dokumentasi", response_class=HTMLResponse)
 async def documentation_page(request: Request):
     user = get_current_user(request)
-    if not user:
-        return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
     return render(
         request,
         "documentation.html",
