@@ -1,4 +1,5 @@
-﻿import asyncio
+from xiaozhi.services.youtube_streamer import stream_video_to_websocket
+import asyncio
 import base64
 import io
 import logging
@@ -7,7 +8,7 @@ import shutil
 import subprocess
 from typing import Optional, AsyncGenerator
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from xiaozhi.dependencies import get_current_user, get_store, require_user
@@ -158,7 +159,7 @@ async def _stream_opus_audio(video_id: str) -> AsyncGenerator[bytes, None]:
         "-i", source_url,
         "-vn",
         "-ac", "1",
-        "-ar", "48000",
+        "-ar", "24000",
         "-c:a", "libopus",
         "-b:a", "48k",
         "-f", "ogg",
@@ -190,7 +191,7 @@ async def _stream_opus_audio(video_id: str) -> AsyncGenerator[bytes, None]:
 
 @router.get("/api/audio/stream/{video_id}")
 async def audio_stream_ogg_opus(video_id: str, request: Request):
-    """Real-time Ogg/Opus mono 48kHz transcoding stream for ESP32 hardware decoder."""
+    """Real-time Ogg/Opus mono 24kHz transcoding stream for ESP32 hardware decoder."""
     return StreamingResponse(
         _stream_opus_audio(video_id),
         media_type="audio/ogg",
@@ -374,3 +375,55 @@ async def device_audio_ack(request: Request):
     if owner_id and command_id:
         store.ack_audio_command(owner_id, command_id)
     return {"success": True}
+
+
+@router.websocket("/ws/audio/stream/{video_id}")
+async def ws_audio_stream_endpoint(
+    websocket: WebSocket,
+    video_id: str,
+    sample_rate: int = 24000,
+    title: str = ""
+):
+    """WebSocket Opus 24kHz stream for ESP32 hardware decoder."""
+    await websocket.accept()
+    try:
+        await stream_video_to_websocket(websocket, video_id, title=title, sample_rate=sample_rate)
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logger.error("WebSocket stream error: %s", exc)
+
+
+@router.websocket("/ws/device/audio/{device_id}")
+async def ws_device_audio_channel(websocket: WebSocket, device_id: str):
+    """Persistent audio streaming channel for ESP32 device."""
+    await websocket.accept()
+    store = get_store()
+    owner_id = _resolve_owner_for_device(store, device_id)
+    logger.info("Device connected to persistent audio channel: %s (owner=%s)", device_id, owner_id)
+    
+    try:
+        while True:
+            # Poll for pending audio commands for this device
+            if owner_id:
+                commands = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else store.get_audio_commands(owner_id)
+                if commands:
+                    cmd = commands[0]
+                    cmd_id = str(cmd.get("id", ""))
+                    video_id = cmd.get("video_id", "")
+                    title = cmd.get("title", "")
+                    if video_id:
+                        store.ack_audio_command(owner_id, cmd_id)
+                        await stream_video_to_websocket(websocket, video_id, title=title, sample_rate=24000)
+            
+            # Non-blocking check or wait
+            try:
+                msg = await asyncio.wait_for(websocket.receive_text(), timeout=2.0)
+                if "ping" in msg.lower():
+                    await websocket.send_text("pong")
+            except asyncio.TimeoutError:
+                pass
+    except WebSocketDisconnect:
+        logger.info("Device disconnected from audio channel: %s", device_id)
+    except Exception as exc:
+        logger.error("Device audio channel error: %s", exc)
