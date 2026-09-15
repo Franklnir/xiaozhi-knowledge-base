@@ -195,14 +195,14 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def recall_chat_memory(query: str = "", limit: int = 5) -> dict:
         """
-        Ingat kembali riwayat percakapan sebelumnya antara user dan Xiaozhi dari memori jangka panjang (Long-Term Memory).
+        Ingat kembali riwayat percakapan sebelumnya antara user dan Xiaozhi dari memori jangka panjang (Long-Term Semantic Memory).
         Panggil tool ini ketika user:
         - Bertanya tentang obrolan yang lalu ("tadi kita bahas apa", "kemarin saya nanya apa", "ingat nggak...").
+        - Mengungkit topik/konsep secara semantik (contoh: user tanya "masalah keuanganku" padahal sebelumnya cuma cerita "biaya skripsi dan uang kos").
         - Meminta melanjutkan pembahasan sebelumnya ("lanjutkan topik kita tadi").
-        - Menanyakan informasi atau preferensi pribadi yang pernah disampaikan dalam sesi sebelumnya.
 
         Args:
-            query: Kata kunci topik yang ingin dicari (contoh: "tugas fisika", "resep", "sholat", "koding"). Kosongkan untuk membaca percakapan paling terkini.
+            query: Kata kunci topik atau konsep yang ingin dicari (contoh: "keuangan", "tugas fisika", "resep", "koding"). Kosongkan untuk membaca percakapan paling terkini.
             limit: Jumlah riwayat percakapan terakhir yang ingin diambil (default: 5, maksimal: 10).
         """
         owner_id = mcp_active_owner_ctx.get()
@@ -213,23 +213,29 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         query_clean = str(query or "").strip()
 
         try:
-            records = store.list_chat_history(owner_id, query=query_clean, limit=limit_val)
+            # Gunakan mode semantik cerdas jika user mencari berdasarkan topik/makna
+            use_semantic = bool(query_clean)
+            records = store.list_chat_history(owner_id, query=query_clean, limit=limit_val, semantic=use_semantic)
             parsed_history = []
             for r in records:
                 user_msg = str(r.get("user_message") or "").strip()
                 ai_ans = str(r.get("xiaozhi_answer") or "").strip()
                 if not user_msg and not ai_ans:
                     continue
-                parsed_history.append({
+                item_dict = {
                     "waktu": str(r.get("created_at") or ""),
                     "pesan_user": user_msg,
                     "jawaban_xiaozhi": ai_ans[:350] + ("..." if len(ai_ans) > 350 else ""),
                     "tool_dipakai": str(r.get("tool_name") or "")
-                })
+                }
+                if "similarity_score" in r:
+                    item_dict["relevansi_semantik"] = r["similarity_score"]
+                parsed_history.append(item_dict)
 
             response = {
                 "success": True,
                 "pencarian": query_clean or "Percakapan Terkini",
+                "mode": "Semantic Long-Term Recall" if use_semantic else "Chronological",
                 "total_ditemukan": len(parsed_history),
                 "riwayat_percakapan": parsed_history,
                 "instruksi_xiaozhi": (
@@ -241,6 +247,77 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         except Exception:
             logger.exception("Error recalling chat memory")
             return {"success": False, "message": "Gagal membaca memori percakapan.", "riwayat_percakapan": []}
+
+    @mcp_server.tool()
+    def remember_user_profile(
+        key: str,
+        value: str,
+        category: str = "informasi_pribadi"
+    ) -> dict:
+        """
+        Simpan fakta penting, preferensi pribadi, hobi, atau kebiasaan belajar user ke dalam profil jangka panjang (User Persona Profiling).
+        Panggil tool ini secara otomatis saat user mengungkapkan:
+        - Gaya bicara yang disukai: (contoh: key="gaya_bicara", value="Suka dipanggil Kak dan nada santai").
+        - Minat & hobi: (contoh: key="hobi_utama", value="Bermain gitar dan nonton anime One Piece").
+        - Fakta pribadi: (contoh: key="nama_panggilan", value="Frank"), (key="jurusan", value="Teknik Informatika").
+        - Makanan / minuman favorit: (contoh: key="kopi_favorit", value="Kopi susu gula aren tanpa ampas").
+        - Cita-cita / tujuan: (contoh: key="target_karir", value="Menjadi AI Engineer").
+
+        Args:
+            key: Label/kunci preferensi (contoh: "nama_panggilan", "hobi", "bahasa_pemrograman_favorit").
+            value: Rincian preferensi atau fakta yang disampaikan user.
+            category: Kategori persona: 'informasi_pribadi', 'minat_hobi', 'gaya_bicara', 'tujuan_belajar', atau 'kebiasaan'.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif."}
+
+        key_clean = str(key or "").strip()
+        val_clean = str(value or "").strip()
+        cat_clean = str(category or "informasi_pribadi").strip().lower()
+
+        if not key_clean or not val_clean:
+            return {"success": False, "message": "Parameter key dan value wajib diisi."}
+
+        try:
+            res = store.save_user_preference(owner_id, cat_clean, key_clean, val_clean)
+            return {
+                "success": True,
+                "message": f"Preferensi '{key_clean}' berhasil disimpan ke profil persona.",
+                "data": res,
+                "instruksi_xiaozhi": f"Konfirmasi kepada user dengan ramah bahwa kamu akan mengingat '{key_clean}: {val_clean}' untuk seterusnya."
+            }
+        except Exception:
+            logger.exception("Error saving user profile preference")
+            return {"success": False, "message": "Gagal menyimpan preferensi profil pengguna."}
+
+    @mcp_server.tool()
+    def get_user_profile(category: str = "") -> dict:
+        """
+        Ambil seluruh profil preferensi jangka panjang, hobi, dan persona pengguna yang tersimpan.
+        Panggil tool ini di awal percakapan atau ketika ingin memberikan respon yang sangat personal, intim, dan sesuai gaya user.
+
+        Args:
+            category: Filter kategori tertentu ('informasi_pribadi', 'minat_hobi', 'gaya_bicara', 'tujuan_belajar', 'kebiasaan') atau kosongkan untuk mengambil semua.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif.", "profil": []}
+
+        try:
+            from xiaozhi.services.semantic_memory_service import format_user_persona_for_prompt
+            persona_items = store.get_user_persona(owner_id, category=category)
+            prompt_context = format_user_persona_for_prompt(persona_items)
+            return {
+                "success": True,
+                "total_preferensi": len(persona_items),
+                "preferensi_tersimpan": persona_items,
+                "prompt_context": prompt_context,
+                "instruksi_xiaozhi": "Gunakan preferensi di atas untuk menyesuaikan gaya bicara dan relevansi jawabanmu agar user merasa sangat dipahami dan akrab."
+            }
+        except Exception:
+            logger.exception("Error getting user profile")
+            return {"success": False, "message": "Gagal mengambil profil persona pengguna.", "profil": []}
 
     @mcp_server.tool()
     def control_relay(channel: int, action: str) -> dict:

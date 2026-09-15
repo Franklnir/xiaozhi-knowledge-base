@@ -278,6 +278,22 @@ class SQLiteStore:
                 UNIQUE(user_id, tool_name)
             );
             CREATE INDEX IF NOT EXISTS idx_mcp_toggles_user ON mcp_tool_toggles(user_id);
+
+            -- User Persona (Long-Term Preferences & Memory Profiling)
+            CREATE TABLE IF NOT EXISTS user_persona (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_id INTEGER NOT NULL,
+                category TEXT NOT NULL DEFAULT 'informasi_pribadi',
+                preference_key TEXT NOT NULL,
+                preference_value TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 1.0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(owner_id, preference_key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_persona_owner ON user_persona(owner_id);
+            CREATE INDEX IF NOT EXISTS idx_persona_owner_cat ON user_persona(owner_id, category);
         """)
 
         # Migration check: Ensure google_id and google_email exist in users table
@@ -806,10 +822,30 @@ class SQLiteStore:
             request_payload=payload, token_hash=token_hash
         )
 
-    def list_chat_history(self, owner_id: int, query: str = "", limit: int = 100, token_hash: str = "") -> List[Dict[str, Any]]:
+    def list_chat_history(
+        self,
+        owner_id: int,
+        query: str = "",
+        limit: int = 100,
+        token_hash: str = "",
+        semantic: bool = False
+    ) -> List[Dict[str, Any]]:
         conn = self._get_conn()
         sql = "SELECT * FROM chat_history WHERE owner_id = ?"
-        params = [owner_id]
+        params: List[Any] = [owner_id]
+
+        # If semantic search is requested and query is provided, fetch a broader window and rank semantically
+        if semantic and query.strip():
+            sql += " ORDER BY id DESC LIMIT ?"
+            params.append(max(limit * 4, 30))
+            rows = conn.execute(sql, params).fetchall()
+            records = [dict(row) for row in rows]
+            try:
+                from xiaozhi.services.semantic_memory_service import rank_chat_history_semantically
+                return rank_chat_history_semantically(query.strip(), records, top_k=limit)
+            except Exception as e:
+                logger.warning("Fallback semantic search to standard filter: %s", e)
+
         if query:
             sql += " AND (user_message LIKE ? OR xiaozhi_answer LIKE ?)"
             params.extend([f"%{query}%", f"%{query}%"])
@@ -831,6 +867,63 @@ class SQLiteStore:
         cursor = conn.execute("DELETE FROM chat_history WHERE owner_id = ?", (owner_id,))
         conn.commit()
         return cursor.rowcount
+
+    # ── User Persona & Preferences ─────────────────────────────────────────
+
+    def save_user_preference(
+        self,
+        owner_id: int,
+        category: str,
+        preference_key: str,
+        preference_value: str,
+        confidence: float = 1.0
+    ) -> Dict[str, Any]:
+        conn = self._get_conn()
+        now = utc_now()
+        cat_clean = str(category or "informasi_pribadi").strip().lower()
+        key_clean = str(preference_key or "").strip()
+        val_clean = str(preference_value or "").strip()
+        conf_val = max(0.1, min(float(confidence or 1.0), 1.0))
+
+        conn.execute("""
+            INSERT INTO user_persona (owner_id, category, preference_key, preference_value, confidence, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(owner_id, preference_key) DO UPDATE SET
+                category=excluded.category,
+                preference_value=excluded.preference_value,
+                confidence=excluded.confidence,
+                updated_at=excluded.updated_at
+        """, (owner_id, cat_clean, key_clean, val_clean, conf_val, now, now))
+        conn.commit()
+        return {
+            "success": True,
+            "owner_id": owner_id,
+            "category": cat_clean,
+            "preference_key": key_clean,
+            "preference_value": val_clean,
+            "confidence": conf_val,
+            "updated_at": now
+        }
+
+    def get_user_persona(self, owner_id: int, category: str = "") -> List[Dict[str, Any]]:
+        conn = self._get_conn()
+        sql = "SELECT * FROM user_persona WHERE owner_id = ?"
+        params: List[Any] = [owner_id]
+        if category:
+            sql += " AND category = ?"
+            params.append(category.strip().lower())
+        sql += " ORDER BY category ASC, updated_at DESC"
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_user_preference(self, owner_id: int, preference_key: str) -> bool:
+        conn = self._get_conn()
+        cursor = conn.execute(
+            "DELETE FROM user_persona WHERE owner_id = ? AND preference_key = ?",
+            (owner_id, preference_key.strip())
+        )
+        conn.commit()
+        return cursor.rowcount > 0
 
     # ── Relay Rooms ────────────────────────────────────────────────────────
 
