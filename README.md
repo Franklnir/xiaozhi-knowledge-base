@@ -51,9 +51,9 @@ Tanpa `HF_TOKEN`, app memakai cache lokal `.hf_db_cache/app_data.json` hanya unt
 - Endpoint MCP bisa diperbarui dari dashboard; nilai lama akan diganti dan disimpan terenkripsi.
 - Halaman auth menyediakan pilihan Login, Cari akun, dan Register. Pencarian akun dibatasi prefix minimal 2 karakter dan memakai rate limit dasar.
 - Relay Nyata memakai API polling dari ESP32/8266 dll, bukan broker MQTT. ESP32/8266 dll membaca perintah dari endpoint `/api/device/relay/{slug}/commands` dan mengirim status terbaru ke `/api/device/relay/{slug}/status` memakai token perangkat.
-## Daftar 35 Tools MCP Xiaozhi
+## Daftar 36 Tools MCP Xiaozhi
 
-Server MCP Xiaozhi menyediakan 35 tools siap pakai yang dipanggil secara otomatis oleh AI berdasarkan percakapan suara atau teks:
+Server MCP Xiaozhi menyediakan 36 tools siap pakai yang dipanggil secara otomatis oleh AI berdasarkan percakapan suara atau teks:
 
 ### 1. Pembelajaran & Akademik (Study Suite)
 * `solve_study_problem`: Pemecah soal bertahap (Diketahui, Ditanyakan, Rumus, Perhitungan, Tips jebakan).
@@ -88,10 +88,11 @@ Server MCP Xiaozhi menyediakan 35 tools siap pakai yang dipanggil secara otomati
 * `control_relay`, `control_smart_home_room`, `get_relay_status`, `all_relays_on`, `all_relays_off`: Kontrol perangkat rumah pintar virtual.
 * `control_real_relay_by_voice`, `get_real_relay_status`, `all_real_relays_on`, `all_real_relays_off`: Kontrol relay fisik nyata via polling ESP32.
 
-### 7. Multimedia & Utilitas
+### 7. Multimedia, Utilitas & Memori Percakapan
 * `play_youtube_song`: Pencarian lagu dan streaming audio YouTube ke speaker ESP32.
 * `search_web`, `search_news`: Pencarian web dan berita terkini.
 * `calculate`: Perhitungan matematika dan kalkulator ekspresi.
 * `translate_text`: Penerjemah multi-bahasa.
 * `set_reminder`: Pembuatan pengingat/jadwal.
-* `save_chat_history`: Penyimpanan riwayat percakapan otomatis.
+* `save_chat_history`: Penyimpanan riwayat percakapan otomatis ke database.
+* `recall_chat_memory`: Mengingat kembali percakapan masa lalu (long-term memory recall) untuk daya ingat tinggi antar-sesi.

@@ -193,6 +193,56 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         return response
 
     @mcp_server.tool()
+    def recall_chat_memory(query: str = "", limit: int = 5) -> dict:
+        """
+        Ingat kembali riwayat percakapan sebelumnya antara user dan Xiaozhi dari memori jangka panjang (Long-Term Memory).
+        Panggil tool ini ketika user:
+        - Bertanya tentang obrolan yang lalu ("tadi kita bahas apa", "kemarin saya nanya apa", "ingat nggak...").
+        - Meminta melanjutkan pembahasan sebelumnya ("lanjutkan topik kita tadi").
+        - Menanyakan informasi atau preferensi pribadi yang pernah disampaikan dalam sesi sebelumnya.
+
+        Args:
+            query: Kata kunci topik yang ingin dicari (contoh: "tugas fisika", "resep", "sholat", "koding"). Kosongkan untuk membaca percakapan paling terkini.
+            limit: Jumlah riwayat percakapan terakhir yang ingin diambil (default: 5, maksimal: 10).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif.", "riwayat_percakapan": []}
+
+        limit_val = max(1, min(int(limit or 5), 10))
+        query_clean = str(query or "").strip()
+
+        try:
+            records = store.list_chat_history(owner_id, query=query_clean, limit=limit_val)
+            parsed_history = []
+            for r in records:
+                user_msg = str(r.get("user_message") or "").strip()
+                ai_ans = str(r.get("xiaozhi_answer") or "").strip()
+                if not user_msg and not ai_ans:
+                    continue
+                parsed_history.append({
+                    "waktu": str(r.get("created_at") or ""),
+                    "pesan_user": user_msg,
+                    "jawaban_xiaozhi": ai_ans[:350] + ("..." if len(ai_ans) > 350 else ""),
+                    "tool_dipakai": str(r.get("tool_name") or "")
+                })
+
+            response = {
+                "success": True,
+                "pencarian": query_clean or "Percakapan Terkini",
+                "total_ditemukan": len(parsed_history),
+                "riwayat_percakapan": parsed_history,
+                "instruksi_xiaozhi": (
+                    "Gunakan memori percakapan di atas untuk merespons pertanyaan pengguna secara akurat, ramah, dan kontekstual. "
+                    "Tunjukkan bahwa kamu mengingat percakapan sebelumnya dengan menyebutkan topik atau rincian yang pernah dibicarakan."
+                )
+            }
+            return response
+        except Exception:
+            logger.exception("Error recalling chat memory")
+            return {"success": False, "message": "Gagal membaca memori percakapan.", "riwayat_percakapan": []}
+
+    @mcp_server.tool()
     def control_relay(channel: int, action: str) -> dict:
         """
         Kontrol relay pada simulasi smarthome virtual.
