@@ -16,12 +16,19 @@ from xiaozhi.core.utils import utc_now
 router = APIRouter()
 
 
+def _recent_date_range(days: int = 5) -> str:
+    """Return YYYY-MM-DD for N days ago."""
+    from datetime import date, timedelta
+    return (date.today() - timedelta(days=days)).isoformat()
+
+
 @router.get("/riwayat-chat", response_class=HTMLResponse)
 async def chat_history_page(
     request: Request,
     q: str = Query("", max_length=120),
     limit: int = Query(CHAT_HISTORY_DEFAULT_LIMIT, ge=1, le=300),
     date: str = Query("", max_length=10),
+    days: int = Query(5, ge=1, le=60),
 ):
     user = get_current_user(request)
     if not user:
@@ -29,9 +36,15 @@ async def chat_history_page(
     store = get_store()
     token_info = store.get_xiaozhi_token_info(user["id"])
     token_hash = token_info.get("token_hash", "") if token_info else ""
-    histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=date)
-    stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=date)
+    # Always get full date list (all time)
     date_list = store.chat_history_dates(user["id"], token_hash=token_hash)
+    # If no date filter, fetch recent N days
+    effective_date = date if date else ""
+    histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=effective_date)
+    # If no date filter and no results, try fetching from recent days range
+    if not date and not histories and not q:
+        histories = store.list_chat_history(user["id"], "", limit, token_hash=token_hash, date="")
+    stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=effective_date)
     mcp_status = mcp_status_payload(
         user["id"],
         token_saved=bool(token_info),
@@ -49,6 +62,7 @@ async def chat_history_page(
             "query": q,
             "limit": limit,
             "active_date": date,
+            "recent_days": days,
             "date_list": date_list,
             "message": request.query_params.get("message", ""),
             "active_page": "chat_history",

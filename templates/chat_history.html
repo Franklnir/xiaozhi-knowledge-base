@@ -2,131 +2,40 @@
 
 {% block content %}
 <style>
-    .chat-shell {
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        min-height: 0;
-        overflow: hidden;
-        border: 1px solid var(--app-border);
-        border-radius: var(--app-radius);
-        background: var(--app-surface);
-        box-shadow: var(--app-shadow);
-    }
-    .chat-sidebar {
-        border-right: 1px solid var(--app-border);
-        display: grid;
-        grid-template-rows: auto 1fr;
-        min-height: 0;
-    }
-    .chat-sidebar-header {
-        padding: 14px;
-        border-bottom: 1px solid var(--app-border);
-        background: var(--app-surface-muted);
-    }
-    .chat-sidebar-scroll {
-        overflow-y: auto;
-        padding: 8px;
-    }
-    .chat-date-group { margin-bottom: 6px; }
-    .chat-date-label {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 10px 4px;
-        font-size: 11px;
-        font-weight: 750;
-        color: var(--app-muted);
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        user-select: none;
-        cursor: pointer;
-    }
-    .chat-date-label:hover { color: var(--app-accent); }
-    .chat-date-count {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 20px;
-        height: 18px;
-        padding: 0 5px;
-        border-radius: 9px;
-        background: var(--app-surface-muted);
-        font-size: 10px;
-        font-weight: 700;
-        color: var(--app-muted);
-    }
-    .chat-date-label.is-active .chat-date-count {
-        background: var(--app-accent);
-        color: #fff;
-    }
-    .chat-session-btn {
-        width: 100%;
-        border: 1px solid transparent;
-        border-radius: 8px;
-        background: transparent;
-        padding: 10px 12px;
-        text-align: left;
-        color: var(--app-text);
-        transition: background .12s, border-color .12s;
-    }
-    .chat-session-btn:hover { background: var(--app-surface-muted); }
-    .chat-session-btn.is-active { border-color: #bae6fd; background: #e0f2fe; }
-    .chat-session-title {
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: 13px;
-        font-weight: 700;
-    }
-    .chat-session-meta { display: block; margin-top: 4px; font-size: 11px; color: var(--app-muted); }
-    .chat-session-items { display: grid; gap: 3px; }
-    .chat-session-items.is-collapsed { display: none; }
-    .chat-date-picker-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
-    .chat-date-picker-row input[type="date"] {
-        flex: 1; padding: 6px 8px; border: 1px solid var(--app-border);
-        border-radius: var(--app-radius); font-size: 12px;
-        background: var(--app-surface); color: var(--app-text);
-    }
-    .chat-thread { display: grid; grid-template-rows: auto 1fr; min-width: 0; }
-    .chat-thread-header {
-        display: flex; align-items: flex-start; justify-content: space-between;
-        gap: 14px; padding: 16px 18px;
-        border-bottom: 1px solid var(--app-border); background: var(--app-surface);
-    }
-    .chat-thread-body { max-height: 640px; overflow-y: auto; padding: 18px; background: #fff; }
-    .chat-msg { display: block; margin-bottom: 22px; }
-    .chat-bubble {
-        width: min(100%, 720px); max-width: 100%;
-        border-radius: 8px; padding: 10px 12px 8px;
-        box-shadow: 0 1px 1px rgba(15,23,42,.04);
-    }
-    .chat-bubble-user { background: #e0f2fe; }
-    .chat-bubble-ai, .chat-bubble-tool { background: #f1f5f9; }
-    .chat-bubble-meta {
-        display: flex; align-items: center; justify-content: space-between;
-        gap: 14px; margin-bottom: 8px; font-size: 11px; color: #64748b;
-    }
-    .chat-bubble-role { font-weight: 800; }
-    .chat-bubble-time { white-space: nowrap; font-weight: 600; }
-    .chat-bubble-text {
-        color: #020617; font-size: 13px; line-height: 1.55;
-        white-space: pre-wrap; word-break: break-word;
-    }
-    .chat-bubble-footer {
-        margin-top: 6px; text-align: right;
-        font-size: 11px; color: #64748b; font-weight: 600;
-    }
-    .chat-empty {
-        display: grid; min-height: 380px; place-items: center;
-        text-align: center; color: var(--app-muted);
-    }
-    @media (max-width: 900px) {
-        .chat-shell { grid-template-columns: 1fr; }
-        .chat-sidebar { border-right: none; border-bottom: 1px solid var(--app-border); }
-        .chat-sidebar-scroll { max-height: 280px; }
-        .chat-thread-body { max-height: none; }
-    }
+    .chat-shell { display:grid; grid-template-columns:280px 1fr; min-height:0; overflow:hidden; border:1px solid var(--app-border); border-radius:var(--app-radius); background:var(--app-surface); box-shadow:var(--app-shadow); }
+    .chat-sidebar { border-right:1px solid var(--app-border); display:grid; grid-template-rows:auto 1fr; min-height:0; }
+    .chat-sidebar-header { padding:14px; border-bottom:1px solid var(--app-border); background:var(--app-surface-muted); }
+    .chat-sidebar-scroll { overflow-y:auto; padding:6px; }
+    .chat-date-group { margin-bottom:4px; }
+    .chat-date-label { display:flex; align-items:center; gap:8px; padding:8px 10px 4px; font-size:11px; font-weight:750; color:var(--app-muted); text-transform:uppercase; letter-spacing:.04em; cursor:pointer; }
+    .chat-date-label:hover { color:var(--app-accent); }
+    .chat-date-badge { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:18px; padding:0 5px; border-radius:9px; background:var(--app-surface-muted); font-size:10px; font-weight:700; color:var(--app-muted); }
+    .chat-date-label.is-active { color:var(--app-accent); }
+    .chat-date-label.is-active .chat-date-badge { background:var(--app-accent); color:#fff; }
+    .chat-sessions { display:grid; gap:2px; }
+    .chat-sessions.collapsed { display:none; }
+    .chat-item { width:100%; border:1px solid transparent; border-radius:8px; background:transparent; padding:10px 12px; text-align:left; color:var(--app-text); }
+    .chat-item:hover { background:var(--app-surface-muted); }
+    .chat-item.active { border-color:#bae6fd; background:#e0f2fe; }
+    .chat-item-title { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:700; }
+    .chat-item-meta { display:block; margin-top:3px; font-size:11px; color:var(--app-muted); }
+    .chat-date-input { display:flex; gap:6px; margin-top:8px; }
+    .chat-date-input input[type="date"] { flex:1; padding:6px 8px; border:1px solid var(--app-border); border-radius:var(--app-radius); font-size:12px; background:var(--app-surface); color:var(--app-text); }
+    .chat-thread { display:grid; grid-template-rows:auto 1fr; min-width:0; }
+    .chat-thread-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid var(--app-border); background:var(--app-surface); }
+    .chat-thread-body { max-height:640px; overflow-y:auto; padding:18px; background:#fff; }
+    .chat-msg { display:block; margin-bottom:20px; }
+    .chat-bubble { width:min(100%,720px); border-radius:8px; padding:10px 12px 8px; box-shadow:0 1px 1px rgba(15,23,42,.04); }
+    .chat-bubble-user { background:#e0f2fe; }
+    .chat-bubble-ai { background:#f1f5f9; }
+    .chat-bubble-tool { background:#f1f5f9; }
+    .chat-bubble-head { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:8px; font-size:11px; color:#64748b; }
+    .chat-bubble-role { font-weight:800; }
+    .chat-bubble-time { white-space:nowrap; font-weight:600; }
+    .chat-bubble-body { color:#020617; font-size:13px; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+    .chat-bubble-foot { margin-top:6px; text-align:right; font-size:11px; color:#64748b; font-weight:600; }
+    .chat-empty { display:grid; min-height:380px; place-items:center; text-align:center; color:var(--app-muted); }
+    @media (max-width:900px) { .chat-shell { grid-template-columns:1fr; } .chat-sidebar { border-right:none; border-bottom:1px solid var(--app-border); } .chat-sidebar-scroll { max-height:260px; } .chat-thread-body { max-height:none; } }
 </style>
 
 <div class="app-page">
@@ -134,7 +43,7 @@
         <div>
             <p class="app-eyebrow">Riwayat Xiaozhi</p>
             <h1 class="app-title">Riwayat Chat</h1>
-            <p class="app-subtitle">Percakapan dan tool call dari endpoint MCP. Filter per hari atau cari kata kunci.</p>
+            <p class="app-subtitle">Percakapan terbaru dari MCP. Klik tanggal untuk filter per hari.</p>
         </div>
         <div class="app-toolbar">
             <span class="app-status-pill {% if mcp_status.connected %}is-online{% elif not mcp_status.tokenSaved %}is-offline{% endif %}" id="mcpStatusPill">
@@ -146,257 +55,176 @@
     </header>
 
     <section class="app-stat-grid">
-        <div class="app-stat-card">
-            <p class="app-stat-label">Total</p>
-            <p class="app-stat-value" id="statTotal">{{ stats.total }}</p>
-        </div>
-        <div class="app-stat-card">
-            <p class="app-stat-label">Ditampilkan</p>
-            <p class="app-stat-value" id="statShown">{{ histories|length }}</p>
-        </div>
-        <div class="app-stat-card">
-            <p class="app-stat-label">Hari Aktif</p>
-            <p class="app-stat-value">{{ date_list|length }}</p>
-        </div>
-        <div class="app-stat-card">
-            <p class="app-stat-label">Filter</p>
-            <p class="app-stat-value">{{ active_date if active_date else "Semua" }}</p>
-        </div>
+        <div class="app-stat-card"><p class="app-stat-label">Total</p><p class="app-stat-value" id="statTotal">{{ stats.total }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Ditampilkan</p><p class="app-stat-value" id="statShown">{{ histories|length }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Hari Aktif</p><p class="app-stat-value">{{ date_list|length }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Filter</p><p class="app-stat-value" id="statFilter">{{ active_date if active_date else "Semua" }}</p></div>
     </section>
 
     <section class="chat-shell">
-        <!-- SIDEBAR -->
         <aside class="chat-sidebar">
             <div class="chat-sidebar-header">
                 <form action="/riwayat-chat" method="GET" class="grid gap-2">
                     <input type="search" name="q" value="{{ query }}" placeholder="Cari chat..." class="app-input" style="font-size:13px;padding:8px 10px;">
-                    <div class="chat-date-picker-row">
-                        <input type="date" name="date" value="{{ active_date }}" id="datePicker">
+                    <div class="chat-date-input">
+                        <input type="date" name="date" value="{{ active_date }}">
                         <button type="submit" class="app-button app-button-primary" style="padding:6px 12px;font-size:12px;">Filter</button>
-                        {% if active_date %}
-                        <a href="/riwayat-chat{% if query %}?q={{ query }}{% endif %}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--app-border);border-radius:var(--app-radius);background:var(--app-surface);color:var(--app-muted);font-size:14px;cursor:pointer;" title="Reset tanggal">&#10005;</a>
-                        {% endif %}
                     </div>
                 </form>
                 <div style="display:flex;gap:6px;margin-top:8px;">
-                    <a href="/riwayat-chat" class="app-button app-button-full" style="font-size:12px;padding:6px 10px;">Semua Hari</a>
-                    <form action="/riwayat-chat/clear" method="POST" onsubmit="return confirm('Hapus semua riwayat chat?');" style="flex:1;">
+                    <a href="/riwayat-chat" class="app-button" style="flex:1;font-size:12px;padding:6px 8px;text-align:center;">Semua</a>
+                    <form action="/riwayat-chat/clear" method="POST" onsubmit="return confirm('Hapus semua?');" style="flex:1;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="app-button app-button-danger app-button-full" style="font-size:12px;padding:6px 10px;">Hapus</button>
+                        <button type="submit" class="app-button app-button-danger" style="width:100%;font-size:12px;padding:6px 8px;">Hapus</button>
                     </form>
                 </div>
             </div>
-            <div class="chat-sidebar-scroll" id="dateGroupList"></div>
+            <div class="chat-sidebar-scroll" id="sidebarList"></div>
         </aside>
 
-        <!-- THREAD -->
         <div class="chat-thread">
-            <div class="chat-thread-header">
+            <div class="chat-thread-head">
                 <div>
                     <h2 class="app-section-title" id="threadTitle">Pilih riwayat</h2>
-                    <p class="app-section-subtitle" id="threadMeta">Klik tanggal atau chat di sidebar.</p>
+                    <p class="app-section-subtitle" id="threadMeta">Klik chat di sidebar untuk lihat detail.</p>
                 </div>
                 <span class="app-chip app-chip-small app-chip-neutral" id="threadBadge">-</span>
             </div>
-            <div class="chat-thread-body" id="chatThreadBody">
-                <div class="chat-empty">
-                    <div>
-                        <p style="font-size:16px;font-weight:700;color:var(--app-text);">Belum ada percakapan</p>
-                        <p class="mt-2 text-sm">Pilih tanggal atau chat dari sidebar kiri.</p>
-                    </div>
-                </div>
+            <div class="chat-thread-body" id="threadBody">
+                <div class="chat-empty"><div><p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih chat</p><p class="mt-2 text-sm">Klik salah satu item di sidebar kiri.</p></div></div>
             </div>
         </div>
     </section>
 </div>
 
 <script>
-    const initialHistories = {{ histories|tojson }};
-    const initialDateList = {{ date_list|tojson }};
-    const initialMcpStatus = {{ mcp_status|tojson }};
-    const activeQuery = {{ query|tojson }};
-    const activeLimit = {{ limit|tojson }};
-    const activeDate = {{ active_date|tojson }};
-    let histories = Array.isArray(initialHistories) ? initialHistories : [];
-    let dateList = Array.isArray(initialDateList) ? initialDateList : [];
-    let mcpStatus = initialMcpStatus || {};
-    let selectedHistoryId = histories.length ? Number(histories[0].id) : null;
-    let maxHistoryId = histories.reduce((max, item) => Math.max(max, Number(item.id || 0)), 0);
-    let collapsedDates = new Set();
+    var H = {{ histories|tojson }};
+    var DL = {{ date_list|tojson }};
+    var MQ = {{ query|tojson }};
+    var AD = {{ active_date|tojson }};
+    var sel = H.length ? Number(H[0].id) : null;
+    var maxId = H.reduce(function(m,i){ return Math.max(m, Number(i.id||0)); }, 0);
+    var collapsed = {};
+    var E = App.escapeHtml;
 
-    const E = App.escapeHtml;
+    function fmt(v){ var d=new Date(v); return isNaN(d)?v||"-":d.toLocaleString("id-ID",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}); }
+    function fmtShort(v){ var d=new Date(v); return isNaN(d)?"":d.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}); }
+    function relDay(s){ if(!s)return""; var t=new Date();t.setHours(0,0,0,0); var d=new Date(s+"T00:00:00"); var diff=Math.round((t-d)/864e5); if(diff===0)return"Hari Ini"; if(diff===1)return"Kemarin"; if(diff<7)return diff+" hari lalu"; return d.toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}); }
+    function cmp(v,m){ m=m||76; var t=String(v||"").replace(/\s+/g," ").trim(); return t.length<=m?t:t.slice(0,m-3).trim()+"..."; }
+    function kind(i){ if(i.source==="chat_transcript")return"Transcript"; if(String(i.tool_name||"").startsWith("xiaozhi_ws"))return"Chat MCP"; return"Tool"; }
 
-    function compactText(v, max) {
-        max = max || 76;
-        var t = String(v || "").replace(/\s+/g, " ").trim();
-        if (!t) return "Tanpa pesan";
-        return t.length <= max ? t : t.slice(0, max - 3).trim() + "...";
-    }
-
-    function formatTime(v) {
-        var d = new Date(v);
-        if (isNaN(d)) return v || "-";
-        return d.toLocaleString("id-ID", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
-    }
-
-    function formatTimeShort(v) {
-        var d = new Date(v);
-        if (isNaN(d)) return "";
-        return d.toLocaleTimeString("id-ID", { hour:"2-digit", minute:"2-digit" });
-    }
-
-    function kindLabel(item) {
-        if (item.source === "chat_transcript") return "Transcript";
-        if (String(item.tool_name || "").startsWith("xiaozhi_ws")) return "Chat MCP";
-        return "Tool";
-    }
-
-    function relativeDay(dateStr) {
-        if (!dateStr) return "";
-        var today = new Date(); today.setHours(0,0,0,0);
-        var d = new Date(dateStr + "T00:00:00");
-        var diff = Math.round((today - d) / 86400000);
-        if (diff === 0) return "Hari Ini";
-        if (diff === 1) return "Kemarin";
-        if (diff < 7) return diff + " hari lalu";
-        return d.toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
-    }
-
-    function groupHistoriesByDate(items) {
-        var groups = {};
-        items.forEach(function(item) {
-            var d = (item.created_at || "").slice(0, 10) || "unknown";
-            if (!groups[d]) groups[d] = [];
-            groups[d].push(item);
+    function groupByDate(items) {
+        var g = {};
+        items.forEach(function(i) {
+            var d = (i.created_at||"").slice(0,10) || "?";
+            if(!g[d]) g[d] = [];
+            g[d].push(i);
         });
-        return groups;
+        return g;
     }
 
-    function renderDateSidebar() {
-        var el = document.getElementById("dateGroupList");
-        if (!dateList.length && !histories.length) {
-            el.innerHTML = '<div class="p-5 text-center text-sm font-semibold" style="color:var(--app-muted);">Belum ada riwayat.</div>';
+    function renderSidebar() {
+        var el = document.getElementById("sidebarList");
+        var grouped = groupByDate(H);
+        // Merge dateList dates with grouped dates
+        var allDates = {};
+        DL.forEach(function(e) { allDates[e.date] = e.count; });
+        Object.keys(grouped).forEach(function(d) { if(!allDates[d]) allDates[d] = grouped[d].length; });
+        var dates = Object.keys(allDates).sort().reverse();
+
+        if (!dates.length && !H.length) {
+            el.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--app-muted);">Belum ada riwayat chat.</div>';
             return;
         }
-        var grouped = groupHistoriesByDate(histories);
+
         var html = "";
-        dateList.forEach(function(entry) {
-            var d = entry.date;
-            var label = relativeDay(d);
-            var isActive = d === activeDate;
-            var isCollapsed = collapsedDates.has(d) && !isActive;
+        dates.forEach(function(d) {
+            var isActive = d === AD;
+            var isCol = collapsed[d] && !isActive;
             var items = grouped[d] || [];
-            var count = entry.count;
+            var cnt = allDates[d] || items.length;
             html += '<div class="chat-date-group">';
-            html += '<div class="chat-date-label ' + (isActive ? 'is-active' : '') + '" data-date="' + E(d) + '" onclick="navigateDate(\'' + E(d) + '\')">';
-            html += '<span>' + E(label || d) + '</span>';
-            html += '<span class="chat-date-count">' + count + '</span>';
+            html += '<div class="chat-date-label '+(isActive?'is-active':'')+'" onclick="navDate(\''+E(d)+'\')">';
+            html += '<span>'+E(relDay(d) || d)+'</span>';
+            html += '<span class="chat-date-badge">'+cnt+'</span>';
             html += '</div>';
-            if (items.length) {
-                html += '<div class="chat-session-items ' + (isCollapsed ? 'is-collapsed' : '') + '" id="group-' + E(d) + '">';
-                items.forEach(function(item) {
-                    var id = Number(item.id);
-                    var act = id === selectedHistoryId ? "is-active" : "";
-                    html += '<button type="button" class="chat-session-btn ' + act + '" data-history-id="' + id + '">';
-                    html += '<span class="chat-session-title">' + E(compactText(item.user_message || item.xiaozhi_answer)) + '</span>';
-                    html += '<span class="chat-session-meta">' + E(kindLabel(item)) + ' &middot; ' + E(formatTimeShort(item.created_at)) + '</span>';
-                    html += '</button>';
-                });
-                html += '</div>';
-            }
-            html += '</div>';
+            html += '<div class="chat-sessions '+(isCol?'collapsed':'')+'">';
+            items.forEach(function(i) {
+                var id = Number(i.id);
+                html += '<button type="button" class="chat-item '+(id===sel?'active':'')+'" onclick="selChat('+id+')">';
+                html += '<span class="chat-item-title">'+E(cmp(i.user_message||i.xiaozhi_answer||i.tool_name))+'</span>';
+                html += '<span class="chat-item-meta">'+E(kind(i))+' &middot; '+E(fmtShort(i.created_at))+'</span>';
+                html += '</button>';
+            });
+            html += '</div></div>';
         });
         el.innerHTML = html;
-        el.querySelectorAll("[data-history-id]").forEach(function(btn) {
-            btn.addEventListener("click", function() {
-                selectedHistoryId = Number(btn.dataset.historyId);
-                renderDateSidebar();
-                renderThread();
-            });
-        });
     }
 
-    function navigateDate(date) {
-        if (date === activeDate) return;
+    function navDate(d) {
+        if (d === AD) return;
         var url = new URL(window.location);
-        url.searchParams.set("date", date);
-        if (activeQuery) url.searchParams.set("q", activeQuery);
+        url.searchParams.set("date", d);
+        if (MQ) url.searchParams.set("q", MQ);
         window.location = url;
     }
 
+    function selChat(id) {
+        sel = id;
+        renderSidebar();
+        renderThread();
+    }
+
     function renderThread() {
-        var item = histories.find(function(h) { return Number(h.id) === selectedHistoryId; });
-        var body = document.getElementById("chatThreadBody");
+        var item = H.find(function(i){ return Number(i.id)===sel; });
+        var body = document.getElementById("threadBody");
         if (!item) {
-            document.getElementById("threadTitle").textContent = activeDate ? relativeDay(activeDate) : "Pilih riwayat";
-            document.getElementById("threadMeta").textContent = "Klik chat dari sidebar untuk melihat detail.";
+            document.getElementById("threadTitle").textContent = AD ? relDay(AD) : "Pilih riwayat";
+            document.getElementById("threadMeta").textContent = "Klik chat dari sidebar.";
             document.getElementById("threadBadge").textContent = "-";
             body.innerHTML = '<div class="chat-empty"><div><p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih chat</p><p class="mt-2 text-sm">Klik salah satu item di sidebar.</p></div></div>';
             return;
         }
-        document.getElementById("threadTitle").textContent = compactText(item.user_message || item.xiaozhi_answer || item.tool_name);
-        document.getElementById("threadBadge").textContent = kindLabel(item);
-        document.getElementById("threadMeta").textContent = formatTime(item.created_at);
+        document.getElementById("threadTitle").textContent = cmp(item.user_message||item.xiaozhi_answer||item.tool_name);
+        document.getElementById("threadBadge").textContent = kind(item);
+        document.getElementById("threadMeta").textContent = fmt(item.created_at);
 
-        var msgs = "";
-        if (item.user_message) {
-            msgs += '<div class="chat-msg"><article class="chat-bubble chat-bubble-user"><div class="chat-bubble-meta"><span class="chat-bubble-role">User</span><time class="chat-bubble-time">' + E(formatTime(item.created_at)) + '</time></div><div class="chat-bubble-text">' + E(item.user_message) + '</div></article></div>';
-        }
-        if (item.xiaozhi_answer) {
-            msgs += '<div class="chat-msg"><article class="chat-bubble chat-bubble-ai"><div class="chat-bubble-meta"><span class="chat-bubble-role">Xiaozhi AI</span><time class="chat-bubble-time">' + E(formatTime(item.created_at)) + '</time></div><div class="chat-bubble-text">' + E(item.xiaozhi_answer) + '</div><div class="chat-bubble-footer">Content generated by AI</div></article></div>';
-        }
-        if (!msgs && item.tool_name) {
-            msgs += '<div class="chat-msg"><article class="chat-bubble chat-bubble-tool"><div class="chat-bubble-meta"><span class="chat-bubble-role">Tool: ' + E(item.tool_name) + '</span><time class="chat-bubble-time">' + E(formatTime(item.created_at)) + '</time></div><div class="chat-bubble-text">Tool call tercatat.</div></article></div>';
-        }
-        if (!msgs) {
-            msgs = '<div class="chat-empty"><div><p style="font-size:14px;font-weight:600;">Chat kosong</p></div></div>';
-        }
-        body.innerHTML = msgs;
+        var m = "";
+        if (item.user_message) m += '<div class="chat-msg"><div class="chat-bubble chat-bubble-user"><div class="chat-bubble-head"><span class="chat-bubble-role">User</span><time class="chat-bubble-time">'+E(fmt(item.created_at))+'</time></div><div class="chat-bubble-body">'+E(item.user_message)+'</div></div></div>';
+        if (item.xiaozhi_answer) m += '<div class="chat-msg"><div class="chat-bubble chat-bubble-ai"><div class="chat-bubble-head"><span class="chat-bubble-role">Xiaozhi AI</span><time class="chat-bubble-time">'+E(fmt(item.created_at))+'</time></div><div class="chat-bubble-body">'+E(item.xiaozhi_answer)+'</div><div class="chat-bubble-foot">Content generated by AI</div></div></div>';
+        if (!m && item.tool_name) m += '<div class="chat-msg"><div class="chat-bubble chat-bubble-tool"><div class="chat-bubble-head"><span class="chat-bubble-role">Tool: '+E(item.tool_name)+'</span><time>'+E(fmt(item.created_at))+'</time></div><div class="chat-bubble-body">Tool call tercatat.</div></div></div>';
+        if (!m) m = '<div class="chat-empty"><p>Chat kosong</p></div>';
+        body.innerHTML = m;
         body.scrollTop = body.scrollHeight;
     }
 
-    function renderMcpStatus(status) {
-        mcpStatus = status || mcpStatus;
-        var pill = document.getElementById("mcpStatusPill");
-        var text = document.getElementById("mcpStatusText");
-        if (pill) { pill.classList.toggle("is-online", mcpStatus.connected); pill.classList.toggle("is-offline", !mcpStatus.tokenSaved); }
-        if (text) text.textContent = mcpStatus.statusText || "MCP";
-    }
-
-    function mergeNewItems(items) {
-        if (!Array.isArray(items) || !items.length) return false;
-        var byId = new Map(histories.map(function(i) { return [Number(i.id), i]; }));
-        var changed = false;
-        items.forEach(function(item) {
-            var id = Number(item.id || 0);
-            var existing = byId.get(id);
-            if (!existing || JSON.stringify(existing) !== JSON.stringify(item)) { byId.set(id, item); changed = true; }
-        });
-        if (!changed) return false;
-        histories = Array.from(byId.values()).sort(function(a, b) { return Number(b.id || 0) - Number(a.id || 0); }).slice(0, activeLimit);
-        maxHistoryId = Math.max.apply(null, [maxHistoryId].concat(items.map(function(i) { return Number(i.id || 0); })));
+    function merge(items) {
+        if (!Array.isArray(items)||!items.length) return false;
+        var byId = new Map(H.map(function(i){return [Number(i.id),i];}));
+        var ch = false;
+        items.forEach(function(i){ var id=Number(i.id||0); var ex=byId.get(id); if(!ex||JSON.stringify(ex)!==JSON.stringify(i)){byId.set(id,i);ch=true;} });
+        if (!ch) return false;
+        H = Array.from(byId.values()).sort(function(a,b){return Number(b.id||0)-Number(a.id||0);}).slice(0,{{ limit }});
+        maxId = Math.max.apply(null,[maxId].concat(items.map(function(i){return Number(i.id||0);})));
         return true;
     }
 
-    async function pollChatHistory() {
+    async function poll() {
         try {
-            var params = new URLSearchParams({
-                after_id: String(maxHistoryId),
-                q: activeQuery || "",
-                limit: String(activeLimit || 100),
-                date: activeDate || "",
-            });
-            var res = await fetch("/api/chat-history?" + params, { headers: { Accept: "application/json" }, credentials: "same-origin" });
-            var data = await res.json().catch(function() { return {}; });
-            if (!res.ok || !data.success) return;
-            if (data.mcp_status) renderMcpStatus(data.mcp_status);
-            if (data.date_list) { dateList = data.date_list; renderDateSidebar(); }
-            if (mergeNewItems(data.items)) { renderDateSidebar(); renderThread(); }
-        } catch (e) {}
+            var p = new URLSearchParams({after_id:String(maxId),q:MQ||"",limit:"{{ limit }}",date:AD||""});
+            var r = await fetch("/api/chat-history?"+p,{headers:{Accept:"application/json"},credentials:"same-origin"});
+            var d = await r.json().catch(function(){return{};});
+            if(!r.ok||!d.success) return;
+            if(d.date_list) DL = d.date_list;
+            if(merge(d.items)) { renderSidebar(); renderThread(); }
+            else if(d.date_list) { renderSidebar(); }
+            document.getElementById("statTotal").textContent = d.stats ? d.stats.total : 0;
+            document.getElementById("statShown").textContent = H.length;
+        } catch(e){}
     }
 
-    renderDateSidebar();
+    renderSidebar();
     renderThread();
-    App.startPolling("chatHistory", pollChatHistory, 2000);
+    App.startPolling("chat", poll, 2000);
 </script>
 {% endblock %}
