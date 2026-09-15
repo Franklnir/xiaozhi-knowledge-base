@@ -1858,16 +1858,21 @@ class HFJsonStore:
         with self._lock:
             data = self._load()
             data.setdefault("registered_devices", [])
-            existing = next(
-                (d for d in data["registered_devices"]
-                 if d.get("mac_address") == mac_address and int(d.get("owner_id", 0)) == int(owner_id)),
-                None,
-            )
-            if existing:
-                existing["device_name"] = device_name
-                existing["last_seen_at"] = utc_now()
+            existing_by_owner = None
+            existing_by_other = None
+            for d in data["registered_devices"]:
+                if d.get("mac_address") == mac_address:
+                    if int(d.get("owner_id", 0)) == int(owner_id):
+                        existing_by_owner = d
+                    else:
+                        existing_by_other = d
+            if existing_by_other:
+                raise ValueError(f"Device MAC '{mac_address}' sudah terdaftar di akun lain. 1 ESP32 hanya bisa terikat ke 1 akun.")
+            if existing_by_owner:
+                existing_by_owner["device_name"] = device_name
+                existing_by_owner["last_seen_at"] = utc_now()
                 self._commit(data, "Update registered device")
-                return existing
+                return existing_by_owner
             device = {
                 "id": secrets.token_hex(8),
                 "owner_id": int(owner_id),
@@ -1886,6 +1891,9 @@ class HFJsonStore:
             data = self._load()
             return [d for d in data.get("registered_devices", []) if int(d.get("owner_id", 0)) == int(owner_id)]
 
+    def list_registered_devices(self, owner_id: int) -> list:
+        return self.list_devices(owner_id)
+
     def find_device_by_mac(self, mac_address: str) -> Optional[Dict[str, Any]]:
         mac_address = str(mac_address or "").strip().upper().replace("-", ":")
         with self._lock:
@@ -1896,6 +1904,23 @@ class HFJsonStore:
                     self._commit(data, "Device heartbeat")
                     return d
             return None
+
+    def find_device_by_id(self, device_id: str) -> Optional[Dict[str, Any]]:
+        device_id = str(device_id or "").strip()
+        if not device_id:
+            return None
+        with self._lock:
+            data = self._load()
+            for d in data.get("registered_devices", []):
+                if d.get("id") == device_id or d.get("mac_address", "").lower() == device_id.lower():
+                    return d
+            return None
+
+    def is_device_owned_by(self, device_id: str, owner_id: int) -> bool:
+        dev = self.find_device_by_id(device_id)
+        if not dev:
+            return False
+        return int(dev.get("owner_id", 0)) == int(owner_id)
 
     def delete_device(self, owner_id: int, device_id: str) -> bool:
         with self._lock:

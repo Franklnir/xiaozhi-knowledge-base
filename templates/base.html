@@ -5,10 +5,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
     <!-- SEO Primary Meta Tags -->
     <title>{% block title %}Xiaozhi Indonesia - Asisten Suara Cerdas IoT, AI & Knowledge Base{% endblock %}</title>
-    <meta name="title" content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT, AI & Knowledge Base">
-    <meta name="description" content="Platform resmi Xiaozhi Indonesia: asisten suara cerdas berbasis IoT ESP32, integrasi 35 MCP tools, Smart Home, dan manajemen materi edukasi.">
+    <meta name="title"{% block meta_title_attr %} content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT, AI & Knowledge Base"{% endblock %}>
+    <meta name="description"{% block meta_desc_attr %} content="Platform resmi Xiaozhi Indonesia: asisten suara cerdas berbasis IoT ESP32, integrasi 35 MCP tools, Smart Home, dan manajemen materi edukasi."{% endblock %}>
     <meta name="keywords" content="Xiaozhi, Xiaozhi Indonesia, Asisten Suara AI, ESP32, Smart Home IoT, FastMCP, Knowledge Base, AI Voice Assistant, EduSmart, Model Context Protocol">
     <meta name="author" content="Xiaozhi Indonesia Team">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
@@ -18,18 +27,24 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Xiaozhi Indonesia">
     <meta property="og:url" content="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
-    <meta property="og:title" content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT & Knowledge Base">
-    <meta property="og:description" content="Kelola materi belajar, kontrol perangkat smart home virtual & relay nyata, serta akses 35 tools cerdas terintegrasi untuk asisten suara Xiaozhi.">
+    <meta property="og:title"{% block og_title_attr %} content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT & Knowledge Base"{% endblock %}>
+    <meta property="og:description"{% block og_desc_attr %} content="Kelola materi belajar, kontrol perangkat smart home virtual & relay nyata, serta akses 35 tools cerdas terintegrasi untuk asisten suara Xiaozhi."{% endblock %}>
     <meta property="og:image" content="https://xiaozhiscig.biz.id/static/img/og-preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <meta property="og:locale" content="id_ID">
 
     <!-- Twitter Cards -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT & AI">
-    <meta name="twitter:description" content="Platform IoT & Voice Assistant Xiaozhi dengan 35 Tools Cerdas dan integrasi Smart Home.">
+    <meta name="twitter:title"{% block tw_title_attr %} content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT & AI"{% endblock %}>
+    <meta name="twitter:description"{% block tw_desc_attr %} content="Platform IoT & Voice Assistant Xiaozhi dengan 35 Tools Cerdas dan integrasi Smart Home."{% endblock %}>
     <meta name="twitter:image" content="https://xiaozhiscig.biz.id/static/img/og-preview.png">
 
-    <!-- Canonical URL -->
+    <!-- hreflang (bilingual) -->
+    <link rel="alternate" hreflang="id" href="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
+    <link rel="alternate" hreflang="x-default" href="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
+
+    <!-- Canonical URL (strip query params) -->
     <link rel="canonical" href="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
 
     <!-- Structured Data (JSON-LD Schema) -->
@@ -42,7 +57,7 @@
       "applicationCategory": "EducationalApplication, UtilitiesApplication",
       "operatingSystem": "All",
       "description": "Platform integrasi asisten suara cerdas IoT ESP32, 35 tools MCP, kontrol smart home, dan knowledge base.",
-      "inLanguage": "id-ID",
+      "inLanguage": ["id-ID", "en"],
       "offers": {
         "@type": "Offer",
         "price": "0",
@@ -51,7 +66,8 @@
     }
     </script>
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (compiled, ~14KB vs 300KB+ CDN) -->
+    <link rel="stylesheet" href="/static/css/app.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -603,7 +619,16 @@
             .app-meta-row .app-chip { font-size: 11px; padding: 4px 6px; }
             .app-card { padding: 16px 12px; }
         }
+
+        /* MODAL (shared component) */
+        .app-modal { display:none; position:fixed; inset:0; z-index:9000; align-items:center; justify-content:center; background:rgba(0,0,0,.45); backdrop-filter:blur(4px); }
+        .app-modal.is-open { display:flex; }
+        .app-modal-box { background:var(--app-surface); border-radius:var(--app-radius); box-shadow:var(--app-shadow,0 8px 30px rgba(0,0,0,.2)); max-width:520px; width:92%; max-height:90vh; overflow-y:auto; padding:24px; }
+        .app-modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+        .app-modal-title { font-size:18px; font-weight:700; color:var(--app-text); }
+        .app-modal-close { background:none; border:none; font-size:20px; cursor:pointer; color:var(--app-muted); padding:4px; }
     </style>
+    <script defer src="/static/js/app.js"></script>
 </head>
 {% set page = active_page|default('') %}
 <body>
@@ -757,7 +782,8 @@
                 } catch (e) {
                     select.value = prev;
                     applyTheme(prev);
-                    alert(e.message || "Gagal simpan tema.");
+                    if (window.App && App.toast) App.toast.error(e.message || "Gagal simpan tema.");
+                    else alert(e.message || "Gagal simpan tema.");
                 }
             });
         })();

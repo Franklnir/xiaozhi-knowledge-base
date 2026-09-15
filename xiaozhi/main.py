@@ -208,25 +208,31 @@ async def robots_txt():
 
 @app.get("/sitemap.xml", include_in_schema=False)
 async def sitemap_xml():
-    xml_content = """<?xml version="1.0" encoding="UTF-8"?>
+    from datetime import date
+    today = date.today().isoformat()
+    xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
         <loc>https://xiaozhiscig.biz.id/</loc>
+        <lastmod>{today}</lastmod>
         <changefreq>daily</changefreq>
         <priority>1.0</priority>
     </url>
     <url>
         <loc>https://xiaozhiscig.biz.id/dokumentasi</loc>
+        <lastmod>{today}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.9</priority>
     </url>
     <url>
         <loc>https://xiaozhiscig.biz.id/login</loc>
+        <lastmod>{today}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.6</priority>
     </url>
     <url>
         <loc>https://xiaozhiscig.biz.id/register</loc>
+        <lastmod>{today}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.6</priority>
     </url>

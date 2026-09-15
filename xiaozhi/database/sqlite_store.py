@@ -1092,21 +1092,51 @@ class SQLiteStore:
 
     def register_device(self, owner_id: int, device_id: str = "", name: str = "", device_type: str = "") -> Dict[str, Any]:
         conn = self._get_conn()
-        try:
-            cursor = conn.execute(
-                "INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, created_at) VALUES (?, ?, ?, ?, ?)",
-                (owner_id, device_id, name, device_type, utc_now())
-            )
-            conn.commit()
-            return {"id": cursor.lastrowid, "device_id": device_id, "name": name}
-        except sqlite3.IntegrityError:
-            raise ValueError("Device sudah terdaftar.")
+        normalized_id = str(device_id or "").strip()
+        if not normalized_id:
+            raise ValueError("Device ID diperlukan.")
+        existing = conn.execute(
+            "SELECT id, owner_id, device_name FROM registered_devices WHERE LOWER(device_id) = ?",
+            (normalized_id.lower(),)
+        ).fetchone()
+        if existing:
+            if int(existing["owner_id"]) == int(owner_id):
+                conn.execute(
+                    "UPDATE registered_devices SET device_name = ?, device_type = ? WHERE id = ?",
+                    (name or existing["device_name"], device_type, existing["id"])
+                )
+                conn.commit()
+                return {"id": existing["id"], "device_id": device_id, "name": name or existing["device_name"], "reused": True}
+            raise ValueError(f"Device '{normalized_id}' sudah terdaftar di akun lain. 1 ESP32 hanya bisa terikat ke 1 akun.")
+        cursor = conn.execute(
+            "INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, created_at) VALUES (?, ?, ?, ?, ?)",
+            (owner_id, normalized_id, name, device_type, utc_now())
+        )
+        conn.commit()
+        return {"id": cursor.lastrowid, "device_id": device_id, "name": name}
 
     def delete_device(self, owner_id: int, device_id: str) -> bool:
         conn = self._get_conn()
         cursor = conn.execute("DELETE FROM registered_devices WHERE device_id = ? AND owner_id = ?", (device_id, owner_id))
         conn.commit()
         return cursor.rowcount > 0
+
+    def find_device_by_id(self, device_id: str) -> Optional[Dict[str, Any]]:
+        device_id = str(device_id or "").strip()
+        if not device_id:
+            return None
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM registered_devices WHERE LOWER(device_id) = ?",
+            (device_id.lower(),)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def is_device_owned_by(self, device_id: str, owner_id: int) -> bool:
+        dev = self.find_device_by_id(device_id)
+        if not dev:
+            return False
+        return int(dev.get("owner_id", 0)) == int(owner_id)
 
     # ── Feature Settings ───────────────────────────────────────────────────
 
