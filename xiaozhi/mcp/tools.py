@@ -320,6 +320,40 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return {"success": False, "message": "Gagal mengambil profil persona pengguna.", "profil": []}
 
     @mcp_server.tool()
+    def get_registered_devices() -> dict:
+        """
+        Ambil daftar semua ESP32/device yang terdaftar di akun ini.
+        Gunakan tool ini saat user bertanya tentang device yang terhubung, ESP32 yang terdaftar,
+        atau ingin melihat MAC address dan status perangkat.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif.", "devices": []}
+        try:
+            devices = store.list_registered_devices(owner_id) if hasattr(store, "list_registered_devices") else []
+            formatted = []
+            for d in devices:
+                formatted.append({
+                    "device_id": d.get("device_id") or d.get("mac_address") or d.get("id", ""),
+                    "name": d.get("device_name") or d.get("name", ""),
+                    "type": d.get("device_type") or d.get("type", ""),
+                    "mac_address": d.get("mac_address", ""),
+                    "registered_at": d.get("created_at", ""),
+                    "last_seen": d.get("last_seen_at", ""),
+                })
+            response = {
+                "success": True,
+                "message": f"Ditemukan {len(formatted)} device terdaftar." if formatted else "Belum ada device yang terdaftar.",
+                "total": len(formatted),
+                "devices": formatted,
+            }
+            record_mcp_tool_history(owner_id, "get_registered_devices", "daftar device", {}, response)
+            return response
+        except Exception:
+            logger.exception("Error MCP get_registered_devices")
+            return {"success": False, "message": "Gagal mengambil daftar device.", "devices": []}
+
+    @mcp_server.tool()
     def control_relay(channel: int, action: str) -> dict:
         """
         Kontrol relay pada simulasi smarthome virtual.
