@@ -21,6 +21,7 @@ async def chat_history_page(
     request: Request,
     q: str = Query("", max_length=120),
     limit: int = Query(CHAT_HISTORY_DEFAULT_LIMIT, ge=1, le=300),
+    date: str = Query("", max_length=10),
 ):
     user = get_current_user(request)
     if not user:
@@ -28,8 +29,9 @@ async def chat_history_page(
     store = get_store()
     token_info = store.get_xiaozhi_token_info(user["id"])
     token_hash = token_info.get("token_hash", "") if token_info else ""
-    histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash)
-    stats = store.chat_history_stats(user["id"], token_hash=token_hash)
+    histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=date)
+    stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=date)
+    date_list = store.chat_history_dates(user["id"], token_hash=token_hash)
     mcp_status = mcp_status_payload(
         user["id"],
         token_saved=bool(token_info),
@@ -46,6 +48,8 @@ async def chat_history_page(
             "mcp_status": mcp_status,
             "query": q,
             "limit": limit,
+            "active_date": date,
+            "date_list": date_list,
             "message": request.query_params.get("message", ""),
             "active_page": "chat_history",
         },
@@ -58,12 +62,13 @@ async def chat_history_api(
     after_id: int = Query(0, ge=0),
     q: str = Query("", max_length=120),
     limit: int = Query(CHAT_HISTORY_DEFAULT_LIMIT, ge=1, le=300),
+    date: str = Query("", max_length=10),
 ):
     user = require_user(request)
     store = get_store()
     token_info = store.get_xiaozhi_token_info(user["id"])
     token_hash = token_info.get("token_hash", "") if token_info else ""
-    histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash)
+    histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=date)
     if after_id:
         recent_histories = histories[:5]
         new_histories = [item for item in histories if int(item.get("id", 0)) > int(after_id)]
@@ -71,11 +76,13 @@ async def chat_history_api(
         for item in [*new_histories, *recent_histories]:
             merged_by_id[int(item.get("id", 0))] = item
         histories = sorted(merged_by_id.values(), key=lambda item: int(item.get("id", 0)), reverse=True)
-    stats = store.chat_history_stats(user["id"], token_hash=token_hash)
+    stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=date)
+    date_list = store.chat_history_dates(user["id"], token_hash=token_hash)
     return {
         "success": True,
         "items": histories,
         "stats": stats,
+        "date_list": date_list,
         "mcp_status": mcp_status_payload(
             user["id"],
             token_saved=bool(token_info),

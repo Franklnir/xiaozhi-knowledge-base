@@ -1249,6 +1249,7 @@ class HFJsonStore:
         limit: int = CHAT_HISTORY_DEFAULT_LIMIT,
         token_hash: str = "",
         semantic: bool = False,
+        date: str = "",
     ) -> List[Dict[str, Any]]:
         query = clean_text(query, max_len=120, field="Pencarian riwayat") if query else ""
         limit = max(1, min(int(limit or CHAT_HISTORY_DEFAULT_LIMIT), 300))
@@ -1260,6 +1261,12 @@ class HFJsonStore:
                 for item in data.get("chat_history", [])
                 if int(item.get("owner_id", 0)) == int(owner_id)
                 and history_matches_token(item, token_hash)
+            ]
+
+        if date:
+            rows = [
+                item for item in rows
+                if (item.get("created_at", "") or "")[:10] == date
             ]
 
         if semantic and query.strip():
@@ -1298,7 +1305,8 @@ class HFJsonStore:
             item["response_size_label"] = format_size_mb(utf8_size(item.get("response_payload", "")))
         return rows
 
-    def chat_history_stats(self, owner_id: int, token_hash: str = "") -> Dict[str, int]:
+    def chat_history_dates(self, owner_id: int, token_hash: str = "") -> List[Dict[str, Any]]:
+        """Ambil daftar tanggal yang punya chat, dengan jumlah per hari."""
         token_hash = normalize_token_hash(token_hash)
         with self._lock:
             data = self._load()
@@ -1308,6 +1316,29 @@ class HFJsonStore:
                 if int(item.get("owner_id", 0)) == int(owner_id)
                 and history_matches_token(item, token_hash)
             ]
+        date_counts: Dict[str, int] = {}
+        for item in rows:
+            d = (item.get("created_at", "") or "")[:10]
+            if d:
+                date_counts[d] = date_counts.get(d, 0) + 1
+        return sorted(
+            [{"date": d, "count": c} for d, c in date_counts.items()],
+            key=lambda x: x["date"],
+            reverse=True,
+        )[:60]
+
+    def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "") -> Dict[str, int]:
+        token_hash = normalize_token_hash(token_hash)
+        with self._lock:
+            data = self._load()
+            rows = [
+                item
+                for item in data.get("chat_history", [])
+                if int(item.get("owner_id", 0)) == int(owner_id)
+                and history_matches_token(item, token_hash)
+            ]
+        if date:
+            rows = [item for item in rows if (item.get("created_at", "") or "")[:10] == date]
         return {
             "total": len(rows),
             "transcript": sum(1 for item in rows if item.get("source") == "chat_transcript"),

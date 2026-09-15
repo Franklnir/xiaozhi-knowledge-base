@@ -828,11 +828,20 @@ class SQLiteStore:
         query: str = "",
         limit: int = 100,
         token_hash: str = "",
-        semantic: bool = False
+        semantic: bool = False,
+        date: str = "",
     ) -> List[Dict[str, Any]]:
         conn = self._get_conn()
         sql = "SELECT * FROM chat_history WHERE owner_id = ?"
         params: List[Any] = [owner_id]
+
+        if date:
+            sql += " AND DATE(created_at) = ?"
+            params.append(date)
+
+        if token_hash:
+            sql += " AND (token_hash = ? OR token_hash = '')"
+            params.append(token_hash)
 
         # If semantic search is requested and query is provided, fetch a broader window and rank semantically
         if semantic and query.strip():
@@ -854,12 +863,29 @@ class SQLiteStore:
         rows = conn.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
-    def chat_history_stats(self, owner_id: int, token_hash: str = "") -> Dict[str, Any]:
+    def chat_history_dates(self, owner_id: int, token_hash: str = "") -> List[Dict[str, Any]]:
+        """Ambil daftar tanggal yang punya chat, dengan jumlah per hari."""
         conn = self._get_conn()
-        row = conn.execute(
-            "SELECT COUNT(*) as total FROM chat_history WHERE owner_id = ?",
-            (owner_id,)
-        ).fetchone()
+        sql = "SELECT DATE(created_at) as date, COUNT(*) as count FROM chat_history WHERE owner_id = ?"
+        params: List[Any] = [owner_id]
+        if token_hash:
+            sql += " AND (token_hash = ? OR token_hash = '')"
+            params.append(token_hash)
+        sql += " GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC LIMIT 60"
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "") -> Dict[str, Any]:
+        conn = self._get_conn()
+        sql = "SELECT COUNT(*) as total FROM chat_history WHERE owner_id = ?"
+        params: List[Any] = [owner_id]
+        if date:
+            sql += " AND DATE(created_at) = ?"
+            params.append(date)
+        if token_hash:
+            sql += " AND (token_hash = ? OR token_hash = '')"
+            params.append(token_hash)
+        row = conn.execute(sql, params).fetchone()
         return {"total": row["total"] if row else 0}
 
     def clear_chat_history(self, owner_id: int) -> int:
