@@ -138,6 +138,276 @@
         width: 24px;
         height: 24px;
     }
+
+    /* AI Persona & Vector Profiling Styling */
+    .persona-container {
+        margin-bottom: 28px;
+    }
+    .persona-top-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .persona-badge-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .persona-badge-pulse {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--app-accent);
+        background: var(--app-soft);
+        padding: 4px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--app-border);
+    }
+    .persona-pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--app-accent);
+        box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+        animation: pulse-ring 2s infinite;
+    }
+    @keyframes pulse-ring {
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+        70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .persona-btn-scan {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #059669, #047857);
+        color: white;
+        border: none;
+        border-radius: var(--app-radius);
+        font-size: 13px;
+        font-weight: 750;
+        cursor: pointer;
+        transition: transform 0.15s, opacity 0.15s;
+    }
+    .persona-btn-scan:hover {
+        opacity: 0.92;
+        transform: translateY(-1px);
+    }
+    .persona-btn-scan.loading svg {
+        animation: spin-scan 1s linear infinite;
+    }
+    @keyframes spin-scan {
+        100% { transform: rotate(360deg); }
+    }
+    .persona-hero-card {
+        padding: 22px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+        margin-bottom: 16px;
+        box-shadow: var(--app-shadow);
+    }
+    .persona-hero-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    .persona-trait-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--app-text);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .persona-trait-badge {
+        font-size: 12px;
+        font-weight: 750;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+    }
+    .persona-trait-desc {
+        font-size: 13.5px;
+        color: var(--app-muted);
+        line-height: 1.55;
+        margin-bottom: 16px;
+    }
+    .personality-gauge-wrap {
+        margin-top: 14px;
+    }
+    .personality-gauge-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12.5px;
+        font-weight: 750;
+        color: var(--app-text);
+        margin-bottom: 6px;
+    }
+    .personality-gauge-track {
+        height: 14px;
+        background: var(--app-soft);
+        border-radius: 999px;
+        overflow: hidden;
+        display: flex;
+        border: 1px solid var(--app-border);
+    }
+    .personality-gauge-intro {
+        height: 100%;
+        background: linear-gradient(90deg, #7c3aed, #a855f7);
+        transition: width 0.8s ease;
+    }
+    .personality-gauge-extro {
+        height: 100%;
+        background: linear-gradient(90deg, #10b981, #06b6d4);
+        transition: width 0.8s ease;
+    }
+    .personality-gauge-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--app-muted);
+        margin-top: 6px;
+    }
+    .persona-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    .persona-card {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+        padding: 20px;
+        box-shadow: var(--app-shadow);
+    }
+    .persona-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--app-border);
+    }
+    .persona-card-heading {
+        font-size: 15px;
+        font-weight: 750;
+        color: var(--app-text);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .persona-stat-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+    .persona-stat-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .persona-stat-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        font-weight: 650;
+        color: var(--app-text);
+    }
+    .persona-stat-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .persona-stat-pct {
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--app-accent);
+    }
+    .persona-bar-track {
+        height: 8px;
+        background: var(--app-soft);
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.03);
+    }
+    .persona-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .persona-bar-hobby {
+        background: linear-gradient(90deg, #2563eb, #06b6d4);
+    }
+    .persona-bar-activity {
+        background: linear-gradient(90deg, #10b981, #3b82f6);
+    }
+    .persona-bar-danger {
+        background: linear-gradient(90deg, #ef4444, #f97316);
+    }
+    .persona-bar-warning {
+        background: linear-gradient(90deg, #f59e0b, #eab308);
+    }
+    .persona-bar-neutral {
+        background: linear-gradient(90deg, #6b7280, #94a3b8);
+    }
+    .persona-pill-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .persona-pill-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--app-soft);
+        border: 1px solid var(--app-border);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 650;
+        color: var(--app-text);
+    }
+    .persona-pill-pct {
+        color: var(--app-accent);
+        font-weight: 800;
+    }
+    .persona-toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 12px 20px;
+        background: #065f46;
+        color: white;
+        border-radius: var(--app-radius);
+        font-size: 13.5px;
+        font-weight: 700;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        z-index: 999;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .persona-toast.show {
+        transform: translateY(0);
+        opacity: 1;
+    }
 </style>
 
 <div class="app-page">
@@ -168,6 +438,203 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- 🧠 AI Persona & Vector Profiling Dashboard -->
+    <div class="persona-container">
+        <div class="persona-top-bar">
+            <div class="persona-badge-wrap">
+                <div class="profile-section-title" style="margin-bottom: 0;">
+                    <span>🧠</span> Karakter & Persona AI (RAG Vector)
+                </div>
+                <div class="persona-badge-pulse">
+                    <span class="persona-pulse-dot"></span>
+                    <span>Deteksi Otomatis Percakapan</span>
+                </div>
+                <span class="app-chip app-chip-small app-chip-neutral" id="persona-chat-count">
+                    {{ persona_analysis.total_chats_analyzed if persona_analysis else 0 }} Riwayat Dianalisis
+                </span>
+            </div>
+            <button type="button" class="persona-btn-scan" id="btnScanPersona" onclick="triggerPersonaScan()">
+                <svg id="scanIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+                <span id="scanBtnText">Scan Ulang AI</span>
+            </button>
+        </div>
+
+        <!-- Personality Spectrum Card -->
+        <div class="persona-hero-card">
+            <div class="persona-hero-header">
+                <div class="persona-trait-title">
+                    <span>🧬 Spektrum Kepribadian:</span>
+                    <span id="personaTraitTitle" class="persona-trait-badge">
+                        {{ persona_analysis.personality.primary_trait if persona_analysis and persona_analysis.personality else 'Ambivert Seimbang' }}
+                    </span>
+                </div>
+                <div class="app-chip app-chip-small app-chip-success" id="personaConfidence">
+                    ✓ Akurasi: {{ persona_analysis.confidence_level if persona_analysis else 'Data Awal' }}
+                </div>
+            </div>
+
+            <p class="persona-trait-desc" id="personaTraitDesc">
+                {{ persona_analysis.personality.description if persona_analysis and persona_analysis.personality else 'Xiaozhi sedang mempelajari pola komunikasi dan interaksi Anda untuk memahami kepribadian Anda secara akurat.' }}
+            </p>
+
+            <div class="personality-gauge-wrap">
+                <div class="personality-gauge-labels">
+                    <span style="color: #8b5cf6;">🟣 Introvert (<span id="introvertPctVal">{{ persona_analysis.personality.introvert_percent if persona_analysis and persona_analysis.personality else 50 }}%</span>)</span>
+                    <span style="color: #10b981;">🟢 Extrovert (<span id="extrovertPctVal">{{ persona_analysis.personality.extrovert_percent if persona_analysis and persona_analysis.personality else 50 }}%</span>)</span>
+                </div>
+                <div class="personality-gauge-track">
+                    <div id="introvertGaugeBar" class="personality-gauge-intro" style="width: {{ persona_analysis.personality.introvert_percent if persona_analysis and persona_analysis.personality else 50 }}%;"></div>
+                    <div id="extrovertGaugeBar" class="personality-gauge-extro" style="width: {{ persona_analysis.personality.extrovert_percent if persona_analysis and persona_analysis.personality else 50 }}%;"></div>
+                </div>
+                <div class="personality-gauge-meta">
+                    <span>Reflektif, Mandiri & Mendalam</span>
+                    <span>Tengah: Ambivert</span>
+                    <span>Sosial, Terbuka & Ekspresif</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2 Column Analytics Grid: Hobbies & Challenges -->
+        <div class="persona-grid">
+            <!-- Hobbies Breakdown -->
+            <div class="persona-card">
+                <div class="persona-card-header">
+                    <div class="persona-card-heading">
+                        <span>🎯</span> Hobi & Minat Utama
+                    </div>
+                    <span class="app-chip app-chip-small app-chip-primary">1 - 100% Rasio</span>
+                </div>
+                <div class="persona-stat-list" id="hobbiesContainer">
+                    {% if persona_analysis and persona_analysis.hobbies %}
+                        {% for h in persona_analysis.hobbies %}
+                        <div class="persona-stat-item">
+                            <div class="persona-stat-top">
+                                <div class="persona-stat-left">
+                                    <span>{{ h.icon }}</span>
+                                    <span>{{ h.name }}</span>
+                                </div>
+                                <span class="persona-stat-pct">{{ h.percent }}%</span>
+                            </div>
+                            <div class="persona-bar-track">
+                                <div class="persona-bar-fill persona-bar-hobby" style="width: {{ h.percent }}%;"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="font-size: 13px; color: var(--app-muted); text-align: center; padding: 16px;">
+                            Belum ada hobi yang terdeteksi. Mulailah mengobrol tentang kesukaan Anda!
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Challenges / Masalah yang Dihadapi -->
+            <div class="persona-card">
+                <div class="persona-card-header">
+                    <div class="persona-card-heading">
+                        <span>⚠️</span> Masalah & Tantangan Dihadapi
+                    </div>
+                    <span class="app-chip app-chip-small app-chip-danger">Prioritas Solusi</span>
+                </div>
+                <div class="persona-stat-list" id="challengesContainer">
+                    {% if persona_analysis and persona_analysis.challenges %}
+                        {% for c in persona_analysis.challenges %}
+                        <div class="persona-stat-item">
+                            <div class="persona-stat-top">
+                                <div class="persona-stat-left">
+                                    <span>{{ c.icon }}</span>
+                                    <span>{{ c.name }}</span>
+                                    <span class="app-chip app-chip-small {% if c.badge == 'danger' %}app-chip-danger{% elif c.badge == 'warning' %}app-chip-warning{% else %}app-chip-neutral{% endif %}" style="font-size: 10px; padding: 2px 6px;">
+                                        {{ c.level }}
+                                    </span>
+                                </div>
+                                <span class="persona-stat-pct" style="{% if c.badge == 'danger' %}color: var(--app-danger);{% endif %}">{{ c.percent }}%</span>
+                            </div>
+                            <div class="persona-bar-track">
+                                <div class="persona-bar-fill {% if c.badge == 'danger' %}persona-bar-danger{% elif c.badge == 'warning' %}persona-bar-warning{% else %}persona-bar-neutral{% endif %}" style="width: {{ c.percent }}%;"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="font-size: 13px; color: var(--app-muted); text-align: center; padding: 16px;">
+                            Tidak ada kendala berat terdeteksi. Percakapan berjalan santai dan positif!
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 2 Column Analytics Grid: Activities & Preferences -->
+        <div class="persona-grid">
+            <!-- Daily Activities & Patterns -->
+            <div class="persona-card">
+                <div class="persona-card-header">
+                    <div class="persona-card-heading">
+                        <span>📅</span> Pola Rutinitas & Kegiatan
+                    </div>
+                    <span class="app-chip app-chip-small app-chip-neutral">Aktivitas Harian</span>
+                </div>
+                <div class="persona-stat-list" id="activitiesContainer">
+                    {% if persona_analysis and persona_analysis.activities %}
+                        {% for a in persona_analysis.activities %}
+                        <div class="persona-stat-item">
+                            <div class="persona-stat-top">
+                                <div class="persona-stat-left">
+                                    <span>{{ a.icon }}</span>
+                                    <span>{{ a.name }}</span>
+                                </div>
+                                <span class="persona-stat-pct">{{ a.percent }}%</span>
+                            </div>
+                            <div class="persona-bar-track">
+                                <div class="persona-bar-fill persona-bar-activity" style="width: {{ a.percent }}%;"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="font-size: 13px; color: var(--app-muted); text-align: center; padding: 16px;">
+                            Pola kegiatan sedang dipelajari oleh sistem.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Communication & Preferences -->
+            <div class="persona-card">
+                <div class="persona-card-header">
+                    <div class="persona-card-heading">
+                        <span>💬</span> Kesukaan & Preferensi Interaksi
+                    </div>
+                    <span class="app-chip app-chip-small app-chip-success">Kecocokan AI</span>
+                </div>
+                <div class="persona-pill-grid" id="preferencesContainer" style="margin-top: 8px;">
+                    {% if persona_analysis and persona_analysis.preferences %}
+                        {% for p in persona_analysis.preferences %}
+                        <div class="persona-pill-chip">
+                            <span>{{ p.icon }}</span>
+                            <span>{{ p.name }}</span>
+                            <span class="persona-pill-pct">{{ p.percent }}%</span>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                    {% if persona_analysis and persona_analysis.hobbies and persona_analysis.hobbies|length > 0 %}
+                    <div class="persona-pill-chip" style="background: rgba(4, 120, 87, 0.1); border-color: rgba(4, 120, 87, 0.3);">
+                        <span>⭐</span>
+                        <span>Fokus Utama: {{ persona_analysis.hobbies[0].name }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div style="margin-top: 18px; padding: 12px; background: var(--app-soft); border-radius: var(--app-radius); border: 1px solid var(--app-border); font-size: 12px; color: var(--app-muted); line-height: 1.5;">
+                    💡 <strong>Terhubung ke Suara Xiaozhi:</strong> AI Xiaozhi di ESP32 Anda secara otomatis membaca data profil ini agar saat diajak bicara, tanggapan suaranya selalu memahami kepribadian, hobi, dan masalah Anda.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="personaToast" class="persona-toast">✓ Profil persona berhasil dianalisis ulang via RAG Vector!</div>
 
     <!-- Google Account Integration -->
     <div class="profile-section">
@@ -388,5 +855,139 @@
         const m = document.getElementById("unlinkModal");
         if (e.target === m) closeUnlinkModal();
     });
+
+    // ── AI Persona Scan Trigger (RAG & Vector) ──
+    async function triggerPersonaScan() {
+        const btn = document.getElementById("btnScanPersona");
+        const text = document.getElementById("scanBtnText");
+        if (!btn || btn.classList.contains("loading")) return;
+
+        btn.classList.add("loading");
+        if (text) text.textContent = "Menganalisis...";
+
+        try {
+            const res = await fetch("/api/profile/scan-persona", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            const data = await res.json();
+            if (data.success && data.analysis) {
+                updatePersonaUI(data.analysis);
+                showPersonaToast("✓ Karakter & preferensi berhasil dipindai ulang dari percakapan!");
+            } else {
+                showPersonaToast("Gagal memperbarui profil: " + (data.message || "Kesalahan server"));
+            }
+        } catch (err) {
+            console.error("Scan error:", err);
+            showPersonaToast("Gagal terhubung ke server.");
+        } finally {
+            btn.classList.remove("loading");
+            if (text) text.textContent = "Scan Ulang AI";
+        }
+    }
+
+    function showPersonaToast(msg) {
+        const toast = document.getElementById("personaToast");
+        if (!toast) return;
+        toast.textContent = msg;
+        toast.classList.add("show");
+        setTimeout(() => {
+            toast.classList.remove("show");
+        }, 3500);
+    }
+
+    function updatePersonaUI(analysis) {
+        if (!analysis) return;
+
+        // 1. Personality
+        if (analysis.personality) {
+            const p = analysis.personality;
+            const traitTitle = document.getElementById("personaTraitTitle");
+            if (traitTitle) traitTitle.textContent = p.primary_trait || "Ambivert";
+
+            const traitDesc = document.getElementById("personaTraitDesc");
+            if (traitDesc) traitDesc.textContent = p.description || "";
+
+            const introVal = document.getElementById("introvertPctVal");
+            if (introVal) introVal.textContent = (p.introvert_percent || 50) + "%";
+
+            const extroVal = document.getElementById("extrovertPctVal");
+            if (extroVal) extroVal.textContent = (p.extrovert_percent || 50) + "%";
+
+            const introBar = document.getElementById("introvertGaugeBar");
+            if (introBar) introBar.style.width = (p.introvert_percent || 50) + "%";
+
+            const extroBar = document.getElementById("extrovertGaugeBar");
+            if (extroBar) extroBar.style.width = (p.extrovert_percent || 50) + "%";
+        }
+
+        const countEl = document.getElementById("persona-chat-count");
+        if (countEl) countEl.textContent = (analysis.total_chats_analyzed || 0) + " Riwayat Dianalisis";
+
+        const confEl = document.getElementById("personaConfidence");
+        if (confEl) confEl.textContent = "✓ Akurasi: " + (analysis.confidence_level || "Data Awal");
+
+        // 2. Hobbies
+        const hContainer = document.getElementById("hobbiesContainer");
+        if (hContainer && analysis.hobbies && analysis.hobbies.length > 0) {
+            hContainer.innerHTML = analysis.hobbies.map(h => `
+                <div class="persona-stat-item">
+                    <div class="persona-stat-top">
+                        <div class="persona-stat-left">
+                            <span>${h.icon}</span>
+                            <span>${h.name}</span>
+                        </div>
+                        <span class="persona-stat-pct">${h.percent}%</span>
+                    </div>
+                    <div class="persona-bar-track">
+                        <div class="persona-bar-fill persona-bar-hobby" style="width: ${h.percent}%;"></div>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        // 3. Challenges
+        const cContainer = document.getElementById("challengesContainer");
+        if (cContainer && analysis.challenges && analysis.challenges.length > 0) {
+            cContainer.innerHTML = analysis.challenges.map(c => `
+                <div class="persona-stat-item">
+                    <div class="persona-stat-top">
+                        <div class="persona-stat-left">
+                            <span>${c.icon}</span>
+                            <span>${c.name}</span>
+                            <span class="app-chip app-chip-small ${c.badge === 'danger' ? 'app-chip-danger' : (c.badge === 'warning' ? 'app-chip-warning' : 'app-chip-neutral')}" style="font-size: 10px; padding: 2px 6px;">
+                                ${c.level}
+                            </span>
+                        </div>
+                        <span class="persona-stat-pct" style="${c.badge === 'danger' ? 'color: var(--app-danger);' : ''}">${c.percent}%</span>
+                    </div>
+                    <div class="persona-bar-track">
+                        <div class="persona-bar-fill ${c.badge === 'danger' ? 'persona-bar-danger' : (c.badge === 'warning' ? 'persona-bar-warning' : 'persona-bar-neutral')}" style="width: ${c.percent}%;"></div>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        // 4. Activities
+        const aContainer = document.getElementById("activitiesContainer");
+        if (aContainer && analysis.activities && analysis.activities.length > 0) {
+            aContainer.innerHTML = analysis.activities.map(a => `
+                <div class="persona-stat-item">
+                    <div class="persona-stat-top">
+                        <div class="persona-stat-left">
+                            <span>${a.icon}</span>
+                            <span>${a.name}</span>
+                        </div>
+                        <span class="persona-stat-pct">${a.percent}%</span>
+                    </div>
+                    <div class="persona-bar-track">
+                        <div class="persona-bar-fill persona-bar-activity" style="width: ${a.percent}%;"></div>
+                    </div>
+                </div>
+            `).join("");
+        }
+    }
 </script>
 {% endblock %}
