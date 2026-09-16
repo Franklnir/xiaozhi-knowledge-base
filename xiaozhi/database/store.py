@@ -84,11 +84,14 @@ class HFJsonStore:
         if IS_PRODUCTION and self.local_only_requested and os.getenv("ALLOW_LOCAL_DB_IN_PRODUCTION", "").lower() not in {"1", "true", "yes"}:
             raise RuntimeError("HF_DB_LOCAL_ONLY tidak aman untuk production.")
         if IS_PRODUCTION and not self.token and not self.local_only_requested:
-            raise RuntimeError("HF_TOKEN wajib diset agar database tersimpan permanen di Hugging Face.")
-        self.local_only = self.local_only_requested or not self.token
+            logger.warning("HF_TOKEN belum diset di production. Database memakai file lokal sementara. Set HF_TOKEN di HuggingFace Space Secrets.")
+            self.local_only = True
+        else:
+            self.local_only = self.local_only_requested or not self.token
         self.api = HfApi(token=self.token) if self.token and HfApi else None
         self._data: Optional[Dict[str, Any]] = None
         self._lock = RLock()
+        self._hf_healthy = False
 
         if self.local_only:
             logger.warning("HF_TOKEN belum diset. Database memakai file lokal sementara.")
@@ -148,16 +151,25 @@ class HFJsonStore:
             with open(downloaded_path, "r", encoding="utf-8") as handle:
                 data = normalize_database(json.load(handle))
             self._write_local(data)
+            self._hf_healthy = True
             return data
         except Exception as exc:
             message = str(exc).lower()
+            if "401" in message or "unauthorized" in message or "invalid username" in message:
+                logger.error("HF_TOKEN tidak valid atau expired. Beralih ke mode lokal. Perbaiki HF_TOKEN di HuggingFace Space Secrets.")
+                self.local_only = True
+                self._hf_healthy = False
+                if self.local_path.exists():
+                    return self._read_local()
+                return empty_database()
             if "404" in message or "entry not found" in message or "not found" in message:
                 data = empty_database()
                 self._write_local(data)
-                self._upload_remote(data, "Initialize EduSmart database")
+                self._upload_remote(data, "Initialize database")
                 return data
             if self.local_path.exists():
                 logger.warning("Gagal memuat HF DB, memakai cache lokal: %s", exc)
+                self._hf_healthy = False
                 return self._read_local()
             raise RuntimeError("Gagal memuat database dari Hugging Face.") from exc
 
@@ -179,13 +191,22 @@ class HFJsonStore:
             if self.local_only:
                 self._data = self._read_local()
             else:
-                self._data = self._load_remote()
+                try:
+                    self._data = self._load_remote()
+                except Exception:
+                    logger.warning("Gagal load remote, fallback ke lokal.")
+                    self.local_only = True
+                    self._data = self._read_local()
         return self._data
 
-    def _commit(self, data: Dict[str, Any], message: str = "Update EduSmart database") -> None:
+    def _commit(self, data: Dict[str, Any], message: str = "Update database") -> None:
         self._data = normalize_database(data)
         self._write_local(self._data)
-        self._upload_remote(self._data, message)
+        if not self.local_only:
+            try:
+                self._upload_remote(self._data, message)
+            except Exception as exc:
+                logger.warning("Gagal upload ke HF, data tersimpan lokal: %s", exc)
 
     @staticmethod
     def _next_id(data: Dict[str, Any], bucket: str) -> int:
