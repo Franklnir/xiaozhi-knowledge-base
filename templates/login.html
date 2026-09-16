@@ -3,6 +3,9 @@
 {% block title %}Masuk Dashboard - Xiaozhi Indonesia Asisten Suara Cerdas{% endblock %}
 
 {% block content_login %}
+<style>
+    .hidden { display: none !important; }
+</style>
 <section class="auth-layout">
     <div class="auth-card">
         <div class="mb-6">
@@ -20,15 +23,15 @@
         <div class="mb-5">
             <label for="authMode" class="app-label">Pilih akses</label>
             <select id="authMode" class="app-select">
-                <option value="login">Login</option>
-                <option value="search">Cari akun</option>
-                <option value="register">Register</option>
-                <option value="cek_mcp">Cek MCP Endpoint</option>
+                <option value="login"{% if (active_mode or 'login') == 'login' %} selected{% endif %}>Login</option>
+                <option value="search"{% if active_mode == 'search' %} selected{% endif %}>Cari akun</option>
+                <option value="register"{% if active_mode == 'register' %} selected{% endif %}>Register</option>
+                <option value="cek_mcp"{% if active_mode == 'cek_mcp' %} selected{% endif %}>Cek MCP Endpoint</option>
             </select>
         </div>
 
         <div class="auth-panel">
-            <form id="loginPanel" action="/login" method="POST" class="space-y-4">
+            <form id="loginPanel" action="/login" method="POST" class="space-y-4{% if active_mode and active_mode != 'login' %} hidden{% endif %}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="auth_mode" value="login">
                 <div>
@@ -56,13 +59,13 @@
                 </a>
             </form>
 
-            <div id="searchPanel" class="hidden space-y-4">
+            <div id="searchPanel" class="space-y-4{% if active_mode != 'search' %} hidden{% endif %}">
                 <div>
                     <label for="accountSearch" class="app-label">Cari username</label>
                     <input id="accountSearch" type="search" autocomplete="off" placeholder="irs" value="{{ search_username or '' }}" class="app-input">
                 </div>
                 <div id="accountResults" class="hidden overflow-hidden rounded-lg border border-slate-200"></div>
-                <form id="searchLoginForm" action="/login" method="POST" class="hidden space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <form id="searchLoginForm" action="/login" method="POST" class="{% if not search_username %}hidden {% endif %}space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="auth_mode" value="search">
                     <input id="selectedUsername" type="hidden" name="username" value="{{ search_username or '' }}">
@@ -80,7 +83,7 @@
                 </form>
             </div>
 
-            <form id="registerPanel" action="/register" method="POST" class="hidden space-y-4">
+            <form id="registerPanel" action="/register" method="POST" class="space-y-4{% if active_mode != 'register' %} hidden{% endif %}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div>
                     <label for="register_username" class="app-label">Username</label>
@@ -109,7 +112,7 @@
                 </a>
             </form>
 
-            <div id="cek_mcpPanel" class="hidden space-y-4">
+            <div id="cek_mcpPanel" class="space-y-4{% if active_mode != 'cek_mcp' %} hidden{% endif %}">
                 <div>
                     <label for="mcpEndpointInput" class="app-label">Endpoint MCP</label>
                     <input id="mcpEndpointInput" type="text" placeholder="wss://api.xiaozhi.me/mcp/?token=..." class="app-input" autocomplete="off">
