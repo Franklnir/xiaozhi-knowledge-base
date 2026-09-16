@@ -20,7 +20,12 @@ router = APIRouter(prefix="/api/v1/auth", tags=["API v1 Auth"])
 
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=32, pattern=r"[a-z0-9_]+")
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=6, max_length=128)
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=32, pattern=r"[a-z0-9_]+")
+    password: str = Field(..., min_length=6, max_length=128)
 
 
 class RefreshRequest(BaseModel):
@@ -40,6 +45,40 @@ class ApiError(BaseModel):
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
+
+@router.post("/register", response_model=TokenResponse)
+async def api_register(body: RegisterRequest):
+    """
+    Register a new user account and return JWT tokens.
+    """
+    store = get_store()
+    try:
+        user = store.create_user(body.username, body.password)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"success": False, "data": None, "message": str(exc)}
+        )
+
+    user_id = int(user["id"])
+    role = str(user.get("role") or "user").lower()
+    session_version = max(1, int(user.get("session_version", 1) or 1))
+
+    tokens = create_token_pair(user_id, body.username, role, session_version)
+
+    return TokenResponse(
+        success=True,
+        data={
+            "user": {
+                "id": user_id,
+                "username": body.username,
+                "role": role,
+            },
+            **tokens,
+        },
+        message="Registrasi berhasil."
+    )
+
 
 @router.post("/login", response_model=TokenResponse)
 async def api_login(body: LoginRequest):

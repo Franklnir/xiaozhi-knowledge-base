@@ -156,7 +156,13 @@ from xiaozhi.routers import (
     smarthome,
     youtube,
 )
-from xiaozhi.routers import api_v1_auth, api_v1_materials, api_v1_smarthome
+from xiaozhi.routers import (
+    api_v1_auth,
+    api_v1_chat,
+    api_v1_materials,
+    api_v1_mcp,
+    api_v1_smarthome,
+)
 
 app.include_router(auth.router)
 app.include_router(google_auth.router)
@@ -174,6 +180,8 @@ app.include_router(devices.router)
 app.include_router(api_v1_auth.router)
 app.include_router(api_v1_materials.router)
 app.include_router(api_v1_smarthome.router)
+app.include_router(api_v1_mcp.router)
+app.include_router(api_v1_chat.router)
 
 
 # Mount MCP SSE endpoint - will be mounted during startup
