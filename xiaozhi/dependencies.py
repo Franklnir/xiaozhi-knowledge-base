@@ -81,9 +81,26 @@ def validate_csrf(request: Request, token: str, user: Optional[Dict[str, Any]]) 
 
 def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None, status_code: int = 200):
     user = context.get("user") if context else None
-    merged = {"user": user, "csrf_token": make_csrf_token(user)}
+    if user is None:
+        user = get_current_user(request)
+
+    mcp_connected = False
+    if user and isinstance(user, dict) and "id" in user:
+        try:
+            from xiaozhi.services.mcp_service import is_mcp_connected
+            mcp_connected = bool(is_mcp_connected(int(user["id"])))
+        except Exception:
+            mcp_connected = False
+
+    merged = {
+        "user": user,
+        "csrf_token": make_csrf_token(user),
+        "mcp_connected": mcp_connected,
+    }
     if context:
         merged.update(context)
+        if "mcp_connected" not in context:
+            merged["mcp_connected"] = mcp_connected
     return templates.TemplateResponse(
         request=request,
         name=name,
