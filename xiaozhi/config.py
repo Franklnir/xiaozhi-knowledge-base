@@ -153,12 +153,11 @@ GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
 # ── JWT Secret ─────────────────────────────────────────────────────────────
 JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET:
-    if IS_PRODUCTION:
-        raise RuntimeError("JWT_SECRET wajib diset untuk production.")
-    JWT_SECRET = secrets.token_urlsafe(64)
-    logger.warning(
-        "JWT_SECRET belum diset. Token JWT hanya stabil sampai proses restart."
-    )
+    JWT_SECRET = APP_SECRET_KEY
+    if not IS_PRODUCTION:
+        logger.warning(
+            "JWT_SECRET belum diset. Menggunakan APP_SECRET_KEY sebagai fallback."
+        )
 
 
 def _fernet_from_secret() -> Fernet:
