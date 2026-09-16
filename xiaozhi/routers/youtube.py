@@ -183,14 +183,22 @@ async def _stream_opus_audio(video_id: str) -> AsyncGenerator[bytes, None]:
         stderr=subprocess.DEVNULL
     )
 
+    total_bytes = 0
+    logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid}")
     try:
         while True:
             chunk = await proc.stdout.read(1536)
             if not chunk:
+                logger.info(f"YouTube stream for {video_id} reached EOF, total={total_bytes} bytes")
                 break
+            total_bytes += len(chunk)
+            if total_bytes % (1536 * 50) == 0:
+                logger.info(f"YouTube stream for {video_id}: sent {total_bytes // 1024} KB")
             yield chunk
-    except (asyncio.CancelledError, GeneratorExit):
-        pass
+    except (asyncio.CancelledError, GeneratorExit) as exc:
+        logger.warning(f"YouTube stream for {video_id} client disconnected or cancelled after {total_bytes} bytes")
+    except Exception as exc:
+        logger.error(f"YouTube stream for {video_id} error after {total_bytes} bytes: {exc}")
     finally:
         if proc.returncode is None:
             try:
@@ -198,6 +206,7 @@ async def _stream_opus_audio(video_id: str) -> AsyncGenerator[bytes, None]:
                 await proc.wait()
             except Exception:
                 pass
+        logger.info(f"YouTube stream for {video_id} closed, proc_returncode={proc.returncode}")
 
 
 @router.get("/api/audio/stream/{video_id}")
