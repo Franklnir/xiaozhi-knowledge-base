@@ -20,6 +20,46 @@
         <div class="app-alert app-alert-success mb-5">{{ success }}</div>
         {% endif %}
 
+        
+        <!-- MCP Gating Card (Displayed when user is not connected) -->
+        <div id="loginMcpGatingCard" class="{% if not mcp_pending %}hidden {% endif %}mcp-slide-down mb-6 rounded-xl border-2 border-black bg-amber-50 p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <div class="flex items-center justify-between mb-3">
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-black bg-amber-300 px-3 py-1 text-xs font-black uppercase tracking-wider text-black">
+                    Koneksi MCP Wajib
+                </span>
+                <div class="neo-pulse-dot">
+                    <span id="loginMcpPulseRing" class="neo-pulse-ring bg-amber-400 opacity-75"></span>
+                    <span id="loginMcpPulseCore" class="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-600 border border-black"></span>
+                </div>
+            </div>
+
+            <h2 class="text-base font-black text-slate-900">Endpoint MCP Belum Terhubung</h2>
+            <p class="mt-1 text-xs text-slate-700">
+                Akun Anda belum memiliki koneksi MCP aktif. Anda wajib memasukkan dan menghubungkan WebSocket MCP sebelum dapat masuk ke Dashboard:
+            </p>
+
+            <div class="mt-4 space-y-3">
+                <div>
+                    <label for="login_mcp_token" class="block text-xs font-black uppercase tracking-wider text-slate-800 mb-1">WebSocket URL Endpoint</label>
+                    <input id="login_mcp_token" type="url" placeholder="wss://api.xiaozhi.me/v1/mcp?token=..." value="{{ mcp_token_preview or '' }}" class="w-full rounded-lg border-2 border-black bg-white px-3.5 py-2.5 text-sm font-semibold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div id="loginMcpStatusNotice" class="hidden rounded-lg border-2 border-black bg-white p-3 text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                    <div class="flex items-center gap-2">
+                        <span id="loginMcpStatusIcon" class="text-base">⏳</span>
+                        <span id="loginMcpStatusText" class="font-black text-slate-800">Menghubungkan ke bridge WebSocket...</span>
+                    </div>
+                    <div class="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-100 border border-slate-300">
+                        <div id="loginMcpProgressBar" class="h-full bg-amber-500 transition-all duration-500" style="width: 30%"></div>
+                    </div>
+                </div>
+
+                <button id="loginConnectMcpBtn" type="button" class="w-full rounded-lg border-2 border-black bg-amber-400 hover:bg-amber-500 px-4 py-3 text-sm font-black uppercase tracking-wider text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-transform hover:-translate-y-0.5 active:translate-y-0.5">
+                    Hubungkan MCP & Masuk
+                </button>
+            </div>
+        </div>
+
         <div class="mb-5">
             <label for="authMode" class="app-label">Pilih akses</label>
             <select id="authMode" class="app-select">
@@ -280,3 +320,156 @@
     }
 </script>
 {% endblock %}
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const loginForm = document.getElementById("loginPanel");
+    const searchLoginForm = document.getElementById("searchLoginForm");
+    const mcpCard = document.getElementById("loginMcpGatingCard");
+    const mcpTokenInput = document.getElementById("login_mcp_token");
+    const connectBtn = document.getElementById("loginConnectMcpBtn");
+    const notice = document.getElementById("loginMcpStatusNotice");
+    const noticeText = document.getElementById("loginMcpStatusText");
+    const noticeIcon = document.getElementById("loginMcpStatusIcon");
+    const progressBar = document.getElementById("loginMcpProgressBar");
+    const csrf = document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : "";
+
+    let pollTimer = null;
+
+    async function handleAjaxLogin(username, password, submitBtn) {
+        if (!username || !password) return;
+        submitBtn.disabled = true;
+        const origText = submitBtn.textContent;
+        submitBtn.textContent = "Memverifikasi...";
+
+        try {
+            const resp = await fetch("/api/auth/web-login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                    csrf_token: csrf
+                })
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                if (data.mcp_required) {
+                    // MCP is required and not connected! Show gating card!
+                    if (loginForm) loginForm.classList.add("hidden");
+                    if (searchLoginForm) searchLoginForm.classList.add("hidden");
+                    document.getElementById("authMode")?.parentElement?.classList.add("hidden");
+
+                    mcpCard.classList.remove("hidden");
+                    if (data.token_preview) mcpTokenInput.value = data.token_preview;
+                    mcpTokenInput.focus();
+                } else {
+                    window.location.href = data.redirect_url || "/dashboard";
+                }
+            } else {
+                alert(data.message || "Username atau password salah.");
+                submitBtn.disabled = false;
+                submitBtn.textContent = origText;
+            }
+        } catch (_) {
+            loginForm.submit();
+        }
+    }
+
+    if (loginForm) {
+        loginForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            const u = document.getElementById("login_username").value.trim();
+            const p = document.getElementById("login_password").value;
+            const btn = loginForm.querySelector('button[type="submit"]');
+            handleAjaxLogin(u, p, btn);
+        });
+    }
+
+    if (connectBtn) {
+        connectBtn.addEventListener("click", async function() {
+            const token = mcpTokenInput.value.trim();
+            if (!token || (!token.startsWith("wss://") && !token.startsWith("ws://"))) {
+                alert("Endpoint MCP wajib diawali wss:// atau ws://");
+                mcpTokenInput.focus();
+                return;
+            }
+
+            connectBtn.disabled = true;
+            connectBtn.textContent = "Menghubungkan ke XiaoZhi...";
+            notice.classList.remove("hidden");
+            noticeIcon.textContent = "⏳";
+            noticeText.textContent = "Menyimpan endpoint MCP...";
+            progressBar.style.width = "40%";
+
+            try {
+                const fd = new FormData();
+                fd.append("csrf_token", csrf);
+                fd.append("mcp_token", token);
+
+                const sResp = await fetch("/save_mcp", {
+                    method: "POST",
+                    body: fd,
+                    credentials: "same-origin"
+                });
+                const sData = await sResp.json();
+
+                if (sData.success) {
+                    noticeText.textContent = "Endpoint tersimpan. Menghubungkan ke bridge WebSocket...";
+                    progressBar.style.width = "70%";
+
+                    let attempts = 0;
+                    if (pollTimer) clearInterval(pollTimer);
+
+                    pollTimer = setInterval(async function() {
+                        attempts++;
+                        try {
+                            const stResp = await fetch("/api/mcp/status", { credentials: "same-origin" });
+                            const stData = await stResp.json();
+
+                            if (stData.success && stData.status) {
+                                const s = stData.status;
+                                if (s.connected) {
+                                    clearInterval(pollTimer);
+                                    noticeIcon.textContent = "✅";
+                                    noticeText.textContent = "MCP Berhasil Terhubung! Mengalihkan ke Dashboard...";
+                                    progressBar.style.width = "100%";
+                                    progressBar.className = "h-full bg-emerald-600 transition-all duration-300";
+
+                                    setTimeout(function() {
+                                        window.location.href = "/dashboard";
+                                    }, 1200);
+                                    return;
+                                } else {
+                                    noticeText.textContent = s.statusText || ("Menunggu respon XiaoZhi (" + attempts + "s)...");
+                                }
+                            }
+                        } catch (_) {}
+
+                        if (attempts >= 25) {
+                            clearInterval(pollTimer);
+                            connectBtn.disabled = false;
+                            connectBtn.textContent = "Coba Hubungkan Ulang";
+                            noticeIcon.textContent = "⚠️";
+                            noticeText.textContent = "Belum terhubung. Pastikan URL WebSocket MCP benar.";
+                        }
+                    }, 1500);
+
+                } else {
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = "Hubungkan MCP & Masuk";
+                    noticeIcon.textContent = "❌";
+                    noticeText.textContent = sData.detail || "Gagal menyimpan endpoint.";
+                }
+            } catch (err) {
+                connectBtn.disabled = false;
+                connectBtn.textContent = "Hubungkan MCP & Masuk";
+                noticeIcon.textContent = "❌";
+                noticeText.textContent = "Terjadi kesalahan: " + err.message;
+            }
+        });
+    }
+});
+</script>
