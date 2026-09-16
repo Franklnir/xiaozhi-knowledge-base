@@ -117,12 +117,15 @@ def record_mcp_tool_history_to_store(
     if owner_id is None:
         return
     try:
+        ans = xiaozhi_answer
+        if not ans and isinstance(response, dict):
+            ans = str(response.get("message") or response.get("result") or response.get("text") or "")
         _store_ref.add_chat_history(
             owner_id,
             source=source,
             tool_name=tool_name,
             user_message=query,
-            xiaozhi_answer=xiaozhi_answer or str(response),
+            xiaozhi_answer=ans or str(response),
             request_payload=arguments,
             response_payload=response,
         )
