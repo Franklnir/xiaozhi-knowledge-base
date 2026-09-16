@@ -297,12 +297,14 @@ class SQLiteStore:
             CREATE INDEX IF NOT EXISTS idx_persona_owner_cat ON user_persona(owner_id, category);
         """)
 
-        # Migration check: Ensure google_id and google_email exist in users table
+        # Migration check: Ensure google_id, google_email, and registered_with_google exist in users table
         user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
         if "google_id" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_id TEXT")
         if "google_email" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN google_email TEXT")
+        if "registered_with_google" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN registered_with_google INTEGER NOT NULL DEFAULT 0")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL")
 
         conn.commit()
@@ -321,7 +323,7 @@ class SQLiteStore:
             conn.commit()
             user_id = cursor.lastrowid
             self._seed_default_categories(user_id)
-            return {"id": user_id, "username": username, "role": "user", "session_version": 1, "ui_theme": DEFAULT_UI_THEME}
+            return {"id": user_id, "username": username, "role": "user", "session_version": 1, "ui_theme": DEFAULT_UI_THEME, "registered_with_google": False}
         except sqlite3.IntegrityError:
             raise ValueError("Username sudah digunakan.")
 
@@ -339,6 +341,7 @@ class SQLiteStore:
             "ui_theme": row["ui_theme"],
             "google_id": row["google_id"] if "google_id" in keys else None,
             "google_email": row["google_email"] if "google_email" in keys else None,
+            "registered_with_google": bool(row["registered_with_google"]) if "registered_with_google" in keys else False,
             "created_at": row["created_at"] if "created_at" in keys else None,
         }
 
@@ -378,6 +381,12 @@ class SQLiteStore:
 
     def unlink_google_account(self, user_id: int) -> None:
         conn = self._get_conn()
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row:
+            raise ValueError("Pengguna tidak ditemukan.")
+        keys = row.keys()
+        if "registered_with_google" in keys and row["registered_with_google"]:
+            raise ValueError("Akun ini didaftarkan menggunakan Google sehingga tautan Google bersifat permanen dan tidak dapat dilepas.")
         conn.execute(
             "UPDATE users SET google_id = NULL, google_email = NULL, updated_at = ? WHERE id = ?",
             (utc_now(), user_id)
@@ -391,7 +400,7 @@ class SQLiteStore:
         conn = self._get_conn()
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash, role, google_id, google_email, created_at) VALUES (?, ?, 'user', ?, ?, ?)",
+                "INSERT INTO users (username, password_hash, role, google_id, google_email, registered_with_google, created_at) VALUES (?, ?, 'user', ?, ?, 1, ?)",
                 (username, password_hash, str(google_id), str(google_email).strip().lower(), utc_now())
             )
             conn.commit()
@@ -405,6 +414,7 @@ class SQLiteStore:
                 "ui_theme": DEFAULT_UI_THEME,
                 "google_id": str(google_id),
                 "google_email": str(google_email).strip().lower(),
+                "registered_with_google": True,
                 "created_at": utc_now(),
             }
         except sqlite3.IntegrityError as e:

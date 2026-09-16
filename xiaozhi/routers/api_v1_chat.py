@@ -263,6 +263,7 @@ async def get_profile_data(request: Request):
             "created_at": user.get("created_at", ""),
             "google_id": user.get("google_id"),
             "google_email": user.get("google_email"),
+            "registered_with_google": bool(user.get("registered_with_google", False)),
         },
         persona_analysis=persona_analysis,
         tools_catalog=tools_catalog,
