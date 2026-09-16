@@ -846,7 +846,7 @@ class SQLiteStore:
         # If semantic search is requested and query is provided, fetch a broader window and rank semantically
         if semantic and query.strip():
             sql += " ORDER BY id DESC LIMIT ?"
-            params.append(max(limit * 4, 30))
+            params.append(max(limit * 20, 250))
             rows = conn.execute(sql, params).fetchall()
             records = [dict(row) for row in rows]
             try:
@@ -950,6 +950,33 @@ class SQLiteStore:
         )
         conn.commit()
         return cursor.rowcount > 0
+
+    def get_user_persona_analysis(self, owner_id: int) -> Dict[str, Any]:
+        """
+        Runs RAG & Vector Semantic profiling on the user's chat history & stored personas.
+        """
+        from xiaozhi.services.semantic_memory_service import analyze_user_persona_from_chats
+        try:
+            chats = self.list_chat_history(owner_id, limit=300)
+            stored_personas = self.get_user_persona(owner_id)
+            return analyze_user_persona_from_chats(chats, stored_personas)
+        except Exception as e:
+            logger.exception("Error analyzing user persona for owner %s: %s", owner_id, e)
+            return {
+                "total_chats_analyzed": 0,
+                "confidence_level": "Data Awal",
+                "personality": {
+                    "primary_trait": "Ambivert Seimbang",
+                    "introvert_percent": 50,
+                    "extrovert_percent": 50,
+                    "dominant": "ambivert",
+                    "description": "Sedang mempelajari kepribadian Anda melalui percakapan."
+                },
+                "hobbies": [],
+                "challenges": [],
+                "activities": [],
+                "preferences": []
+            }
 
     # ── Relay Rooms ────────────────────────────────────────────────────────
 

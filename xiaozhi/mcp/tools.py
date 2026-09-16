@@ -307,13 +307,15 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         try:
             from xiaozhi.services.semantic_memory_service import format_user_persona_for_prompt
             persona_items = store.get_user_persona(owner_id, category=category)
-            prompt_context = format_user_persona_for_prompt(persona_items)
+            persona_analysis = store.get_user_persona_analysis(owner_id) if hasattr(store, "get_user_persona_analysis") else None
+            prompt_context = format_user_persona_for_prompt(persona_items, persona_analysis=persona_analysis)
             return {
                 "success": True,
                 "total_preferensi": len(persona_items),
                 "preferensi_tersimpan": persona_items,
+                "analisis_vektor_karakter": persona_analysis,
                 "prompt_context": prompt_context,
-                "instruksi_xiaozhi": "Gunakan preferensi di atas untuk menyesuaikan gaya bicara dan relevansi jawabanmu agar user merasa sangat dipahami dan akrab."
+                "instruksi_xiaozhi": "Gunakan preferensi, kepribadian, hobi, dan tantangan di atas untuk menyesuaikan gaya bicara dan relevansi jawabanmu agar user merasa sangat dipahami dan akrab."
             }
         except Exception:
             logger.exception("Error getting user profile")

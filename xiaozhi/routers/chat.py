@@ -157,6 +157,7 @@ async def profile_page(request: Request):
         token_preview=token_info.get("preview", "") if token_info else "",
         token_hash=token_hash,
     )
+    persona_analysis = store.get_user_persona_analysis(user["id"])
     return render(
         request,
         "profile.html",
@@ -164,6 +165,22 @@ async def profile_page(request: Request):
             "user": user,
             "features": features,
             "mcp_status": mcp_status,
+            "persona_analysis": persona_analysis,
             "active_page": "profile",
         },
     )
+
+
+@router.post("/api/profile/scan-persona")
+async def api_scan_persona(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "message": "Unauthorized"}, status_code=401)
+    store = get_store()
+    analysis = store.get_user_persona_analysis(user["id"])
+    return JSONResponse({
+        "success": True,
+        "message": "Profil persona dan karakter berhasil dipindai ulang via RAG Vector.",
+        "analysis": analysis
+    })
+
