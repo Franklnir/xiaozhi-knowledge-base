@@ -632,7 +632,7 @@
 </head>
 {% set page = active_page|default('') %}
 <body>
-    {% if not user and (self.content_login is defined and self.content_login()) %}
+    {% if not user and active_page == 'login' %}
     <!-- No user (login/register page) -->
     <div style="flex:1; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; width:100%">
         {% block content_login %}{% endblock %}

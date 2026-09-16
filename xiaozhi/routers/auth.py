@@ -67,7 +67,7 @@ async def login_page(request: Request, mode: str = Query("login")):
     return render(
         request,
         "login.html",
-        {"user": None, "error": error, "success": success, "active_mode": active_mode},
+        {"user": None, "error": error, "success": success, "active_mode": active_mode, "active_page": "login"},
     )
 
 
@@ -106,6 +106,7 @@ async def login_post(
                 "error": "Username atau password salah.",
                 "success": None,
                 "active_mode": active_mode,
+                "active_page": "login",
                 "login_username": submitted_username if active_mode == "login" else "",
                 "search_username": submitted_username if active_mode == "search" else "",
             },
@@ -120,6 +121,7 @@ async def login_post(
                 "error": "Username atau password salah.",
                 "success": None,
                 "active_mode": active_mode,
+                "active_page": "login",
                 "login_username": submitted_username if active_mode == "login" else "",
                 "search_username": submitted_username if active_mode == "search" else "",
             },
@@ -137,7 +139,7 @@ async def register_page(request: Request):
     return render(
         request,
         "register.html",
-        {"user": None, "error": error, "success": success},
+        {"user": None, "error": error, "success": success, "active_page": "login"},
     )
 
 
