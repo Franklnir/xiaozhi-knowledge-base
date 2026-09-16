@@ -291,7 +291,7 @@
                     {% for cat in categories %}
                     <div class="app-list-row">
                         <span class="text-sm font-semibold text-slate-700">{{ cat.name }}</span>
-                        {% if cat.name|lower != 'data dari api' %}
+                        {% if cat.name|trim|lower != 'data dari api' %}
                         <form action="/delete_category/{{ cat.id }}" method="POST" onsubmit="return confirm('Hapus kategori ini?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button type="submit" class="app-button app-button-ghost app-button-small app-button-text-danger">Hapus</button>
