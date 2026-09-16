@@ -679,12 +679,19 @@
                     </div>
                     <div>
                         {% if user.google_id %}
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                             <span style="font-size: 14px; font-weight: 750; color: var(--app-text);">{{ user.google_email or 'Akun Google Tertaut' }}</span>
                             <span class="app-chip app-chip-small app-chip-success">✓ Terhubung</span>
+                            {% if user.registered_with_google %}
+                            <span class="app-chip app-chip-small app-chip-neutral">Permanen</span>
+                            {% endif %}
                         </div>
                         <div style="font-size: 12px; color: var(--app-muted); margin-top: 3px;">
+                            {% if user.registered_with_google %}
+                            Akun didaftarkan via Google. Tautan Google permanen demi keamanan akses akun.
+                            {% else %}
                             Akun Google aktif untuk login 1-klik ke sistem.
+                            {% endif %}
                         </div>
                         {% else %}
                         <div style="display: flex; align-items: center; gap: 8px;">
@@ -700,9 +707,15 @@
 
                 <div>
                     {% if user.google_id %}
-                    <button type="button" class="app-button app-button-danger app-button-small" onclick="openUnlinkModal()">
-                        Putuskan Tautan
-                    </button>
+                        {% if user.registered_with_google %}
+                        <span class="app-chip app-chip-neutral app-chip-small" style="padding: 6px 12px; font-weight: 700;">
+                            🔒 Tautan Permanen
+                        </span>
+                        {% else %}
+                        <button type="button" class="app-button app-button-danger app-button-small" onclick="openUnlinkModal()">
+                            Putuskan Tautan
+                        </button>
+                        {% endif %}
                     {% else %}
                     <a href="/api/auth/google/link" class="app-button app-button-primary app-button-small" style="text-decoration:none;">
                         Tautkan Akun Google

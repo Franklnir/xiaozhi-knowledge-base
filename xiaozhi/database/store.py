@@ -264,6 +264,7 @@ class HFJsonStore:
             "ui_theme": str(user.get("ui_theme") or DEFAULT_UI_THEME) if str(user.get("ui_theme") or DEFAULT_UI_THEME) in UI_THEMES else DEFAULT_UI_THEME,
             "google_id": user.get("google_id"),
             "google_email": user.get("google_email"),
+            "registered_with_google": bool(user.get("registered_with_google", False)),
             "created_at": user.get("created_at"),
         }
 
@@ -685,6 +686,8 @@ class HFJsonStore:
             user = next((u for u in data["users"] if int(u.get("id", 0)) == int(user_id)), None)
             if not user:
                 raise ValueError("Pengguna tidak ditemukan.")
+            if user.get("registered_with_google"):
+                raise ValueError("Akun ini didaftarkan menggunakan Google sehingga tautan Google bersifat permanen dan tidak dapat dilepas.")
             user["google_id"] = None
             user["google_email"] = None
             user["updated_at"] = utc_now()
@@ -709,6 +712,7 @@ class HFJsonStore:
                 "ui_theme": DEFAULT_UI_THEME,
                 "google_id": str(google_id),
                 "google_email": str(google_email).strip().lower(),
+                "registered_with_google": True,
                 "created_at": utc_now(),
             }
             data["users"].append(user)
