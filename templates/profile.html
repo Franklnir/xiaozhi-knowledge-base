@@ -57,27 +57,32 @@
     }
     .tool-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
         gap: 12px;
     }
     .tool-item {
-        padding: 12px;
+        padding: 12px 14px;
         background: var(--app-surface);
         border: 1px solid var(--app-border);
         border-radius: var(--app-radius);
         display: flex;
-        align-items: center;
-        gap: 10px;
+        align-items: flex-start;
+        gap: 12px;
+        transition: transform 0.15s, border-color 0.15s;
+    }
+    .tool-item:hover {
+        border-color: var(--app-accent);
+        transform: translateY(-1px);
     }
     .tool-icon {
-        width: 36px;
-        height: 36px;
+        width: 38px;
+        height: 38px;
         border-radius: 8px;
         background: var(--app-soft);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 18px;
+        font-size: 20px;
         flex-shrink: 0;
     }
     .tool-info {
@@ -86,7 +91,7 @@
     }
     .tool-name {
         font-size: 13px;
-        font-weight: 700;
+        font-weight: 750;
         color: var(--app-text);
         white-space: nowrap;
         overflow: hidden;
@@ -96,6 +101,26 @@
         font-size: 11px;
         color: var(--app-accent);
         font-weight: 600;
+    }
+    .tool-filter-btn {
+        padding: 5px 12px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 650;
+        color: var(--app-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .tool-filter-btn:hover {
+        background: var(--app-soft);
+        color: var(--app-text);
+    }
+    .tool-filter-btn.active {
+        background: var(--app-accent);
+        color: white;
+        border-color: var(--app-accent);
     }
     .help-section {
         margin-top: 32px;
@@ -688,89 +713,62 @@
         </div>
     </div>
 
-    <!-- Active Tools -->
+    <!-- Active Tools (All 39 Tools Catalog) -->
     <div class="profile-section">
-        <div class="profile-section-title">
-            <span>🔧</span> Tools Aktif
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+            <div>
+                <div class="profile-section-title" style="margin-bottom: 4px;">
+                    <span>🔧</span> Tools Cerdas Aktif
+                    <span class="app-chip app-chip-small app-chip-success" style="margin-left: 6px;">
+                        <span id="activeToolCountDisplay">{{ total_tools if total_tools else 39 }}</span> Tools Terpasang
+                    </span>
+                </div>
+                <p style="font-size: 13px; color: var(--app-muted); margin: 0;">
+                    Kemampuan asisten suara Xiaozhi yang terhubung dengan akun Anda. Status aktif dapat diatur via Panel Admin.
+                </p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="search" id="profileToolSearch" class="app-input" style="max-width: 200px; padding: 6px 12px; font-size: 12.5px;" placeholder="Cari tool..." oninput="filterProfileTools()">
+            </div>
         </div>
-        <div class="tool-grid">
-            <div class="tool-item">
-                <div class="tool-icon">📚</div>
-                <div class="tool-info">
-                    <div class="tool-name">Knowledge Base</div>
-                    <div class="tool-status">✓ Aktif</div>
-                </div>
-            </div>
 
-            <div class="tool-item">
-                <div class="tool-icon">🏠</div>
-                <div class="tool-info">
-                    <div class="tool-name">Smart Home Virtual</div>
-                    <div class="tool-status">✓ Aktif</div>
-                </div>
-            </div>
+        <!-- Filter Categories -->
+        <div class="profile-tool-filter-bar" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button type="button" class="tool-filter-btn active" onclick="filterToolCategory('all', this)">Semua ({{ total_tools if total_tools else 39 }})</button>
+            <button type="button" class="tool-filter-btn" onclick="filterToolCategory('knowledge', this)">Knowledge & Memori</button>
+            <button type="button" class="tool-filter-btn" onclick="filterToolCategory('iot', this)">Smart Home & IoT</button>
+            <button type="button" class="tool-filter-btn" onclick="filterToolCategory('education', this)">Edukasi & Kuliah</button>
+            <button type="button" class="tool-filter-btn" onclick="filterToolCategory('productivity', this)">Produktivitas</button>
+            <button type="button" class="tool-filter-btn" onclick="filterToolCategory('media', this)">Media & Web</button>
+            <button type="button" class="tool-filter-btn" onclick="filterToolCategory('critical_thinking', this)">Logika & IT</button>
+            <button type="button" class="tool-filter-btn" onclick="filterToolCategory('spiritual', this)">Spiritual & Agama</button>
+            <button type="button" class="tool-filter-btn" onclick="filterToolCategory('info', this)">Cuaca & BMKG</button>
+        </div>
 
-            <div class="tool-item">
-                <div class="tool-icon">⚡</div>
-                <div class="tool-info">
-                    <div class="tool-name">Relay Nyata</div>
-                    <div class="tool-status">✓ Aktif</div>
-                </div>
-            </div>
-
-            <div class="tool-item">
-                <div class="tool-icon">🎵</div>
-                <div class="tool-info">
-                    <div class="tool-name">YouTube Music</div>
-                    <div class="tool-status">
-                        {% if features.youtube_music %}
-                        ✓ Aktif
-                        {% else %}
-                        ✗ Nonaktif
-                        {% endif %}
+        <div class="tool-grid" id="profileToolGrid">
+            {% if tools_catalog %}
+                {% for tool in tools_catalog %}
+                <div class="tool-item profile-tool-card" data-category="{{ tool.category }}" data-name="{{ (tool.title ~ ' ' ~ tool.name ~ ' ' ~ tool.category_label ~ ' ' ~ tool.description)|lower }}">
+                    <div class="tool-icon">{{ tool.icon }}</div>
+                    <div class="tool-info">
+                        <div class="tool-name" title="{{ tool.title }}">{{ tool.title }}</div>
+                        <div style="font-size: 11.5px; color: var(--app-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ tool.description }}">{{ tool.description }}</div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
+                            <span class="app-chip app-chip-small app-chip-neutral" style="font-size: 10px; padding: 1px 6px;">{{ tool.category_label }}</span>
+                            {% if tool.enabled %}
+                            <span class="tool-status" style="color: var(--app-accent);">✓ Aktif</span>
+                            {% else %}
+                            <span class="tool-status" style="color: var(--app-muted);">✗ Nonaktif</span>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
-            </div>
+                {% endfor %}
+            {% endif %}
+        </div>
 
-            <div class="tool-item">
-                <div class="tool-icon">🔍</div>
-                <div class="tool-info">
-                    <div class="tool-name">Web Search</div>
-                    <div class="tool-status">✓ Aktif</div>
-                </div>
-            </div>
-
-            <div class="tool-item">
-                <div class="tool-icon">📰</div>
-                <div class="tool-info">
-                    <div class="tool-name">News Search</div>
-                    <div class="tool-status">✓ Aktif</div>
-                </div>
-            </div>
-
-            <div class="tool-item">
-                <div class="tool-icon">⏰</div>
-                <div class="tool-info">
-                    <div class="tool-name">Reminder</div>
-                    <div class="tool-status">✓ Aktif</div>
-                </div>
-            </div>
-
-            <div class="tool-item">
-                <div class="tool-icon">🧮</div>
-                <div class="tool-info">
-                    <div class="tool-name">Calculator</div>
-                    <div class="tool-status">✓ Aktif</div>
-                </div>
-            </div>
-
-            <div class="tool-item">
-                <div class="tool-icon">🌐</div>
-                <div class="tool-info">
-                    <div class="tool-name">Translate</div>
-                    <div class="tool-status">✓ Aktif</div>
-                </div>
-            </div>
+        <div id="noToolsMatch" class="hidden" style="text-align: center; padding: 28px; color: var(--app-muted); font-size: 13.5px; background: var(--app-surface); border: 1px dashed var(--app-border); border-radius: var(--app-radius); margin-top: 10px;">
+            Tidak ada tool yang cocok dengan pencarian Anda.
         </div>
     </div>
 
@@ -987,6 +985,46 @@
                     </div>
                 </div>
             `).join("");
+        }
+    }
+
+    // ── Profile Active Tools Filtering ──
+    let currentCategoryFilter = 'all';
+
+    function filterToolCategory(category, btn) {
+        currentCategoryFilter = category;
+        document.querySelectorAll('.tool-filter-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        applyProfileToolFilters();
+    }
+
+    function filterProfileTools() {
+        applyProfileToolFilters();
+    }
+
+    function applyProfileToolFilters() {
+        const q = (document.getElementById('profileToolSearch')?.value || '').trim().toLowerCase();
+        const cards = document.querySelectorAll('.profile-tool-card');
+        let visibleCount = 0;
+
+        cards.forEach(card => {
+            const cat = card.getAttribute('data-category') || '';
+            const searchData = card.getAttribute('data-name') || '';
+
+            const matchCat = (currentCategoryFilter === 'all' || cat === currentCategoryFilter);
+            const matchQuery = (!q || searchData.includes(q));
+
+            if (matchCat && matchQuery) {
+                card.style.display = 'flex';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        const noMatch = document.getElementById('noToolsMatch');
+        if (noMatch) {
+            noMatch.classList.toggle('hidden', visibleCount > 0);
         }
     }
 </script>

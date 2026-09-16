@@ -57,6 +57,342 @@ USER_FEATURE_FLAGS = {
     "youtube_music": True,
 }
 
+# ── All 39 MCP Tools Catalog ──────────────────────────────────────────────
+ALL_MCP_TOOLS_CATALOG = [
+    # 1. Knowledge Base & Memori AI
+    {
+        "name": "search_course_materials",
+        "title": "Knowledge Base & Materi",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "📚",
+        "description": "Pencarian materi perkuliahan, tugas, jadwal, pengumuman, dan data API realtime.",
+    },
+    {
+        "name": "read_live_api_data",
+        "title": "Live API Sensor & Cuaca",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "📡",
+        "description": "Membaca data API realtime sensor, suhu, cuaca, dan status perangkat.",
+    },
+    {
+        "name": "read_material_database",
+        "title": "Database Materi EduSmart",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "🗃️",
+        "description": "Membaca database materi pembelajaran lengkap sesuai pertanyaan.",
+    },
+    {
+        "name": "read_material_detail",
+        "title": "Detail Materi Lengkap",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "📄",
+        "description": "Membaca satu materi spesifik secara utuh berdasarkan ID atau kata kunci.",
+    },
+    {
+        "name": "save_chat_history",
+        "title": "Simpan Riwayat Percakapan",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "💾",
+        "description": "Mencatat obrolan penting ke database riwayat memori.",
+    },
+    {
+        "name": "recall_chat_memory",
+        "title": "Semantic Chat Memory Recall",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "🧠",
+        "description": "Mengingat percakapan lampau menggunakan vektor semantik RAG.",
+    },
+
+    # 2. Karakter, Persona & Device
+    {
+        "name": "remember_user_profile",
+        "title": "Profil Preferensi & Persona",
+        "category": "persona",
+        "category_label": "Karakter & Device",
+        "icon": "👤",
+        "description": "Menyimpan preferensi, hobi, dan gaya bahasa user jangka panjang.",
+    },
+    {
+        "name": "get_user_profile",
+        "title": "Baca Karakter & Persona AI",
+        "category": "persona",
+        "category_label": "Karakter & Device",
+        "icon": "🧬",
+        "description": "Membaca kepribadian (Introvert/Extrovert), hobi, dan tantangan hidup pengguna.",
+    },
+    {
+        "name": "get_registered_devices",
+        "title": "Daftar Perangkat ESP32",
+        "category": "persona",
+        "category_label": "Karakter & Device",
+        "icon": "📟",
+        "description": "Melihat daftar perangkat keras ESP32 dan MAC address yang terhubung.",
+    },
+
+    # 3. Smart Home Virtual & Relay Nyata
+    {
+        "name": "control_relay",
+        "title": "Kontrol Relay Virtual",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "🏠",
+        "description": "Kontrol relay pada simulasi smart home virtual.",
+    },
+    {
+        "name": "control_smart_home_room",
+        "title": "Kontrol Ruangan Virtual",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "🛋️",
+        "description": "Kontrol perangkat simulasi smart home berdasarkan nama ruangan.",
+    },
+    {
+        "name": "get_relay_status",
+        "title": "Status Relay Virtual",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "📊",
+        "description": "Membaca status ON/OFF semua relay di smart home virtual.",
+    },
+    {
+        "name": "all_relays_on",
+        "title": "Semua Relay Virtual ON",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "💡",
+        "description": "Menyalakan semua perangkat virtual sekaligus.",
+    },
+    {
+        "name": "all_relays_off",
+        "title": "Semua Relay Virtual OFF",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "🌑",
+        "description": "Mematikan semua perangkat virtual sekaligus termasuk AC dan alarm.",
+    },
+    {
+        "name": "control_real_relay_by_voice",
+        "title": "Kontrol Suara Relay Fisik",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "⚡",
+        "description": "Kontrol modul relay fisik nyata via polling API suara ESP32.",
+    },
+    {
+        "name": "get_real_relay_status",
+        "title": "Status Relay Fisik Nyata",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "🔌",
+        "description": "Membaca status realtime modul relay fisik nyata.",
+    },
+    {
+        "name": "all_real_relays_on",
+        "title": "Semua Relay Fisik ON",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "🟢",
+        "description": "Menyalakan seluruh pin relay fisik ESP32 secara serentak.",
+    },
+    {
+        "name": "all_real_relays_off",
+        "title": "Semua Relay Fisik OFF",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "🔴",
+        "description": "Mematikan seluruh pin relay fisik ESP32 secara serentak.",
+    },
+
+    # 4. Multimedia & Web
+    {
+        "name": "play_youtube_song",
+        "title": "YouTube Music Player",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "🎵",
+        "description": "Pencarian dan pemutaran audio lagu dari YouTube.",
+    },
+    {
+        "name": "search_web",
+        "title": "Web Search Live",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "🔍",
+        "description": "Pencarian informasi terkini dari internet.",
+    },
+    {
+        "name": "search_news",
+        "title": "Berita Terkini Indonesia",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "📰",
+        "description": "Pencarian berita aktual dari berbagai portal berita Indonesia.",
+    },
+
+    # 5. Produktivitas & Utilitas Harian
+    {
+        "name": "set_reminder",
+        "title": "Pengingat & Smart Alarm",
+        "category": "productivity",
+        "category_label": "Produktivitas",
+        "icon": "⏰",
+        "description": "Mengatur pengingat dan alarm menggunakan perintah suara.",
+    },
+    {
+        "name": "calculate",
+        "title": "Kalkulator & Matematika",
+        "category": "productivity",
+        "category_label": "Produktivitas",
+        "icon": "🧮",
+        "description": "Menghitung ekspresi matematika rumit secara instan.",
+    },
+    {
+        "name": "translate_text",
+        "title": "Penerjemah Multi-Bahasa",
+        "category": "productivity",
+        "category_label": "Produktivitas",
+        "icon": "🌐",
+        "description": "Menerjemahkan teks antar berbagai bahasa di dunia.",
+    },
+    {
+        "name": "convert_currency",
+        "title": "Konversi Kurs Mata Uang",
+        "category": "productivity",
+        "category_label": "Produktivitas",
+        "icon": "💱",
+        "description": "Konversi nilai tukar valuta asing ke Rupiah (IDR) secara realtime.",
+    },
+    {
+        "name": "lookup_kbbi",
+        "title": "Kamus KBBI Resmi",
+        "category": "productivity",
+        "category_label": "Produktivitas",
+        "icon": "📖",
+        "description": "Definisi baku dan ejaan resmi Kamus Besar Bahasa Indonesia.",
+    },
+    {
+        "name": "search_wikipedia",
+        "title": "Ensiklopedia Wikipedia",
+        "category": "productivity",
+        "category_label": "Produktivitas",
+        "icon": "🌍",
+        "description": "Mencari ringkasan ensiklopedis resmi dari Wikipedia.",
+    },
+
+    # 6. Edukasi, Akademik & Sains
+    {
+        "name": "solve_study_problem",
+        "title": "Pemecah Soal Pelajaran",
+        "category": "education",
+        "category_label": "Edukasi & Kuliah",
+        "icon": "🎓",
+        "description": "Menyelesaikan soal sekolah dan tugas kuliah secara mendidik (step-by-step).",
+    },
+    {
+        "name": "explain_concept",
+        "title": "Penjelas Konsep Edukasi",
+        "category": "education",
+        "category_label": "Edukasi & Kuliah",
+        "icon": "💡",
+        "description": "Menjelaskan konsep rumit atau abstrak dengan analogi sederhana.",
+    },
+    {
+        "name": "quiz_me",
+        "title": "Kuis Interaktif Materi",
+        "category": "education",
+        "category_label": "Edukasi & Kuliah",
+        "icon": "📝",
+        "description": "Partner belajar interaktif untuk menguji pemahaman materi kuliah.",
+    },
+    {
+        "name": "lookup_formula",
+        "title": "Kamus Rumus Sains",
+        "category": "education",
+        "category_label": "Edukasi & Kuliah",
+        "icon": "📐",
+        "description": "Kamus cepat rumus Fisika, Matematika, Kimia, dan Ekonomi lengkap dengan satuan SI.",
+    },
+    {
+        "name": "academic_english_helper",
+        "title": "Academic English & Grammar",
+        "category": "education",
+        "category_label": "Edukasi & Kuliah",
+        "icon": "🔤",
+        "description": "Pengecekan tata bahasa akademik dan kosakata paper ilmiah bahasa Inggris.",
+    },
+
+    # 7. Informasi Cuaca & Bencana
+    {
+        "name": "get_earthquake_info",
+        "title": "Info Gempa Bumi BMKG",
+        "category": "info",
+        "category_label": "Cuaca & Info Publik",
+        "icon": "🌋",
+        "description": "Informasi gempa terkini M 5.0+ resmi dari BMKG Indonesia.",
+    },
+    {
+        "name": "get_weather_bmkg",
+        "title": "Prakiraan Cuaca BMKG",
+        "category": "info",
+        "category_label": "Cuaca & Info Publik",
+        "icon": "🌤️",
+        "description": "Prakiraan cuaca dan suhu realtime per kota di Indonesia dari BMKG.",
+    },
+
+    # 8. Logika, Pola Pikir & IT
+    {
+        "name": "detect_logical_fallacy",
+        "title": "Deteksi Cacat Logika (Fallacy)",
+        "category": "critical_thinking",
+        "category_label": "Logika & IT",
+        "icon": "🎯",
+        "description": "Menganalisis kesesatan berpikir dan argumen dalam debat atau opini.",
+    },
+    {
+        "name": "identify_cognitive_bias",
+        "title": "Identifikasi Bias Kognitif",
+        "category": "critical_thinking",
+        "category_label": "Logika & IT",
+        "icon": "🧩",
+        "description": "Mendeteksi distorsi psikologis dan bias kognitif dalam pengambilan keputusan.",
+    },
+    {
+        "name": "it_code_and_architecture_helper",
+        "title": "Asisten Koding & Arsitektur IT",
+        "category": "critical_thinking",
+        "category_label": "Logika & IT",
+        "icon": "💻",
+        "description": "Panduan rekayasa perangkat lunak, algoritma, koding, dan arsitektur sistem.",
+    },
+
+    # 9. Spiritual & Keagamaan
+    {
+        "name": "lookup_scripture_and_verse",
+        "title": "Pencarian Ayat Kitab Suci",
+        "category": "spiritual",
+        "category_label": "Spiritual & Agama",
+        "icon": "📖",
+        "description": "Pencarian nama surat, pasal, dan ayat kitab suci berbagai agama resmi.",
+    },
+    {
+        "name": "get_prayer_and_worship_guide",
+        "title": "Panduan Ibadah & Doa",
+        "category": "spiritual",
+        "category_label": "Spiritual & Agama",
+        "icon": "🕌",
+        "description": "Bimbingan doa harian dan tata cara ibadah lengkap untuk semua agama.",
+    },
+]
+
+ALL_MCP_TOOL_NAMES = [t["name"] for t in ALL_MCP_TOOLS_CATALOG]
+
+
 # ── Emote Aliases ──────────────────────────────────────────────────────────
 EMOTE_ALIASES = {
     "angry": "\U0001f620",

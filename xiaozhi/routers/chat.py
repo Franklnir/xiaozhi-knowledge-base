@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from xiaozhi.config import CHAT_HISTORY_DEFAULT_LIMIT
+from xiaozhi.config import CHAT_HISTORY_DEFAULT_LIMIT, ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
     get_current_user,
     get_store,
@@ -158,6 +158,20 @@ async def profile_page(request: Request):
         token_hash=token_hash,
     )
     persona_analysis = store.get_user_persona_analysis(user["id"])
+
+    # Load MCP tool toggles for this user
+    toggles = store.get_mcp_tool_toggles(user["id"]) if hasattr(store, "get_mcp_tool_toggles") else {}
+    tools_catalog = []
+    for tool_info in ALL_MCP_TOOLS_CATALOG:
+        tool_name = tool_info["name"]
+        is_enabled = toggles.get(tool_name, True)
+        if tool_name == "play_youtube_song" and not features.get("youtube_music", True):
+            is_enabled = False
+        tools_catalog.append({
+            **tool_info,
+            "enabled": is_enabled,
+        })
+
     return render(
         request,
         "profile.html",
@@ -166,6 +180,8 @@ async def profile_page(request: Request):
             "features": features,
             "mcp_status": mcp_status,
             "persona_analysis": persona_analysis,
+            "tools_catalog": tools_catalog,
+            "total_tools": len(tools_catalog),
             "active_page": "profile",
         },
     )

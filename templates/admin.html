@@ -288,12 +288,15 @@
 
 <!-- MCP Tools Overlay -->
 <div id="toolsOverlay" class="overlay-backdrop">
-    <div class="overlay-panel">
+    <div class="overlay-panel" style="max-width: 780px;">
         <div class="overlay-header">
-            <span class="overlay-title">MCP Tools: <span id="toolsUsername"></span></span>
+            <span class="overlay-title">MCP Tools (<span id="toolsCount">39</span> Tools): <span id="toolsUsername"></span></span>
             <button class="overlay-close" onclick="closeToolsOverlay()">&times;</button>
         </div>
-        <p style="font-size:13px;color:#64748b;margin-bottom:16px">Centang tools yang ingin diaktifkan untuk user ini. Default: semua aktif.</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+            <p style="font-size:13px;color:#64748b;margin:0">Centang tools yang ingin diaktifkan untuk user ini. Default: semua aktif.</p>
+            <input type="search" id="adminToolsSearch" class="app-input" style="max-width:220px;padding:6px 12px;font-size:12px;" placeholder="Cari tool..." oninput="filterAdminTools()">
+        </div>
         <div id="mcpToolsGrid" class="mcp-tools-grid">
             <!-- Tools will be loaded here -->
         </div>
@@ -400,33 +403,62 @@
     }
 
     // ── MCP Tools Overlay ────────────────────────────────────────────────
+    let allAdminTools = [];
 
     async function openToolsOverlay(userId, username) {
         currentToolsUserId = userId;
         document.getElementById('toolsUsername').textContent = username;
+        const searchInput = document.getElementById('adminToolsSearch');
+        if (searchInput) searchInput.value = '';
 
         try {
             const r = await fetch(`/admin/api/mcp/tools/${userId}`);
             const d = await r.json();
 
             if (d.success) {
-                const grid = document.getElementById('mcpToolsGrid');
-                grid.innerHTML = d.tools.map(tool => `
-                    <div class="mcp-tool-item">
-                        <input type="checkbox"
-                            id="tool-${tool.name}"
-                            ${tool.enabled ? 'checked' : ''}
-                            onchange="toggleTool('${tool.name}', this.checked)">
-                        <span class="mcp-tool-name">${formatToolName(tool.name)}</span>
-                        <span class="mcp-tool-status ${tool.enabled ? 'active' : 'inactive'}">${tool.enabled ? 'ON' : 'OFF'}</span>
-                    </div>
-                `).join('');
+                allAdminTools = d.tools || [];
+                const countEl = document.getElementById('toolsCount');
+                if (countEl) countEl.textContent = allAdminTools.length;
+                renderAdminToolsGrid(allAdminTools);
             }
         } catch(e) {
             console.error('Error loading tools:', e);
         }
 
         document.getElementById('toolsOverlay').classList.add('active');
+    }
+
+    function renderAdminToolsGrid(tools) {
+        const grid = document.getElementById('mcpToolsGrid');
+        if (!grid) return;
+        grid.innerHTML = tools.map(tool => `
+            <div class="mcp-tool-item" data-name="${(tool.title + ' ' + tool.name + ' ' + (tool.category_label || '')).toLowerCase()}">
+                <input type="checkbox"
+                    id="tool-${tool.name}"
+                    ${tool.enabled ? 'checked' : ''}
+                    onchange="toggleTool('${tool.name}', this.checked)">
+                <span style="font-size: 18px; flex-shrink: 0;">${tool.icon || '🔧'}</span>
+                <div style="flex:1; min-width:0;">
+                    <div class="mcp-tool-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${tool.title || formatToolName(tool.name)}">
+                        ${tool.title || formatToolName(tool.name)}
+                    </div>
+                    <div style="font-size:11px;color:#64748b;display:flex;align-items:center;gap:6px;margin-top:2px;">
+                        <span style="font-family:monospace;font-size:10px;">${tool.name}</span>
+                        <span style="background:#e2e8f0;border-radius:3px;padding:1px 5px;font-size:9.5px;font-weight:600;">${tool.category_label || 'Umum'}</span>
+                    </div>
+                </div>
+                <span class="mcp-tool-status ${tool.enabled ? 'active' : 'inactive'}">${tool.enabled ? 'ON' : 'OFF'}</span>
+            </div>
+        `).join('');
+    }
+
+    function filterAdminTools() {
+        const q = (document.getElementById('adminToolsSearch')?.value || '').trim().toLowerCase();
+        const items = document.querySelectorAll('#mcpToolsGrid .mcp-tool-item');
+        items.forEach(item => {
+            const text = item.getAttribute('data-name') || '';
+            item.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
+        });
     }
 
     function closeToolsOverlay() {
