@@ -38,13 +38,17 @@ async def chat_history_page(
     token_hash = token_info.get("token_hash", "") if token_info else ""
     # Always get full date list (all time)
     date_list = store.chat_history_dates(user["id"], token_hash=token_hash)
+    if not date_list and token_hash:
+        date_list = store.chat_history_dates(user["id"], token_hash="")
     # If no date filter, fetch recent N days
     effective_date = date if date else ""
     histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=effective_date)
-    # If no date filter and no results, try fetching from recent days range
-    if not date and not histories and not q:
-        histories = store.list_chat_history(user["id"], "", limit, token_hash=token_hash, date="")
+    # If no results with token_hash, fallback to fetching all user chats
+    if not histories and token_hash:
+        histories = store.list_chat_history(user["id"], q, limit, token_hash="", date=effective_date)
     stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=effective_date)
+    if not stats.get("total") and token_hash:
+        stats = store.chat_history_stats(user["id"], token_hash="", date=effective_date)
     mcp_status = mcp_status_payload(
         user["id"],
         token_saved=bool(token_info),
@@ -83,6 +87,8 @@ async def chat_history_api(
     token_info = store.get_xiaozhi_token_info(user["id"])
     token_hash = token_info.get("token_hash", "") if token_info else ""
     histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=date)
+    if not histories and not q and token_hash:
+        histories = store.list_chat_history(user["id"], "", limit, token_hash="", date=date)
     if after_id:
         recent_histories = histories[:5]
         new_histories = [item for item in histories if int(item.get("id", 0)) > int(after_id)]
@@ -91,7 +97,11 @@ async def chat_history_api(
             merged_by_id[int(item.get("id", 0))] = item
         histories = sorted(merged_by_id.values(), key=lambda item: int(item.get("id", 0)), reverse=True)
     stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=date)
+    if not stats.get("total") and token_hash:
+        stats = store.chat_history_stats(user["id"], token_hash="", date=date)
     date_list = store.chat_history_dates(user["id"], token_hash=token_hash)
+    if not date_list and token_hash:
+        date_list = store.chat_history_dates(user["id"], token_hash="")
     return {
         "success": True,
         "items": histories,
