@@ -658,7 +658,7 @@
             position: fixed;
             inset: 0;
             z-index: 99999;
-            background: rgba(15, 23, 42, 0.82);
+            background: rgba(15, 23, 42, 0.85);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             display: flex;
@@ -671,11 +671,12 @@
             border: 3px solid #111827;
             border-radius: 16px;
             box-shadow: 8px 8px 0 #111827;
-            max-width: 520px;
+            max-width: 500px;
             width: 100%;
-            padding: 32px 26px;
+            padding: 30px 24px;
             text-align: center;
             animation: mcpPopIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
         }
         :root[data-theme="dark"] .mcp-blocking-box {
             border-color: #facc15;
@@ -684,6 +685,133 @@
         @keyframes mcpPopIn {
             from { transform: scale(0.92); opacity: 0; }
             to { transform: scale(1); opacity: 1; }
+        }
+
+        /* MCP Radar & Connection Animation */
+        .mcp-radar-container {
+            position: relative;
+            width: 76px;
+            height: 76px;
+            margin: 0 auto 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .mcp-radar-core {
+            position: relative;
+            z-index: 3;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #fef3c7;
+            border: 3px solid #111827;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 3px 3px 0 #111827;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        :root[data-theme="dark"] .mcp-radar-core {
+            background: #292524;
+            border-color: #facc15;
+            box-shadow: 3px 3px 0 rgba(250, 204, 21, 0.4);
+        }
+        .mcp-radar-ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 2px solid #059669;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .mcp-radar-container.is-connecting .mcp-radar-ring.ring-1 {
+            animation: mcpRadarPulse 1.8s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+        }
+        .mcp-radar-container.is-connecting .mcp-radar-ring.ring-2 {
+            animation: mcpRadarPulse 1.8s infinite cubic-bezier(0.215, 0.61, 0.355, 1) 0.6s;
+        }
+        .mcp-radar-container.is-connecting .mcp-radar-ring.ring-3 {
+            animation: mcpRadarPulse 1.8s infinite cubic-bezier(0.215, 0.61, 0.355, 1) 1.2s;
+        }
+        @keyframes mcpRadarPulse {
+            0% { transform: scale(0.7); opacity: 0.85; border-color: #0284c7; }
+            60% { opacity: 0.35; border-color: #059669; }
+            100% { transform: scale(2.2); opacity: 0; border-color: #10b981; }
+        }
+        .mcp-radar-container.is-connected .mcp-radar-core {
+            background: #d1fae5;
+            border-color: #059669;
+            box-shadow: 0 0 24px rgba(16, 185, 129, 0.7);
+            animation: mcpSuccessPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes mcpSuccessPop {
+            0% { transform: scale(0.6); }
+            70% { transform: scale(1.18); }
+            100% { transform: scale(1); }
+        }
+
+        /* Connecting Progress Panel */
+        .mcp-connecting-panel {
+            background: var(--app-surface-muted, #f8fafc);
+            border: 2px dashed #0284c7;
+            border-radius: 12px;
+            padding: 14px 16px;
+            text-align: center;
+            margin-bottom: 14px;
+            animation: mcpPopIn 0.2s ease-out;
+        }
+        :root[data-theme="dark"] .mcp-connecting-panel {
+            background: rgba(15, 23, 42, 0.6);
+            border-color: #38bdf8;
+        }
+        .mcp-connecting-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .mcp-tech-spinner {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 3px solid rgba(2, 132, 199, 0.2);
+            border-top-color: #0284c7;
+            animation: mcpSpin 0.75s linear infinite;
+        }
+        :root[data-theme="dark"] .mcp-tech-spinner {
+            border-color: rgba(56, 189, 248, 0.2);
+            border-top-color: #38bdf8;
+        }
+        @keyframes mcpSpin {
+            to { transform: rotate(360deg); }
+        }
+        .mcp-connecting-text {
+            font-size: 13.5px;
+            font-weight: 800;
+            color: var(--app-text);
+        }
+        .mcp-shimmer-track {
+            width: 100%;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.08);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        :root[data-theme="dark"] .mcp-shimmer-track {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .mcp-shimmer-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #0284c7, #10b981, #f59e0b, #0284c7);
+            background-size: 300% 100%;
+            animation: mcpShimmerMove 1.4s infinite linear;
+        }
+        @keyframes mcpShimmerMove {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
         }
     </style>
     <script src="/static/js/app.js"></script>
@@ -696,36 +824,81 @@
     <!-- Blocking Overlay: MCP Connection Required -->
     <div class="mcp-blocking-overlay" id="mcpRequiredOverlay" role="dialog" aria-modal="true" aria-labelledby="mcpModalTitle">
         <div class="mcp-blocking-box">
-            <div style="width:64px; height:64px; margin:0 auto 16px; border-radius:50%; background:#fef3c7; border:3px solid #111827; display:flex; align-items:center; justify-content:center; font-size:30px; box-shadow:3px 3px 0 #111827;">
-                🔌
+            <!-- Animated Radar Icon -->
+            <div class="mcp-radar-container" id="reqOverlayRadar">
+                <div class="mcp-radar-ring ring-1"></div>
+                <div class="mcp-radar-ring ring-2"></div>
+                <div class="mcp-radar-ring ring-3"></div>
+                <div class="mcp-radar-core" id="reqOverlayCoreIcon">🔌</div>
             </div>
-            <div style="display:inline-flex; align-items:center; gap:6px; padding:5px 14px; background:#fef3c7; color:#92400e; border:2px solid #d97706; border-radius:99px; font-size:12px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:14px;">
-                <span>⚠️</span> KONEKSI XIAOZHI MCP DIPERLUKAN
+
+            <!-- Compact Badge -->
+            <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:#fef3c7; color:#92400e; border:2px solid #d97706; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:12px;">
+                <span>⚠️</span> KONEKSI MCP DIPERLUKAN
             </div>
-            <h2 id="mcpModalTitle" style="font-size:22px; font-weight:900; color:var(--app-text); margin:0 0 10px; line-height:1.3;">
+
+            <!-- Header -->
+            <h2 id="mcpModalTitle" style="font-size:21px; font-weight:900; color:var(--app-text); margin:0 0 8px; line-height:1.3;">
                 Akses Dibatasi — Hubungkan MCP
             </h2>
-            <p style="font-size:14px; line-height:1.6; color:var(--app-muted); margin:0 0 20px;">
-                Akun Anda saat ini <strong>belum terhubung ke Xiaozhi MCP</strong>. Sebelum terhubung, Anda hanya dapat mengakses halaman <strong>Dashboard</strong> dan <strong>Dokumentasi</strong>.
+
+            <!-- Concise & Direct Instruction -->
+            <p style="font-size:13.5px; line-height:1.55; color:var(--app-muted); margin:0 0 16px;">
+                Salin endpoint MCP milik Anda di <a href="https://xiaozhi.me" target="_blank" rel="noopener noreferrer" style="color:var(--app-primary, #047857); font-weight:800; text-decoration:underline;">xiaozhi.me ↗</a> lalu tempelkan di bawah ini:
             </p>
 
-            <div style="background:var(--app-surface-muted); border:2px dashed var(--app-border-strong); border-radius:12px; padding:16px; text-align:left; margin-bottom:24px;">
-                <div style="font-size:13px; font-weight:800; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                    <span>💡</span> Cara Membuka Seluruh Halaman:
+            <!-- Direct MCP Input Area -->
+            <div id="reqOverlayInputGroup" style="text-align:left; margin-bottom:14px;">
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="position:relative; width:100%;">
+                        <input 
+                            type="text" 
+                            id="reqOverlayMcpInput" 
+                            class="app-input" 
+                            placeholder="wss://api.xiaozhi.me/mcp/?token=..." 
+                            style="width:100%; font-family:monospace; font-size:12.5px; padding-right:42px; box-sizing:border-box;"
+                            onkeydown="if(event.key==='Enter') window.submitMcpDirect('reqOverlay')"
+                        >
+                        <button 
+                            type="button" 
+                            onclick="if(navigator.clipboard){navigator.clipboard.readText().then(t=>{document.getElementById('reqOverlayMcpInput').value=t.trim()}).catch(()=>{})}" 
+                            title="Tempel dari Clipboard"
+                            style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; font-size:16px; opacity:0.75;"
+                        >
+                            📋
+                        </button>
+                    </div>
+                    <div id="reqOverlayErrorMsg" style="display:none; color:#dc2626; font-size:12px; font-weight:700; padding:2px 4px;"></div>
+                    <button 
+                        type="button" 
+                        id="reqOverlaySubmitBtn" 
+                        onclick="window.submitMcpDirect('reqOverlay')" 
+                        class="app-button app-button-primary" 
+                        style="width:100%; font-size:14px; font-weight:800; padding:11px 18px; justify-content:center; border:2px solid #111827; box-shadow:3px 3px 0 #111827;"
+                    >
+                        ⚡ Hubungkan Sekarang
+                    </button>
                 </div>
-                <ol style="margin:0; padding-left:20px; font-size:13px; color:var(--app-muted); line-height:1.6;">
-                    <li>Buka halaman <strong>Dashboard</strong></li>
-                    <li>Pada kartu <strong>Koneksi XiaoZhi</strong>, masukkan Endpoint token MCP Anda</li>
-                    <li>Klik <strong>Simpan Endpoint</strong> hingga berstatus <strong style="color:#047857;">Terhubung</strong></li>
-                </ol>
             </div>
 
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <a href="/dashboard#mcpCard" class="app-button app-button-primary" style="font-size:14px; font-weight:800; padding:12px 20px; text-decoration:none; justify-content:center; border:2px solid #111827; box-shadow:4px 4px 0 #111827;">
-                    🚀 Buka Dashboard & Hubungkan MCP
+            <!-- Live Connecting Animation Panel -->
+            <div id="reqOverlayConnectingSection" class="mcp-connecting-panel" style="display:none;">
+                <div class="mcp-connecting-row">
+                    <div class="mcp-tech-spinner"></div>
+                    <span id="reqOverlayStatusText" class="mcp-connecting-text">Menyambungkan ke WebSocket XiaoZhi...</span>
+                </div>
+                <div class="mcp-shimmer-track">
+                    <div class="mcp-shimmer-bar"></div>
+                </div>
+            </div>
+
+            <!-- Secondary Navigation Links -->
+            <div style="display:flex; gap:8px; justify-content:center; margin-top:6px;">
+                <a href="/dashboard" class="app-button" style="flex:1; font-size:12.5px; font-weight:700; padding:8px 12px; text-decoration:none; justify-content:center; border:1.5px solid var(--app-border-strong);">
+                    🏠 Dashboard
                 </a>
-                <a href="/dokumentasi" class="app-button" style="font-size:13.5px; font-weight:750; padding:10px 16px; text-decoration:none; justify-content:center; border:1.5px solid var(--app-border-strong);">
-                    📖 Buka Halaman Dokumentasi
+                <a href="/dokumentasi" class="app-button" style="flex:1; font-size:12.5px; font-weight:700; padding:8px 12px; text-decoration:none; justify-content:center; border:1.5px solid var(--app-border-strong);">
+                    📖 Dokumentasi
                 </a>
             </div>
         </div>
@@ -733,39 +906,78 @@
     {% endif %}
 
     <!-- Reusable Modal for Clicking Locked Nav on Dashboard/Documentation -->
-    <div class="mcp-blocking-overlay" id="mcpClickModal" style="display:none;" role="dialog" aria-modal="true">
+    <div class="mcp-blocking-overlay" id="mcpClickModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="mcpClickModalTitle">
         <div class="mcp-blocking-box">
-            <div style="width:64px; height:64px; margin:0 auto 16px; border-radius:50%; background:#fef3c7; border:3px solid #111827; display:flex; align-items:center; justify-content:center; font-size:30px; box-shadow:3px 3px 0 #111827;">
-                🔒
+            <!-- Animated Radar Icon -->
+            <div class="mcp-radar-container" id="clickModalRadar">
+                <div class="mcp-radar-ring ring-1"></div>
+                <div class="mcp-radar-ring ring-2"></div>
+                <div class="mcp-radar-ring ring-3"></div>
+                <div class="mcp-radar-core" id="clickModalCoreIcon">🔒</div>
             </div>
-            <div style="display:inline-flex; align-items:center; gap:6px; padding:5px 14px; background:#fef3c7; color:#92400e; border:2px solid #d97706; border-radius:99px; font-size:12px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:14px;">
-                <span>⚠️</span> KONEKSI MCP BELUM AKTIF
+
+            <!-- Compact Badge -->
+            <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:#fef3c7; color:#92400e; border:2px solid #d97706; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:12px;">
+                <span>⚠️</span> KONEKSI MCP DIPERLUKAN
             </div>
-            <h2 id="mcpClickModalTitle" style="font-size:22px; font-weight:900; color:var(--app-text); margin:0 0 10px; line-height:1.3;">
+
+            <!-- Header -->
+            <h2 id="mcpClickModalTitle" style="font-size:21px; font-weight:900; color:var(--app-text); margin:0 0 8px; line-height:1.3;">
                 Halaman Terkunci
             </h2>
-            <p id="mcpClickModalDesc" style="font-size:14px; line-height:1.6; color:var(--app-muted); margin:0 0 20px;">
-                Halaman ini memerlukan asisten suara Xiaozhi yang terhubung aktif. Silakan hubungkan endpoint token MCP Anda di Dashboard terlebih dahulu.
+
+            <!-- Concise & Direct Instruction -->
+            <p id="mcpClickModalDesc" style="font-size:13.5px; line-height:1.55; color:var(--app-muted); margin:0 0 16px;">
+                Salin endpoint MCP milik Anda di <a href="https://xiaozhi.me" target="_blank" rel="noopener noreferrer" style="color:var(--app-primary, #047857); font-weight:800; text-decoration:underline;">xiaozhi.me ↗</a> lalu tempelkan di bawah ini:
             </p>
 
-            <div style="background:var(--app-surface-muted); border:2px dashed var(--app-border-strong); border-radius:12px; padding:16px; text-align:left; margin-bottom:24px;">
-                <div style="font-size:13px; font-weight:800; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                    <span>💡</span> Cara Membuka Seluruh Halaman:
+            <!-- Direct MCP Input Area -->
+            <div id="clickModalInputGroup" style="text-align:left; margin-bottom:14px;">
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="position:relative; width:100%;">
+                        <input 
+                            type="text" 
+                            id="clickModalMcpInput" 
+                            class="app-input" 
+                            placeholder="wss://api.xiaozhi.me/mcp/?token=..." 
+                            style="width:100%; font-family:monospace; font-size:12.5px; padding-right:42px; box-sizing:border-box;"
+                            onkeydown="if(event.key==='Enter') window.submitMcpDirect('clickModal')"
+                        >
+                        <button 
+                            type="button" 
+                            onclick="if(navigator.clipboard){navigator.clipboard.readText().then(t=>{document.getElementById('clickModalMcpInput').value=t.trim()}).catch(()=>{})}" 
+                            title="Tempel dari Clipboard"
+                            style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; font-size:16px; opacity:0.75;"
+                        >
+                            📋
+                        </button>
+                    </div>
+                    <div id="clickModalErrorMsg" style="display:none; color:#dc2626; font-size:12px; font-weight:700; padding:2px 4px;"></div>
+                    <button 
+                        type="button" 
+                        id="clickModalSubmitBtn" 
+                        onclick="window.submitMcpDirect('clickModal')" 
+                        class="app-button app-button-primary" 
+                        style="width:100%; font-size:14px; font-weight:800; padding:11px 18px; justify-content:center; border:2px solid #111827; box-shadow:3px 3px 0 #111827;"
+                    >
+                        ⚡ Hubungkan Sekarang
+                    </button>
                 </div>
-                <ol style="margin:0; padding-left:20px; font-size:13px; color:var(--app-muted); line-height:1.6;">
-                    <li>Buka halaman <strong>Dashboard</strong></li>
-                    <li>Pada kartu <strong>Koneksi XiaoZhi</strong>, masukkan Endpoint token MCP Anda</li>
-                    <li>Klik <strong>Simpan Endpoint</strong> hingga berstatus <strong style="color:#047857;">Terhubung</strong></li>
-                </ol>
             </div>
 
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <a href="/dashboard#mcpCard" onclick="closeMcpClickModal()" class="app-button app-button-primary" style="font-size:14px; font-weight:800; padding:12px 20px; text-decoration:none; justify-content:center; border:2px solid #111827; box-shadow:4px 4px 0 #111827;">
-                    🚀 Buka Dashboard & Hubungkan MCP
-                </a>
-                <a href="/dokumentasi" onclick="closeMcpClickModal()" class="app-button" style="font-size:13.5px; font-weight:750; padding:10px 16px; text-decoration:none; justify-content:center; border:1.5px solid var(--app-border-strong);">
-                    📖 Buka Halaman Dokumentasi
-                </a>
+            <!-- Live Connecting Animation Panel -->
+            <div id="clickModalConnectingSection" class="mcp-connecting-panel" style="display:none;">
+                <div class="mcp-connecting-row">
+                    <div class="mcp-tech-spinner"></div>
+                    <span id="clickModalStatusText" class="mcp-connecting-text">Menyambungkan ke WebSocket XiaoZhi...</span>
+                </div>
+                <div class="mcp-shimmer-track">
+                    <div class="mcp-shimmer-bar"></div>
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
                 <button type="button" onclick="closeMcpClickModal()" class="app-button" style="font-size:13px; font-weight:700; padding:8px 14px; justify-content:center; color:var(--app-muted); border-color:transparent; background:transparent;">
                     Tutup Notifikasi
                 </button>
@@ -907,8 +1119,12 @@
             const desc = document.getElementById('mcpClickModalDesc');
             if (modal) {
                 if (title) title.innerText = featureName ? 'Fitur ' + featureName + ' Terkunci' : 'Halaman Terkunci';
-                if (desc) desc.innerHTML = 'Halaman <strong>' + (featureName || 'ini') + '</strong> hanya dapat diakses setelah akun Anda terhubung ke <strong>Xiaozhi MCP</strong>. Saat ini Anda hanya dapat membuka halaman <strong>Dashboard</strong> dan <strong>Dokumentasi</strong>.';
+                if (desc) desc.innerHTML = 'Salin endpoint MCP milik Anda di <a href="https://xiaozhi.me" target="_blank" rel="noopener noreferrer" style="color:var(--app-primary, #047857); font-weight:800; text-decoration:underline;">xiaozhi.me ↗</a> lalu tempelkan di bawah ini:';
                 modal.style.display = 'flex';
+                const input = document.getElementById('clickModalMcpInput');
+                if (input) {
+                    setTimeout(() => input.focus(), 50);
+                }
             }
             return false;
         }
@@ -917,6 +1133,120 @@
             const modal = document.getElementById('mcpClickModal');
             if (modal) modal.style.display = 'none';
         }
+
+        // Direct MCP Submission with radar & live connecting animation
+        window.submitMcpDirect = async function(prefix) {
+            const input = document.getElementById(prefix + 'McpInput');
+            const errorEl = document.getElementById(prefix + 'ErrorMsg');
+            const submitBtn = document.getElementById(prefix + 'SubmitBtn');
+            const connPanel = document.getElementById(prefix + 'ConnectingSection');
+            const statusText = document.getElementById(prefix + 'StatusText');
+            const radar = document.getElementById(prefix + 'Radar');
+            const coreIcon = document.getElementById(prefix + 'CoreIcon');
+
+            if (errorEl) { errorEl.style.display = 'none'; errorEl.textContent = ''; }
+            const token = (input ? input.value : '').trim();
+            if (!token) {
+                if (errorEl) { errorEl.textContent = 'Harap tempelkan endpoint MCP Anda.'; errorEl.style.display = 'block'; }
+                if (input) input.focus();
+                return;
+            }
+            if (!token.startsWith('wss://')) {
+                if (errorEl) { errorEl.textContent = 'Endpoint MCP harus diawali dengan wss://'; errorEl.style.display = 'block'; }
+                if (input) input.focus();
+                return;
+            }
+
+            // Start Connecting Animation
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Menghubungkan...';
+                submitBtn.style.opacity = '0.85';
+            }
+            if (input) input.disabled = true;
+            if (connPanel) connPanel.style.display = 'block';
+            if (statusText) statusText.textContent = 'Menyimpan & menghubungi WebSocket XiaoZhi...';
+            if (radar) {
+                radar.classList.add('is-connecting');
+                radar.classList.remove('is-connected');
+            }
+            if (coreIcon) coreIcon.textContent = '📡';
+
+            try {
+                const csrfToken = {{ csrf_token|tojson }};
+                const fd = new FormData();
+                fd.append('mcp_token', token);
+                fd.append('csrf_token', csrfToken);
+
+                const resp = await fetch('/save_mcp', {
+                    method: 'POST',
+                    body: fd,
+                    credentials: 'same-origin'
+                });
+                const resData = await resp.json().catch(() => ({}));
+                if (!resp.ok || !resData.success) {
+                    throw new Error(resData.detail || 'Gagal menyimpan endpoint MCP.');
+                }
+
+                // Poll /api/mcp/status for live status & connection confirmation
+                let attempts = 0;
+                const pollTimer = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const sResp = await fetch('/api/mcp/status', { credentials: 'same-origin' });
+                        const sData = await sResp.json();
+                        if (sData && sData.success && sData.status) {
+                            const st = sData.status;
+                            if (st.statusText && statusText) {
+                                statusText.textContent = st.statusText;
+                            }
+                            if (st.connected) {
+                                clearInterval(pollTimer);
+                                // Connected Animation State
+                                if (radar) {
+                                    radar.classList.remove('is-connecting');
+                                    radar.classList.add('is-connected');
+                                }
+                                if (coreIcon) coreIcon.textContent = '✅';
+                                if (statusText) {
+                                    statusText.innerHTML = '<span style="color:#059669; font-weight:900;">🎉 Berhasil Terhubung ke XiaoZhi!</span>';
+                                }
+                                if (submitBtn) {
+                                    submitBtn.textContent = '✅ Terhubung! Membuka Halaman...';
+                                    submitBtn.style.background = '#059669';
+                                    submitBtn.style.borderColor = '#047857';
+                                    submitBtn.style.color = '#fff';
+                                }
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 1200);
+                                return;
+                            }
+                        }
+                    } catch (_) {}
+
+                    if (attempts >= 30) {
+                        clearInterval(pollTimer);
+                        throw new Error('Koneksi timeout (30s). Periksa apakah endpoint Xiaozhi aktif.');
+                    }
+                }, 1000);
+
+            } catch (err) {
+                if (radar) radar.classList.remove('is-connecting');
+                if (coreIcon) coreIcon.textContent = prefix === 'reqOverlay' ? '🔌' : '🔒';
+                if (connPanel) connPanel.style.display = 'none';
+                if (input) input.disabled = false;
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '⚡ Hubungkan Sekarang';
+                    submitBtn.style.opacity = '1';
+                }
+                if (errorEl) {
+                    errorEl.textContent = err.message || 'Terjadi kesalahan saat menghubungkan.';
+                    errorEl.style.display = 'block';
+                }
+            }
+        };
 
         // Theme switcher
         (function () {
