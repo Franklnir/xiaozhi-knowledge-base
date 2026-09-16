@@ -35,6 +35,7 @@ from xiaozhi.core.utils import (
     clean_text,
     compact_text,
     count_text_words,
+    is_live_api_category,
     parse_int_range,
     parse_limit_value,
     utc_now,
@@ -488,9 +489,20 @@ class SQLiteStore:
                 pass
         conn.commit()
 
+    def _ensure_live_api_category(self, user_id: int) -> None:
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO categories (owner_id, name, created_at) VALUES (?, ?, ?)",
+                (user_id, LIVE_API_CATEGORY, utc_now())
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            pass
+
     def list_categories(self, owner_id: int) -> List[Dict[str, Any]]:
         conn = self._get_conn()
-        self._seed_default_categories(owner_id)
+        self._ensure_live_api_category(owner_id)
         rows = conn.execute(
             "SELECT id, name FROM categories WHERE owner_id = ? ORDER BY name",
             (owner_id,)
@@ -511,15 +523,23 @@ class SQLiteStore:
 
     def delete_category(self, owner_id: int, category_id: int) -> bool:
         conn = self._get_conn()
+        row = conn.execute(
+            "SELECT name FROM categories WHERE id = ? AND owner_id = ?",
+            (category_id, owner_id)
+        ).fetchone()
+        if not row:
+            return False
+        if is_live_api_category(row["name"]):
+            raise ValueError("Kategori data dari api bersifat permanen.")
         cursor = conn.execute(
-            "DELETE FROM categories WHERE id = ? AND owner_id = ? AND LOWER(name) != ?",
-            (category_id, owner_id, LIVE_API_CATEGORY)
+            "DELETE FROM categories WHERE id = ? AND owner_id = ?",
+            (category_id, owner_id)
         )
         conn.commit()
         return cursor.rowcount > 0
 
     def ensure_categories(self, owner_id: int, names: List[str]) -> List[str]:
-        self._seed_default_categories(owner_id)
+        self._ensure_live_api_category(owner_id)
         conn = self._get_conn()
         result = []
         for name in names:

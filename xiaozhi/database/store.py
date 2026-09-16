@@ -236,6 +236,24 @@ class HFJsonStore:
             changed = True
         return changed
 
+    def _ensure_live_api_category(self, data: Dict[str, Any], user_id: int) -> bool:
+        existing_names = {
+            cat.get("name", "").lower()
+            for cat in data["categories"]
+            if int(cat.get("owner_id", 0)) == user_id
+        }
+        if LIVE_API_CATEGORY.lower() not in existing_names:
+            data["categories"].append(
+                {
+                    "id": self._next_id(data, "categories"),
+                    "owner_id": user_id,
+                    "name": LIVE_API_CATEGORY,
+                    "created_at": utc_now(),
+                }
+            )
+            return True
+        return False
+
     @staticmethod
     def _public_user(user: Dict[str, Any]) -> Dict[str, Any]:
         return {
@@ -718,14 +736,14 @@ class HFJsonStore:
     def list_categories(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._lock:
             data = self._load()
-            seeded = self._seed_default_categories(data, owner_id)
+            seeded = self._ensure_live_api_category(data, owner_id)
             categories = [
                 {"id": int(cat["id"]), "name": cat["name"]}
                 for cat in data["categories"]
                 if int(cat.get("owner_id", 0)) == int(owner_id)
             ]
             if seeded:
-                self._commit(data, "Ensure default categories")
+                self._commit(data, "Ensure live api category")
             return sorted(categories, key=lambda item: item["name"].lower())
 
     def add_category(self, owner_id: int, name: str) -> None:
@@ -756,7 +774,7 @@ class HFJsonStore:
                 cleaned_names.append(cleaned)
         with self._lock:
             data = self._load()
-            self._seed_default_categories(data, owner_id)
+            self._ensure_live_api_category(data, owner_id)
             existing_lookup = {
                 cat.get("name", "").lower(): cat.get("name", "")
                 for cat in data["categories"]
@@ -795,7 +813,9 @@ class HFJsonStore:
                 ),
                 None,
             )
-            if target and target.get("name", "").lower() == LIVE_API_CATEGORY:
+            if not target:
+                return False
+            if is_live_api_category(target.get("name", "")):
                 raise ValueError("Kategori data dari api bersifat permanen.")
             before = len(data["categories"])
             data["categories"] = [

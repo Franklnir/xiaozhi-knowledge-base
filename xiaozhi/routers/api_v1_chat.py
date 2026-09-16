@@ -145,10 +145,13 @@ async def delete_category(cat_id: int, request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Sesi tidak valid.")
     store = get_store()
-    deleted = store.delete_category(user["id"], cat_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Kategori tidak ditemukan atau tidak dapat dihapus.")
-    return SimpleActionResponse(success=True, message="Kategori berhasil dihapus.")
+    try:
+        deleted = store.delete_category(user["id"], cat_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Kategori tidak ditemukan atau tidak dapat dihapus.")
+        return SimpleActionResponse(success=True, message="Kategori berhasil dihapus.")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── Chat History Endpoints ─────────────────────────────────────────────────
