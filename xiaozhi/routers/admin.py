@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from xiaozhi.config import ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
     get_store,
     make_csrf_token,
@@ -300,40 +301,27 @@ async def admin_api_mcp_tools(request: Request, target_user_id: int):
     admin = require_admin(request)
     store = get_store()
 
-    # List of all available MCP tools
-    all_tools = [
-        "search_course_materials",
-        "read_live_api_data",
-        "read_material_database",
-        "read_material_detail",
-        "save_chat_history",
-        "control_relay",
-        "control_smart_home_room",
-        "get_relay_status",
-        "all_relays_on",
-        "all_relays_off",
-        "control_real_relay_by_voice",
-        "get_real_relay_status",
-        "all_real_relays_on",
-        "all_real_relays_off",
-        "play_youtube_song",
-        "search_web",
-        "search_news",
-        "set_reminder",
-        "calculate",
-        "translate_text",
-    ]
-
     toggles = store.get_mcp_tool_toggles(target_user_id)
 
     tools_with_status = []
-    for tool in all_tools:
+    for tool_info in ALL_MCP_TOOLS_CATALOG:
+        tool_name = tool_info["name"]
         tools_with_status.append({
-            "name": tool,
-            "enabled": toggles.get(tool, True),  # Default True
+            "name": tool_name,
+            "title": tool_info.get("title", tool_name),
+            "category": tool_info.get("category", "general"),
+            "category_label": tool_info.get("category_label", "Umum"),
+            "icon": tool_info.get("icon", "🔧"),
+            "description": tool_info.get("description", ""),
+            "enabled": toggles.get(tool_name, True),  # Default True
         })
 
-    return {"success": True, "user_id": target_user_id, "tools": tools_with_status}
+    return {
+        "success": True,
+        "user_id": target_user_id,
+        "tools": tools_with_status,
+        "total_tools": len(tools_with_status)
+    }
 
 
 @router.post("/admin/api/mcp/tools/{target_user_id}/toggle")
