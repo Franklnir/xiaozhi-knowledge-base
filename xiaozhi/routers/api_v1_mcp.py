@@ -128,3 +128,28 @@ async def delete_mcp_token(request: Request):
     signal_mcp_reload()
 
     return SimpleResponse(success=True, message="Endpoint MCP berhasil dihapus.")
+
+
+@router.post("/reconnect", response_model=SimpleResponse)
+async def reconnect_mcp(request: Request):
+    """
+    Reconnect MCP WebSocket bridge for current user.
+    """
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sesi tidak valid.")
+
+    store = get_store()
+    token_info = store.get_xiaozhi_token_info(user["id"])
+    if not token_info:
+        raise HTTPException(status_code=400, detail="Belum ada endpoint MCP tersimpan.")
+
+    token_hash = token_info.get("token_hash", "")
+    set_mcp_connection_state(user["id"], token_hash, connected=False, message="Menghubungkan ulang ke XiaoZhi...")
+
+    user_task = mcp_bridge_tasks.pop(user["id"], None)
+    if user_task and not user_task.done():
+        user_task.cancel()
+    signal_mcp_reload()
+
+    return SimpleResponse(success=True, message="Mencoba menghubungkan ulang MCP...")
