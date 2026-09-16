@@ -79,6 +79,7 @@ async def login_post(
     csrf_token: str = Form(...),
     auth_mode: str = Form("login"),
 ):
+    from xiaozhi.services.mcp_service import is_mcp_connected
     enforce_predefined_limit(request, "login")
     store = get_store()
     validate_csrf(request, csrf_token, None)
@@ -95,9 +96,30 @@ async def login_post(
                 "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
                 "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
             }
-            redirect = RedirectResponse(url="/admin" if role == "admin" else "/dashboard", status_code=303)
-            set_session_cookie(redirect, request, user)
-            return redirect
+            # Admin always bypasses MCP gating
+            if role == "admin" or is_mcp_connected(user["id"]):
+                redirect = RedirectResponse(url="/admin" if role == "admin" else "/dashboard", status_code=303)
+                set_session_cookie(redirect, request, user)
+                return redirect
+
+            # If user has not connected MCP, show MCP gating panel
+            token_info = store.get_xiaozhi_token_info(user["id"])
+            response = render(
+                request,
+                "login.html",
+                {
+                    "user": user,
+                    "error": None,
+                    "success": "Sesi aktif. Masukkan endpoint WebSocket MCP untuk melanjutkan ke Dashboard.",
+                    "active_mode": "mcp_gating",
+                    "active_page": "login",
+                    "mcp_pending": True,
+                    "mcp_token_preview": token_info.get("preview", "") if token_info else "",
+                }
+            )
+            set_session_cookie(response, request, user)
+            return response
+
         return render(
             request,
             "login.html",
@@ -129,6 +151,55 @@ async def login_post(
         )
 
 
+@router.post("/api/auth/web-login")
+async def web_login_api(request: Request):
+    from fastapi.responses import JSONResponse
+    from xiaozhi.services.mcp_service import is_mcp_connected
+    enforce_predefined_limit(request, "login")
+    body = await request.json()
+    username = str(body.get("username", "")).strip().lower()
+    password = str(body.get("password", ""))
+    csrf_token = str(body.get("csrf_token", ""))
+
+    validate_csrf(request, csrf_token, None)
+    store = get_store()
+    user_record = store.get_user_by_username(username)
+    if not user_record or not verify_password(password, user_record.get("password_hash", "")):
+        return JSONResponse({"success": False, "message": "Username atau password salah."}, status_code=401)
+
+    role = str(user_record.get("role") or "user").lower()
+    user_id = int(user_record["id"])
+    user = {
+        "id": user_id,
+        "username": user_record["username"],
+        "role": role,
+        "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
+        "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
+    }
+
+    token_info = store.get_xiaozhi_token_info(user_id)
+    mcp_ok = is_mcp_connected(user_id)
+
+    if role == "admin" or mcp_ok:
+        res = JSONResponse({
+            "success": True,
+            "mcp_required": False,
+            "redirect_url": "/admin" if role == "admin" else "/dashboard"
+        })
+        set_session_cookie(res, request, user)
+        return res
+    else:
+        res = JSONResponse({
+            "success": True,
+            "mcp_required": True,
+            "token_saved": bool(token_info),
+            "token_preview": token_info.get("preview", "") if token_info else "",
+            "message": "Koneksi MCP belum terhubung. Silakan hubungkan endpoint WebSocket MCP."
+        })
+        set_session_cookie(res, request, user)
+        return res
+
+
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     user = get_current_user(request)
@@ -154,9 +225,30 @@ async def register_post(
     store = get_store()
     validate_csrf(request, csrf_token, None)
     try:
-        user = store.create_user(username, password)
-        # Redirect to login with success message
-        return redirect_with_message("/login", "Akun berhasil dibuat! Silakan masuk.")
+        user_record = store.create_user(username, password)
+        user_id = int(user_record["id"])
+        user = {
+            "id": user_id,
+            "username": user_record["username"],
+            "role": "user",
+            "session_version": 1,
+            "ui_theme": DEFAULT_UI_THEME,
+        }
+        # Render register page with MCP input section smoothly shown below
+        response = render(
+            request,
+            "register.html",
+            {
+                "user": user,
+                "error": None,
+                "success": "Akun berhasil dibuat! Silakan masukkan dan hubungkan endpoint MCP di bawah ini.",
+                "active_page": "login",
+                "mcp_pending": True,
+                "registered_username": username,
+            }
+        )
+        set_session_cookie(response, request, user)
+        return response
     except ValueError as exc:
         return render(
             request,
@@ -168,6 +260,40 @@ async def register_post(
             },
             status_code=400,
         )
+
+
+@router.post("/api/auth/web-register")
+async def web_register_api(request: Request):
+    from fastapi.responses import JSONResponse
+    enforce_predefined_limit(request, "register")
+    body = await request.json()
+    username = str(body.get("username", "")).strip().lower()
+    password = str(body.get("password", ""))
+    csrf_token = str(body.get("csrf_token", ""))
+
+    validate_csrf(request, csrf_token, None)
+    store = get_store()
+    try:
+        user_record = store.create_user(username, password)
+        user = {
+            "id": int(user_record["id"]),
+            "username": user_record["username"],
+            "role": "user",
+            "session_version": 1,
+            "ui_theme": DEFAULT_UI_THEME,
+        }
+        res = JSONResponse({
+            "success": True,
+            "message": "Akun berhasil dibuat! Silakan hubungkan endpoint MCP.",
+            "mcp_required": True,
+            "username": username,
+        })
+        set_session_cookie(res, request, user)
+        return res
+    except ValueError as exc:
+        return JSONResponse({"success": False, "message": str(exc)}, status_code=400)
+    except Exception:
+        return JSONResponse({"success": False, "message": "Gagal membuat akun."}, status_code=500)
 
 
 @router.get("/logout")
