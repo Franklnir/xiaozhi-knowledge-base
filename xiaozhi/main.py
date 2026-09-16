@@ -2,9 +2,11 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from xiaozhi.config import (
@@ -23,7 +25,9 @@ from xiaozhi.dependencies import init_dependencies
 from xiaozhi.services.mcp_service import set_store_ref
 
 # Templates
-templates = Jinja2Templates(directory="templates")
+BASE_DIR = Path(__file__).resolve().parent
+TEMPLATES_DIR = BASE_DIR.parent / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR) if TEMPLATES_DIR.exists() else "templates")
 
 # Store - auto-detect backend (HF for Spaces, SQLite for VPS)
 store = create_store()
@@ -95,6 +99,11 @@ app = FastAPI(
     docs_url=None,  # Custom docs
     redoc_url=None,
 )
+
+# Static files
+STATIC_DIR = BASE_DIR / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Setup API documentation
 setup_api_docs(app)
