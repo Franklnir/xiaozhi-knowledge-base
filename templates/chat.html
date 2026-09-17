@@ -283,6 +283,8 @@
                     <span style="font-size:11.5px;font-weight:700;color:var(--app-muted);display:flex;align-items:center;white-space:nowrap;">💡 Saran:</span>
                     <button type="button" class="suggestion-pill" onclick="useSuggestion('Siapa nama akun saya dan apa role saya?')">👤 Data Akun Saya</button>
                     <button type="button" class="suggestion-pill" onclick="useSuggestion('Apa MAC address ESP32 saya dan apakah sudah terdaftar?')">📟 MAC ESP32 Saya</button>
+                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Jelaskan panduan setup koneksi MCP dari awal')">🔌 Setup FastMCP</button>
+                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Apa saja 41 tools MCP yang tersedia dan apa saja fungsinya?')">🛠️ 41 Tools FastMCP</button>
                     <button type="button" class="suggestion-pill" onclick="useSuggestion('Berapa kuota dan materi yang saya miliki di Knowledge Base?')">📚 Materi & Kuota Saya</button>
                     {% for s in suggestions %}
                     <button type="button" class="suggestion-pill" onclick="useSuggestion('Jelaskan materi tentang {{ s }}')">📖 {{ s }}</button>
@@ -376,8 +378,8 @@
                     <button type="button" class="quick-data-btn" onclick="useSuggestion('Apakah saya memiliki perangkat smart home atau saklar relay?')">
                         💡 Cek perangkat smart home saya
                     </button>
-                    <button type="button" class="quick-data-btn" style="border-color:#f59e0b;color:#d97706;" onclick="useSuggestion('Bisakah kamu melihat data atau MAC address pengguna lain?')">
-                        🔒 Uji isolasi data (Cek data user lain)
+                    <button type="button" class="quick-data-btn" style="border-color:var(--app-accent);color:var(--app-accent);" onclick="useSuggestion('Jelaskan panduan lengkap dan fitur apa saja yang ada di dokumentasi XiaoZhi')">
+                        📖 Panduan & Fitur Dokumentasi
                     </button>
                 </div>
             </div>

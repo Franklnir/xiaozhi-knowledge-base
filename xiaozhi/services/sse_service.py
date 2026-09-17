@@ -226,7 +226,7 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
         )
 
     # ── User ESP32 Hardware & MAC Inquiries ──────────────────────────────────
-    elif any(k in q_lower for k in ["mac address", "mac saya", "perangkat saya", "board saya", "esp32 saya", "device saya", "hardware saya", "alamat mac"]):
+    elif any(k in q_lower for k in ["mac address", "mac saya", "perangkat saya", "board saya", "esp32 saya", "device saya", "hardware saya", "alamat mac"]) and not any(k in q_lower for k in ["putar", "lagu", "musik", "youtube", "panduan", "cara"]):
         if user_mac:
             dev_lines = []
             if devices:
@@ -258,7 +258,7 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
             )
 
     # ── User Knowledge Base & Quota Inquiries ────────────────────────────────
-    elif any(k in q_lower for k in ["kuota", "materi saya", "daftar materi", "kapasitas materi", "sisa kuota", "knowledge base saya", "berapa materi"]):
+    elif any(k in q_lower for k in ["kuota", "materi saya", "daftar materi", "kapasitas materi", "sisa kuota", "knowledge base saya", "berapa materi"]) and not any(k in q_lower for k in ["panduan", "cara upload", "cara tambah"]):
         mat_count = len(user_materials)
         quota_label = quota.get("materials", {}).get("label", "Tanpa Batas") if quota else "Normal"
         remaining = quota.get("materials", {}).get("remaining") if quota else None
@@ -280,7 +280,7 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
         )
 
     # ── FastMCP Token & Connection Status Inquiries ──────────────────────────
-    elif any(k in q_lower for k in ["token mcp", "token saya", "koneksi mcp", "status mcp", "fastmcp", "endpoint mcp", "mcp saya"]):
+    elif any(k in q_lower for k in ["token mcp saya", "token saya", "status mcp saya", "status mcp", "koneksi mcp saya", "mcp saya"]) and not any(k in q_lower for k in ["panduan", "cara", "langkah", "setup", "bagaimana", "apa itu"]):
         status_badge = "🟢 **Terhubung (Online)**" if mcp_connected else "🔴 **Terputus / Standby**"
         token_str = f"`{token_preview}`" if token_preview else "*Belum dibuat*"
         full_text = (
@@ -289,11 +289,11 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
             f"- **Token MCP Tersimpan**: {token_str}\n"
             f"- **Hash Token Keamanan**: `{token_hash[:16]}...` (Terverifikasi)\n\n"
             "**Fungsi FastMCP:**\n"
-            "FastMCP memungkinkan board ESP32 Anda memanggil **38 Tools Ilmiah** (Kalkulator, Analisis Soal, Deteksi Bias Kognitif, Cuaca BMKG, Kontrol Relay, dsb) secara otomatis saat Anda berbicara."
+            "FastMCP memungkinkan board ESP32 Anda memanggil **41 Tools Ilmiah** (Kalkulator, Analisis Soal, Deteksi Bias Kognitif, Cuaca BMKG, Kontrol Relay, dsb) secara otomatis saat Anda berbicara."
         )
 
     # ── User Smart Home & Relay Inquiries ────────────────────────────────────
-    elif any(k in q_lower for k in ["smart home", "smarthome", "relay", "saklar", "lampu", "perangkat rumah", "ruangan"]):
+    elif any(k in q_lower for k in ["smart home saya", "relay saya", "saklar saya", "lampu saya", "perangkat rumah saya", "ruangan saya"]) and not any(k in q_lower for k in ["panduan", "cara", "langkah", "bagaimana", "apa itu"]):
         if relay_rooms:
             rooms_desc = []
             for r in relay_rooms:
@@ -331,6 +331,154 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                 "Anda dapat menyetel pengingat langsung dengan berbicara ke board ESP32 XiaoZhi Anda."
             )
 
+    # ── Specific Tool Inquiry (Lookup in 41 Tools Catalog) ───────────────────
+    elif any(k in q_lower for k in ["tool", "fungsi tool", "apa itu tool", "kegunaan tool"]) and not any(k in q_lower for k in ["daftar tool", "apa saja tool", "katalog tool", "sebutkan tool"]):
+        from xiaozhi.config import ALL_MCP_TOOLS_CATALOG
+        tool_matched = None
+        for t in ALL_MCP_TOOLS_CATALOG:
+            name = t["name"].lower()
+            title = t["title"].lower()
+            if name in q_lower or (len(name) > 4 and name.replace("_", " ") in q_lower):
+                tool_matched = t
+                break
+            if title in q_lower:
+                tool_matched = t
+                break
+
+        if not tool_matched:
+            tool_keywords = {
+                "cuaca": "get_weather_bmkg", "bmkg": "get_weather_bmkg", "gempa": "get_earthquake_info",
+                "kalkulator": "calculate", "hitung": "calculate", "matematika": "calculate",
+                "soal": "solve_study_problem", "kuis": "quiz_me", "bias": "identify_cognitive_bias",
+                "fallacy": "detect_logical_fallacy", "sesat pikir": "detect_logical_fallacy",
+                "kamus": "lookup_kbbi", "kbbi": "lookup_kbbi", "terjemah": "translate_text",
+                "kurs": "convert_currency", "wikipedia": "search_wikipedia", "koding": "it_code_and_architecture_helper",
+                "sholat": "get_prayer_and_worship_guide", "doa": "get_prayer_and_worship_guide",
+                "hadits": "lookup_scripture_and_verse", "ayat": "lookup_scripture_and_verse",
+                "berita": "search_news", "web search": "search_web", "pengingat": "set_reminder",
+                "memori": "recall_chat_memory", "ingat": "recall_chat_memory", "relay": "control_real_relay_by_voice"
+            }
+            for kw, t_name in tool_keywords.items():
+                if kw in q_lower:
+                    for t in ALL_MCP_TOOLS_CATALOG:
+                        if t["name"] == t_name:
+                            tool_matched = t
+                            break
+                    if tool_matched:
+                        break
+
+        if tool_matched:
+            icon = tool_matched.get("icon", "🛠️")
+            t_name = tool_matched.get("name", "")
+            t_title = tool_matched.get("title", "")
+            t_cat = tool_matched.get("category_label", tool_matched.get("category", "General"))
+            t_desc = tool_matched.get("description", "")
+            full_text = (
+                f"{icon} **Detail Tool FastMCP: {t_title}**\n\n"
+                f"- **Identifier Teknis**: `{t_name}`\n"
+                f"- **Kategori**: `{t_cat}`\n"
+                f"- **Deskripsi Fungsi**: {t_desc}\n\n"
+                f"**Cara Kerja di XiaoZhi:**\n"
+                f"Tool ini dipanggil secara otomatis oleh asisten suara XiaoZhi di board ESP32 saat Anda mengajukan pertanyaan atau perintah suara yang relevan. "
+                f"Server FastMCP mengeksekusi fungsi ini dan menyajikan hasilnya secara instan ke XiaoZhi."
+            )
+
+    # ── All 41 FastMCP Tools Catalog Inquiry ─────────────────────────────────
+    elif any(k in q_lower for k in ["apa saja tool", "daftar tool", "katalog tool", "41 tool", "sebutkan tool", "tool apa saja", "tools mcp", "tools yang ada"]):
+        from xiaozhi.config import ALL_MCP_TOOLS_CATALOG
+        cat_groups = {}
+        for t in ALL_MCP_TOOLS_CATALOG:
+            c = t.get("category_label", t.get("category", "Lainnya"))
+            if c not in cat_groups:
+                cat_groups[c] = []
+            cat_groups[c].append(f"{t.get('icon', '•')} **{t.get('title')}** (`{t.get('name')}`): {t.get('description')}")
+
+        lines = [f"🛠️ **Katalog Resmi 41 Tools FastMCP XiaoZhi Indonesia**\n\nXiaoZhi terhubung dengan **41 tools cerdas** berstandar ilmiah dan realtime:"]
+        for c_name, items in cat_groups.items():
+            lines.append(f"\n📂 **{c_name}**:")
+            for item in items:
+                lines.append(f"  - {item}")
+        lines.append("\n💡 *Semua tools di atas dipanggil secara otomatis oleh XiaoZhi saat mendengarkan perintah suara Anda.*")
+        full_text = "\n".join(lines)
+
+    # ── Documentation: FastMCP Setup & Troubleshooting ───────────────────────
+    elif any(k in q_lower for k in ["setup mcp", "koneksi mcp", "cara menghubungkan mcp", "token wss", "troubleshoot mcp", "mcp terputus", "mcp offline", "apa itu mcp"]):
+        full_text = (
+            "🔌 **Panduan Lengkap Setup & Troubleshooting FastMCP**\n\n"
+            "**Apa itu MCP?**\n"
+            "MCP (Model Context Protocol) adalah protokol penghubung antara asisten suara XiaoZhi dengan server Knowledge Base dan 41 tools kami.\n\n"
+            "**Langkah-Langkah Setup:**\n"
+            "1. **Buka Konsol XiaoZhi**: Kunjungi [https://xiaozhi.me](https://xiaozhi.me) dan login ke akun Anda.\n"
+            "2. **Ambil Endpoint MCP**: Cari menu *Koneksi MCP* / *MCP Endpoint*, salin URL lengkap berawalan `wss://`.\n"
+            "   *Contoh*: `wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1Ni...`\n"
+            "3. **Simpan di Dashboard**: Buka Dashboard Xiaozhi Indonesia, tempel URL di panel *Koneksi XiaoZhi* (sidebar kanan), lalu klik **Simpan**.\n"
+            "4. **Verifikasi**: Tunggu beberapa detik hingga indikator status di dashboard berubah hijau (**Terhubung**).\n\n"
+            "**Troubleshooting Jika Gagal / Offline:**\n"
+            "- Pastikan menyalin URL LENGKAP berawalan `wss://` (jangan terpotong).\n"
+            "- Pastikan koneksi internet port 443 tidak diblokir firewall.\n"
+            "- Jika status terputus, klik 'Hubungkan Ulang' atau generate ulang token di xiaozhi.me."
+        )
+
+    # ── Documentation: YouTube Music Streaming on ESP32 ─────────────────────
+    elif any(k in q_lower for k in ["panduan musik", "panduan youtube", "streaming audio", "youtube esp32", "format audio", "opus", "bitrate", "troubleshoot audio", "watchdog", "wdt", "ack audio"]):
+        full_text = (
+            "🎵 **Panduan Lengkap YouTube Music Streaming di ESP32**\n\n"
+            "**Cara Kerja Arsitektur:**\n"
+            "- Server mencari audio YouTube secara real-time dan langsung melakukan transcoding ke format **Ogg/Opus Mono 24kHz** (atau 16kHz).\n"
+            "- Audio di-stream ke ESP32 melalui HTTP Streaming (`/api/audio/stream/{video_id}?br=11k&mac={MAC}`) atau saluran persisten WebSocket (`/ws/device/audio/{MAC}`).\n"
+            "- Bitrate adaptif: **6k – 32k** (default 11k, sangat hemat kuota dan ringan untuk mikrokontroler ESP32).\n\n"
+            "**Perintah Suara:**\n"
+            "- *'XiaoZhi, putar lagu [Judul/Artis]'*\n"
+            "- *'Jeda musik'* / *'Lanjutkan musik'* / *'Hentikan musik'*\n\n"
+            "**Solusi Kendala (Troubleshooting ESP32):**\n"
+            "- **Board Sering Reboot (Watchdog Reset / WDT)**: Tambahkan `yield();` di dalam loop `while (stream->available())` firmware C++ Anda.\n"
+            "- **Lagu Mengulang Terus**: Pastikan firmware memanggil `POST /api/device/audio/ack` dengan `command_id` saat pemutaran selesai.\n"
+            "- **Status Admin 'Menunggu Board'**: Pastikan request polling ESP32 menyertakan parameter `?mac=...` atau header `Device-Id`."
+        )
+
+    # ── Documentation: Smart Home & Relay ────────────────────────────────────
+    elif any(k in q_lower for k in ["panduan relay", "panduan smart home", "cara kerja smart home", "cara relay", "gpio relay"]):
+        full_text = (
+            "🏠 **Panduan Smart Home & Kontrol Relay Fisik**\n\n"
+            "**Dua Mode Operasi:**\n"
+            "1. **Simulasi Smarthome Virtual**: Eksplorasi denah rumah pintar, ruangan virtual, dan simulasi saklar lampu langsung dari browser.\n"
+            "2. **Relay Nyata (Hardware ESP32)**: Mengontrol saklar relay fisik yang terhubung ke pin GPIO mikrokontroler ESP32 Anda.\n\n"
+            "**Konfigurasi Pin GPIO ESP32:**\n"
+            "- Hubungkan Pin Kontrol Relay (IN1, IN2) ke GPIO ESP32 (contoh: GPIO 26, GPIO 27).\n"
+            "- Sambungkan VCC ke 5V / 3.3V dan GND ke GND.\n\n"
+            "**Perintah Suara:**\n"
+            "- *'Nyalakan lampu kamar'* / *'Matikan saklar relay 1'* / *'Nyalakan semua lampu'*.\n"
+            "- XiaoZhi memanggil tool `control_real_relay_by_voice` dan memperbarui state relay secara instan."
+        )
+
+    # ── Documentation: Knowledge Base & Vektorisasi ──────────────────────────
+    elif any(k in q_lower for k in ["panduan knowledge", "cara upload materi", "cara tambah materi", "vektorisasi", "live api"]):
+        full_text = (
+            "📚 **Panduan Knowledge Base & Vektorisasi Semantik**\n\n"
+            "**Fungsi Knowledge Base:**\n"
+            "Menyimpan catatan perkuliahan, SOP, referensi belajar, maupun data sensor realtime agar dapat dijawab oleh XiaoZhi saat Anda bertanya.\n\n"
+            "**Alur Vektorisasi Semantik:**\n"
+            "1. **Pembersihan & Tokenisasi Teks**: Menghapus stopwords bahasa Indonesia dan mengekstrak istilah inti.\n"
+            "2. **Pencocokan Taksonomi & Konsep**: Memetakan hubungan antar topik dan bobot fitur semantik.\n"
+            "3. **Penyimpanan Database Terindeks**: Disimpan dengan isolasi ketat sesuai user ID pemiliknya.\n"
+            "4. **Integrasi Live API**: Anda dapat menautkan URL API publik (cuaca, sensor IoT) yang diperbarui secara berkala.\n\n"
+            "Saat Anda bertanya, tool `search_course_materials` mencari kecocokan semantik tertinggi dan menyajikan jawaban yang akurat."
+        )
+
+    # ── Master Documentation Overview ────────────────────────────────────────
+    elif any(k in q_lower for k in ["dokumentasi", "panduan lengkap", "buku panduan", "fitur apa saja", "fitur xiaozhi"]):
+        full_text = (
+            "📖 **Buku Panduan & Arsitektur Resmi XiaoZhi Indonesia**\n\n"
+            "XiaoZhi Indonesia mengintegrasikan 6 pilar teknologi cerdas:\n\n"
+            "1. 🔌 **FastMCP Integration**: Menghubungkan board ESP32 dengan 41 tools komputasi ilmiah dan memori jangka panjang.\n"
+            "2. 🎵 **YouTube Music Streamer**: Transcoding Opus 24kHz real-time dengan konsumsi bandwidth ultra-rendah untuk speaker board.\n"
+            "3. 🏠 **Smart Home & Relay Nyata**: Kontrol saklar fisik dan otomasi rumah berbasis IoT dan perintah suara.\n"
+            "4. 📚 **Knowledge Base & Semantic RAG**: Penyimpanan materi perkuliahan dengan pencarian semantik cerdas.\n"
+            "5. 💬 **Tanya AI SSE Real-Time**: Chatbot cerdas streaming berbasis Server-Sent Events dengan kursor mengetik interaktif.\n"
+            "6. 🛡️ **Isolasi Multi-Tenant**: Perlindungan data pribadi tingkat tinggi; data Anda 100% aman dan terisolasi dari akun lain.\n\n"
+            "💡 *Anda dapat menanyakan panduan spesifik kapan saja, seperti 'Bagaimana cara setup MCP?' atau 'Apa fungsi tool BMKG?'*"
+        )
+
     # ── Search Knowledge Materials (RAG) ─────────────────────────────────────
     else:
         try:
@@ -366,11 +514,13 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
         if gemini_api_key:
             try:
                 system_instruction = (
-                    f"Anda adalah XiaoZhi AI Indonesia, asisten AI ramah dan cerdas. "
+                    f"Anda adalah XiaoZhi AI Indonesia, asisten AI ramah, cerdas, dan menguasai seluruh dokumentasi sistem XiaoZhi. "
                     f"Pengguna aktif: {username} (Role: {role}, MAC: {user_mac or 'belum disetel'}). "
                     f"ATURAN KEAMANAN MUTLAK: Anda HANYA diizinkan merujuk dan melayani data milik pengguna {username}. "
                     f"JANGAN PERNAH membocorkan, menyebutkan, atau mengarang data pengguna lain. "
-                    f"Jawablah dalam Bahasa Indonesia yang jelas, ringkas, dan solutif."
+                    f"Anda memiliki pengetahuan lengkap tentang dokumentasi XiaoZhi: setup FastMCP WSS, YouTube Music streaming Opus di ESP32, "
+                    f"smart home relay nyata via GPIO, knowledge base RAG, dan 41 tools FastMCP. "
+                    f"Jawablah dalam Bahasa Indonesia yang jelas, ramah, dan terstruktur."
                 )
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?alt=sse&key={gemini_api_key}"
                 payload = {
