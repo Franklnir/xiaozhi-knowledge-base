@@ -130,7 +130,7 @@ def youtube_search(query: str, max_results: int = 5) -> list:
         return items
 
 
-async def _stream_opus_audio(video_id: str, bitrate: str = "11k") -> AsyncGenerator[bytes, None]:
+async def _stream_opus_audio(video_id: str, bitrate: str = "12k", start_sec: float = 0.0) -> AsyncGenerator[bytes, None]:
     valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "32k"}
     br = bitrate.lower().strip() if bitrate and bitrate.lower().strip() in valid_bitrates else "11k"
     if not yt_dlp:
@@ -167,6 +167,10 @@ async def _stream_opus_audio(video_id: str, bitrate: str = "11k") -> AsyncGenera
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
+    ]
+    if start_sec > 0:
+        cmd.extend(["-ss", f"{start_sec:.2f}"])
+    cmd.extend([
         "-re",
         "-i", source_url,
         "-vn",
@@ -182,7 +186,7 @@ async def _stream_opus_audio(video_id: str, bitrate: str = "11k") -> AsyncGenera
         "-page_duration", "60000",
         "-f", "ogg",
         "pipe:1"
-    ]
+    ])
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -217,10 +221,10 @@ async def _stream_opus_audio(video_id: str, bitrate: str = "11k") -> AsyncGenera
 
 
 @router.get("/api/audio/stream/{video_id}")
-async def audio_stream_ogg_opus(video_id: str, request: Request, br: str = "11k"):
-    """Real-time Ogg/Opus mono 24kHz transcoding stream for ESP32 hardware decoder."""
+async def audio_stream_ogg_opus(video_id: str, request: Request, br: str = "12k", start: float = 0.0):
+    """Real-time Ogg/Opus mono 24kHz transcoding stream for ESP32 hardware decoder with adaptive bitrate and seek resume support."""
     return StreamingResponse(
-        _stream_opus_audio(video_id, bitrate=br),
+        _stream_opus_audio(video_id, bitrate=br, start_sec=start),
         media_type="audio/ogg",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
