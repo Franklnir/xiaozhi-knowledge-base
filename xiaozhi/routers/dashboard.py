@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from xiaozhi.services.sse_service import stream_material_indexing
 
 from xiaozhi.config import DEFAULT_UI_THEME, LIVE_API_SOURCE_TYPE, UI_THEMES
 from xiaozhi.core.utils import (
@@ -109,6 +110,49 @@ async def add_material(
         return redirect_with_message("/dashboard", "Data materi berhasil ditambahkan.")
     except ValueError as exc:
         return redirect_with_message("/dashboard", f"Gagal: {exc}")
+
+
+@router.post("/api/materials/stream-index")
+async def api_materials_stream_index(request: Request):
+    """Real-time SSE vectorization and material indexing progress stream."""
+    user = require_user(request)
+    store = get_store()
+
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        payload = await request.json()
+        title = payload.get("title", "")
+        category = payload.get("category", "")
+        content = payload.get("content", "")
+        keywords = payload.get("keywords", "")
+        api_url = payload.get("api_url", "")
+    else:
+        form = await request.form()
+        title = form.get("title", "")
+        category = form.get("category", "")
+        content = form.get("content", "")
+        keywords = form.get("keywords", "")
+        api_url = form.get("api_url", "")
+
+    return StreamingResponse(
+        stream_material_indexing(
+            user_id=user["id"],
+            title=str(title or ""),
+            category=str(category or ""),
+            content=str(content or ""),
+            keywords=str(keywords or ""),
+            api_url=str(api_url or ""),
+            store=store,
+            request=request,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
 
 
 @router.post("/delete_material/{material_id}")

@@ -3,7 +3,7 @@ import logging
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import APIRouter, HTTPException, Request, Form, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from xiaozhi.config import ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
@@ -671,4 +671,21 @@ async def api_v1_admin_users(request: Request):
         "total": len(users),
         "message": "Daftar pengguna berhasil dimuat."
     }
+
+
+@router.get("/admin/api/logs/stream")
+async def admin_api_logs_stream(request: Request):
+    """Real-time SSE event stream for live admin console and MCP logging."""
+    require_admin(request)
+    from xiaozhi.services.sse_service import stream_admin_logs
+    return StreamingResponse(
+        stream_admin_logs(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
 

@@ -128,6 +128,17 @@ class PlaybackTracker:
                 except Exception as e:
                     logger.debug("Could not auto-register device_mac in tracker: %s", e)
 
+            try:
+                from xiaozhi.services.sse_service import log_admin_event
+                log_admin_event("audio", f"Mulai audio stream: '{title[:40]}' (User: {username or user_id})", {
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "title": title,
+                    "device_mac": device_mac,
+                })
+            except Exception:
+                pass
+
             return session
 
     def end_session(self, session_id: str, reason: str = "finished") -> None:
@@ -142,6 +153,15 @@ class PlaybackTracker:
                     "end_reason": reason
                 }
                 logger.info("Playback session ended (%s): %s for user %s", reason, session_id, session.user_id)
+                try:
+                    from xiaozhi.services.sse_service import log_admin_event
+                    log_admin_event("audio", f"Audio stream selesai ({reason}): '{session.title[:40]}' (User: {session.username or session.user_id})", {
+                        "session_id": session_id,
+                        "user_id": session.user_id,
+                        "title": session.title,
+                    })
+                except Exception:
+                    pass
 
     def stop_session(self, session_id: str) -> bool:
         """Force stop a session by setting its abort event."""

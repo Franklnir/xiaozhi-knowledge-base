@@ -226,7 +226,7 @@
                         <p class="app-section-subtitle">Simpan materi manual atau hubungkan endpoint API realtime.</p>
                     </div>
                 </div>
-                <form action="/add_material" method="POST" class="app-form-section">
+                <form action="/add_material" method="POST" class="app-form-section" id="addMaterialForm" onsubmit="return handleAddMaterialSubmit(event)">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <div>
                         <label for="title" class="app-label">Judul</label>
@@ -363,8 +363,134 @@
     </div>
 </div>
 
+<!-- Real-Time Material Indexing & Vectorization Progress Modal -->
+<div id="materialProgressModal" class="app-modal" role="dialog" aria-modal="true" style="display:none;">
+    <div class="app-modal-box" style="max-width: 460px; text-align: center; padding: 28px 22px;">
+        <div style="width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 50%; background: #ecfdf5; border: 2px solid #047857; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+            ⚡
+        </div>
+        <h3 id="matProgStepTitle" style="font-size: 17px; font-weight: 800; color: var(--app-text); margin: 0 0 6px;">
+            Memproses Vektorisasi Materi...
+        </h3>
+        <p id="matProgMessage" style="font-size: 12.5px; color: var(--app-muted); margin: 0 0 18px; line-height: 1.5;">
+            Menghubungkan ke SSE pipeline...
+        </p>
+
+        <!-- Progress bar track -->
+        <div style="background: rgba(0,0,0,0.08); border: 2px solid var(--app-border-strong); border-radius: 99px; height: 16px; overflow: hidden; position: relative; margin-bottom: 10px;">
+            <div id="matProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #047857, #10b981, #34d399); transition: width 0.35s ease; border-radius: 99px;"></div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 800; color: var(--app-muted);">
+            <span id="matProgPercent">0%</span>
+            <span>⚡ SSE FastMCP Stream</span>
+        </div>
+    </div>
+</div>
+
 <script>
     const DASHBOARD_CSRF_TOKEN = {{ csrf_token|tojson }};
+
+    async function handleAddMaterialSubmit(event) {
+        event.preventDefault();
+        const form = event.target;
+        const title = form.querySelector('[name="title"]').value.trim();
+        const category = form.querySelector('[name="category"]').value.trim();
+        const content = form.querySelector('[name="content"]').value.trim();
+        const keywords = form.querySelector('[name="keywords"]').value.trim();
+        const apiUrl = form.querySelector('[name="api_url"]') ? form.querySelector('[name="api_url"]').value.trim() : '';
+
+        if (!title || !content) {
+            form.submit();
+            return false;
+        }
+
+        const modal = document.getElementById('materialProgressModal');
+        const bar = document.getElementById('matProgressBar');
+        const percentText = document.getElementById('matProgPercent');
+        const titleEl = document.getElementById('matProgStepTitle');
+        const msgEl = document.getElementById('matProgMessage');
+
+        modal.style.display = 'flex';
+        bar.style.width = '5%';
+        percentText.innerText = '5%';
+        titleEl.innerText = 'Memulai Vektorisasi...';
+        msgEl.innerText = 'Mengirim data materi ke server...';
+
+        try {
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('category', category);
+            formData.append('content', content);
+            formData.append('keywords', keywords);
+            formData.append('api_url', apiUrl);
+
+            const response = await fetch('/api/materials/stream-index', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'text/event-stream'
+                }
+            });
+
+            if (!response.ok) {
+                form.submit();
+                return false;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop();
+
+                for (const part of parts) {
+                    if (!part.trim() || part.startsWith(':')) continue;
+
+                    let currentEvent = 'message';
+                    let dataText = '';
+                    for (const line of part.split('\n')) {
+                        if (line.startsWith('event:')) currentEvent = line.replace('event:', '').trim();
+                        else if (line.startsWith('data:')) dataText += line.replace('data:', '').trim();
+                    }
+                    if (!dataText) continue;
+
+                    try {
+                        const parsed = JSON.parse(dataText);
+                        if (currentEvent === 'progress') {
+                            bar.style.width = parsed.percent + '%';
+                            percentText.innerText = parsed.percent + '%';
+                            if (parsed.step) titleEl.innerText = parsed.step;
+                            if (parsed.message) msgEl.innerText = parsed.message;
+                        } else if (currentEvent === 'done') {
+                            bar.style.width = '100%';
+                            percentText.innerText = '100%';
+                            titleEl.innerText = '✅ Selesai!';
+                            msgEl.innerText = parsed.message || 'Materi berhasil disimpan dan divektorisasi.';
+                            setTimeout(() => {
+                                window.location.href = '/dashboard?message=Data+materi+berhasil+ditambahkan+dan+divektorisasi.';
+                            }, 700);
+                            return true;
+                        } else if (currentEvent === 'error') {
+                            alert('Gagal: ' + (parsed.message || 'Terjadi kesalahan'));
+                            modal.style.display = 'none';
+                            return false;
+                        }
+                    } catch(err) {}
+                }
+            }
+        } catch (err) {
+            console.warn('Stream failed, falling back to standard submit:', err);
+            form.submit();
+        }
+        return false;
+    }
 
     function escapeHtml(value) {
         return String(value ?? "")

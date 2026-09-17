@@ -456,6 +456,46 @@
             </table>
         </div>
     </section>
+
+    <!-- ⚡ Live Server & MCP Console (SSE) -->
+    <section class="app-card" style="margin-top: 24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <h2 class="app-section-title" style="margin:0;">⚡ Live Server & MCP Console (SSE)</h2>
+                <span id="sseStatusBadge" class="app-chip app-chip-small app-chip-info" style="font-size:10.5px;padding:2px 8px;display:inline-flex;align-items:center;gap:5px;">
+                    <span id="sseStatusDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#38bdf8;"></span>
+                    <span id="sseStatusText">Menyambungkan SSE...</span>
+                </span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="app-button app-button-small" id="toggleAutoScrollBtn" onclick="toggleConsoleAutoScroll()" style="font-size:11.5px;">
+                    ⬇ Auto-Scroll: ON
+                </button>
+                <button type="button" class="app-button app-button-small" onclick="clearLiveConsole()" style="font-size:11.5px;">
+                    🗑 Bersihkan
+                </button>
+                <button type="button" class="app-button app-button-small" onclick="reconnectSSE()" style="font-size:11.5px;">
+                    🔄 Reconnect
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter category tags -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:12px;font-weight:700;color:var(--app-muted);margin-right:4px;">Kategori:</span>
+            <button type="button" class="filter-pill active" data-sse-cat="all" onclick="setConsoleFilter('all')">Semua Log</button>
+            <button type="button" class="filter-pill" data-sse-cat="mcp" onclick="setConsoleFilter('mcp')">🔌 MCP Bridge</button>
+            <button type="button" class="filter-pill" data-sse-cat="audio" onclick="setConsoleFilter('audio')">🎵 Audio Stream</button>
+            <button type="button" class="filter-pill" data-sse-cat="chat" onclick="setConsoleFilter('chat')">💬 Tanya AI</button>
+            <button type="button" class="filter-pill" data-sse-cat="material" onclick="setConsoleFilter('material')">📚 Knowledge</button>
+            <button type="button" class="filter-pill" data-sse-cat="system" onclick="setConsoleFilter('system')">⚙️ System</button>
+        </div>
+
+        <!-- Terminal Console Screen -->
+        <div id="adminLiveConsole" style="background:#0a0e17;color:#e2e8f0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;font-size:12px;line-height:1.6;border-radius:8px;padding:14px;height:340px;overflow-y:auto;border:2px solid #1e293b;box-shadow:inset 0 2px 8px rgba(0,0,0,0.6);">
+            <div style="color:#64748b;font-style:italic;">Memulai koneksi Server-Sent Events (SSE) ke /admin/api/logs/stream...</div>
+        </div>
+    </section>
 </div>
 
 <!-- Edit User Overlay -->
@@ -1107,9 +1147,130 @@
         }
     }
 
-    // Initialize real-time WebSocket on page load
+    // ── Live Server & MCP Console (SSE) ──────────────────────────────────
+    let adminSSE = null;
+    let sseAutoScroll = true;
+    let sseFilterCategory = 'all';
+
+    function initAdminSSE() {
+        if (adminSSE) {
+            try { adminSSE.close(); } catch(e) {}
+        }
+        const badge = document.getElementById('sseStatusBadge');
+        const dot = document.getElementById('sseStatusDot');
+        const text = document.getElementById('sseStatusText');
+
+        try {
+            adminSSE = new EventSource('/admin/api/logs/stream');
+
+            adminSSE.onopen = function() {
+                if (badge) badge.className = 'app-chip app-chip-small app-chip-success';
+                if (dot) dot.style.background = '#10b981';
+                if (text) text.innerText = '● LIVE (SSE Terhubung)';
+            };
+
+            adminSSE.addEventListener('connected', function(e) {
+                try {
+                    const data = JSON.parse(e.data || '{}');
+                    appendConsoleLog('system', data.message || 'Stream log aktif.', new Date().toLocaleTimeString());
+                } catch(err) {}
+            });
+
+            adminSSE.addEventListener('log', function(e) {
+                try {
+                    const item = JSON.parse(e.data);
+                    appendConsoleLog(item.category || 'system', item.message, item.time || new Date().toLocaleTimeString());
+                } catch(err) {
+                    console.debug('Error parsing SSE log:', err);
+                }
+            });
+
+            adminSSE.onerror = function() {
+                if (badge) badge.className = 'app-chip app-chip-small app-chip-danger';
+                if (dot) dot.style.background = '#ef4444';
+                if (text) text.innerText = '● Terputus (Reconnecting...)';
+            };
+        } catch(e) {
+            console.error('Failed to connect SSE:', e);
+        }
+    }
+
+    function appendConsoleLog(category, message, timeStr) {
+        const consoleEl = document.getElementById('adminLiveConsole');
+        if (!consoleEl) return;
+
+        const row = document.createElement('div');
+        row.className = 'sse-log-entry';
+        row.dataset.category = category;
+        if (sseFilterCategory !== 'all' && sseFilterCategory !== category) {
+            row.style.display = 'none';
+        }
+
+        let catColor = '#38bdf8';
+        let catLabel = (category || 'SYSTEM').toUpperCase();
+        if (category === 'mcp') { catColor = '#c084fc'; }
+        else if (category === 'audio') { catColor = '#34d399'; }
+        else if (category === 'chat') { catColor = '#fde047'; }
+        else if (category === 'material') { catColor = '#fb923c'; }
+        else if (category === 'system') { catColor = '#94a3b8'; }
+
+        row.innerHTML = `<span style="color:#64748b;">[${timeStr}]</span> <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;color:${catColor};background:rgba(255,255,255,0.06);margin-right:6px;">${catLabel}</span> <span>${escapeHtml(message)}</span>`;
+
+        consoleEl.appendChild(row);
+
+        while (consoleEl.children.length > 200) {
+            consoleEl.removeChild(consoleEl.firstChild);
+        }
+
+        if (sseAutoScroll) {
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+    }
+
+    function toggleConsoleAutoScroll() {
+        sseAutoScroll = !sseAutoScroll;
+        const btn = document.getElementById('toggleAutoScrollBtn');
+        if (btn) {
+            btn.innerText = sseAutoScroll ? '⬇ Auto-Scroll: ON' : '⏸ Auto-Scroll: OFF';
+        }
+    }
+
+    function clearLiveConsole() {
+        const consoleEl = document.getElementById('adminLiveConsole');
+        if (consoleEl) {
+            consoleEl.innerHTML = '<div style="color:#64748b;font-style:italic;">Console dibersihkan. Menunggu event baru...</div>';
+        }
+    }
+
+    function reconnectSSE() {
+        clearLiveConsole();
+        initAdminSSE();
+    }
+
+    function setConsoleFilter(cat) {
+        sseFilterCategory = cat;
+        document.querySelectorAll('[data-sse-cat]').forEach(el => {
+            el.classList.toggle('active', el.dataset.sseCat === cat);
+        });
+        document.querySelectorAll('.sse-log-entry').forEach(row => {
+            if (cat === 'all' || row.dataset.category === cat) {
+                row.style.display = 'block';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize real-time WebSocket & SSE on page load
     document.addEventListener("DOMContentLoaded", function() {
         initAdminWebSocket();
+        initAdminSSE();
         applyFilters();
     });
 
