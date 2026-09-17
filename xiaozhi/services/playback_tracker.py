@@ -72,6 +72,8 @@ class PlaybackTracker:
         self._sessions: Dict[str, PlaybackSession] = {}
         # Mapping user_id -> active session_id
         self._user_sessions: Dict[int, str] = {}
+        # Mapping user_id -> last played session info
+        self._last_played: Dict[int, Dict[str, Any]] = {}
 
     def start_session(
         self,
@@ -91,6 +93,11 @@ class PlaybackTracker:
                 old_session = self._sessions.pop(old_sid, None)
                 if old_session:
                     old_session.abort_event.set()
+                    self._last_played[user_id] = {
+                        **old_session.to_dict(),
+                        "ended_at": time.time(),
+                        "end_reason": "replaced"
+                    }
 
             session_id = f"play_{user_id}_{int(time.time())}_{video_id[:8]}"
             session = PlaybackSession(
@@ -109,13 +116,18 @@ class PlaybackTracker:
             logger.info("Playback session started: %s for user %s (%s)", session_id, user_id, title)
             return session
 
-    def end_session(self, session_id: str) -> None:
+    def end_session(self, session_id: str, reason: str = "finished") -> None:
         with self._lock:
             session = self._sessions.pop(session_id, None)
             if session:
                 if self._user_sessions.get(session.user_id) == session_id:
                     self._user_sessions.pop(session.user_id, None)
-                logger.info("Playback session ended: %s for user %s", session_id, session.user_id)
+                self._last_played[session.user_id] = {
+                    **session.to_dict(),
+                    "ended_at": time.time(),
+                    "end_reason": reason
+                }
+                logger.info("Playback session ended (%s): %s for user %s", reason, session_id, session.user_id)
 
     def stop_session(self, session_id: str) -> bool:
         """Force stop a session by setting its abort event."""
@@ -173,6 +185,68 @@ class PlaybackTracker:
             if sid and sid in self._sessions:
                 return self._sessions[sid]
             return None
+
+    def get_playback_status(self, user_id: int) -> Dict[str, Any]:
+        """Get comprehensive playback status for AI tools and user queries."""
+        with self._lock:
+            active = self.get_user_session(user_id)
+            if active:
+                return {
+                    "is_playing": True,
+                    "status": "playing",
+                    "title": active.get("title", ""),
+                    "video_id": active.get("video_id", ""),
+                    "elapsed_seconds": active.get("elapsed_seconds", 0),
+                    "elapsed_formatted": active.get("elapsed_formatted", "00:00"),
+                    "duration": active.get("duration", ""),
+                    "bitrate": active.get("bitrate", "11k"),
+                    "device_mac": active.get("device_mac", ""),
+                    "message": f"Saat ini sedang memutar lagu '{active.get('title', '')}' (berjalan selama {active.get('elapsed_formatted', '00:00')}).",
+                }
+
+            last = self._last_played.get(user_id)
+            if last:
+                ended_at = last.get("ended_at", time.time())
+                elapsed_mins = max(0, int((time.time() - ended_at) // 60))
+                ago_str = "baru saja" if elapsed_mins < 1 else f"{elapsed_mins} menit yang lalu"
+                end_reason = last.get("end_reason", "finished")
+                reason_str = "dihentikan pengguna" if end_reason in {"stopped", "aborted"} else "selesai diputar"
+                return {
+                    "is_playing": False,
+                    "status": end_reason,
+                    "title": last.get("title", ""),
+                    "video_id": last.get("video_id", ""),
+                    "last_played_at": ended_at,
+                    "end_reason": end_reason,
+                    "message": f"Saat ini tidak ada lagu yang diputar. Lagu terakhir '{last.get('title', '')}' telah {reason_str} ({ago_str}).",
+                }
+
+            return {
+                "is_playing": False,
+                "status": "idle",
+                "title": "",
+                "video_id": "",
+                "message": "Saat ini tidak ada lagu yang sedang atau baru saja diputar di perangkat Anda.",
+            }
+
+    def handle_device_status(self, user_id: int, status: str, video_id: str = "") -> bool:
+        """Handle playback status reported directly from ESP32 board."""
+        with self._lock:
+            status_lower = status.strip().lower()
+            sid = self._user_sessions.get(user_id)
+            if status_lower in {"finished", "stopped", "aborted", "idle"}:
+                if sid and sid in self._sessions:
+                    self.end_session(sid, reason=status_lower)
+                    logger.info("Device reported %s for user %s, session %s ended", status_lower, user_id, sid)
+                    return True
+                elif user_id in self._last_played:
+                    self._last_played[user_id]["end_reason"] = status_lower
+                    return True
+            elif status_lower == "playing":
+                if sid and sid in self._sessions:
+                    self._sessions[sid].last_active_at = time.time()
+                    return True
+            return False
 
 
 # Global singleton instance

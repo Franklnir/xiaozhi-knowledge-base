@@ -241,6 +241,22 @@ ALL_MCP_TOOLS_CATALOG = [
         "description": "Pencarian dan pemutaran audio lagu dari YouTube.",
     },
     {
+        "name": "get_playback_status",
+        "title": "Status Pemutaran Musik",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "🎧",
+        "description": "Mengecek status lagu YouTube yang sedang atau baru saja selesai diputar di speaker.",
+    },
+    {
+        "name": "stop_youtube_song",
+        "title": "Stop Musik YouTube",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "⏹️",
+        "description": "Menghentikan pemutaran musik/audio YouTube yang sedang berjalan di speaker perangkat.",
+    },
+    {
         "name": "search_web",
         "title": "Web Search Live",
         "category": "media",
