@@ -181,8 +181,8 @@ async def websocket_client_server(user_id: int, url: str, token_hash: str):
                             await read_stream_writer.send(SessionMessage(msg))
                         except Exception as exc:
                             await read_stream_writer.send(exc)
-            except Exception:
-                logger.info("WebSocket reader berhenti.")
+            except Exception as exc:
+                logger.info("WebSocket reader berhenti: %s (%s)", type(exc).__name__, exc)
 
         async def ws_writer():
             try:
@@ -191,8 +191,8 @@ async def websocket_client_server(user_id: int, url: str, token_hash: str):
                         json_str = session_message.message.model_dump_json(by_alias=True, exclude_none=True)
                         asyncio.create_task(asyncio.to_thread(capture_xiaozhi_ws_chat, user_id, "outbound", json_str, token_hash))
                         await ws.send(json_str)
-            except Exception:
-                logger.info("WebSocket writer berhenti.")
+            except Exception as exc:
+                logger.info("WebSocket writer berhenti: %s (%s)", type(exc).__name__, exc)
 
         async with anyio.create_task_group() as tg:
             tg.start_soon(ws_reader)
