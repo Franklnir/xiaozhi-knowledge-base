@@ -383,6 +383,16 @@ async def audio_stream_ogg_opus(
     user_id = user["id"] if user else None
     username = user["username"] if user else ""
 
+    # Check YouTube Music permission for this user
+    if user_id:
+        features = store.get_user_features(user_id) if hasattr(store, "get_user_features") else {}
+        if not features.get("youtube_music", True):
+            logger.warning(f"YouTube stream rejected for user {user_id} ({username}): feature youtube_music disabled.")
+            raise HTTPException(
+                status_code=403,
+                detail="Anda tidak diizinkan putar lagu YouTube. Fitur YouTube Music telah dinonaktifkan oleh administrator."
+            )
+
     logger.info(f"Stream request for {video_id}: requested_br={br}, rssi={rssi} dBm -> selected_br={selected_br}")
 
     try:

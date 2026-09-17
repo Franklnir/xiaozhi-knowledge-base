@@ -180,4 +180,8 @@ def generate_csrf(user: Optional[Dict[str, Any]]) -> str:
 
 
 def get_store():
+    global _store
+    if _store is None:
+        from xiaozhi.database.factory import create_store
+        _store = create_store()
     return _store
