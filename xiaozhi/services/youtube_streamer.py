@@ -104,11 +104,21 @@ async def demux_ogg_opus(proc_stdout) -> AsyncGenerator[bytes, None]:
                     curr_packet.clear()
 
 
-async def stream_video_to_websocket(websocket, video_id: str, title: str = "", sample_rate: int = 24000):
+async def stream_video_to_websocket(
+    websocket,
+    video_id: str,
+    title: str = "",
+    sample_rate: int = 24000,
+    user_id: Optional[int] = None,
+    username: str = "",
+    device_mac: str = ""
+):
     """
     Streams a YouTube video as paced Opus frames over a WebSocket connection.
     Formatted to XiaoZhi BinaryProtocol3 / standard audio frames.
     """
+    from xiaozhi.services.playback_tracker import playback_tracker
+
     ffmpeg_bin = get_ffmpeg_binary()
     if not ffmpeg_bin:
         await websocket.send_json({"type": "error", "message": "FFmpeg tidak terpasang di server."})
@@ -122,6 +132,18 @@ async def stream_video_to_websocket(websocket, video_id: str, title: str = "", s
         logger.error("Gagal ekstrak direct audio URL: %s", exc)
         await websocket.send_json({"type": "error", "message": f"Gagal ekstrak audio: {exc}"})
         return
+
+    session = None
+    if user_id:
+        session = playback_tracker.start_session(
+            user_id=user_id,
+            username=username or f"user-{user_id}",
+            video_id=video_id,
+            title=title,
+            stream_type="WebSocket",
+            device_mac=device_mac,
+            bitrate="11k"
+        )
 
     cmd = [
         ffmpeg_bin,
@@ -177,15 +199,11 @@ async def stream_video_to_websocket(websocket, video_id: str, title: str = "", s
         target_time = time.monotonic()
 
         async for packet in demux_ogg_opus(proc.stdout):
-            if abort_event.is_set():
-                logger.info("Stream dihentikan oleh user abort.")
+            if abort_event.is_set() or (session and session.abort_event.is_set()):
+                logger.info("Stream dihentikan oleh user abort atau admin.")
                 break
 
             # Pack ke XiaoZhi BinaryProtocol3:
-            # byte 0: type = 0 (audio)
-            # byte 1: reserved = 0
-            # byte 2-3: payload size (uint16 BE)
-            # bytes 4+: raw opus payload
             payload_len = len(packet)
             binary_frame = bytearray(4 + payload_len)
             binary_frame[0] = 0x00
@@ -195,6 +213,8 @@ async def stream_video_to_websocket(websocket, video_id: str, title: str = "", s
             binary_frame[4:] = packet
 
             await websocket.send_bytes(bytes(binary_frame))
+            if session:
+                session.record_chunk(len(binary_frame))
             frame_idx += 1
 
             # Pacing: Pre-buffer 8 frames (480ms), lalu kirim tepat setiap 60ms
@@ -208,7 +228,7 @@ async def stream_video_to_websocket(websocket, video_id: str, title: str = "", s
                     target_time = time.monotonic()
 
         # 3. Kirim state stop saat selesai
-        if not abort_event.is_set():
+        if not abort_event.is_set() and not (session and session.abort_event.is_set()):
             await websocket.send_json({"type": "tts", "state": "stop"})
 
     except (asyncio.CancelledError, GeneratorExit):
@@ -217,6 +237,8 @@ async def stream_video_to_websocket(websocket, video_id: str, title: str = "", s
         logger.error("Error saat streaming audio: %s", exc)
     finally:
         listen_task.cancel()
+        if session:
+            playback_tracker.end_session(session.session_id)
         if proc.returncode is None:
             try:
                 proc.kill()

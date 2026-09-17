@@ -1371,6 +1371,24 @@ class SQLiteStore:
             device_mac = str(dev_row["device_id"]).upper() if dev_row and dev_row["device_id"] else ""
             device_name = dev_row["device_name"] if dev_row and dev_row["device_name"] else ""
 
+            # Check if user is currently playing music in playback_tracker
+            active_session = None
+            try:
+                from xiaozhi.services.playback_tracker import playback_tracker
+                active_session = playback_tracker.get_session_by_user(user_id)
+            except Exception:
+                pass
+
+            is_playing = active_session is not None
+            current_track = active_session.title if active_session else ""
+            if not device_mac and active_session and active_session.device_mac:
+                device_mac = str(active_session.device_mac).upper()
+                device_name = f"ESP32 ({device_mac[-5:]})"
+                try:
+                    self.register_device(user_id, device_id=device_mac, name=device_name, device_type="esp32")
+                except Exception:
+                    pass
+
             # Check MCP status from real-time connection states
             mcp_state = all_mcp_states.get(user_id, {})
             has_token = conn.execute("SELECT COUNT(*) FROM xiaozhi_tokens WHERE user_id = ?", (user_id,)).fetchone()[0] > 0
@@ -1388,6 +1406,8 @@ class SQLiteStore:
                 "features": self.get_user_features(user_id),
                 "device_mac": device_mac,
                 "device_name": device_name,
+                "is_playing": is_playing,
+                "current_track": current_track,
                 "mcp_status": {
                     "has_token": has_token,
                     "connected": is_connected or bridge_running,
@@ -1395,6 +1415,8 @@ class SQLiteStore:
                     "updated_at": mcp_state.get("updated_at", ""),
                 },
             })
+        # Kelompokkan: User yang baru daftar (belum konek MCP) di paling atas, baru setelahnya user yang sudah terhubung MCP
+        result.sort(key=lambda u: (1 if u.get("mcp_status", {}).get("connected") else 0, -int(u.get("id", 0))))
         return result
 
     def get_pending_relay_commands(self, owner_id: int, room_id: int) -> List[Dict[str, Any]]:
