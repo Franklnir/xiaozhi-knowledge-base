@@ -6,7 +6,7 @@ services:
     container_name: xiaozhi
     restart: unless-stopped
     ports:
-      - "80:7860"
+      - "127.0.0.1:8080:7860"
     environment:
       - APP_SECRET_KEY=Zb6fyD2dkYd7pSSGNk1RBqTt+DQXf18elJ7euA0r5qw=
       - DATA_ENCRYPTION_KEY=dbaxtyENVdPRoCcRhWEArO2UhWWhx14nh6XE3+xQh0o=
@@ -17,9 +17,9 @@ services:
       - DB_BACKEND=sqlite
       - SQLITE_DB_PATH=/app/data/xiaozhi.db
       - ENVIRONMENT=production
-      - ALLOWED_HOSTS=163.61.58.235,localhost
+      - ALLOWED_HOSTS=163.61.58.235,localhost,xiaozhiscig.biz.id,www.xiaozhiscig.biz.id
     volumes:
-      - ./data:/app/data
+      - .:/app
     mem_limit: 512m
     memswap_limit: 1g
     cpus: 1.0
