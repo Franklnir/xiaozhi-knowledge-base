@@ -130,9 +130,9 @@ def youtube_search(query: str, max_results: int = 5) -> list:
         return items
 
 
-async def _stream_opus_audio(video_id: str, bitrate: str = "12k") -> AsyncGenerator[bytes, None]:
-    valid_bitrates = {"8k", "10k", "12k", "16k", "20k", "24k", "32k"}
-    br = bitrate.lower().strip() if bitrate and bitrate.lower().strip() in valid_bitrates else "12k"
+async def _stream_opus_audio(video_id: str, bitrate: str = "6k") -> AsyncGenerator[bytes, None]:
+    valid_bitrates = {"6k", "8k", "10k", "12k", "16k", "20k", "24k", "32k"}
+    br = bitrate.lower().strip() if bitrate and bitrate.lower().strip() in valid_bitrates else "6k"
     if not yt_dlp:
         raise HTTPException(status_code=503, detail="yt_dlp tidak tersedia.")
 
@@ -167,6 +167,7 @@ async def _stream_opus_audio(video_id: str, bitrate: str = "12k") -> AsyncGenera
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
+        "-re",
         "-i", source_url,
         "-vn",
         "-ac", "1",
@@ -216,7 +217,7 @@ async def _stream_opus_audio(video_id: str, bitrate: str = "12k") -> AsyncGenera
 
 
 @router.get("/api/audio/stream/{video_id}")
-async def audio_stream_ogg_opus(video_id: str, request: Request, br: str = "12k"):
+async def audio_stream_ogg_opus(video_id: str, request: Request, br: str = "6k"):
     """Real-time Ogg/Opus mono 24kHz transcoding stream for ESP32 hardware decoder."""
     return StreamingResponse(
         _stream_opus_audio(video_id, bitrate=br),
