@@ -1162,6 +1162,16 @@ class SQLiteStore:
 
     # ── Devices ────────────────────────────────────────────────────────────
 
+    def get_user_mac_address(self, user_id: int) -> Optional[str]:
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT device_id FROM registered_devices WHERE owner_id = ? ORDER BY id DESC LIMIT 1",
+            (int(user_id),)
+        ).fetchone()
+        if row and row["device_id"]:
+            return str(row["device_id"]).upper()
+        return None
+
     def list_registered_devices(self, owner_id: int) -> List[Dict[str, Any]]:
         conn = self._get_conn()
         rows = conn.execute(
@@ -1352,6 +1362,14 @@ class SQLiteStore:
                 limits_dict = dict(limits_row)
                 limits = {k: limits_dict.get(k, v) for k, v in USER_LIMIT_DEFAULTS.items()}
 
+            # Get registered device / MAC address
+            dev_row = conn.execute(
+                "SELECT device_id, device_name FROM registered_devices WHERE owner_id = ? ORDER BY id DESC LIMIT 1",
+                (user_id,)
+            ).fetchone()
+            device_mac = str(dev_row["device_id"]).upper() if dev_row and dev_row["device_id"] else ""
+            device_name = dev_row["device_name"] if dev_row and dev_row["device_name"] else ""
+
             # Check MCP status from real-time connection states
             mcp_state = all_mcp_states.get(user_id, {})
             has_token = conn.execute("SELECT COUNT(*) FROM xiaozhi_tokens WHERE user_id = ?", (user_id,)).fetchone()[0] > 0
@@ -1367,6 +1385,8 @@ class SQLiteStore:
                 "limits": limits,
                 "usage": usage,
                 "features": self.get_user_features(user_id),
+                "device_mac": device_mac,
+                "device_name": device_name,
                 "mcp_status": {
                     "has_token": has_token,
                     "connected": is_connected or bridge_running,

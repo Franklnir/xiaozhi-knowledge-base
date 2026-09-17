@@ -162,6 +162,7 @@
                         <th style="width:40px">ID</th>
                         <th>Username</th>
                         <th>MCP Status</th>
+                        <th>Board (MAC)</th>
                         <th>Materi</th>
                         <th>API</th>
                         <th>Relay</th>
@@ -171,7 +172,7 @@
                 </thead>
                 <tbody>
                     {% for item in managed_users %}
-                    <tr class="admin-user-row" data-search="{{ (item.username ~ ' ' ~ item.id)|lower|e }}" data-user-id="{{ item.id }}">
+                    <tr class="admin-user-row" data-search="{{ (item.username ~ ' ' ~ item.id ~ ' ' ~ (item.device_mac or ''))|lower|e }}" data-user-id="{{ item.id }}">
                         <td><span class="app-table-subtext">{{ item.id }}</span></td>
                         <td>
                             <span class="app-table-title">{{ item.username }}</span>
@@ -192,6 +193,24 @@
                             <span class="app-chip app-chip-small app-chip-neutral">
                                 ✗ Tidak ada
                             </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.device_mac %}
+                            <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
+                                <code style="font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                                    {{ item.device_mac }}
+                                </code>
+                                {% if item.device_name %}
+                                <span style="font-size: 10px; color: var(--app-muted); padding-left: 2px;">{{ item.device_name }}</span>
+                                {% endif %}
+                            </div>
+                            {% elif item.mcp_status.connected %}
+                            <span class="app-chip app-chip-small app-chip-info" style="font-size: 11px;">
+                                ⏳ Menunggu Board
+                            </span>
+                            {% else %}
+                            <span class="app-table-subtext">-</span>
                             {% endif %}
                         </td>
                         <td>
@@ -227,12 +246,12 @@
                     </tr>
                     {% else %}
                     <tr id="adminEmptyRow">
-                        <td colspan="8" class="py-10 text-center text-sm text-slate-500">Belum ada user terdaftar.</td>
+                        <td colspan="9" class="py-10 text-center text-sm text-slate-500">Belum ada user terdaftar.</td>
                     </tr>
                     {% endfor %}
                     {% if managed_users %}
                     <tr id="adminNoMatchRow" class="hidden">
-                        <td colspan="8" class="py-10 text-center text-sm text-slate-500">User tidak ditemukan.</td>
+                        <td colspan="9" class="py-10 text-center text-sm text-slate-500">User tidak ditemukan.</td>
                     </tr>
                     {% endif %}
                 </tbody>

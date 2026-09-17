@@ -461,6 +461,26 @@
             {% if user.created_at %}
             <div class="profile-joined">Bergabung: {{ user.created_at[:10] }}</div>
             {% endif %}
+            <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                {% if device_mac %}
+                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 999px; font-size: 12.5px; font-weight: 700; color: #10b981;">
+                    <span style="font-size: 14px;">📟</span>
+                    <span style="color: var(--app-muted); font-weight: 600;">ESP32 Board ID:</span>
+                    <code style="font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 800; color: #10b981; background: transparent; padding: 0;">{{ device_mac }}</code>
+                    <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
+                </div>
+                {% elif mcp_status.connected %}
+                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 999px; font-size: 12px; font-weight: 650; color: #3b82f6;">
+                    <span style="font-size: 14px;">📟</span>
+                    <span>MCP Aktif (Menunggu board ESP32 terhubung)</span>
+                </div>
+                {% else %}
+                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: var(--app-soft); border: 1px solid var(--app-border); border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--app-muted);">
+                    <span style="font-size: 14px;">📟</span>
+                    <span>ESP32: Belum terhubung</span>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 

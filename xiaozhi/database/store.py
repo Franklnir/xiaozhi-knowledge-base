@@ -432,6 +432,14 @@ class HFJsonStore:
                 if self._is_admin_user(user) or user.get("username") == admin_username:
                     continue
                 user_id = int(user.get("id", 0))
+                dev_mac = ""
+                dev_name = ""
+                for dev in data.get("registered_devices", []):
+                    if int(dev.get("owner_id", 0)) == user_id:
+                        dev_mac = str(dev.get("device_id", "")).upper()
+                        dev_name = dev.get("device_name", "")
+                        break
+
                 # MCP status for this user
                 has_token = any(
                     int(t.get("user_id", 0)) == user_id
@@ -447,6 +455,8 @@ class HFJsonStore:
                         "limits": self._limits_for_user_unlocked(data, user_id),
                         "usage": self._usage_for_user_unlocked(data, user_id),
                         "features": self.get_user_features(user_id),
+                        "device_mac": dev_mac,
+                        "device_name": dev_name,
                         "mcp_status": {
                             "has_token": has_token,
                             "connected": mcp_connected,
@@ -1992,6 +2002,14 @@ class HFJsonStore:
         with self._lock:
             data = self._load()
             return [d for d in data.get("registered_devices", []) if int(d.get("owner_id", 0)) == int(owner_id)]
+
+    def get_user_mac_address(self, user_id: int) -> Optional[str]:
+        with self._lock:
+            data = self._load()
+            for dev in data.get("registered_devices", []):
+                if int(dev.get("owner_id", 0)) == int(user_id):
+                    return str(dev.get("device_id", "")).upper()
+            return None
 
     def list_registered_devices(self, owner_id: int) -> list:
         return self.list_devices(owner_id)

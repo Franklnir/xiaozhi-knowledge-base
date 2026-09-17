@@ -397,6 +397,32 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
     if not owner_id:
         return {"success": True, "commands": []}
 
+    # Auto-register / update device MAC for this user
+    device_mac = mac or request.headers.get("Device-Id", "")
+    if owner_id and device_mac:
+        clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+        clean_mac = clean_mac.strip().upper()
+        if len(clean_mac) >= 11 and conn is not None:
+            try:
+                existing = conn.execute(
+                    "SELECT id, owner_id FROM registered_devices WHERE UPPER(device_id) = ?",
+                    (clean_mac,)
+                ).fetchone()
+                if not existing:
+                    conn.execute(
+                        "INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
+                        (owner_id, clean_mac, f"ESP32 ({clean_mac[-5:]})", "esp32")
+                    )
+                    conn.commit()
+                elif int(existing["owner_id"]) != int(owner_id):
+                    conn.execute(
+                        "UPDATE registered_devices SET owner_id = ? WHERE id = ?",
+                        (owner_id, existing["id"])
+                    )
+                    conn.commit()
+            except Exception:
+                pass
+
     commands = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else store.get_audio_commands(owner_id)
     if commands:
         latest = commands[-1]
