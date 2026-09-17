@@ -158,6 +158,13 @@ class PlaybackTracker:
             sid = self._user_sessions.get(user_id)
             return bool(sid and sid in self._sessions)
 
+    def get_session_by_user(self, user_id: int) -> Optional[PlaybackSession]:
+        with self._lock:
+            sid = self._user_sessions.get(user_id)
+            if sid and sid in self._sessions:
+                return self._sessions[sid]
+            return None
+
 
 # Global singleton instance
 playback_tracker = PlaybackTracker()

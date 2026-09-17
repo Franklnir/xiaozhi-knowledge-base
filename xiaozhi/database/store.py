@@ -487,8 +487,15 @@ class HFJsonStore:
                         },
                     }
                 )
-            # Kelompokkan: User yang baru daftar (belum konek MCP) di paling atas, baru setelahnya user yang sudah terhubung MCP
-            return sorted(rows, key=lambda u: (1 if u.get("mcp_status", {}).get("connected") else 0, -int(u.get("id", 0))))
+            # Prioritas Urutan Tampilan Admin:
+            # 1. Paling atas: User yang sedang memutar YouTube Music
+            # 2. Kedua: User yang sudah terhubung ke MCP
+            # 3. Ketiga: User lainnya (diurutkan berdasarkan user baru / id desc)
+            return sorted(rows, key=lambda u: (
+                0 if u.get("is_playing") else 1,
+                0 if u.get("mcp_status", {}).get("connected") else 1,
+                -int(u.get("id", 0))
+            ))
 
     @staticmethod
     def _quota_item(used: int, limit: int) -> Dict[str, Any]:

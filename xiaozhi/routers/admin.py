@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException, Request, Form
+import asyncio
+import logging
+from typing import Any, Dict, List, Optional, Set
+
+from fastapi import APIRouter, HTTPException, Request, Form, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from xiaozhi.config import ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
+    get_current_user,
     get_store,
     make_csrf_token,
     render,
@@ -23,16 +28,19 @@ from xiaozhi.services.mcp_service import (
 
 from xiaozhi.services.playback_tracker import playback_tracker
 
+logger = logging.getLogger("xiaozhi.admin")
 router = APIRouter()
 
+# Active admin websocket connections for real-time dashboard sync
+_admin_ws_clients: Set[WebSocket] = set()
 
-@router.get("/admin", response_class=HTMLResponse)
-async def admin_page(request: Request):
-    admin = require_admin(request)
+
+def get_admin_dashboard_snapshot() -> Dict[str, Any]:
+    """Generate complete real-time snapshot of users, streams, and system metrics."""
     store = get_store()
     managed_users = store.list_admin_manageable_users()
 
-    # Get active YouTube Music streams
+    # Active YouTube Music streams
     active_streams = playback_tracker.get_active_sessions()
     active_user_map = {int(s["user_id"]): s for s in active_streams}
 
@@ -42,20 +50,49 @@ async def admin_page(request: Request):
 
     totals = {
         "users": len(managed_users),
-        "materials": sum(u["usage"]["materials"] for u in managed_users),
-        "live_apis": sum(u["usage"]["live_apis"] for u in managed_users),
-        "relay_rooms": sum(u["usage"]["relay_rooms"] for u in managed_users),
+        "materials": sum(u.get("usage", {}).get("materials", 0) for u in managed_users),
+        "live_apis": sum(u.get("usage", {}).get("live_apis", 0) for u in managed_users),
+        "relay_rooms": sum(u.get("usage", {}).get("relay_rooms", 0) for u in managed_users),
         "youtube_active": len(active_streams),
     }
+
+    return {
+        "users": managed_users,
+        "active_streams": active_streams,
+        "total_active_streams": len(active_streams),
+        "totals": totals,
+    }
+
+
+async def broadcast_admin_users_update():
+    """Broadcast real-time user list and playback update to all connected admin websockets."""
+    if not _admin_ws_clients:
+        return
+    snapshot = get_admin_dashboard_snapshot()
+    stale = set()
+    for ws in list(_admin_ws_clients):
+        try:
+            await ws.send_json({"type": "update", "data": snapshot})
+        except Exception:
+            stale.add(ws)
+    for ws in stale:
+        _admin_ws_clients.discard(ws)
+
+
+@router.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request):
+    admin = require_admin(request)
+    snapshot = get_admin_dashboard_snapshot()
+
     return render(
         request,
         "admin.html",
         {
             "user": admin,
-            "managed_users": managed_users,
-            "totals": totals,
-            "active_streams": active_streams,
-            "total_active_streams": len(active_streams),
+            "managed_users": snapshot["users"],
+            "totals": snapshot["totals"],
+            "active_streams": snapshot["active_streams"],
+            "total_active_streams": snapshot["total_active_streams"],
             "csrf_token": make_csrf_token(admin),
             "message": request.query_params.get("message", ""),
             "active_page": "admin",
@@ -98,11 +135,62 @@ async def admin_toggle_feature(
 ):
     admin = require_admin(request)
     store = get_store()
+    is_enabled = enabled.lower() in {"true", "1", "on"}
     try:
-        store.set_user_feature(target_user_id, feature, enabled.lower() in {"true", "1", "on"})
-        return {"success": True, "feature": feature, "enabled": enabled.lower() in {"true", "1", "on"}}
+        store.set_user_feature(target_user_id, feature, is_enabled)
+        # If admin disables youtube_music, immediately abort active playback for this user
+        if feature == "youtube_music" and not is_enabled:
+            stopped = playback_tracker.stop_user_playback(target_user_id)
+            if stopped:
+                logger.info(f"Active YouTube playback stopped for user {target_user_id} due to feature disable.")
+        # Broadcast updated user list to all connected admin WebSocket clients
+        await broadcast_admin_users_update()
+        return {"success": True, "feature": feature, "enabled": is_enabled}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/admin/api/users-data")
+async def admin_api_users_data(request: Request):
+    """REST endpoint for admin user data snapshot (used for initial load and fallback)."""
+    require_admin(request)
+    snapshot = get_admin_dashboard_snapshot()
+    return {"success": True, **snapshot}
+
+
+@router.websocket("/ws/admin/users")
+async def admin_users_websocket(websocket: WebSocket):
+    """Real-time WebSocket connection for live Admin User List & YouTube Music sync."""
+    user = get_current_user(websocket)
+    if not user or user.get("role") != "admin":
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+    _admin_ws_clients.add(websocket)
+    try:
+        # Send initial snapshot immediately upon connection
+        snapshot = get_admin_dashboard_snapshot()
+        await websocket.send_json({"type": "init", "data": snapshot})
+
+        while True:
+            try:
+                # Wait for any client ping or message; tick every 2.5s to keep active stream timers fresh
+                msg = await asyncio.wait_for(websocket.receive_text(), timeout=2.5)
+                if msg == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif msg == "refresh":
+                    snapshot = get_admin_dashboard_snapshot()
+                    await websocket.send_json({"type": "update", "data": snapshot})
+            except asyncio.TimeoutError:
+                snapshot = get_admin_dashboard_snapshot()
+                await websocket.send_json({"type": "tick", "data": snapshot})
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        _admin_ws_clients.discard(websocket)
 
 
 @router.get("/admin/mcp-monitor", response_class=HTMLResponse)

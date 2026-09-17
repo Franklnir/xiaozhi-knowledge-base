@@ -606,7 +606,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             if owner_id:
                 features = store.get_user_features(owner_id)
                 if not features.get("youtube_music", True):
-                    response = {"success": False, "message": "Fitur putar lagu YouTube dinonaktifkan oleh admin.", "results": []}
+                    response = {"success": False, "message": "Anda tidak diizinkan putar lagu YouTube. Fitur YouTube Music telah dinonaktifkan oleh administrator.", "results": []}
                     record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query}, response)
                     return response
                 user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
