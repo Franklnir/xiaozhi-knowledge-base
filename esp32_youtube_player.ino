@@ -98,7 +98,15 @@ void setup_i2s() {
 
 // ============== PLAY AUDIO STREAM ==============
 bool play_audio_stream(String url, String title) {
-    Serial.printf("\n[AUDIO] Memutar: %s\n", title.c_str());
+    int rssi = WiFi.RSSI();
+    Serial.printf("\n[AUDIO] Memutar: %s (WiFi RSSI: %d dBm)\n", title.c_str(), rssi);
+    
+    // Sertakan parameter adaptif cerdas jika belum ada di URL
+    if (url.indexOf("rssi=") < 0) {
+        char sep = (url.indexOf('?') >= 0) ? '&' : '?';
+        url += sep;
+        url += "br=auto&rssi=" + String(rssi);
+    }
     Serial.printf("[AUDIO] Stream URL: %s\n", url.c_str());
     is_playing = true;
     
@@ -107,10 +115,14 @@ bool play_audio_stream(String url, String title) {
     http.addHeader("User-Agent", "ESP32-YouTubePlayer/2.0");
     http.addHeader("Device-Id", get_mac());
     http.addHeader("X-Device-Mac", get_mac());
+    http.addHeader("X-WiFi-RSSI", String(rssi));
     if (strlen(MCP_TOKEN) > 0) {
         http.addHeader("X-Device-Token", MCP_TOKEN);
     }
     http.setTimeout(15000);
+    
+    const char* header_keys[] = {"X-Adaptive-Bitrate", "X-Adaptive-RSSI"};
+    http.collectHeaders(header_keys, 2);
     
     int code = http.GET();
     if (code != 200) {
@@ -120,10 +132,49 @@ bool play_audio_stream(String url, String title) {
         return false;
     }
     
+    String adaptive_br = http.header("X-Adaptive-Bitrate");
+    if (adaptive_br.length() > 0) {
+        Serial.printf("[ADAPTIF] Server memilih bitrate optimal: %s (berdasarkan sinyal %d dBm)\n", adaptive_br.c_str(), rssi);
+    }
+    
+    // Ambang batas pre-buffer dinamis berdasarkan kualitas sinyal Wi-Fi:
+    // Sinyal kuat (>= -65 dBm): 4 KB (~0.4 detik audio)
+    // Sinyal sedang (-75 s.d -65 dBm): 8 KB (~0.8 detik audio)
+    // Sinyal lemah (< -75 dBm): 12 KB (~1.5 detik audio untuk mencegah stutter/tersendat)
+    size_t prebuffer_threshold = 4096;
+    if (rssi < -75) {
+        prebuffer_threshold = 12288;
+    } else if (rssi < -65) {
+        prebuffer_threshold = 8192;
+    }
+    Serial.printf("[ADAPTIF] Pre-buffering dinamis: %u bytes...\n", (unsigned int)prebuffer_threshold);
+    
     WiFiClient* stream = http.getStreamPtr();
     uint8_t buf[AUDIO_BUF_SIZE];
     size_t total_bytes = 0;
+    size_t prebuffered = 0;
     
+    // Tahap 1: Pengisian pre-buffer awal secara cepat
+    unsigned long prebuf_start = millis();
+    while (http.connected() && prebuffered < prebuffer_threshold && (millis() - prebuf_start < 3500)) {
+        size_t avail = stream->available();
+        if (avail > 0) {
+            size_t bytes_to_read = avail > sizeof(buf) ? sizeof(buf) : avail;
+            size_t n = stream->readBytes(buf, bytes_to_read);
+            if (n > 0) {
+                size_t written = 0;
+                i2s_write(I2S_PORT, buf, n, &written, portMAX_DELAY);
+                total_bytes += written;
+                prebuffered += written;
+            }
+        } else {
+            delay(10);
+        }
+        yield();
+    }
+    Serial.printf("[ADAPTIF] Pre-buffer siap (%u bytes). Memulai playback stabil...\n", (unsigned int)prebuffered);
+    
+    // Tahap 2: Continuous Real-Time Streaming
     while (http.connected() && (stream->available() || stream->connected())) {
         size_t avail = stream->available();
         if (avail > 0) {
@@ -134,6 +185,9 @@ bool play_audio_stream(String url, String title) {
                 i2s_write(I2S_PORT, buf, n, &written, portMAX_DELAY);
                 total_bytes += written;
             }
+        } else {
+            // Buffer data kosong sesaat (network jitter), beri toleransi sejenak
+            delay(5);
         }
         yield(); // Feed watchdog timer
     }

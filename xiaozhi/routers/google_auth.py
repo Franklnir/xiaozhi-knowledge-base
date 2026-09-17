@@ -24,7 +24,7 @@ from xiaozhi.config import (
     GOOGLE_REDIRECT_URI,
     google_oauth_serializer,
 )
-from xiaozhi.core.security import normalize_username
+from xiaozhi.core.security import create_token_pair, normalize_username
 from xiaozhi.dependencies import (
     get_current_user,
     get_store,
@@ -84,10 +84,12 @@ def generate_unique_username(email: str, name: str, store) -> str:
 
 
 @router.get("/login")
-async def google_login(request: Request, intent: str = Query("login")):
+async def google_login(request: Request, intent: str = Query("login"), source: str = Query("web")):
     """Initiate Google OAuth flow for Login or Register."""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         logger.error("Google OAuth credentials not configured.")
+        if source == "mobile":
+            return RedirectResponse(url=f"espbridge://oauth/callback?error={urlencode({'msg': 'Integrasi Google belum dikonfigurasi di server.'})}", status_code=303)
         return redirect_with_message("/login", "Integrasi Google belum dikonfigurasi di server.")
 
     valid_intent = "register" if intent == "register" else "login"
@@ -95,6 +97,7 @@ async def google_login(request: Request, intent: str = Query("login")):
     # State payload signed with secret key and salt
     state = google_oauth_serializer.dumps({
         "action": valid_intent,
+        "source": source,
         "nonce": secrets.token_urlsafe(16),
     })
 
@@ -165,6 +168,23 @@ async def google_callback(
         return redirect_with_message("/login", "Sesi autentikasi Google kedaluwarsa. Silakan coba lagi.")
 
     action = state_data.get("action", "login")
+    is_mobile = (state_data.get("source") == "mobile")
+
+    def respond_error(msg: str, target: str = "/login"):
+        if is_mobile:
+            return RedirectResponse(url=f"espbridge://oauth/callback?error={urlencode({'msg': msg})}", status_code=303)
+        return redirect_with_message(target, msg)
+
+    def mobile_success_response(u: dict, r: str) -> RedirectResponse:
+        token_pair = create_token_pair(u["id"], u["username"], r, u.get("session_version", 1))
+        cb_params = {
+            "access_token": token_pair["access_token"],
+            "refresh_token": token_pair["refresh_token"],
+            "username": u["username"],
+            "role": r,
+            "user_id": str(u["id"]),
+        }
+        return RedirectResponse(url=f"espbridge://oauth/callback?{urlencode(cb_params)}", status_code=303)
 
     # Exchange authorization code for tokens
     redirect_uri = get_google_redirect_uri(request)
@@ -183,13 +203,13 @@ async def google_callback(
     except Exception as exc:
         logger.error("Failed to exchange code with Google: %s", exc)
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
-        return redirect_with_message(target, "Gagal menghubungi server Google. Coba lagi.")
+        return respond_error("Gagal menghubungi server Google. Coba lagi.", target)
 
     if not token_resp.ok or "access_token" not in token_data:
         err_msg = token_data.get("error_description") or token_data.get("error") or "Gagal menukar token Google."
         logger.error("Google token exchange error: %s", token_data)
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
-        return redirect_with_message(target, f"Error Google: {err_msg}")
+        return respond_error(f"Error Google: {err_msg}", target)
 
     access_token = token_data["access_token"]
 
@@ -204,11 +224,11 @@ async def google_callback(
     except Exception as exc:
         logger.error("Failed to fetch userinfo from Google: %s", exc)
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
-        return redirect_with_message(target, "Gagal mengambil data profil Google.")
+        return respond_error("Gagal mengambil data profil Google.", target)
 
     if not userinfo_resp.ok:
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
-        return redirect_with_message(target, "Gagal memverifikasi akun Google.")
+        return respond_error("Gagal memverifikasi akun Google.", target)
 
     google_id = str(userinfo.get("id") or "").strip()
     google_email = str(userinfo.get("email") or "").strip().lower()
@@ -216,7 +236,7 @@ async def google_callback(
 
     if not google_id or not google_email:
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
-        return redirect_with_message(target, "Data akun Google tidak memiliki ID atau Email.")
+        return respond_error("Data akun Google tidak memiliki ID atau Email.", target)
 
     store = get_store()
 
@@ -225,13 +245,13 @@ async def google_callback(
         current_user = get_current_user(request)
         state_uid = state_data.get("user_id")
         if not current_user or int(current_user["id"]) != int(state_uid):
-            return redirect_with_message("/login", "Sesi login tidak cocok saat menautkan akun.")
+            return respond_error("Sesi login tidak cocok saat menautkan akun.", "/login")
 
         try:
             store.link_google_account(int(current_user["id"]), google_id, google_email)
             return redirect_with_message("/profil", f"Akun Google ({google_email}) berhasil ditautkan!")
         except ValueError as exc:
-            return redirect_with_message("/profil", str(exc))
+            return respond_error(str(exc), "/profil")
 
     # ── Action: REGISTER DENGAN GOOGLE ─────────────────────────────────────
     if action == "register":
@@ -253,7 +273,7 @@ async def google_callback(
             try:
                 user_record = store.create_google_user(username, google_id, google_email)
             except ValueError as exc:
-                return redirect_with_message("/register", str(exc))
+                return respond_error(str(exc), "/register")
 
         role = str(user_record.get("role") or "user").lower()
         user = {
@@ -263,6 +283,9 @@ async def google_callback(
             "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
             "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
         }
+
+        if is_mobile:
+            return mobile_success_response(user, role)
 
         # Check MCP requirement:
         # Admin: NOT mandatory to enter MCP!
@@ -314,7 +337,7 @@ async def google_callback(
         try:
             user_record = store.create_google_user(username, google_id, google_email)
         except ValueError as exc:
-            return redirect_with_message("/login", f"Gagal membuat akun Google: {exc}")
+            return respond_error(f"Gagal membuat akun Google: {exc}", "/login")
 
     # 4. User is registered / logged in, proceed with role & MCP check
     role = str(user_record.get("role") or "user").lower()
@@ -325,6 +348,9 @@ async def google_callback(
         "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
         "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
     }
+
+    if is_mobile:
+        return mobile_success_response(user, role)
 
     # Admin: never required to enter MCP!
     if role == "admin":

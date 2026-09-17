@@ -111,13 +111,18 @@ async def stream_video_to_websocket(
     sample_rate: int = 24000,
     user_id: Optional[int] = None,
     username: str = "",
-    device_mac: str = ""
+    device_mac: str = "",
+    bitrate: str = "auto",
+    rssi: Optional[int] = None
 ):
     """
     Streams a YouTube video as paced Opus frames over a WebSocket connection.
-    Formatted to XiaoZhi BinaryProtocol3 / standard audio frames.
+    Formatted to XiaoZhi BinaryProtocol3 / standard audio frames with adaptive bitrate.
     """
     from xiaozhi.services.playback_tracker import playback_tracker
+    from xiaozhi.routers.youtube import resolve_adaptive_bitrate
+
+    selected_br = resolve_adaptive_bitrate(bitrate, rssi)
 
     ffmpeg_bin = get_ffmpeg_binary()
     if not ffmpeg_bin:
@@ -142,7 +147,7 @@ async def stream_video_to_websocket(
             title=title,
             stream_type="WebSocket",
             device_mac=device_mac,
-            bitrate="11k"
+            bitrate=selected_br
         )
 
     cmd = [
@@ -156,7 +161,7 @@ async def stream_video_to_websocket(
         "-ac", "1",
         "-ar", str(sample_rate),
         "-c:a", "libopus",
-        "-b:a", "11k",
+        "-b:a", selected_br,
         "-vbr", "on",
         "-compression_level", "5",
         "-application", "voip",

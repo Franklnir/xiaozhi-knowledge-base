@@ -13,6 +13,7 @@ from xiaozhi.core.security import (
     validate_refresh_token,
     verify_password,
 )
+from xiaozhi.core.rate_limiter import enforce_predefined_limit
 from xiaozhi.dependencies import get_store
 from xiaozhi.services.mcp_service import is_mcp_connected
 
@@ -55,10 +56,11 @@ class ApiError(BaseModel):
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=TokenResponse)
-async def api_register(body: RegisterRequest):
+async def api_register(body: RegisterRequest, request: Request):
     """
     Register a new user account and return JWT tokens.
     """
+    enforce_predefined_limit(request, "register")
     store = get_store()
     try:
         user = store.create_user(body.username, body.password)
@@ -93,11 +95,12 @@ async def api_register(body: RegisterRequest):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def api_login(body: LoginRequest):
+async def api_login(body: LoginRequest, request: Request):
     """
     Login with username and password.
     Returns JWT access and refresh tokens for mobile/API clients.
     """
+    enforce_predefined_limit(request, "login")
     store = get_store()
     user_record = store.get_user_by_username(body.username)
 
@@ -225,6 +228,7 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
     """
     Authenticate, register, or link with Google ID token (for Android & Mobile clients).
     """
+    enforce_predefined_limit(request, "login")
     token_str = body.id_token.strip()
     if not token_str:
         raise HTTPException(

@@ -328,8 +328,8 @@ All secrets are stored in `/opt/xiaozhi/.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ADMIN_USERNAME` | `irsyad03` | Admin username |
-| `ADMIN_PASSWORD` | `[REDACTED_ADMIN_PASSWORD]` | Admin password |
+| `ADMIN_USERNAME` | `admin` | Admin username |
+| `ADMIN_PASSWORD` | *(auto-generated if empty)* | Admin password (set in `.env`) |
 | `COOKIE_SECURE` | `true` | HTTPS cookies |
 | `ALLOWED_HOSTS` | `*` | Allowed hosts |
 | `LOG_LEVEL` | `INFO` | Logging level |
