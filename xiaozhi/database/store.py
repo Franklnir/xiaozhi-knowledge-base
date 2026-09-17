@@ -441,6 +441,20 @@ class HFJsonStore:
                         dev_name = dev.get("device_name", "")
                         break
 
+                # Check active playback in playback_tracker
+                active_session = None
+                try:
+                    from xiaozhi.services.playback_tracker import playback_tracker
+                    active_session = playback_tracker.get_session_by_user(user_id)
+                except Exception:
+                    pass
+
+                is_playing = active_session is not None
+                current_track = active_session.title if active_session else ""
+                if not dev_mac and active_session and active_session.device_mac:
+                    dev_mac = str(active_session.device_mac).upper()
+                    dev_name = f"ESP32 ({dev_mac[-5:]})"
+
                 # MCP status for this user
                 has_token = any(
                     int(t.get("user_id", 0)) == user_id
@@ -458,6 +472,8 @@ class HFJsonStore:
                         "features": self.get_user_features(user_id),
                         "device_mac": dev_mac,
                         "device_name": dev_name,
+                        "is_playing": is_playing,
+                        "current_track": current_track,
                         "mcp_status": {
                             "has_token": has_token,
                             "connected": mcp_connected,
@@ -466,7 +482,8 @@ class HFJsonStore:
                         },
                     }
                 )
-            return sorted(rows, key=lambda item: int(item.get("id", 0)), reverse=True)
+            # Kelompokkan: User yang baru daftar (belum konek MCP) di paling atas, baru setelahnya user yang sudah terhubung MCP
+            return sorted(rows, key=lambda u: (1 if u.get("mcp_status", {}).get("connected") else 0, -int(u.get("id", 0))))
 
     @staticmethod
     def _quota_item(used: int, limit: int) -> Dict[str, Any]:

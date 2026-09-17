@@ -111,6 +111,58 @@
 
     /* Limit edit grid */
     .limit-edit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
+    /* Active YouTube Music Monitoring */
+    .pulse-green-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #10b981;
+        box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+        animation: pulse-dot 1.5s infinite;
+        vertical-align: middle;
+    }
+    @keyframes pulse-dot {
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+        70% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .music-bar-anim {
+        display: inline-flex;
+        align-items: flex-end;
+        gap: 2px;
+        height: 12px;
+        vertical-align: middle;
+        margin-right: 3px;
+    }
+    .music-bar-anim span {
+        width: 2.5px;
+        background: #10b981;
+        border-radius: 1px;
+        animation: barBounce 1s ease-in-out infinite alternate;
+    }
+    .music-bar-anim span:nth-child(1) { height: 4px; animation-delay: 0.1s; }
+    .music-bar-anim span:nth-child(2) { height: 11px; animation-delay: 0.3s; }
+    .music-bar-anim span:nth-child(3) { height: 7px; animation-delay: 0.2s; }
+    @keyframes barBounce {
+        0% { height: 3px; }
+        100% { height: 12px; }
+    }
+    .stream-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        transition: all 0.2s;
+    }
+    .stream-card:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+    }
 </style>
 
 <div class="app-page">
@@ -147,6 +199,73 @@
             <p class="app-stat-label">Perangkat Relay</p>
             <p class="app-stat-value">{{ totals.relay_rooms }}</p>
         </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">YouTube Aktif</p>
+            <p class="app-stat-value" id="statYoutubeActive" style="color: {% if totals.youtube_active and totals.youtube_active > 0 %}#047857{% else %}inherit{% endif %}">
+                {{ totals.youtube_active or 0 }}
+                {% if totals.youtube_active and totals.youtube_active > 0 %}
+                <span class="pulse-green-dot" style="margin-left: 4px;"></span>
+                {% endif %}
+            </p>
+        </div>
+    </section>
+
+    <!-- Active YouTube Music Streams Section -->
+    <section class="app-card" style="margin-bottom: 24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:20px">🎵</span>
+                <h2 class="app-section-title" style="margin:0">YouTube Music Sedang Berjalan</h2>
+                <span id="activeStreamsBadge" class="app-chip app-chip-small {% if active_streams %}app-chip-success{% else %}app-chip-neutral{% endif %}">
+                    {{ total_active_streams or 0 }} sedang memutar
+                </span>
+            </div>
+            <button type="button" onclick="pollActiveStreams()" class="app-button app-button-small" style="font-size:12px">
+                🔄 Refresh Stream
+            </button>
+        </div>
+
+        <div id="activeStreamsContainer">
+            {% if active_streams %}
+            <div style="display:flex;flex-direction:column;gap:10px" id="activeStreamsList">
+                {% for s in active_streams %}
+                <div class="stream-card" id="stream-card-{{ s.session_id }}">
+                    {% if s.thumbnail_url %}
+                    <img src="{{ s.thumbnail_url }}" alt="Thumbnail" style="width:60px;height:45px;border-radius:6px;object-fit:cover;flex-shrink:0;">
+                    {% else %}
+                    <div style="width:60px;height:45px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🎵</div>
+                    {% endif %}
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                            <span class="music-bar-anim"><span></span><span></span><span></span></span>
+                            <a href="{{ s.video_url }}" target="_blank" style="font-weight:600;font-size:13.5px;color:#0f172a;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px;">
+                                {{ s.title }}
+                            </a>
+                            <span class="app-chip app-chip-small app-chip-success" style="font-size:10.5px">
+                                ▶ {{ s.stream_type }}
+                            </span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
+                            <span>👤 <strong>{{ s.username }}</strong> (ID {{ s.user_id }})</span>
+                            {% if s.device_mac %}
+                            <span>📡 <code>{{ s.device_mac }}</code></span>
+                            {% endif %}
+                            <span>⏱ Berjalan: <strong id="elapsed-{{ s.session_id }}">{{ s.elapsed_formatted }}</strong></span>
+                            <span>📊 {{ s.bytes_formatted }} ({{ s.bitrate }})</span>
+                        </div>
+                    </div>
+                    <button type="button" class="app-button app-button-small" style="background:#dc2626;color:white;flex-shrink:0" onclick="stopPlayback('{{ s.session_id }}')">
+                        ⏹ Hentikan
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div id="noStreamsPlaceholder" style="padding:24px;text-align:center;color:#64748b;font-size:13px;background:#f8fafc;border-radius:8px;border:1px dashed #cbd5e1;">
+                🎧 Tidak ada user yang sedang memainkan YouTube Music saat ini.
+            </div>
+            {% endif %}
+        </div>
     </section>
 
     <section class="app-card">
@@ -179,6 +298,12 @@
                             {% if item.created_at %}
                             <br><span class="app-table-subtext">{{ item.created_at[:10] }}</span>
                             {% endif %}
+                            <div id="user-playback-badge-{{ item.id }}" class="user-playback-badge" style="margin-top: 4px; {% if not item.youtube_stream %}display:none;{% endif %}">
+                                <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 2px 6px;">
+                                    <span class="music-bar-anim" style="height:10px"><span></span><span></span><span></span></span>
+                                    <span class="playback-title">{% if item.youtube_stream %}{{ item.youtube_stream.title[:24] }}...{% endif %}</span>
+                                </span>
+                            </div>
                         </td>
                         <td>
                             {% if item.mcp_status.connected %}
@@ -196,7 +321,19 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if item.device_mac %}
+                            {% if item.is_playing %}
+                            <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
+                                <span class="app-chip app-chip-small app-chip-success" style="font-size: 11px; background: rgba(16, 185, 129, 0.18); border: 1px solid #10b981; color: #059669; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+                                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
+                                    🔊 Sedang Memutar
+                                </span>
+                                {% if item.device_mac %}
+                                <code style="font-family: ui-monospace, monospace; font-size: 11px; font-weight: 800; color: #10b981;">{{ item.device_mac }}</code>
+                                {% elif item.current_track %}
+                                <span style="font-size: 10px; color: var(--app-muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ item.current_track }}">{{ item.current_track }}</span>
+                                {% endif %}
+                            </div>
+                            {% elif item.device_mac %}
                             <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
                                 <code style="font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
                                     {{ item.device_mac }}
@@ -206,8 +343,8 @@
                                 {% endif %}
                             </div>
                             {% elif item.mcp_status.connected %}
-                            <span class="app-chip app-chip-small app-chip-info" style="font-size: 11px;">
-                                ⏳ Menunggu Board
+                            <span class="app-chip app-chip-small app-chip-info" style="font-size: 11px;" title="MCP terhubung. ESP32 belum mengirimkan MAC address saat polling atau streaming.">
+                                ⏳ Menunggu Board (Belum kirim MAC)
                             </span>
                             {% else %}
                             <span class="app-table-subtext">-</span>
@@ -549,5 +686,110 @@
     }
 
     if (searchInput) searchInput.addEventListener("input", filterUsers);
+
+    // ── Real-time Active YouTube Music Stream Poller ─────────────────────
+    async function pollActiveStreams() {
+        try {
+            const res = await fetch('/admin/api/youtube/active-streams');
+            const data = await res.json();
+            if (!data.success) return;
+
+            const streams = data.streams || [];
+            const totalActive = data.total_active || 0;
+
+            // Update stat card
+            const statEl = document.getElementById('statYoutubeActive');
+            if (statEl) {
+                statEl.innerHTML = `${totalActive} ${totalActive > 0 ? '<span class="pulse-green-dot" style="margin-left:4px"></span>' : ''}`;
+                statEl.style.color = totalActive > 0 ? '#047857' : 'inherit';
+            }
+
+            // Update active streams badge
+            const badgeEl = document.getElementById('activeStreamsBadge');
+            if (badgeEl) {
+                badgeEl.textContent = `${totalActive} sedang memutar`;
+                badgeEl.className = `app-chip app-chip-small ${totalActive > 0 ? 'app-chip-success' : 'app-chip-neutral'}`;
+            }
+
+            // Update active streams container
+            const container = document.getElementById('activeStreamsContainer');
+            if (container) {
+                if (streams.length === 0) {
+                    container.innerHTML = `
+                        <div id="noStreamsPlaceholder" style="padding:24px;text-align:center;color:#64748b;font-size:13px;background:#f8fafc;border-radius:8px;border:1px dashed #cbd5e1;">
+                            🎧 Tidak ada user yang sedang memainkan YouTube Music saat ini.
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div style="display:flex;flex-direction:column;gap:10px" id="activeStreamsList">
+                            ${streams.map(s => `
+                                <div class="stream-card" id="stream-card-${s.session_id}">
+                                    ${s.thumbnail_url ? `<img src="${s.thumbnail_url}" alt="Thumbnail" style="width:60px;height:45px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : `<div style="width:60px;height:45px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🎵</div>`}
+                                    <div style="flex:1;min-width:0">
+                                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                            <span class="music-bar-anim"><span></span><span></span><span></span></span>
+                                            <a href="${s.video_url}" target="_blank" style="font-weight:600;font-size:13.5px;color:#0f172a;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px;">
+                                                ${s.title}
+                                            </a>
+                                            <span class="app-chip app-chip-small app-chip-success" style="font-size:10.5px">
+                                                ▶ ${s.stream_type}
+                                            </span>
+                                        </div>
+                                        <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
+                                            <span>👤 <strong>${s.username}</strong> (ID ${s.user_id})</span>
+                                            ${s.device_mac ? `<span>📡 <code>${s.device_mac}</code></span>` : ''}
+                                            <span>⏱ Berjalan: <strong>${s.elapsed_formatted}</strong></span>
+                                            <span>📊 ${s.bytes_formatted} (${s.bitrate})</span>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="app-button app-button-small" style="background:#dc2626;color:white;flex-shrink:0" onclick="stopPlayback('${s.session_id}')">
+                                        ⏹ Hentikan
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            }
+
+            // Update user table badges
+            const activeUserMap = {};
+            streams.forEach(s => { activeUserMap[s.user_id] = s; });
+
+            document.querySelectorAll('.user-playback-badge').forEach(badge => {
+                const uid = badge.id.replace('user-playback-badge-', '');
+                const userStream = activeUserMap[uid];
+                if (userStream) {
+                    badge.style.display = 'block';
+                    const titleEl = badge.querySelector('.playback-title');
+                    if (titleEl) titleEl.textContent = (userStream.title.substring(0, 24)) + '...';
+                } else {
+                    badge.style.display = 'none';
+                }
+            });
+
+        } catch (err) {
+            console.error('Error polling active streams:', err);
+        }
+    }
+
+    async function stopPlayback(sessionId) {
+        if (!confirm('Hentikan pemutaran musik untuk user ini?')) return;
+        try {
+            const res = await fetch(`/admin/api/youtube/stop/${sessionId}`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                pollActiveStreams();
+            } else {
+                alert(data.message || 'Gagal menghentikan pemutaran');
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    }
+
+    // Auto-poll active streams every 4 seconds
+    setInterval(pollActiveStreams, 4000);
 </script>
 {% endblock %}

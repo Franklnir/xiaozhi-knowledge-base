@@ -1,3 +1,4 @@
+from xiaozhi.services.playback_tracker import playback_tracker
 from xiaozhi.services.youtube_streamer import stream_video_to_websocket
 import asyncio
 import base64
@@ -130,7 +131,91 @@ def youtube_search(query: str, max_results: int = 5) -> list:
         return items
 
 
-async def _stream_opus_audio(video_id: str, bitrate: str = "12k", start_sec: float = 0.0) -> AsyncGenerator[bytes, None]:
+def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_id: Optional[int] = None, mac: Optional[str] = None, token: Optional[str] = None):
+    user = None
+    title = ""
+    device_mac = (mac or "").strip()
+    if not device_mac and hasattr(request, "headers"):
+        device_mac = request.headers.get("Device-Id", "").strip()
+    if not device_mac and hasattr(request, "headers"):
+        device_mac = request.headers.get("X-Device-Mac", "").strip()
+    if not device_mac and hasattr(request, "headers"):
+        device_mac = request.headers.get("X-MAC-Address", "").strip()
+
+    if owner_id:
+        try:
+            user = store.get_user_by_id(int(owner_id)) if hasattr(store, "get_user_by_id") else None
+        except Exception:
+            pass
+
+    if not user and token:
+        try:
+            owner = store.find_user_by_mcp_token(token)
+            if owner and owner.get("user_id"):
+                user = store.get_user_by_id(int(owner["user_id"])) if hasattr(store, "get_user_by_id") else None
+        except Exception:
+            pass
+
+    if not user and device_mac:
+        try:
+            resolved_id = _resolve_owner_for_device(store, device_mac)
+            if resolved_id:
+                user = store.get_user_by_id(int(resolved_id)) if hasattr(store, "get_user_by_id") else None
+        except Exception:
+            pass
+
+    if not user:
+        try:
+            session_user = get_current_user(request)
+            if session_user:
+                user = session_user
+        except Exception:
+            pass
+
+    # Fallback to recent audio_queue record for this video_id
+    conn = getattr(store, "_get_conn", lambda: None)()
+    if conn is not None:
+        try:
+            row = conn.execute(
+                "SELECT owner_id, title FROM audio_queue WHERE video_id = ? ORDER BY id DESC LIMIT 1",
+                (video_id,)
+            ).fetchone()
+            if row:
+                if not user and row["owner_id"]:
+                    user = store.get_user_by_id(int(row["owner_id"])) if hasattr(store, "get_user_by_id") else None
+                if row["title"] and not title:
+                    title = row["title"]
+        except Exception:
+            pass
+
+    if user and not device_mac and hasattr(store, "get_user_mac_address"):
+        try:
+            device_mac = store.get_user_mac_address(user["id"]) or ""
+        except Exception:
+            pass
+
+    # Auto-register device MAC to user in registered_devices
+    if user and device_mac and hasattr(store, "register_device"):
+        clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+        clean_mac = clean_mac.strip().upper()
+        if len(clean_mac) >= 11:
+            try:
+                store.register_device(user["id"], device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+            except Exception:
+                pass
+
+    return user, title, device_mac
+
+
+async def _stream_opus_audio(
+    video_id: str,
+    bitrate: str = "12k",
+    start_sec: float = 0.0,
+    user_id: Optional[int] = None,
+    username: str = "",
+    title: str = "",
+    device_mac: str = "",
+) -> AsyncGenerator[bytes, None]:
     valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "32k"}
     br = bitrate.lower().strip() if bitrate and bitrate.lower().strip() in valid_bitrates else "11k"
     if not yt_dlp:
@@ -151,16 +236,30 @@ async def _stream_opus_audio(video_id: str, bitrate: str = "12k", start_sec: flo
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            return info.get("url")
+            return info.get("url"), info.get("title", "")
 
     try:
-        source_url = await loop.run_in_executor(None, _extract_url)
+        source_url, extracted_title = await loop.run_in_executor(None, _extract_url)
+        if not title:
+            title = extracted_title
     except Exception as exc:
         logger.error("Failed to extract audio URL for video %s: %s", video_id, exc)
         raise HTTPException(status_code=500, detail=f"Gagal mengekstrak audio: {exc}")
 
     if not source_url:
         raise HTTPException(status_code=404, detail="Audio stream tidak ditemukan.")
+
+    session = None
+    if user_id:
+        session = playback_tracker.start_session(
+            user_id=user_id,
+            username=username or f"user-{user_id}",
+            video_id=video_id,
+            title=title or f"Video {video_id}",
+            stream_type="HTTP Stream",
+            device_mac=device_mac,
+            bitrate=br
+        )
 
     cmd = [
         ffmpeg_bin,
@@ -195,14 +294,19 @@ async def _stream_opus_audio(video_id: str, bitrate: str = "12k", start_sec: flo
     )
 
     total_bytes = 0
-    logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid}")
+    logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
     try:
         while True:
+            if session and session.abort_event.is_set():
+                logger.info(f"Stream aborted by admin for video {video_id}")
+                break
             chunk = await proc.stdout.read(1536)
             if not chunk:
                 logger.info(f"YouTube stream for {video_id} reached EOF, total={total_bytes} bytes")
                 break
             total_bytes += len(chunk)
+            if session:
+                session.record_chunk(len(chunk))
             if total_bytes % (1536 * 50) == 0:
                 logger.info(f"YouTube stream for {video_id}: sent {total_bytes // 1024} KB")
             yield chunk
@@ -211,6 +315,8 @@ async def _stream_opus_audio(video_id: str, bitrate: str = "12k", start_sec: flo
     except Exception as exc:
         logger.error(f"YouTube stream for {video_id} error after {total_bytes} bytes: {exc}")
     finally:
+        if session:
+            playback_tracker.end_session(session.session_id)
         if proc.returncode is None:
             try:
                 proc.kill()
@@ -221,10 +327,30 @@ async def _stream_opus_audio(video_id: str, bitrate: str = "12k", start_sec: flo
 
 
 @router.get("/api/audio/stream/{video_id}")
-async def audio_stream_ogg_opus(video_id: str, request: Request, br: str = "12k", start: float = 0.0):
+async def audio_stream_ogg_opus(
+    video_id: str,
+    request: Request,
+    br: str = "12k",
+    start: float = 0.0,
+    owner_id: Optional[int] = Query(None),
+    mac: Optional[str] = Query(None),
+    token: Optional[str] = Query(None),
+):
     """Real-time Ogg/Opus mono 24kHz transcoding stream for ESP32 hardware decoder with adaptive bitrate and seek resume support."""
+    store = get_store()
+    user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request, owner_id=owner_id, mac=mac, token=token)
+    user_id = user["id"] if user else None
+    username = user["username"] if user else ""
     return StreamingResponse(
-        _stream_opus_audio(video_id, bitrate=br, start_sec=start),
+        _stream_opus_audio(
+            video_id,
+            bitrate=br,
+            start_sec=start,
+            user_id=user_id,
+            username=username,
+            title=title,
+            device_mac=device_mac
+        ),
         media_type="audio/ogg",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -242,6 +368,16 @@ async def audio_commands_for_device(device_id: str, request: Request):
     owner_id = _resolve_owner_for_device(store, device_id)
     if not owner_id:
         return {"commands": []}
+
+    # Auto-register device MAC for owner_id
+    if device_id and hasattr(store, "register_device"):
+        clean_mac = device_id[6:] if device_id.lower().startswith("esp32-") else device_id
+        clean_mac = clean_mac.strip().upper()
+        if len(clean_mac) >= 11:
+            try:
+                store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+            except Exception:
+                pass
 
     commands = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else store.get_audio_commands(owner_id)
 
@@ -275,11 +411,19 @@ async def audio_ack_for_device(command_id: str, request: Request):
         pass
 
     if not device_id:
-        device_id = request.headers.get("Device-Id", "").strip()
+        device_id = request.headers.get("Device-Id", "").strip() or request.headers.get("X-Device-Mac", "").strip()
 
     owner_id = _resolve_owner_for_device(store, device_id)
     if owner_id:
         store.ack_audio_command(owner_id, command_id)
+        if device_id and hasattr(store, "register_device"):
+            clean_mac = device_id[6:] if device_id.lower().startswith("esp32-") else device_id
+            clean_mac = clean_mac.strip().upper()
+            if len(clean_mac) >= 11:
+                try:
+                    store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+                except Exception:
+                    pass
     return {"success": True}
 
 
@@ -398,28 +542,13 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
         return {"success": True, "commands": []}
 
     # Auto-register / update device MAC for this user
-    device_mac = mac or request.headers.get("Device-Id", "")
-    if owner_id and device_mac:
+    device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "") or request.headers.get("X-MAC-Address", "")
+    if owner_id and device_mac and hasattr(store, "register_device"):
         clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
         clean_mac = clean_mac.strip().upper()
-        if len(clean_mac) >= 11 and conn is not None:
+        if len(clean_mac) >= 11:
             try:
-                existing = conn.execute(
-                    "SELECT id, owner_id FROM registered_devices WHERE UPPER(device_id) = ?",
-                    (clean_mac,)
-                ).fetchone()
-                if not existing:
-                    conn.execute(
-                        "INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
-                        (owner_id, clean_mac, f"ESP32 ({clean_mac[-5:]})", "esp32")
-                    )
-                    conn.commit()
-                elif int(existing["owner_id"]) != int(owner_id):
-                    conn.execute(
-                        "UPDATE registered_devices SET owner_id = ? WHERE id = ?",
-                        (owner_id, existing["id"])
-                    )
-                    conn.commit()
+                store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
             except Exception:
                 pass
 
@@ -432,7 +561,24 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
             except Exception:
                 pass
         commands = [latest]
-    return {"success": True, "commands": commands}
+
+    formatted_commands = []
+    base_url = str(request.base_url).rstrip("/")
+    for cmd in commands:
+        c = dict(cmd)
+        surl = c.get("stream_url", "")
+        if surl.startswith("/"):
+            surl = f"{base_url}{surl}"
+        sep = "&" if "?" in surl else "?"
+        if "owner_id=" not in surl and owner_id:
+            surl = f"{surl}{sep}owner_id={owner_id}"
+            sep = "&"
+        if "mac=" not in surl and device_mac:
+            surl = f"{surl}{sep}mac={device_mac}"
+        c["stream_url"] = surl
+        formatted_commands.append(c)
+
+    return {"success": True, "commands": formatted_commands}
 
 
 @router.post("/api/device/audio/ack")
@@ -459,9 +605,19 @@ async def device_audio_ack(request: Request):
     if not owner_id and mac:
         owner_id = _resolve_owner_for_device(store, mac)
     if not owner_id:
-        device_hdr = request.headers.get("Device-Id", "")
+        device_hdr = request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
         if device_hdr:
             owner_id = _resolve_owner_for_device(store, device_hdr)
+
+    device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
+    if owner_id and device_mac and hasattr(store, "register_device"):
+        clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+        clean_mac = clean_mac.strip().upper()
+        if len(clean_mac) >= 11:
+            try:
+                store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+            except Exception:
+                pass
 
     if owner_id and command_id:
         store.ack_audio_command(owner_id, command_id)
@@ -473,12 +629,29 @@ async def ws_audio_stream_endpoint(
     websocket: WebSocket,
     video_id: str,
     sample_rate: int = 24000,
-    title: str = ""
+    title: str = "",
+    owner_id: Optional[int] = Query(None),
+    mac: Optional[str] = Query(None),
+    token: Optional[str] = Query(None)
 ):
     """WebSocket Opus 24kHz stream for ESP32 hardware decoder."""
     await websocket.accept()
+    store = get_store()
+    user, extracted_title, device_mac = _resolve_stream_user_and_info(store, video_id, websocket, owner_id=owner_id, mac=mac, token=token)
+    user_id = user["id"] if user else None
+    username = user["username"] if user else ""
+    if not title and extracted_title:
+        title = extracted_title
     try:
-        await stream_video_to_websocket(websocket, video_id, title=title, sample_rate=sample_rate)
+        await stream_video_to_websocket(
+            websocket,
+            video_id,
+            title=title,
+            sample_rate=sample_rate,
+            user_id=user_id,
+            username=username,
+            device_mac=device_mac
+        )
     except WebSocketDisconnect:
         pass
     except Exception as exc:
@@ -491,6 +664,16 @@ async def ws_device_audio_channel(websocket: WebSocket, device_id: str):
     await websocket.accept()
     store = get_store()
     owner_id = _resolve_owner_for_device(store, device_id)
+    if owner_id and device_id and hasattr(store, "register_device"):
+        clean_mac = device_id[6:] if device_id.lower().startswith("esp32-") else device_id
+        clean_mac = clean_mac.strip().upper()
+        if len(clean_mac) >= 11:
+            try:
+                store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+            except Exception:
+                pass
+    user = store.get_user_by_id(owner_id) if owner_id and hasattr(store, "get_user_by_id") else None
+    username = user["username"] if user else f"user-{owner_id}"
     logger.info("Device connected to persistent audio channel: %s (owner=%s)", device_id, owner_id)
     
     try:
@@ -505,7 +688,15 @@ async def ws_device_audio_channel(websocket: WebSocket, device_id: str):
                     title = cmd.get("title", "")
                     if video_id:
                         store.ack_audio_command(owner_id, cmd_id)
-                        await stream_video_to_websocket(websocket, video_id, title=title, sample_rate=24000)
+                        await stream_video_to_websocket(
+                            websocket,
+                            video_id,
+                            title=title,
+                            sample_rate=24000,
+                            user_id=owner_id,
+                            username=username,
+                            device_mac=device_id
+                        )
             
             # Non-blocking check or wait
             try:

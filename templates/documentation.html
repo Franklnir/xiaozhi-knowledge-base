@@ -436,16 +436,22 @@ play_youtube_song(query="Bohemian Rhapsody")<br><br>
                 <div class="doc-step">
                     <div class="doc-step-number">4</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">ESP32 Polling / Terima Perintah Audio</div>
+                        <div class="doc-step-title">ESP32 Polling &amp; Auto-Binding MAC Address</div>
                         <div class="doc-step-desc">
-                            ESP32 melakukan polling ke server setiap 2-5 detik untuk cek perintah audio baru.
-                            Jika ada perintah <code>pending</code>, server mengembalikan data stream.
+                            ESP32 melakukan polling ke server setiap 2-3 detik untuk mengecek perintah audio baru.<br>
+                            <strong>PENTING (Mengatasi Status "Menunggu Board"):</strong><br>
+                            ESP32 <strong>WAJIB menyertakan MAC Address</strong> (<code>?mac={MAC}</code> dan header <code>Device-Id: {MAC}</code>).<br>
+                            Saat server menerima request dengan MAC Address, server otomatis mengikat ESP32 tersebut ke akun user di tabel <code>registered_devices</code>.<br>
+                            Status di Admin &amp; Profil akan langsung berubah dari <span class="app-chip app-chip-small app-chip-info" style="font-size:10px;">⏳ Menunggu Board</span> menjadi kode MAC board berwarna hijau!
                         </div>
                         <div class="doc-code" style="background: #ecfdf5; border-color: #a7f3d0;">
-GET /api/device/audio/commands?token={MCP_TOKEN}&amp;mac={MAC_ADDRESS}
+GET /api/device/audio/commands?mac={MAC_ADDRESS}&amp;token={MCP_TOKEN}<br>
+Header: Device-Id: {MAC_ADDRESS}
                         </div>
                         <div class="doc-tip">
-                            <strong>💡</strong> Server otomatis expire perintah yang sudah lebih dari 30 menit belum diambil.
+                            <strong>💡 Tips Menghubungkan Board:</strong><br>
+                            • Gunakan <code>WiFi.macAddress()</code> di ESP32.<br>
+                            • Jika parameter <code>token</code> juga disertakan, pairing ke akun pemilik terjadi secara instan tanpa perlu setting manual di profil.
                         </div>
                     </div>
                 </div>
@@ -453,13 +459,14 @@ GET /api/device/audio/commands?token={MCP_TOKEN}&amp;mac={MAC_ADDRESS}
                 <div class="doc-step">
                     <div class="doc-step-number">5</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">ESP32 Download & Putar Audio Opus</div>
+                        <div class="doc-step-title">ESP32 Download &amp; Putar Audio Transcoded (Ogg/Opus Mono 24kHz)</div>
                         <div class="doc-step-desc">
-                            ESP32 menerima <code>stream_url</code>, lalu:<br>
-                            • Membuka koneksi HTTP GET ke stream_url<br>
-                            • Server melakukan transcoding real-time: YouTube → FFmpeg → <strong>Ogg/Opus Mono 24kHz</strong><br>
-                            • ESP32 men-decode stream Opus dan memutar melalui <strong>I2S DAC/speaker</strong><br>
-                            • Bitrate default: 11kbps (sangat ringan, cocok untuk ESP32 dengan RAM terbatas)
+                            ESP32 menerima <code>stream_url</code> dari server, lalu:<br>
+                            • Membuka koneksi HTTP GET ke <code>stream_url</code> dengan header <code>Device-Id: {MAC}</code>.<br>
+                            • Server melakukan transcoding real-time: YouTube Audio Stream → FFmpeg → <strong>Ogg/Opus Mono 24kHz</strong>.<br>
+                            • Di dashboard admin, status pengguna yang sedang memutar musik otomatis menampilkan badge hijau <strong>🔊 Sedang Memutar</strong> beserta judul lagu yang aktif!<br>
+                            • ESP32 membaca stream audio dan mengirimnya ke DAC I2S (MAX98357A / PCM5102) untuk diputar di speaker.<br>
+                            • Bitrate default: <strong>11kbps</strong> (sangat ringan dan stabil untuk ESP32 dengan RAM standar).
                         </div>
                     </div>
                 </div>
@@ -467,13 +474,14 @@ GET /api/device/audio/commands?token={MCP_TOKEN}&amp;mac={MAC_ADDRESS}
                 <div class="doc-step">
                     <div class="doc-step-number">6</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">ESP32 Kirim Konfirmasi (ACK)</div>
+                        <div class="doc-step-title">ESP32 Kirim Konfirmasi Selesai (ACK)</div>
                         <div class="doc-step-desc">
-                            Setelah audio selesai diputar, ESP32 mengirim konfirmasi agar perintah tidak diputar ulang.
+                            Setelah lagu selesai diputar (atau dihentikan), ESP32 mengirim konfirmasi (ACK) ke server agar antrean ditandai <code>played</code> dan tidak diputar ulang pada polling berikutnya.
                         </div>
                         <div class="doc-code" style="background: #ecfdf5; border-color: #a7f3d0;">
 POST /api/device/audio/ack<br>
-Body: { "token": "{MCP_TOKEN}", "command_id": "123", "mac": "{MAC_ADDRESS}" }
+Content-Type: application/x-www-form-urlencoded<br>
+Body: command_id={ID}&amp;mac={MAC_ADDRESS}&amp;token={MCP_TOKEN}
                         </div>
                     </div>
                 </div>
@@ -799,7 +807,7 @@ void loop() {
 void pollAudioCommands() {
     HTTPClient http;
 
-    // Gunakan endpoint recommended dengan token + mac
+    // Sertakan MAC address & token di query URL
     String url = String(BASE_URL)
         + "/api/device/audio/commands"
         + "?mac=" + urlencode(DEVICE_MAC);
@@ -808,6 +816,12 @@ void pollAudioCommands() {
     }
 
     http.begin(url);
+    // Kirim header identitas perangkat
+    http.addHeader("Device-Id", DEVICE_MAC);
+    http.addHeader("X-Device-Mac", DEVICE_MAC);
+    if (MCP_TOKEN.length() > 0) {
+        http.addHeader("X-Device-Token", MCP_TOKEN);
+    }
     int httpCode = http.GET();
 
     if (httpCode == 200) {
@@ -839,17 +853,21 @@ void pollAudioCommands() {
 void playAudioStream(String streamUrl) {
     HTTPClient http;
     http.begin(streamUrl);
+    http.addHeader("Device-Id", DEVICE_MAC);
+    http.addHeader("X-Device-Mac", DEVICE_MAC);
     int httpCode = http.GET();
 
     if (httpCode == 200) {
         WiFiClient* stream = http.getStreamPtr();
         // Baca Ogg/Opus stream, decode, kirim ke I2S
-        // Implementasi decode tergantung library yang digunakan
-        while (stream->available()) {
-            // Baca chunk, decode Opus, output ke I2S
+        while (http.connected() && stream->available()) {
             uint8_t buffer[1536];
             int bytesRead = stream->readBytes(buffer, sizeof(buffer));
-            // ... decode dan I2S write ...
+            if (bytesRead > 0) {
+                size_t written = 0;
+                i2s_write(I2S_PORT, buffer, bytesRead, &amp;written, portMAX_DELAY);
+            }
+            yield(); // Feed watchdog timer ESP32
         }
     }
     http.end();
@@ -860,6 +878,7 @@ void acknowledgeCommand(String commandId) {
     HTTPClient http;
     http.begin(String(BASE_URL) + "/api/device/audio/ack");
     http.addHeader("Content-Type", "application/json");
+    http.addHeader("Device-Id", DEVICE_MAC);
 
     String body = "{\"command_id\":\"" + commandId
                 + "\",\"mac\":\"" + DEVICE_MAC + "\"";
@@ -889,6 +908,7 @@ void searchAndPlay(String query) {
     String url = String(BASE_URL) + "/api/audio/play_direct?q="
                  + urlencode(query);
     http.begin(url);
+    http.addHeader("Device-Id", DEVICE_MAC);
     int httpCode = http.GET();
 
     if (httpCode == 200) {
@@ -903,12 +923,37 @@ void searchAndPlay(String query) {
 
             // Stream langsung dari endpoint audio
             String streamUrl = String(BASE_URL)
-                + "/api/audio/stream/" + videoId + "?br=11k";
+                + "/api/audio/stream/" + videoId + "?br=11k&amp;mac=" + urlencode(DEVICE_MAC);
             playAudioStream(streamUrl);
         }
     }
     http.end();
 }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Troubleshooting Box -->
+                <div class="doc-step" style="border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.03);">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title" style="color: #ef4444;">🔧 Tanya Jawab &amp; Solusi Kendala (Troubleshooting)</div>
+                        <div class="doc-step-desc">
+                            <div style="margin-bottom: 12px;">
+                                <strong>❓ Kenapa di panel Admin muncul tulisan "Menunggu Board (Belum kirim MAC)" padahal musik sudah play?</strong><br>
+                                <span>Penyebabnya adalah firmware ESP32 belum mengirimkan parameter <code>mac</code> atau header <code>Device-Id</code> saat polling atau streaming. Server butuh MAC Address untuk mengikat board ke akun kamu. Di firmware versi terbaru, pastikan kode memanggil <code>WiFi.macAddress()</code> dan menyertakannya di URL <code>/api/device/audio/commands?mac=...</code>. Begitu request masuk, server otomatis mencatatnya di database dan status berubah menjadi hijau! Selain itu, saat lagu sedang aktif diputar, admin langsung menampilkan indikator <strong>🔊 Sedang Memutar</strong>.</span>
+                            </div>
+                            <div style="margin-bottom: 12px;">
+                                <strong>❓ Kenapa lagu mengulang terus dari awal setelah selesai?</strong><br>
+                                <span>Fungsi <code>acknowledgeCommand(commandId)</code> belum terpanggil atau gagal kirim. Pastikan setelah loop streaming selesai, firmware mengirim request POST ke <code>/api/device/audio/ack</code>.</span>
+                            </div>
+                            <div style="margin-bottom: 12px;">
+                                <strong>❓ ESP32 sering reboot (Watchdog Reset / WDT) saat streaming audio?</strong><br>
+                                <span>Di dalam loop <code>while (stream-&gt;available())</code>, selalu panggil <code>yield();</code> agar Task Watchdog ESP32 tidak terpicu.</span>
+                            </div>
+                            <div>
+                                <strong>❓ Bagaimana cara menguji stream lagu tanpa menggunakan board ESP32?</strong><br>
+                                <span>Buka browser di HP/Laptop kamu dan kunjungi URL: <code>{BASE_URL}/api/audio/stream/{video_id}?br=11k</code>. Browser akan langsung memutar audio real-time transcoded dari YouTube!</span>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -21,6 +21,8 @@ from xiaozhi.services.mcp_service import (
     signal_mcp_reload,
 )
 
+from xiaozhi.services.playback_tracker import playback_tracker
+
 router = APIRouter()
 
 
@@ -29,11 +31,21 @@ async def admin_page(request: Request):
     admin = require_admin(request)
     store = get_store()
     managed_users = store.list_admin_manageable_users()
+
+    # Get active YouTube Music streams
+    active_streams = playback_tracker.get_active_sessions()
+    active_user_map = {int(s["user_id"]): s for s in active_streams}
+
+    # Attach YouTube active stream info to each user
+    for u in managed_users:
+        u["youtube_stream"] = active_user_map.get(int(u["id"]))
+
     totals = {
         "users": len(managed_users),
         "materials": sum(u["usage"]["materials"] for u in managed_users),
         "live_apis": sum(u["usage"]["live_apis"] for u in managed_users),
         "relay_rooms": sum(u["usage"]["relay_rooms"] for u in managed_users),
+        "youtube_active": len(active_streams),
     }
     return render(
         request,
@@ -42,6 +54,9 @@ async def admin_page(request: Request):
             "user": admin,
             "managed_users": managed_users,
             "totals": totals,
+            "active_streams": active_streams,
+            "total_active_streams": len(active_streams),
+            "csrf_token": make_csrf_token(admin),
             "message": request.query_params.get("message", ""),
             "active_page": "admin",
         },
@@ -248,6 +263,29 @@ async def admin_api_mcp_health(request: Request):
             "errors": error_count,
             "bridge_tasks": len(mcp_bridge_tasks),
         },
+    }
+
+
+# ── YouTube Active Playback Monitor ─────────────────────────────────────
+
+@router.get("/admin/api/youtube/active-streams")
+async def admin_api_youtube_active_streams(request: Request):
+    require_admin(request)
+    streams = playback_tracker.get_active_sessions()
+    return {
+        "success": True,
+        "total_active": len(streams),
+        "streams": streams,
+    }
+
+
+@router.post("/admin/api/youtube/stop/{session_id}")
+async def admin_api_youtube_stop(request: Request, session_id: str):
+    admin = require_admin(request)
+    stopped = playback_tracker.stop_session(session_id)
+    return {
+        "success": stopped,
+        "message": "Pemutaran berhasil dihentikan." if stopped else "Sesi pemutaran tidak ditemukan atau sudah selesai.",
     }
 
 

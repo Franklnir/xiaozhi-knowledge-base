@@ -1,14 +1,23 @@
 /**
- * YouTube Audio Player untuk ESP32 + MAX98357A + INMP441
+ * YouTube Audio Player untuk ESP32 + MAX98357A
  * 
- * Polling server EduSmart untuk audio commands,
- * download M4A, decode, output ke I2S (MAX98357A).
+ * ALUR SISTEM:
+ * 1. User berbicara ke XiaoZhi: "Putar lagu X"
+ * 2. XiaoZhi MCP memanggil tool `play_youtube_song` di server.
+ * 3. Server mencari lagu via yt-dlp & memasukkan ke audio_queue (status: pending).
+ * 4. ESP32 melakukan polling ke server dengan mengirimkan MAC Address (dan opsional Token).
+ *    -> Saat MAC diterima, server OTOMATIS mendaftarkan ESP32 ke akun user di tabel `registered_devices`
+ *    -> Status di Admin & Profil langsung berubah dari "Menunggu Board" menjadi ID MAC board yang valid!
+ * 5. Server mengembalikan stream_url (Ogg/Opus Mono 24kHz atau HTTP Stream).
+ * 6. ESP32 mendownload stream audio dan memutarnya ke I2S DAC (MAX98357A).
+ * 7. Setelah selesai, ESP32 mengirim konfirmasi (ACK) ke server.
  * 
- * INTEGRASI: Tambah file ini ke firmware XiaoZhi ESP32,
- *            panggil audio_player_init() di setup(),
- *            panggil audio_player_loop() di loop().
- * 
- * Koneksi: MAX98357A (BCLK, LRC, DIN) ke pin I2S yang benar.
+ * WIRING MAX98357A -> ESP32:
+ *   BCLK (Bit Clock)    -> GPIO 26
+ *   LRC / WS (Word Sel) -> GPIO 25
+ *   DIN (Data In)       -> GPIO 22
+ *   GND                 -> GND
+ *   VIN                 -> 5V atau 3.3V
  */
 
 #ifndef AUDIO_PLAYER_H
@@ -21,35 +30,46 @@
 #include <driver/i2s.h>
 
 // ============== KONFIGURASI ==============
-// Ganti dengan token device dari dashboard EduSmart
-#define AUDIO_DEVICE_TOKEN  "YOUR_DEVICE_TOKEN_HERE"
+// URL server XiaoZhi Indonesia (sesuaikan dengan domain / IP kamu)
+// Contoh: "https://xiaozhiscig.biz.id" atau "http://192.168.1.100:7860"
+#define AUDIO_SERVER_URL    "https://xiaozhiscig.biz.id"
 
-// URL server EduSmart (sesuaikan dengan deploy)
-// Kalau lokal: http://192.168.x.x:7860
-// Kalau HF Spaces: https://username-edusmart.hf.space
-#define AUDIO_SERVER_URL    "http://192.168.1.100:7860"
+// Token user dari dashboard XiaoZhi Indonesia (opsional jika sudah pair via MAC)
+#define AUDIO_DEVICE_TOKEN  ""
 
-// Polling interval (ms)
+// Polling interval dalam milidetik (rekomendasi: 2500 - 3500 ms)
 #define AUDIO_POLL_INTERVAL 3000
 
-// I2S pins untuk MAX98357A (sesuaikan dengan wiring kamu)
-#define I2S_BCLK_PIN    26
-#define I2S_LRC_PIN     25
-#define I2S_DOUT_PIN    22
+// I2S Pins untuk MAX98357A (sesuaikan pin GPIO board kamu)
+#define I2S_BCLK_PIN        26
+#define I2S_LRC_PIN         25
+#define I2S_DOUT_PIN        22
 
-// I2S config
-#define I2S_PORT        I2S_NUM_0
-#define I2S_SAMPLE_RATE 44100
-#define I2S_BITS        16
-#define I2S_CHANNELS    2
+// I2S Configuration
+#define I2S_PORT            I2S_NUM_0
+#define I2S_SAMPLE_RATE     24000   // Server stream default: 24kHz Mono Opus
+#define I2S_BITS            16
+#define I2S_CHANNELS        1       // Mono
 
-// Buffer size untuk streaming
-#define AUDIO_BUFFER_SIZE 4096
+// Buffer streaming (4KB)
+#define AUDIO_BUFFER_SIZE   4096
 
 // ============== STATE ==============
 static bool audio_playing = false;
 static String current_audio_id = "";
 static unsigned long last_poll_time = 0;
+static String g_cached_mac = "";
+
+// ============== GET MAC ADDRESS ==============
+// Mengambil MAC address WiFi dalam format standard AA:BB:CC:DD:EE:FF
+// PENTING: MAC address ini yang digunakan server untuk mengenali board kamu!
+inline String get_audio_device_mac() {
+    if (g_cached_mac.length() > 0) {
+        return g_cached_mac;
+    }
+    g_cached_mac = WiFi.macAddress();
+    return g_cached_mac;
+}
 
 // ============== I2S SETUP ==============
 void audio_i2s_setup() {
@@ -57,7 +77,7 @@ void audio_i2s_setup() {
         .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
         .sample_rate = I2S_SAMPLE_RATE,
         .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+        .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT, // Mono out ke speaker
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
         .dma_buf_count = 8,
@@ -75,15 +95,15 @@ void audio_i2s_setup() {
     
     i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
     i2s_set_pin(I2S_PORT, &pin_config);
-    i2s_set_clk(I2S_PORT, I2S_SAMPLE_RATE, I2S_BITS, I2S_CHANNEL_STEREO);
+    i2s_set_clk(I2S_PORT, I2S_SAMPLE_RATE, I2S_BITS, I2S_CHANNEL_MONO);
     
-    Serial.println("[AudioPlayer] I2S initialized");
+    Serial.println("[AudioPlayer] I2S MAX98357A Siap (GPIO 26, 25, 22)");
 }
 
 // ============== POLL SERVER ==============
 /**
- * Poll server untuk audio commands baru.
- * Return: JSON array of commands, atau empty array.
+ * Polling server untuk memeriksa apakah ada perintah audio YouTube baru.
+ * PENTING: Mengirim ?mac=... agar server mencatat MAC board & status Admin langsung aktif!
  */
 JsonDocument poll_audio_commands() {
     JsonDocument doc;
@@ -93,23 +113,38 @@ JsonDocument poll_audio_commands() {
     }
     
     HTTPClient http;
-    String url = String(AUDIO_SERVER_URL) + "/api/device/audio/commands";
+    String mac = get_audio_device_mac();
+    String url = String(AUDIO_SERVER_URL) + "/api/device/audio/commands?mac=" + mac;
+    
+    String token = String(AUDIO_DEVICE_TOKEN);
+    token.trim();
+    if (token.length() > 0) {
+        url += "&token=" + token;
+    }
+    
     http.begin(url);
-    http.addHeader("X-Device-Token", AUDIO_DEVICE_TOKEN);
+    http.addHeader("Device-Id", mac);
+    http.addHeader("X-Device-Mac", mac);
+    if (token.length() > 0) {
+        http.addHeader("X-Device-Token", token);
+    }
     http.setTimeout(5000);
     
     int code = http.GET();
     if (code == 200) {
         String payload = http.getString();
         deserializeJson(doc, payload);
-    } else {
-        Serial.printf("[AudioPlayer] Poll failed: %d\n", code);
+    } else if (code > 0) {
+        Serial.printf("[AudioPlayer] Poll status: HTTP %d\n", code);
     }
     http.end();
     return doc;
 }
 
 // ============== ACK COMMAND ==============
+/**
+ * Konfirmasi ke server bahwa lagu telah berhasil diputar.
+ */
 void ack_audio_command(const String& command_id) {
     if (WiFi.status() != WL_CONNECTED) return;
     
@@ -117,34 +152,41 @@ void ack_audio_command(const String& command_id) {
     String url = String(AUDIO_SERVER_URL) + "/api/device/audio/ack";
     http.begin(url);
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    http.addHeader("X-Device-Token", AUDIO_DEVICE_TOKEN);
+    http.addHeader("Device-Id", get_audio_device_mac());
     
-    String body = "command_id=" + command_id + "&token=" + AUDIO_DEVICE_TOKEN;
+    String token = String(AUDIO_DEVICE_TOKEN);
+    token.trim();
+    String body = "command_id=" + command_id + "&mac=" + get_audio_device_mac();
+    if (token.length() > 0) {
+        body += "&token=" + token;
+    }
+    
     http.POST(body);
     http.end();
     
-    Serial.printf("[AudioPlayer] Acked command: %s\n", command_id.c_str());
+    Serial.printf("[AudioPlayer] ACK Perintah Audio: %s\n", command_id.c_str());
 }
 
 // ============== PLAY AUDIO STREAM ==============
 /**
- * Download dan putar audio dari URL via I2S.
- * Blocking - akan loop sampai selesai.
+ * Download & stream audio dari stream_url ke I2S DAC.
  */
 bool play_audio_stream(const String& stream_url, const String& title) {
-    Serial.printf("[AudioPlayer] Playing: %s\n", title.c_str());
+    Serial.printf("[AudioPlayer] Memutar: %s\n", title.c_str());
     Serial.printf("[AudioPlayer] URL: %s\n", stream_url.c_str());
     
     audio_playing = true;
     
     HTTPClient http;
     http.begin(stream_url);
-    http.addHeader("User-Agent", "ESP32-AudioPlayer/1.0");
+    http.addHeader("User-Agent", "ESP32-AudioPlayer/2.0");
+    http.addHeader("Device-Id", get_audio_device_mac());
+    http.addHeader("X-Device-Mac", get_audio_device_mac());
     http.setTimeout(15000);
     
     int code = http.GET();
     if (code != 200) {
-        Serial.printf("[AudioPlayer] HTTP error: %d\n", code);
+        Serial.printf("[AudioPlayer] HTTP Stream Error: %d\n", code);
         http.end();
         audio_playing = false;
         return false;
@@ -154,82 +196,76 @@ bool play_audio_stream(const String& stream_url, const String& title) {
     uint8_t buffer[AUDIO_BUFFER_SIZE];
     size_t total_bytes = 0;
     
-    // Skip M4A header (ftyp + mdat atoms) untuk raw PCM
-    // NOTE: Ini simplified. Untuk production, perlu AAC decoder library.
-    // Contoh: ESP8266Audio library (AudioGeneratorAAC + AudioOutputI2S)
-    
-    // Untuk M4A/AAC, kita perlu decoder. Sementara, output raw bytes
-    // (akan noise tanpa decoder - butuh library ESP8266Audio)
-    
-    while (http.connected() && stream->available()) {
-        size_t bytes_read = stream->readBytes(buffer, AUDIO_BUFFER_SIZE);
-        if (bytes_read > 0) {
-            size_t bytes_written = 0;
-            // Write ke I2S - untuk raw PCM
-            // Kalau pakai AAC decoder, ini akan di-replace
-            i2s_write(I2S_PORT, buffer, bytes_read, &bytes_written, portMAX_DELAY);
-            total_bytes += bytes_written;
+    while (http.connected() && (stream->available() || stream->connected())) {
+        size_t available_bytes = stream->available();
+        if (available_bytes > 0) {
+            size_t bytes_to_read = available_bytes > sizeof(buffer) ? sizeof(buffer) : available_bytes;
+            size_t bytes_read = stream->readBytes(buffer, bytes_to_read);
+            if (bytes_read > 0) {
+                size_t bytes_written = 0;
+                i2s_write(I2S_PORT, buffer, bytes_read, &bytes_written, portMAX_DELAY);
+                total_bytes += bytes_written;
+            }
         }
-        
-        // Yield untuk watchdog
-        yield();
+        yield(); // Hindari Watchdog Timer reset
     }
     
     http.end();
     audio_playing = false;
     
-    Serial.printf("[AudioPlayer] Done: %d bytes played\n", total_bytes);
+    Serial.printf("[AudioPlayer] Selesai: %u bytes diputar ke I2S\n", (unsigned int)total_bytes);
     return total_bytes > 0;
 }
 
 // ============== INIT ==============
 void audio_player_init() {
+    Serial.println("\n[AudioPlayer] Inisialisasi Audio Player ESP32...");
+    Serial.printf("[AudioPlayer] Server URL: %s\n", AUDIO_SERVER_URL);
+    Serial.printf("[AudioPlayer] MAC Address: %s\n", get_audio_device_mac().c_str());
     audio_i2s_setup();
-    Serial.println("[AudioPlayer] Ready. Polling for audio commands...");
+    Serial.println("[AudioPlayer] Siap menerima perintah audio dari XiaoZhi!");
 }
 
-// ============== LOOP (panggil di loop()) ==============
+// ============== LOOP ==============
 void audio_player_loop() {
-    // Skip kalau sedang playing
+    // Lewati jika sedang memutar lagu
     if (audio_playing) return;
     
-    // Skip kalau belum waktunya poll
+    // Cek interval polling
     unsigned long now = millis();
     if (now - last_poll_time < AUDIO_POLL_INTERVAL) return;
     last_poll_time = now;
     
-    // Poll server
+    // Poll perintah baru dari server
     JsonDocument doc = poll_audio_commands();
     if (!doc.is<JsonObject>()) return;
     
-    int count = doc["count"] | 0;
-    if (count == 0) return;
-    
     JsonArray commands = doc["commands"];
+    if (commands.size() == 0) return;
+    
     for (JsonObject cmd : commands) {
         String id = cmd["id"] | "";
-        String title = cmd["title"] | "Unknown";
+        String title = cmd["title"] | "Unknown Track";
         String stream_url = cmd["stream_url"] | "";
         
         if (stream_url.length() == 0) continue;
         
-        // Prepend server URL kalau relative
+        // Perbaiki jika relative URL
         if (stream_url.startsWith("/")) {
             stream_url = String(AUDIO_SERVER_URL) + stream_url;
         }
         
-        Serial.printf("[AudioPlayer] New command: %s\n", title.c_str());
+        Serial.printf("[AudioPlayer] Perintah audio masuk: %s\n", title.c_str());
         
-        // Play audio
+        // Putar audio
         bool success = play_audio_stream(stream_url, title);
         
-        // Ack ke server
-        if (success) {
+        // Kirim ACK ke server agar perintah ditandai selesai
+        if (success && id.length() > 0) {
             ack_audio_command(id);
         }
         
-        // Hanya play 1 lagu per cycle
-        break;
+        break; // 1 lagu per loop cycle
     }
 }
 
