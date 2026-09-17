@@ -759,6 +759,8 @@ class HFJsonStore:
             user = next((user for user in data["users"] if int(user.get("id", 0)) == int(user_id)), None)
             return self._public_user(user) if user else None
 
+    get_user_by_id = get_user
+
     def search_users_by_prefix(self, prefix: str, limit: int = 8) -> List[Dict[str, str]]:
         prefix = normalize_username_prefix(prefix)
         with self._lock:
