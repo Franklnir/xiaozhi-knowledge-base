@@ -1,0 +1,6 @@
+{
+  "success": false,
+  "error": "server_maintenance",
+  "message": "Server sedang dalam pemeliharaan (maintenance) atau sedang restart. Silakan coba beberapa saat lagi.",
+  "status": 503
+}
