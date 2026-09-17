@@ -636,6 +636,56 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return response
 
     @mcp_server.tool()
+    def get_playback_status() -> dict:
+        """
+        Cek status lagu atau audio YouTube yang sedang atau baru saja selesai diputar di speaker perangkat XiaoZhi.
+        Gunakan tool ini saat user bertanya:
+        - "Lagu apa yang lagi diputar?"
+        - "Lagu apa ini?"
+        - "Apakah lagunya masih jalan?"
+        - "Apakah lagunya sudah selesai?"
+        - "Tadi putar lagu apa?"
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "is_playing": False, "message": "Belum ada koneksi perangkat aktif."}
+        from xiaozhi.services.playback_tracker import playback_tracker
+        status = playback_tracker.get_playback_status(owner_id)
+        record_mcp_tool_history(owner_id, "get_playback_status", "status pemutaran", {}, status)
+        return {"success": True, **status}
+
+    @mcp_server.tool()
+    def stop_youtube_song() -> dict:
+        """
+        Hentikan (stop/matikan/pause) pemutaran lagu YouTube yang sedang berputar di speaker perangkat XiaoZhi.
+        Gunakan tool ini saat user meminta:
+        - "Stop lagunya" / "Stop musik"
+        - "Matikan lagunya" / "Matikan musik"
+        - "Berhenti putar lagu"
+        - "Cukup lagunya"
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi perangkat aktif."}
+        from xiaozhi.services.playback_tracker import playback_tracker
+        stopped = playback_tracker.stop_user_playback(owner_id)
+        if stopped:
+            response = {
+                "success": True,
+                "stopped": True,
+                "message": "Pemutaran lagu YouTube berhasil dihentikan. Speaker kini kembali ke mode siaga.",
+                "instructions": "Panggil tool perangkat `self.audio.abort` jika diperlukan agar speaker lokal segera mengosongkan buffer audio.",
+            }
+        else:
+            response = {
+                "success": True,
+                "stopped": False,
+                "message": "Saat ini memang tidak ada lagu YouTube yang sedang diputar.",
+            }
+        record_mcp_tool_history(owner_id, "stop_youtube_song", "stop lagu", {}, response)
+        return response
+
+    @mcp_server.tool()
     def search_web(query: str, max_results: int = 5) -> dict:
         """
         Cari informasi terkini dari internet.

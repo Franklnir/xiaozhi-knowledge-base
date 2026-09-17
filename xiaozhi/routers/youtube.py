@@ -692,6 +692,68 @@ async def device_audio_ack(request: Request):
     return {"success": True}
 
 
+@router.post("/api/device/audio/status")
+async def device_audio_status(request: Request):
+    """
+    Handle real-time playback state events reported from ESP32 board:
+    - 'playing': audio streaming/decoding active
+    - 'finished': audio reached natural EOF
+    - 'stopped' / 'aborted': playback interrupted by user or stop command
+    - 'error': connection interrupted
+    """
+    store = get_store()
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    if not body:
+        try:
+            form = await request.form()
+            body = dict(form)
+        except Exception:
+            pass
+
+    status = str(body.get("status", "")).strip().lower()
+    mac = str(body.get("mac", "") or body.get("device_id", "")).strip()
+    video_id = str(body.get("video_id", "")).strip()
+    token = str(body.get("token", "")).strip()
+
+    if not status:
+        return {"success": False, "error": "status parameter is required"}
+
+    owner_id = None
+    if token:
+        owner = store.find_user_by_mcp_token(token)
+        if owner:
+            owner_id = owner["user_id"]
+    if not owner_id and mac:
+        owner_id = _resolve_owner_for_device(store, mac)
+    if not owner_id:
+        device_hdr = request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
+        if device_hdr:
+            owner_id = _resolve_owner_for_device(store, device_hdr)
+
+    # Fallback: find active session by MAC in playback_tracker
+    device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
+    if not owner_id and device_mac:
+        for s in playback_tracker.get_active_sessions():
+            if s.get("device_mac", "").upper() == device_mac.upper():
+                owner_id = s.get("user_id")
+                break
+
+    if owner_id:
+        playback_tracker.handle_device_status(owner_id, status, video_id=video_id)
+        from xiaozhi.routers.admin import broadcast_admin_users_update
+        try:
+            await broadcast_admin_users_update()
+        except Exception:
+            pass
+        return {"success": True, "owner_id": owner_id, "status": status}
+
+    return {"success": True, "status": status, "warning": "Unmapped device"}
+
+
 @router.websocket("/ws/audio/stream/{video_id}")
 async def ws_audio_stream_endpoint(
     websocket: WebSocket,
