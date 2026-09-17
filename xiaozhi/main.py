@@ -142,8 +142,12 @@ app.add_middleware(
 
 @app.middleware("http")
 async def monitor_requests(request: Request, call_next):
-    """Monitor request timing and errors."""
+    """Monitor request timing and errors with guaranteed unique Request ID."""
+    import uuid
     start = time.time()
+    req_id = request.headers.get("X-Request-ID") or f"req-{uuid.uuid4().hex[:10]}"
+    request.state.request_id = req_id
+
     response = await call_next(request)
     duration_ms = (time.time() - start) * 1000
 
@@ -155,11 +159,11 @@ async def monitor_requests(request: Request, call_next):
 
     # Log slow requests
     if duration_ms > 5000:
-        logger.warning(f"Slow request: {method} {endpoint} took {duration_ms:.0f}ms")
+        logger.warning(f"[{req_id}] Slow request: {method} {endpoint} took {duration_ms:.0f}ms")
 
     # Add performance headers
     response.headers["X-Response-Time"] = f"{duration_ms:.0f}ms"
-    response.headers["X-Request-ID"] = request.headers.get("X-Request-ID", "")
+    response.headers["X-Request-ID"] = req_id
 
     return response
 
