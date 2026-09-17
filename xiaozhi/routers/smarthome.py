@@ -26,6 +26,9 @@ async def smarthome_page(request: Request):
     user = get_current_user(request)
     if not user:
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
+    role = str(user.get("role") or "user").lower()
+    if role != "admin" and not is_mcp_connected(user["id"]):
+        return redirect_with_message("/login", "Endpoint WebSocket MCP wajib dihubungkan sebelum mengakses Smart Home.")
     store = get_store()
     token_info = store.get_xiaozhi_token_info(user["id"])
     token_saved = bool(token_info)

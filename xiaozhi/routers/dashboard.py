@@ -32,6 +32,26 @@ async def dashboard_page(request: Request):
     user = get_current_user(request)
     if not user:
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
+
+    role = str(user.get("role") or "user").lower()
+    # Admin is not required to enter MCP
+    if role != "admin" and not is_mcp_connected(user["id"]):
+        store = get_store()
+        token_info = store.get_xiaozhi_token_info(user["id"])
+        return render(
+            request,
+            "login.html",
+            {
+                "user": user,
+                "error": "Akun Anda belum menghubungkan endpoint WebSocket MCP. Anda wajib menghubungkan MCP sebelum mengakses Dashboard.",
+                "success": None,
+                "active_mode": "mcp_gating",
+                "active_page": "login",
+                "mcp_pending": True,
+                "mcp_token_preview": token_info.get("preview", "") if token_info else "",
+            }
+        )
+
     store = get_store()
     categories = store.list_categories(user["id"])
     materials = store.list_materials(user["id"])

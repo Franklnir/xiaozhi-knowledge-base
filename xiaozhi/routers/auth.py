@@ -21,6 +21,7 @@ from xiaozhi.dependencies import (
     render,
     validate_csrf,
     redirect_with_message,
+    make_csrf_token,
 )
 
 router = APIRouter()
@@ -180,10 +181,12 @@ async def web_login_api(request: Request):
     token_info = store.get_xiaozhi_token_info(user_id)
     mcp_ok = is_mcp_connected(user_id)
 
+    new_csrf = make_csrf_token(user)
     if role == "admin" or mcp_ok:
         res = JSONResponse({
             "success": True,
             "mcp_required": False,
+            "csrf_token": new_csrf,
             "redirect_url": "/admin" if role == "admin" else "/dashboard"
         })
         set_session_cookie(res, request, user)
@@ -192,6 +195,7 @@ async def web_login_api(request: Request):
         res = JSONResponse({
             "success": True,
             "mcp_required": True,
+            "csrf_token": new_csrf,
             "token_saved": bool(token_info),
             "token_preview": token_info.get("preview", "") if token_info else "",
             "message": "Koneksi MCP belum terhubung. Silakan hubungkan endpoint WebSocket MCP."
@@ -282,11 +286,13 @@ async def web_register_api(request: Request):
             "session_version": 1,
             "ui_theme": DEFAULT_UI_THEME,
         }
+        new_csrf = make_csrf_token(user)
         res = JSONResponse({
             "success": True,
             "message": "Akun berhasil dibuat! Silakan hubungkan endpoint MCP.",
             "mcp_required": True,
             "username": username,
+            "csrf_token": new_csrf,
         })
         set_session_cookie(res, request, user)
         return res

@@ -6,6 +6,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from xiaozhi.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 from xiaozhi.core.security import (
     create_token_pair,
     validate_access_token,
@@ -13,6 +14,7 @@ from xiaozhi.core.security import (
     verify_password,
 )
 from xiaozhi.dependencies import get_store
+from xiaozhi.services.mcp_service import is_mcp_connected
 
 router = APIRouter(prefix="/api/v1/auth", tags=["API v1 Auth"])
 
@@ -71,6 +73,8 @@ async def api_register(body: RegisterRequest):
     session_version = max(1, int(user.get("session_version", 1) or 1))
 
     tokens = create_token_pair(user_id, body.username, role, session_version)
+    mcp_required = (role != "admin")
+    mcp_connected = bool(is_mcp_connected(user_id))
 
     return TokenResponse(
         success=True,
@@ -81,6 +85,8 @@ async def api_register(body: RegisterRequest):
                 "role": role,
             },
             **tokens,
+            "mcp_required": mcp_required,
+            "mcp_connected": mcp_connected,
         },
         message="Registrasi berhasil."
     )
@@ -106,6 +112,8 @@ async def api_login(body: LoginRequest):
     session_version = max(1, int(user_record.get("session_version", 1) or 1))
 
     tokens = create_token_pair(user_id, body.username, role, session_version)
+    mcp_required = (role != "admin")
+    mcp_connected = bool(is_mcp_connected(user_id))
 
     return TokenResponse(
         success=True,
@@ -116,6 +124,8 @@ async def api_login(body: LoginRequest):
                 "role": role,
             },
             **tokens,
+            "mcp_required": mcp_required,
+            "mcp_connected": mcp_connected,
         },
         message="Login berhasil."
     )
@@ -153,6 +163,8 @@ async def api_refresh(body: RefreshRequest):
 
     role = str(user.get("role") or "user").lower()
     tokens = create_token_pair(user["id"], user["username"], role, current_sv)
+    mcp_required = (role != "admin")
+    mcp_connected = bool(is_mcp_connected(int(user["id"])))
 
     return TokenResponse(
         success=True,
@@ -163,6 +175,8 @@ async def api_refresh(body: RefreshRequest):
                 "role": role,
             },
             **tokens,
+            "mcp_required": mcp_required,
+            "mcp_connected": mcp_connected,
         },
         message="Token berhasil diperbarui."
     )
@@ -183,18 +197,24 @@ async def api_me(request: Request):
             detail={"success": False, "data": None, "message": "Tidak terotentikasi."}
         )
 
+    role = str(user.get("role") or "user").lower()
+    mcp_required = (role != "admin")
+    mcp_connected = bool(is_mcp_connected(int(user["id"])))
+
     return TokenResponse(
         success=True,
         data={
             "user": {
                 "id": user["id"],
                 "username": user["username"],
-                "role": user.get("role", "user"),
+                "role": role,
                 "ui_theme": user.get("ui_theme", "neo"),
                 "google_id": user.get("google_id"),
                 "google_email": user.get("google_email"),
                 "registered_with_google": user.get("registered_with_google", False),
-            }
+            },
+            "mcp_required": mcp_required,
+            "mcp_connected": mcp_connected,
         },
         message="OK"
     )
@@ -212,7 +232,7 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
             detail={"success": False, "data": None, "message": "ID token Google diperlukan."}
         )
 
-    # Verify token with Google
+    # Verify token with Google (support id_token, access_token, and auth code)
     google_id = None
     google_email = None
     google_name = None
@@ -235,6 +255,34 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
                 google_id = str(payload2.get("id") or "")
                 google_email = (payload2.get("email") or "").strip().lower()
                 google_name = payload2.get("name") or ""
+            else:
+                # Try exchanging as authorization code
+                if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+                    token_resp = requests.post(
+                        "https://oauth2.googleapis.com/token",
+                        data={
+                            "code": token_str,
+                            "client_id": GOOGLE_CLIENT_ID,
+                            "client_secret": GOOGLE_CLIENT_SECRET,
+                            "grant_type": "authorization_code",
+                            "redirect_uri": "",
+                        },
+                        timeout=10,
+                    )
+                    if token_resp.ok:
+                        tdata = token_resp.json()
+                        act = tdata.get("access_token")
+                        if act:
+                            u_resp = requests.get(
+                                "https://www.googleapis.com/oauth2/v2/userinfo",
+                                headers={"Authorization": f"Bearer {act}"},
+                                timeout=10,
+                            )
+                            if u_resp.ok:
+                                u_info = u_resp.json()
+                                google_id = str(u_info.get("id") or "")
+                                google_email = (u_info.get("email") or "").strip().lower()
+                                google_name = u_info.get("name") or ""
     except Exception as exc:
         raise HTTPException(
             status_code=502,
@@ -261,17 +309,20 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
             )
         try:
             store.link_google_account(current_user["id"], google_id, google_email)
+            role = str(current_user.get("role") or "user").lower()
             return TokenResponse(
                 success=True,
                 data={
                     "user": {
                         "id": current_user["id"],
                         "username": current_user["username"],
-                        "role": current_user.get("role", "user"),
+                        "role": role,
                         "google_id": google_id,
                         "google_email": google_email,
                         "registered_with_google": current_user.get("registered_with_google", False),
-                    }
+                    },
+                    "mcp_required": (role != "admin"),
+                    "mcp_connected": bool(is_mcp_connected(current_user["id"])),
                 },
                 message=f"Akun Google ({google_email}) berhasil ditautkan!"
             )
@@ -281,48 +332,8 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
                 detail={"success": False, "data": None, "message": str(exc)}
             )
 
-    # ── Action: REGISTER ──
-    if action == "register":
-        existing_user = store.get_user_by_google_id(google_id)
-        if not existing_user and google_email:
-            existing_user = store.get_user_by_email(google_email)
-
-        if existing_user:
-            raise HTTPException(
-                status_code=400,
-                detail={"success": False, "data": None, "message": f"Akun Google ({google_email}) sudah terdaftar. Silakan langsung masuk."}
-            )
-
-        from xiaozhi.routers.google_auth import generate_unique_username
-        username = generate_unique_username(google_email, google_name, store)
-        try:
-            new_user = store.create_google_user(username, google_id, google_email)
-            user_id = int(new_user["id"])
-            role = str(new_user.get("role") or "user").lower()
-            session_version = 1
-            tokens = create_token_pair(user_id, username, role, session_version)
-            return TokenResponse(
-                success=True,
-                data={
-                    "user": {
-                        "id": user_id,
-                        "username": username,
-                        "role": role,
-                        "google_id": google_id,
-                        "google_email": google_email,
-                        "registered_with_google": True,
-                    },
-                    **tokens,
-                },
-                message="Registrasi dengan Google berhasil."
-            )
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=400,
-                detail={"success": False, "data": None, "message": str(exc)}
-            )
-
-    # ── Action: LOGIN ──
+    # ── Seamless LOGIN / REGISTER ──
+    # 1. Look up existing user by google_id or email
     user_record = store.get_user_by_google_id(google_id)
     if not user_record and google_email:
         user_record = store.get_user_by_email(google_email)
@@ -332,16 +343,24 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
             except Exception:
                 pass
 
+    # 2. If user does not exist, auto-register them seamlessly!
     if not user_record:
-        raise HTTPException(
-            status_code=404,
-            detail={"success": False, "data": None, "message": f"Akun Google ({google_email}) belum terdaftar. Silakan daftar terlebih dahulu melalui tab Daftar."}
-        )
+        from xiaozhi.routers.google_auth import generate_unique_username
+        username = generate_unique_username(google_email, google_name, store)
+        try:
+            user_record = store.create_google_user(username, google_id, google_email)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={"success": False, "data": None, "message": str(exc)}
+            )
 
     user_id = int(user_record["id"])
     role = str(user_record.get("role") or "user").lower()
     session_version = max(1, int(user_record.get("session_version", 1) or 1))
     tokens = create_token_pair(user_id, user_record["username"], role, session_version)
+    mcp_required = (role != "admin")
+    mcp_connected = bool(is_mcp_connected(user_id))
 
     return TokenResponse(
         success=True,
@@ -355,8 +374,10 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
                 "registered_with_google": bool(user_record.get("registered_with_google", False)),
             },
             **tokens,
+            "mcp_required": mcp_required,
+            "mcp_connected": mcp_connected,
         },
-        message="Login dengan Google berhasil."
+        message="Autentikasi Google berhasil."
     )
 
 

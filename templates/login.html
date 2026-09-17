@@ -333,7 +333,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const noticeText = document.getElementById("loginMcpStatusText");
     const noticeIcon = document.getElementById("loginMcpStatusIcon");
     const progressBar = document.getElementById("loginMcpProgressBar");
-    const csrf = document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : "";
+    let csrf = document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : "";
 
     let pollTimer = null;
 
@@ -356,6 +356,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const data = await resp.json();
 
             if (data.success) {
+                if (data.csrf_token) csrf = data.csrf_token;
                 if (data.mcp_required) {
                     // MCP is required and not connected! Show gating card!
                     if (loginForm) loginForm.classList.add("hidden");
