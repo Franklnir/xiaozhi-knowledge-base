@@ -49,22 +49,15 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
 
     raw_mac = device_id[6:] if device_id.lower().startswith("esp32-") else device_id
     mac_with_colons = _normalize_mac(raw_mac)
+    raw_mac_clean = raw_mac.replace(":", "").replace("-", "").lower()
 
     conn = getattr(store, "_get_conn", lambda: None)()
     if conn is not None:
-        try:
-            pending_row = conn.execute(
-                "SELECT owner_id FROM audio_queue WHERE status IN ('pending', 'playing') ORDER BY id DESC LIMIT 1"
-            ).fetchone()
-            if pending_row and pending_row["owner_id"]:
-                return int(pending_row["owner_id"])
-        except Exception:
-            pass
-
+        # 1. PRIMARY AUTHORITY: Check registered_devices by exact device_id / MAC
         try:
             row = conn.execute(
-                "SELECT owner_id FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(device_id) = ?",
-                (device_id.lower(), raw_mac.lower())
+                "SELECT owner_id FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(device_id) = ? OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ? ORDER BY id DESC LIMIT 1",
+                (device_id.lower(), mac_with_colons.lower(), raw_mac_clean)
             ).fetchone()
             if row and row["owner_id"]:
                 return int(row["owner_id"])
@@ -73,35 +66,25 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
 
     if hasattr(store, "find_device_by_mac"):
         try:
-            dev = store.find_device_by_mac(mac_with_colons)
+            dev = store.find_device_by_mac(mac_with_colons) or store.find_device_by_mac(raw_mac)
             if dev and dev.get("owner_id"):
                 return int(dev["owner_id"])
         except Exception:
             pass
 
+    # 2. MATCH AUDIO QUEUE ONLY IF THE URL/COMMAND EXPLICITLY CONTAINS THIS MAC
     if conn is not None:
         try:
-            token_row = conn.execute("SELECT user_id FROM xiaozhi_tokens ORDER BY updated_at DESC LIMIT 1").fetchone()
-            if token_row and token_row["user_id"]:
-                return int(token_row["user_id"])
+            matching_row = conn.execute(
+                "SELECT owner_id FROM audio_queue WHERE status IN ('pending', 'playing') AND (stream_url LIKE ? OR stream_url LIKE ?) ORDER BY id DESC LIMIT 1",
+                (f"%{mac_with_colons}%", f"%{raw_mac_clean}%")
+            ).fetchone()
+            if matching_row and matching_row["owner_id"]:
+                return int(matching_row["owner_id"])
         except Exception:
             pass
 
-        try:
-            admin_row = conn.execute("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1").fetchone()
-            if admin_row and admin_row["id"]:
-                return int(admin_row["id"])
-        except Exception:
-            pass
-
-        try:
-            first_user = conn.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()
-            if first_user and first_user["id"]:
-                return int(first_user["id"])
-        except Exception:
-            pass
-
-    return 1
+    return None
 
 
 def youtube_search(query: str, max_results: int = 5) -> list:

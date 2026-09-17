@@ -114,6 +114,20 @@ class PlaybackTracker:
             self._sessions[session_id] = session
             self._user_sessions[user_id] = session_id
             logger.info("Playback session started: %s for user %s (%s)", session_id, user_id, title)
+
+            # Permanently persist device_mac to database so it never disappears after stream ends
+            if device_mac and user_id:
+                try:
+                    from xiaozhi.dependencies import get_store
+                    st = get_store()
+                    if hasattr(st, "register_device"):
+                        clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+                        clean_mac = clean_mac.strip().upper()
+                        if len(clean_mac) >= 11:
+                            st.register_device(user_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+                except Exception as e:
+                    logger.debug("Could not auto-register device_mac in tracker: %s", e)
+
             return session
 
     def end_session(self, session_id: str, reason: str = "finished") -> None:
