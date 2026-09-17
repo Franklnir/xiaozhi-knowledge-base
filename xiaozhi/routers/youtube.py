@@ -133,15 +133,62 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
     title = ""
     device_mac = (mac or "").strip()
     if not device_mac and hasattr(request, "headers"):
-        device_mac = request.headers.get("Device-Id", "").strip()
-    if not device_mac and hasattr(request, "headers"):
-        device_mac = request.headers.get("X-Device-Mac", "").strip()
-    if not device_mac and hasattr(request, "headers"):
-        device_mac = request.headers.get("X-MAC-Address", "").strip()
+        device_mac = (
+            request.headers.get("Device-Id", "") or
+            request.headers.get("X-Device-Mac", "") or
+            request.headers.get("X-MAC-Address", "") or
+            request.headers.get("X-Device-Id", "") or
+            request.headers.get("device_id", "") or
+            request.headers.get("mac", "")
+        ).strip()
+    if not device_mac and hasattr(request, "query_params"):
+        device_mac = (
+            request.query_params.get("mac", "") or
+            request.query_params.get("device_id", "")
+        ).strip()
 
+    # 1. Highest priority: explicit owner_id from query parameter
     if owner_id:
         user = _fetch_user(store, owner_id)
 
+    # 2. Check recent audio_queue for this video_id (created in last 20 minutes)
+    # This directly identifies the user who just asked XiaoZhi to play this song!
+    if not user:
+        conn = getattr(store, "_get_conn", lambda: None)()
+        if conn is not None:
+            try:
+                row = conn.execute(
+                    "SELECT owner_id, title FROM audio_queue WHERE video_id = ? AND status IN ('pending', 'playing') AND datetime(created_at) >= datetime('now', '-20 minutes') ORDER BY id DESC LIMIT 1",
+                    (video_id,)
+                ).fetchone()
+                if row and row["owner_id"]:
+                    user = _fetch_user(store, row["owner_id"])
+                    if row["title"] and not title:
+                        title = row["title"]
+                    try:
+                        conn.execute(
+                            "UPDATE audio_queue SET status = 'playing' WHERE video_id = ? AND status = 'pending'",
+                            (video_id,)
+                        )
+                        conn.commit()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        elif hasattr(store, "_load"):
+            try:
+                with store._lock:
+                    data = store._load()
+                    for cmd in reversed(data.get("audio_queue", [])):
+                        if cmd.get("video_id") == video_id and cmd.get("owner_id"):
+                            user = _fetch_user(store, cmd["owner_id"])
+                            if cmd.get("title") and not title:
+                                title = cmd["title"]
+                            break
+            except Exception:
+                pass
+
+    # 3. If still not resolved, check MCP token
     if not user and token:
         try:
             owner = store.find_user_by_mcp_token(token)
@@ -150,6 +197,7 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
         except Exception:
             pass
 
+    # 4. If still not resolved, lookup user by device_mac in registered_devices
     if not user and device_mac:
         try:
             resolved_id = _resolve_owner_for_device(store, device_mac)
@@ -158,6 +206,7 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
         except Exception:
             pass
 
+    # 5. Check active session user (web browser session)
     if not user:
         try:
             session_user = get_current_user(request)
@@ -166,51 +215,30 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
         except Exception:
             pass
 
-    # Fallback to recent audio_queue record for this video_id
-    conn = getattr(store, "_get_conn", lambda: None)()
-    if conn is not None:
-        try:
-            row = conn.execute(
-                "SELECT owner_id, title FROM audio_queue WHERE video_id = ? ORDER BY id DESC LIMIT 1",
-                (video_id,)
-            ).fetchone()
-            if row:
-                if not user and row["owner_id"]:
+    # 6. Fallback: recent audio_queue record within 30 minutes (never from days ago!)
+    if not user:
+        conn = getattr(store, "_get_conn", lambda: None)()
+        if conn is not None:
+            try:
+                row = conn.execute(
+                    "SELECT owner_id, title FROM audio_queue WHERE video_id = ? AND datetime(created_at) >= datetime('now', '-30 minutes') ORDER BY id DESC LIMIT 1",
+                    (video_id,)
+                ).fetchone()
+                if row and row["owner_id"]:
                     user = _fetch_user(store, row["owner_id"])
-                if row["title"] and not title:
-                    title = row["title"]
-                # Mark pending item as playing
-                try:
-                    conn.execute(
-                        "UPDATE audio_queue SET status = 'playing' WHERE video_id = ? AND status = 'pending'",
-                        (video_id,)
-                    )
-                    conn.commit()
-                except Exception:
-                    pass
-        except Exception:
-            pass
-    elif hasattr(store, "_load"):
-        try:
-            with store._lock:
-                data = store._load()
-                for cmd in reversed(data.get("audio_queue", [])):
-                    if cmd.get("video_id") == video_id:
-                        if not user and cmd.get("owner_id"):
-                            user = _fetch_user(store, cmd["owner_id"])
-                        if cmd.get("title") and not title:
-                            title = cmd["title"]
-                        break
-        except Exception:
-            pass
+                    if row["title"] and not title:
+                        title = row["title"]
+            except Exception:
+                pass
 
+    # If user known but device_mac not provided in request, check if user already has registered MAC
     if user and not device_mac and hasattr(store, "get_user_mac_address"):
         try:
             device_mac = store.get_user_mac_address(user["id"]) or ""
         except Exception:
             pass
 
-    # Auto-register device MAC to user in registered_devices
+    # Auto-register / rebind device MAC to this user in registered_devices
     if user and device_mac and hasattr(store, "register_device"):
         clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
         clean_mac = clean_mac.strip().upper()
@@ -551,8 +579,14 @@ async def now_playing(request: Request):
 
 
 @router.get("/api/audio/play_direct")
-async def audio_play_direct(q: str):
-    """Direct search and stream for ESP32 instant on-demand playback."""
+async def audio_play_direct(
+    request: Request,
+    q: str = Query(""),
+    mac: str = Query(""),
+    token: str = Query(""),
+    owner_id: Optional[int] = Query(None),
+):
+    """Direct search and stream for ESP32 instant on-demand playback with auto MAC binding."""
     q = (q or "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Query required")
@@ -560,10 +594,78 @@ async def audio_play_direct(q: str):
         results = youtube_search(q, max_results=1)
         if not results:
             raise HTTPException(status_code=404, detail="Song not found")
+        
+        vid = results[0]["video_id"]
+        title = results[0]["title"]
+        store = get_store()
+
+        # Extract device MAC
+        device_mac = (mac or "").strip()
+        if not device_mac and hasattr(request, "headers"):
+            device_mac = (
+                request.headers.get("Device-Id", "") or
+                request.headers.get("X-Device-Mac", "") or
+                request.headers.get("X-MAC-Address", "") or
+                request.headers.get("X-Device-Id", "") or
+                request.headers.get("device_id", "") or
+                request.headers.get("mac", "")
+            ).strip()
+
+        # Resolve owner
+        resolved_owner_id = owner_id
+        if not resolved_owner_id and token:
+            owner = store.find_user_by_mcp_token(token)
+            if owner and owner.get("user_id"):
+                resolved_owner_id = owner["user_id"]
+        if not resolved_owner_id and device_mac:
+            resolved_owner_id = _resolve_owner_for_device(store, device_mac)
+        if not resolved_owner_id:
+            try:
+                su = get_current_user(request)
+                if su and su.get("id"):
+                    resolved_owner_id = su["id"]
+            except Exception:
+                pass
+
+        clean_mac = ""
+        if device_mac:
+            clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+            clean_mac = clean_mac.strip().upper()
+
+        base_url = str(request.base_url).rstrip("/")
+        if resolved_owner_id:
+            # Auto-register device MAC
+            if clean_mac and len(clean_mac) >= 11 and hasattr(store, "register_device"):
+                try:
+                    store.register_device(resolved_owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+                    logger.info(f"[PLAY DIRECT MAC] Device {clean_mac} auto-registered to user {resolved_owner_id}")
+                except Exception as exc:
+                    logger.error(f"[PLAY DIRECT MAC ERROR] {exc}")
+
+            # Queue command so streaming and tracker recognize the user
+            mac_param = f"&mac={clean_mac}" if clean_mac else ""
+            stream_url = f"/api/audio/stream/{vid}?owner_id={resolved_owner_id}{mac_param}"
+            full_stream = f"{base_url}{stream_url}"
+            try:
+                store.queue_audio_command(
+                    resolved_owner_id,
+                    title=title,
+                    stream_url=full_stream,
+                    video_url=f"https://www.youtube.com/watch?v={vid}",
+                    video_id=vid
+                )
+            except Exception:
+                pass
+        else:
+            mac_param = f"&mac={clean_mac}" if clean_mac else ""
+            stream_url = f"/api/audio/stream/{vid}?{mac_param.lstrip('&')}" if mac_param else f"/api/audio/stream/{vid}"
+
         return {
             "success": True,
-            "video_id": results[0]["video_id"],
-            "title": results[0]["title"],
+            "video_id": vid,
+            "title": title,
+            "stream_url": stream_url,
+            "owner_id": resolved_owner_id,
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
@@ -588,9 +690,21 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
         owner_id = _resolve_owner_for_device(store, mac)
 
     if not owner_id:
-        device_hdr = request.headers.get("Device-Id", "")
+        device_hdr = request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
         if device_hdr:
             owner_id = _resolve_owner_for_device(store, device_hdr)
+
+    # If owner_id is still None, check if there's a recent pending command in audio_queue created in last 2 mins
+    if not owner_id and (mac or request.headers.get("Device-Id", "")):
+        if conn is not None:
+            try:
+                recent = conn.execute(
+                    "SELECT owner_id FROM audio_queue WHERE status = 'pending' AND datetime(created_at) >= datetime('now', '-2 minutes') ORDER BY id DESC LIMIT 1"
+                ).fetchone()
+                if recent and recent["owner_id"]:
+                    owner_id = int(recent["owner_id"])
+            except Exception:
+                pass
 
     if not owner_id:
         return {"success": True, "commands": []}
@@ -712,39 +826,70 @@ async def device_audio_status(request: Request):
     video_id = str(body.get("video_id", "")).strip()
     token = str(body.get("token", "")).strip()
 
+    device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "") or request.headers.get("X-MAC-Address", "") or request.headers.get("device_id", "")
+    device_mac = device_mac.strip()
+
     if not status:
         return {"success": False, "error": "status parameter is required"}
 
     owner_id = None
     if token:
         owner = store.find_user_by_mcp_token(token)
-        if owner:
+        if owner and owner.get("user_id"):
             owner_id = owner["user_id"]
-    if not owner_id and mac:
-        owner_id = _resolve_owner_for_device(store, mac)
-    if not owner_id:
-        device_hdr = request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
-        if device_hdr:
-            owner_id = _resolve_owner_for_device(store, device_hdr)
 
-    # Fallback: find active session by MAC in playback_tracker
-    device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
-    if not owner_id and device_mac:
+    # 1. Check audio_queue for this video_id in the last 30 minutes
+    if not owner_id and video_id:
+        conn = getattr(store, "_get_conn", lambda: None)()
+        if conn is not None:
+            try:
+                row = conn.execute(
+                    "SELECT owner_id FROM audio_queue WHERE video_id = ? AND datetime(created_at) >= datetime('now', '-30 minutes') ORDER BY id DESC LIMIT 1",
+                    (video_id,)
+                ).fetchone()
+                if row and row["owner_id"]:
+                    owner_id = int(row["owner_id"])
+            except Exception:
+                pass
+
+    # 2. Fallback: find active session by video_id or device_mac in playback_tracker
+    if not owner_id:
         for s in playback_tracker.get_active_sessions():
-            if s.get("device_mac", "").upper() == device_mac.upper():
+            if video_id and s.get("video_id") == video_id:
+                owner_id = s.get("user_id")
+                break
+            if device_mac and s.get("device_mac", "").upper() == device_mac.upper():
                 owner_id = s.get("user_id")
                 break
 
+    # 3. Fallback: resolve from registered_devices
+    if not owner_id and device_mac:
+        owner_id = _resolve_owner_for_device(store, device_mac)
+
+    # CRITICAL: Auto-register / rebind device MAC to this user in registered_devices
+    mac_saved_ok = False
+    clean_mac = ""
+    if device_mac:
+        clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+        clean_mac = clean_mac.strip().upper()
+        if owner_id and len(clean_mac) >= 11 and hasattr(store, "register_device"):
+            try:
+                store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+                mac_saved_ok = True
+                logger.info(f"[STATUS MAC] Device MAC {clean_mac} auto-registered to user {owner_id}")
+            except Exception as exc:
+                logger.error(f"[STATUS MAC ERROR] Failed to save MAC {clean_mac}: {exc}")
+
     if owner_id:
-        playback_tracker.handle_device_status(owner_id, status, video_id=video_id)
+        playback_tracker.handle_device_status(owner_id, status, video_id=video_id, device_mac=clean_mac)
         from xiaozhi.routers.admin import broadcast_admin_users_update
         try:
             await broadcast_admin_users_update()
         except Exception:
             pass
-        return {"success": True, "owner_id": owner_id, "status": status}
+        return {"success": True, "owner_id": owner_id, "status": status, "device_mac": clean_mac, "mac_saved": mac_saved_ok}
 
-    return {"success": True, "status": status, "warning": "Unmapped device"}
+    return {"success": True, "status": status, "device_mac": clean_mac, "warning": "Unmapped device"}
 
 
 @router.websocket("/ws/audio/stream/{video_id}")
