@@ -38,6 +38,9 @@ async def relay_nyata_page(request: Request):
     user = get_current_user(request)
     if not user:
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
+    role = str(user.get("role") or "user").lower()
+    if role != "admin" and not is_mcp_connected(user["id"]):
+        return redirect_with_message("/login", "Endpoint WebSocket MCP wajib dihubungkan sebelum mengakses Relay Nyata.")
     store = get_store()
     payload = real_relay_page_payload(user["id"])
     feature_settings = store.get_feature_settings(user["id"])

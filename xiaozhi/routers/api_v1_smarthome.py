@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from xiaozhi.dependencies import require_user, get_store
+from xiaozhi.dependencies import require_user, get_store, require_mcp_connected_if_not_admin
 from xiaozhi.services.mcp_service import is_mcp_connected
 from xiaozhi.services.smarthome_service import (
     get_smart_home_state,
@@ -41,6 +41,7 @@ class AllRelaysCommand(BaseModel):
 async def get_state(request: Request):
     """Get current smart home state for all relays."""
     user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
 
     feature_settings = store.get_feature_settings(user["id"])
@@ -66,6 +67,7 @@ async def get_state(request: Request):
 async def control_relay(request: Request, cmd: RelayCommand):
     """Control a specific relay (1-8)."""
     user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
 
     feature_settings = store.get_feature_settings(user["id"])
@@ -90,6 +92,7 @@ async def control_relay(request: Request, cmd: RelayCommand):
 async def control_all_relays(request: Request, cmd: AllRelaysCommand):
     """Turn all relays on or off."""
     user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
 
     feature_settings = store.get_feature_settings(user["id"])

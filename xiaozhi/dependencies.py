@@ -75,8 +75,38 @@ def validate_csrf(request: Request, token: str, user: Optional[Dict[str, Any]]) 
     except BadSignature as exc:
         raise HTTPException(status_code=403, detail="Token keamanan form tidak valid.") from exc
     expected_uid = int(user["id"]) if user else None
-    if payload.get("uid") != expected_uid:
+    token_uid = payload.get("uid")
+    # If token was issued to a specific user, ensure it matches current user
+    if token_uid is not None and expected_uid is not None and token_uid != expected_uid:
         raise HTTPException(status_code=403, detail="Token keamanan form tidak cocok dengan sesi.")
+
+
+def require_mcp_connected_if_not_admin(request: Request, user: Dict[str, Any]) -> None:
+    """
+    Enforce that non-admin users must have an active MCP WebSocket connection.
+    Admin users bypass this check unconditionally.
+    """
+    role = str(user.get("role") or "user").lower()
+    if role == "admin":
+        return
+
+    from xiaozhi.services.mcp_service import is_mcp_connected
+    if not is_mcp_connected(int(user["id"])):
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept:
+            raise HTTPException(
+                status_code=303,
+                headers={"Location": "/login?mode=mcp_gating&message=Endpoint+MCP+wajib+dihubungkan+terlebih+dahulu."}
+            )
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "success": False,
+                "mcp_required": True,
+                "mcp_connected": False,
+                "message": "Koneksi MCP wajib untuk akun non-admin. Silakan hubungkan endpoint WebSocket MCP."
+            }
+        )
 
 
 def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None, status_code: int = 200):

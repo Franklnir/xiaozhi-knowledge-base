@@ -29,9 +29,11 @@ from xiaozhi.dependencies import (
     get_current_user,
     get_store,
     redirect_with_message,
+    render,
     validate_csrf,
 )
 from xiaozhi.routers.auth import set_session_cookie
+from xiaozhi.services.mcp_service import is_mcp_connected
 
 logger = logging.getLogger("xiaozhi.google_auth")
 
@@ -40,9 +42,6 @@ router = APIRouter(prefix="/api/auth/google", tags=["Google Auth"])
 
 def get_google_redirect_uri(request: Request) -> str:
     """Determine the valid Google OAuth redirect URI matching Google Cloud Console configuration."""
-    if GOOGLE_REDIRECT_URI:
-        return GOOGLE_REDIRECT_URI
-
     # Detect host and protocol from request
     forwarded_host = request.headers.get("x-forwarded-host")
     host = forwarded_host or request.headers.get("host") or ""
@@ -56,6 +55,8 @@ def get_google_redirect_uri(request: Request) -> str:
         return "http://127.0.0.1:8000/api/auth/google/callback"
     if "localhost" in host:
         return "http://localhost:8000/api/auth/google/callback"
+    if GOOGLE_REDIRECT_URI:
+        return GOOGLE_REDIRECT_URI
     if "xiaozhiscig.biz.id" in host or os.getenv("ENVIRONMENT") == "production":
         return "https://xiaozhiscig.biz.id/api/auth/google/callback"
 
@@ -238,25 +239,61 @@ async def google_callback(
         existing_user = store.get_user_by_google_id(google_id)
         if not existing_user and google_email:
             existing_user = store.get_user_by_email(google_email)
+            if existing_user:
+                try:
+                    store.link_google_account(int(existing_user["id"]), google_id, google_email)
+                except Exception:
+                    pass
 
+        # If already registered, seamless login!
         if existing_user:
-            return redirect_with_message("/login", f"Akun Google ({google_email}) sudah terdaftar. Silakan langsung masuk.")
+            user_record = existing_user
+        else:
+            username = generate_unique_username(google_email, google_name, store)
+            try:
+                user_record = store.create_google_user(username, google_id, google_email)
+            except ValueError as exc:
+                return redirect_with_message("/register", str(exc))
 
-        username = generate_unique_username(google_email, google_name, store)
-        try:
-            new_user = store.create_google_user(username, google_id, google_email)
-            user = {
-                "id": int(new_user["id"]),
-                "username": new_user["username"],
-                "role": "user",
-                "session_version": 1,
-                "ui_theme": DEFAULT_UI_THEME,
-            }
+        role = str(user_record.get("role") or "user").lower()
+        user = {
+            "id": int(user_record["id"]),
+            "username": user_record["username"],
+            "role": role,
+            "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
+            "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
+        }
+
+        # Check MCP requirement:
+        # Admin: NOT mandatory to enter MCP!
+        if role == "admin":
+            redirect = RedirectResponse(url="/admin", status_code=303)
+            set_session_cookie(redirect, request, user)
+            return redirect
+
+        # Non-admin: MCP is mandatory!
+        if is_mcp_connected(user["id"]):
             redirect = RedirectResponse(url="/dashboard", status_code=303)
             set_session_cookie(redirect, request, user)
             return redirect
-        except ValueError as exc:
-            return redirect_with_message("/register", str(exc))
+
+        # Non-admin without MCP: show gating card
+        token_info = store.get_xiaozhi_token_info(user["id"])
+        response = render(
+            request,
+            "login.html",
+            {
+                "user": user,
+                "error": None,
+                "success": f"Pendaftaran Google berhasil! Halo @{user['username']}, silakan masukkan dan hubungkan endpoint MCP untuk mengakses Dashboard.",
+                "active_mode": "mcp_gating",
+                "active_page": "login",
+                "mcp_pending": True,
+                "mcp_token_preview": token_info.get("preview", "") if token_info else "",
+            }
+        )
+        set_session_cookie(response, request, user)
+        return response
 
     # ── Action: LOGIN DENGAN GOOGLE ────────────────────────────────────────
     # 1. Check if user exists by google_id
@@ -271,14 +308,15 @@ async def google_callback(
             except Exception as exc:
                 logger.warning("Could not auto-link Google account: %s", exc)
 
-    # 3. If user is NOT registered, do NOT log in! Tell them to register first.
+    # 3. If user is NOT registered yet, auto-register them seamlessly!
     if not user_record:
-        return redirect_with_message(
-            "/login",
-            f"Akun Google ({google_email}) belum terdaftar. Silakan daftar terlebih dahulu melalui menu Register.",
-        )
+        username = generate_unique_username(google_email, google_name, store)
+        try:
+            user_record = store.create_google_user(username, google_id, google_email)
+        except ValueError as exc:
+            return redirect_with_message("/login", f"Gagal membuat akun Google: {exc}")
 
-    # 4. User is registered, proceed with login
+    # 4. User is registered / logged in, proceed with role & MCP check
     role = str(user_record.get("role") or "user").lower()
     user = {
         "id": int(user_record["id"]),
@@ -287,10 +325,36 @@ async def google_callback(
         "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
         "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
     }
-    redirect_url = "/admin" if role == "admin" else "/dashboard"
-    redirect = RedirectResponse(url=redirect_url, status_code=303)
-    set_session_cookie(redirect, request, user)
-    return redirect
+
+    # Admin: never required to enter MCP!
+    if role == "admin":
+        redirect = RedirectResponse(url="/admin", status_code=303)
+        set_session_cookie(redirect, request, user)
+        return redirect
+
+    # Non-admin: check MCP connection
+    if is_mcp_connected(user["id"]):
+        redirect = RedirectResponse(url="/dashboard", status_code=303)
+        set_session_cookie(redirect, request, user)
+        return redirect
+
+    # Non-admin without MCP: show gating card
+    token_info = store.get_xiaozhi_token_info(user["id"])
+    response = render(
+        request,
+        "login.html",
+        {
+            "user": user,
+            "error": None,
+            "success": f"Masuk sebagai @{user['username']} berhasil! Silakan masukkan dan hubungkan endpoint MCP untuk mengakses Dashboard.",
+            "active_mode": "mcp_gating",
+            "active_page": "login",
+            "mcp_pending": True,
+            "mcp_token_preview": token_info.get("preview", "") if token_info else "",
+        }
+    )
+    set_session_cookie(response, request, user)
+    return response
 
 
 @router.post("/unlink")

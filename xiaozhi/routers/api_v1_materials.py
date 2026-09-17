@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from xiaozhi.dependencies import get_current_user, get_store, require_user
+from xiaozhi.dependencies import get_current_user, get_store, require_user, require_mcp_connected_if_not_admin
 from xiaozhi.services.mcp_service import is_mcp_connected, mcp_status_payload, signal_mcp_reload
 
 router = APIRouter(prefix="/api/v1/materials", tags=["API v1 Materials"])
@@ -43,6 +43,7 @@ class MaterialUpdate(BaseModel):
 async def list_materials(request: Request, category: Optional[str] = None):
     """List all materials for the authenticated user."""
     user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
     materials = store.list_materials(user["id"])
 
@@ -60,6 +61,7 @@ async def list_materials(request: Request, category: Optional[str] = None):
 async def create_material(request: Request, body: MaterialCreate):
     """Create a new material."""
     user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
 
     try:
@@ -78,6 +80,7 @@ async def create_material(request: Request, body: MaterialCreate):
 async def get_material(request: Request, material_id: int):
     """Get a specific material by ID."""
     user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
 
     material = store.get_material(user["id"], material_id)
@@ -95,6 +98,7 @@ async def get_material(request: Request, material_id: int):
 async def update_material(request: Request, material_id: int, body: MaterialUpdate):
     """Update an existing material."""
     user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
 
     try:
@@ -116,6 +120,7 @@ async def update_material(request: Request, material_id: int, body: MaterialUpda
 async def delete_material(request: Request, material_id: int):
     """Delete a material."""
     user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
 
     deleted = store.delete_material(user["id"], material_id)
@@ -134,6 +139,7 @@ async def delete_material(request: Request, material_id: int):
 async def search_materials(request: Request, q: str = Query("", max_length=200)):
     """Search materials by keyword."""
     user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
 
     results = store.search_materials(user["id"], q, limit=10)

@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from xiaozhi.config import ALL_MCP_TOOLS_CATALOG, CHAT_HISTORY_DEFAULT_LIMIT
-from xiaozhi.dependencies import get_current_user, get_store
+from xiaozhi.dependencies import get_current_user, get_store, require_mcp_connected_if_not_admin
 from xiaozhi.services.mcp_service import is_mcp_connected, mcp_status_payload, signal_mcp_reload
 
 router = APIRouter(prefix="/api/v1", tags=["API v1 Chat, Profile & Dashboard"])
@@ -71,6 +71,7 @@ async def get_dashboard_data(request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Sesi tidak valid atau telah kedaluwarsa.")
+    require_mcp_connected_if_not_admin(request, user)
 
     store = get_store()
     categories = store.list_categories(user["id"])
@@ -131,6 +132,7 @@ async def create_category(body: CategoryCreateRequest, request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Sesi tidak valid.")
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
     try:
         store.add_category(user["id"], body.name.strip())
@@ -144,6 +146,7 @@ async def delete_category(cat_id: int, request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Sesi tidak valid.")
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
     try:
         deleted = store.delete_category(user["id"], cat_id)
@@ -169,6 +172,7 @@ async def get_chat_history(
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Sesi tidak valid atau telah kedaluwarsa.")
+    require_mcp_connected_if_not_admin(request, user)
 
     store = get_store()
     token_info = store.get_xiaozhi_token_info(user["id"])
@@ -210,6 +214,7 @@ async def clear_chat_history_api(request: Request):
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Sesi tidak valid.")
+    require_mcp_connected_if_not_admin(request, user)
     store = get_store()
     removed = store.clear_chat_history(user["id"])
     return SimpleActionResponse(success=True, message=f"{removed} riwayat chat berhasil dihapus.")

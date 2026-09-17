@@ -137,7 +137,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const mcpStatusText = document.getElementById("mcpStatusText");
     const mcpStatusIcon = document.getElementById("mcpStatusIcon");
     const mcpProgressBar = document.getElementById("mcpProgressBar");
-    const csrfToken = document.getElementById("csrfToken").value;
+    let csrfToken = document.getElementById("csrfToken").value;
 
     let pollInterval = null;
 
@@ -165,6 +165,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const data = await resp.json();
 
                 if (data.success) {
+                    if (data.csrf_token) csrfToken = data.csrf_token;
                     registerForm.classList.add("hidden");
                     authAlert.className = "mb-5 app-alert app-alert-success";
                     authAlert.textContent = "Akun @" + username + " berhasil dibuat! Silakan hubungkan endpoint MCP di bawah.";
