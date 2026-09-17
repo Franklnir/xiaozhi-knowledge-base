@@ -378,16 +378,22 @@
                                     🔊 Sedang Memutar
                                 </span>
                                 {% if item.device_mac %}
-                                <code style="font-family: ui-monospace, monospace; font-size: 11px; font-weight: 800; color: #10b981;">{{ item.device_mac }}</code>
+                                <div style="display: inline-flex; align-items: center; gap: 5px;">
+                                    <code style="font-family: ui-monospace, monospace; font-size: 11px; font-weight: 800; color: #10b981;">{{ item.device_mac }}</code>
+                                    <span class="app-chip app-chip-small app-chip-success" style="font-size: 9px; padding: 1px 5px; font-weight: 700; border-radius: 4px;">Tersimpan OK</span>
+                                </div>
                                 {% elif item.current_track %}
                                 <span style="font-size: 10px; color: var(--app-muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ item.current_track }}">{{ item.current_track }}</span>
                                 {% endif %}
                             </div>
                             {% elif item.device_mac %}
                             <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
-                                <code style="font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
-                                    {{ item.device_mac }}
-                                </code>
+                                <div style="display: inline-flex; align-items: center; gap: 5px;">
+                                    <code style="font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                                        {{ item.device_mac }}
+                                    </code>
+                                    <span class="app-chip app-chip-small app-chip-success" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; border-radius: 4px;">Tersimpan OK</span>
+                                </div>
                                 {% if item.device_name %}
                                 <span style="font-size: 10px; color: var(--app-muted); padding-left: 2px;">{{ item.device_name }}</span>
                                 {% endif %}
@@ -994,15 +1000,23 @@
                                     <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
                                     🔊 Sedang Memutar
                                 </span>
-                                ${u.device_mac ? `<code style="font-family: ui-monospace, monospace; font-size: 11px; font-weight: 800; color: #10b981;">${u.device_mac}</code>` : ''}
+                                ${u.device_mac ? `
+                                    <div style="display: inline-flex; align-items: center; gap: 5px;">
+                                        <code style="font-family: ui-monospace, monospace; font-size: 11px; font-weight: 800; color: #10b981;">${u.device_mac}</code>
+                                        <span class="app-chip app-chip-small app-chip-success" style="font-size: 9px; padding: 1px 5px; font-weight: 700; border-radius: 4px;">Tersimpan OK</span>
+                                    </div>
+                                ` : ''}
                             </div>
                         `;
                     } else if (u.device_mac) {
                         macCell.innerHTML = `
                             <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
-                                <code style="font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
-                                    ${u.device_mac}
-                                </code>
+                                <div style="display: inline-flex; align-items: center; gap: 5px;">
+                                    <code style="font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                                        ${u.device_mac}
+                                    </code>
+                                    <span class="app-chip app-chip-small app-chip-success" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; border-radius: 4px;">Tersimpan OK</span>
+                                </div>
                                 ${u.device_name ? `<span style="font-size: 10px; color: var(--app-muted); padding-left: 2px;">${u.device_name}</span>` : ''}
                             </div>
                         `;

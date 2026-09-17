@@ -233,9 +233,10 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
         clean_mac = clean_mac.strip().upper()
         if len(clean_mac) >= 11:
             try:
-                store.register_device(user["id"], device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
-            except Exception:
-                pass
+                res = store.register_device(user["id"], device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+                logger.info(f"[STREAM MAC] Device MAC {clean_mac} berhasil disimpan OK untuk user {user['id']} ({user.get('username')}) -> {res}")
+            except Exception as exc:
+                logger.error(f"[STREAM MAC ERROR] Gagal menyimpan MAC {clean_mac}: {exc}")
 
     return user, title, device_mac
 
@@ -425,6 +426,8 @@ async def audio_stream_ogg_opus(
             "Accept-Ranges": "none",
             "X-Adaptive-Bitrate": selected_br,
             "X-Adaptive-RSSI": str(rssi if rssi is not None else "N/A"),
+            "X-Device-MAC": device_mac or "none",
+            "X-MAC-Status": "Tersimpan OK" if device_mac else "none",
         }
     )
 
@@ -611,14 +614,17 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
 
     # Auto-register / update device MAC for this user
     device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "") or request.headers.get("X-MAC-Address", "")
+    mac_saved_ok = False
     if owner_id and device_mac and hasattr(store, "register_device"):
         clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
         clean_mac = clean_mac.strip().upper()
         if len(clean_mac) >= 11:
             try:
                 store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
-            except Exception:
-                pass
+                mac_saved_ok = True
+                logger.info(f"[COMMAND POLL] Device MAC {clean_mac} berhasil disimpan OK untuk owner {owner_id}")
+            except Exception as exc:
+                logger.error(f"[COMMAND POLL ERROR] Gagal menyimpan MAC {clean_mac}: {exc}")
 
     commands = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else store.get_audio_commands(owner_id)
     if commands:
@@ -646,7 +652,7 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
         c["stream_url"] = surl
         formatted_commands.append(c)
 
-    return {"success": True, "commands": formatted_commands}
+    return {"success": True, "commands": formatted_commands, "mac_status": "Tersimpan OK" if mac_saved_ok else None}
 
 
 @router.post("/api/device/audio/ack")
@@ -678,18 +684,22 @@ async def device_audio_ack(request: Request):
             owner_id = _resolve_owner_for_device(store, device_hdr)
 
     device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
+    mac_saved_ok = False
     if owner_id and device_mac and hasattr(store, "register_device"):
         clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
         clean_mac = clean_mac.strip().upper()
         if len(clean_mac) >= 11:
             try:
                 store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
-            except Exception:
-                pass
+                mac_saved_ok = True
+                logger.info(f"[ACK] Device MAC {clean_mac} berhasil disimpan OK untuk owner {owner_id}")
+            except Exception as exc:
+                logger.error(f"[ACK ERROR] Gagal menyimpan MAC {clean_mac}: {exc}")
 
     if owner_id and command_id:
         store.ack_audio_command(owner_id, command_id)
-    return {"success": True}
+        return {"success": True, "message": "Command acknowledged", "mac_status": "Tersimpan OK" if mac_saved_ok else None}
+    return {"success": True, "mac_status": "Tersimpan OK" if mac_saved_ok else None}
 
 
 @router.post("/api/device/audio/status")
