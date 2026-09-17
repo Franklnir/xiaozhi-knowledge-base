@@ -7,6 +7,28 @@ import secrets
 from cryptography.fernet import Fernet
 from itsdangerous import URLSafeTimedSerializer
 
+def _load_env_file():
+    from pathlib import Path
+    for parent in [Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent]:
+        env_file = parent / ".env"
+        if env_file.exists():
+            try:
+                with open(env_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip("'\"")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+            except Exception:
+                pass
+            break
+
+_load_env_file()
+
 logger = logging.getLogger("xiaozhi")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
@@ -482,9 +504,12 @@ csrf_serializer = URLSafeTimedSerializer(APP_SECRET_KEY, salt="edusmart-csrf")
 google_oauth_serializer = URLSafeTimedSerializer(APP_SECRET_KEY, salt="edusmart-google-oauth")
 
 # ── Google OAuth ───────────────────────────────────────────────────────────
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+GOOGLE_REDIRECT_URI = os.getenv(
+    "GOOGLE_REDIRECT_URI",
+    "https://xiaozhiscig.biz.id/api/auth/google/callback",
+).strip()
 
 # ── JWT Secret ─────────────────────────────────────────────────────────────
 JWT_SECRET = os.getenv("JWT_SECRET")
