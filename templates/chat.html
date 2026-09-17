@@ -2,23 +2,6 @@
 
 {% block content %}
 <style>
-    .chat-container {
-        display: flex;
-        flex-direction: column;
-        height: calc(100vh - 120px);
-        min-height: 550px;
-        max-width: 960px;
-        margin: 0 auto;
-        gap: 16px;
-    }
-    .chat-header-card {
-        padding: 16px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 12px;
-    }
     .chat-messages-box {
         flex: 1;
         overflow-y: auto;
@@ -38,7 +21,7 @@
     .chat-bubble {
         display: flex;
         gap: 12px;
-        max-width: 85%;
+        max-width: 90%;
         animation: chatFadeIn 0.2s ease-out;
     }
     @keyframes chatFadeIn {
@@ -125,7 +108,7 @@
     .chat-input-area {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 10px;
     }
     .chat-suggestions {
         display: flex;
@@ -190,73 +173,215 @@
     .chat-send-btn:hover {
         transform: translate(-1px, -1px);
     }
+    .quick-data-btn {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        text-align: left;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--app-surface);
+        border: 1.5px solid var(--app-border);
+        border-radius: var(--app-radius);
+        cursor: pointer;
+        color: var(--app-text);
+        transition: all 0.15s ease;
+    }
+    .quick-data-btn:hover {
+        background: var(--app-surface-muted, #f8fafc);
+        border-color: var(--app-accent);
+        transform: translateY(-1px);
+    }
+    :root[data-theme="neo"] .quick-data-btn {
+        border: 2px solid #111;
+        box-shadow: 2px 2px 0 #111;
+    }
 </style>
 
-<div class="chat-container">
-    <!-- Header -->
-    <div class="app-card chat-header-card">
+<div class="app-page">
+    <!-- Page Header (Standard XiaoZhi Design System) -->
+    <header class="app-page-header">
         <div>
-            <div style="display:flex;align-items:center;gap:8px;">
-                <h1 class="app-title" style="margin:0;font-size:20px;">💬 Tanya AI XiaoZhi</h1>
-                <span class="app-chip app-chip-small app-chip-success" style="font-weight:800;">SSE STREAMING</span>
-            </div>
-            <p class="app-subtitle" style="margin:4px 0 0 0;font-size:12.5px;">
-                Asisten cerdas berbasis Knowledge Base & FastMCP dengan respon token per kata realtime.
+            <p class="app-eyebrow">Asisten Virtual Cerdas</p>
+            <h1 class="app-title">Tanya AI XiaoZhi</h1>
+            <p class="app-subtitle">
+                Asisten cerdas berbasis protokol real-time SSE, terintegrasi dengan Knowledge Base dan perangkat ESP32 Anda. Data Anda 100% terisolasi.
             </p>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-            <span id="chatStatusBadge" class="app-chip app-chip-small app-chip-neutral" style="font-size:11px;">
+        <div class="app-toolbar">
+            <span class="app-status-pill {% if mcp_status.connected %}is-online{% elif not mcp_status.tokenSaved %}is-offline{% endif %}" id="mcpStatusPill">
+                <span class="app-status-dot"></span>
+                <span id="mcpStatusText">{{ mcp_status.statusText }}</span>
+            </span>
+            <span id="chatStatusBadge" class="app-chip app-chip-small app-chip-success" style="font-weight:800;">
                 ● Siap Menjawab
             </span>
-            <button type="button" onclick="clearChat()" class="app-button app-button-small" title="Bersihkan Chat">
+            <button type="button" onclick="clearChat()" class="app-button app-button-small" title="Bersihkan Layar Chat">
                 🗑️ Bersihkan
             </button>
         </div>
-    </div>
+    </header>
 
-    <!-- Message Stream Area -->
-    <div class="chat-messages-box" id="chatMessagesBox">
-        <!-- Welcome Message -->
-        <div class="chat-bubble assistant">
-            <div class="chat-avatar">🤖</div>
-            <div class="chat-bubble-content">
-                <strong>Halo {{ user.username }}!</strong> Selamat datang di asisten AI XiaoZhi.<br>
-                Saya dapat menjawab pertanyaan seputar materi perkuliahan Anda, status perangkat ESP32, musik YouTube, maupun simulasi smart home secara streaming langsung.
-                <div style="margin-top:8px;font-size:12px;color:var(--app-muted);">
-                    💡 <em>Ketik pertanyaan Anda di bawah atau klik salah satu saran cepat.</em>
+    <!-- Stat Grid (Shows Current User Isolated Context) -->
+    <section class="app-stat-grid">
+        <div class="app-stat-card">
+            <p class="app-stat-label">Akun Anda</p>
+            <p class="app-stat-value" style="font-size:20px;margin-top:6px;">{{ user.username }}</p>
+            <span class="app-chip app-chip-small app-chip-info" style="margin-top:6px;font-size:11px;">
+                Role: {{ user.role|capitalize }}
+            </span>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">MAC ESP32 Anda</p>
+            <p class="app-stat-value" style="font-size:17px;margin-top:6px;font-family:monospace;">
+                {{ user_mac if user_mac else "Belum Disetel" }}
+            </p>
+            <span class="app-chip app-chip-small {% if user_mac %}app-chip-success{% else %}app-chip-neutral{% endif %}" style="margin-top:6px;font-size:11px;">
+                {{ "Terhubung ke Board" if user_mac else "Atur di Menu Profil" }}
+            </span>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Materi Pengetahuan</p>
+            <p class="app-stat-value" style="font-size:20px;margin-top:6px;">{{ materials|length }} Materi</p>
+            <span class="app-chip app-chip-small app-chip-neutral" style="margin-top:6px;font-size:11px;">
+                {{ quota.usage.materials if quota else 0 }}/{{ quota.materials.label if quota and quota.materials else "Maksimal" }}
+            </span>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">FastMCP Bridge</p>
+            <p class="app-stat-value" style="font-size:20px;margin-top:6px;">{{ "Online" if mcp_status.connected else "Standby" }}</p>
+            <span class="app-chip app-chip-small {% if mcp_status.connected %}app-chip-success{% else %}app-chip-warning{% endif %}" style="margin-top:6px;font-size:11px;">
+                {{ "38 Tools Aktif" if mcp_status.connected else "Token Tersedia" if mcp_status.tokenSaved else "Perlu Token" }}
+            </span>
+        </div>
+    </section>
+
+    <!-- Main Content Grid (Left: Chat Room, Right: Isolated Context & Quick Questions) -->
+    <div class="app-content-grid">
+        <!-- Main Chat Box Area (Left Column) -->
+        <div class="app-card" style="display:flex;flex-direction:column;height:calc(100vh - 300px);min-height:580px;gap:14px;">
+            <!-- Message Stream Area -->
+            <div class="chat-messages-box" id="chatMessagesBox">
+                <!-- Welcome Message -->
+                <div class="chat-bubble assistant">
+                    <div class="chat-avatar">🤖</div>
+                    <div class="chat-bubble-content">
+                        <strong>Halo {{ user.username }}!</strong> Selamat datang di asisten AI XiaoZhi.<br>
+                        Saya memiliki akses ke data akun Anda (**{{ user.username }}**), perangkat hardware ESP32, dan materi Knowledge Base milik Anda sendiri.
+                        <div style="margin-top:8px;font-size:12px;color:var(--app-muted);">
+                            💡 <em>Ajukan pertanyaan seputar data Anda, materi kuliah, perintah musik YouTube, maupun simulasi perangkat pintar. Privasi multi-tenant Anda 100% terlindungi.</em>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input & Suggestions Area -->
+            <div class="chat-input-area">
+                <!-- Quick Suggestions -->
+                <div class="chat-suggestions">
+                    <span style="font-size:11.5px;font-weight:700;color:var(--app-muted);display:flex;align-items:center;white-space:nowrap;">💡 Saran:</span>
+                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Siapa nama akun saya dan apa role saya?')">👤 Data Akun Saya</button>
+                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Apa MAC address ESP32 saya dan apakah sudah terdaftar?')">📟 MAC ESP32 Saya</button>
+                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Berapa kuota dan materi yang saya miliki di Knowledge Base?')">📚 Materi & Kuota Saya</button>
+                    {% for s in suggestions %}
+                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Jelaskan materi tentang {{ s }}')">📖 {{ s }}</button>
+                    {% endfor %}
+                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Bagaimana cara memutar musik YouTube di speaker ESP32 saya?')">🎵 Putar YouTube di ESP32</button>
+                </div>
+
+                <!-- Input Form -->
+                <form id="chatForm" onsubmit="handleChatSubmit(event)" class="chat-input-row">
+                    <input 
+                        type="text" 
+                        id="chatInput" 
+                        class="chat-input" 
+                        placeholder="Tanyakan data Anda atau ketik pertanyaan ke AI XiaoZhi (tekan Enter)..." 
+                        autocomplete="off"
+                        required
+                    >
+                    <button type="submit" id="chatSendBtn" class="app-button app-button-primary chat-send-btn">
+                        <span>Kirim</span>
+                        <span id="sendIcon">➤</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Sidebar Column (Right Column) -->
+        <div class="app-nav-sidebar-content">
+            <!-- Privacy & Multi-Tenant Guard Card -->
+            <div class="app-card">
+                <div class="app-card-header is-compact">
+                    <div>
+                        <h3 class="app-section-title" style="font-size:15px;display:flex;align-items:center;gap:6px;">
+                            🛡️ Data Akun Terisolasi
+                        </h3>
+                        <p class="app-section-subtitle" style="font-size:12px;">
+                            Multi-tenant guard aktif. AI hanya diizinkan membaca data milik akun Anda sendiri.
+                        </p>
+                    </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px;">
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--app-border);">
+                        <span style="color:var(--app-muted);">User ID:</span>
+                        <strong style="font-family:monospace;">#{{ user.id }}</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--app-border);">
+                        <span style="color:var(--app-muted);">Username:</span>
+                        <strong>{{ user.username }}</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--app-border);">
+                        <span style="color:var(--app-muted);">MAC ESP32:</span>
+                        <strong style="font-family:monospace;">{{ user_mac if user_mac else "Belum disetel" }}</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--app-border);">
+                        <span style="color:var(--app-muted);">Token MCP:</span>
+                        <span class="app-chip app-chip-small app-chip-neutral" style="font-family:monospace;font-size:11px;">
+                            {{ mcp_status.tokenPreview if mcp_status.tokenPreview else "Belum ada" }}
+                        </span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;">
+                        <span style="color:var(--app-muted);">Smart Home:</span>
+                        <strong>{{ relay_rooms|length }} Ruangan</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Personal Data Questions Card -->
+            <div class="app-card">
+                <div class="app-card-header is-compact">
+                    <div>
+                        <h3 class="app-section-title" style="font-size:15px;display:flex;align-items:center;gap:6px;">
+                            ⚡ Pintasan Tanya Data Saya
+                        </h3>
+                        <p class="app-section-subtitle" style="font-size:12px;">
+                            Klik pertanyaan untuk mengecek data pribadi Anda ke AI:
+                        </p>
+                    </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Siapa nama akun saya dan apa role saya?')">
+                        👤 Siapa nama akun & role saya?
+                    </button>
+                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Apa MAC address ESP32 dan perangkat terdaftar saya?')">
+                        📟 Cek MAC address & ESP32 saya
+                    </button>
+                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Berapa kuota dan materi yang saya miliki?')">
+                        📊 Cek kuota & materi pengetahuan saya
+                    </button>
+                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Apa status token dan koneksi MCP saya?')">
+                        🔑 Cek status token MCP saya
+                    </button>
+                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Apakah saya memiliki perangkat smart home atau saklar relay?')">
+                        💡 Cek perangkat smart home saya
+                    </button>
+                    <button type="button" class="quick-data-btn" style="border-color:#f59e0b;color:#d97706;" onclick="useSuggestion('Bisakah kamu melihat data atau MAC address pengguna lain?')">
+                        🔒 Uji isolasi data (Cek data user lain)
+                    </button>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Input Area -->
-    <div class="chat-input-area">
-        <!-- Quick Suggestions -->
-        <div class="chat-suggestions">
-            <span style="font-size:11.5px;font-weight:700;color:var(--app-muted);display:flex;align-items:center;white-space:nowrap;">💡 Saran:</span>
-            <button type="button" class="suggestion-pill" onclick="useSuggestion('Bagaimana cara memutar musik YouTube di ESP32?')">🎵 Putar YouTube di ESP32</button>
-            <button type="button" class="suggestion-pill" onclick="useSuggestion('Bagaimana cara menghubungkan MAC board ESP32?')">📟 Hubungkan MAC ESP32</button>
-            {% for s in suggestions %}
-            <button type="button" class="suggestion-pill" onclick="useSuggestion('Jelaskan materi tentang {{ s }}')">📚 {{ s }}</button>
-            {% endfor %}
-            <button type="button" class="suggestion-pill" onclick="useSuggestion('Apa fungsi FastMCP pada XiaoZhi Indonesia?')">⚡ Apa itu FastMCP?</button>
-        </div>
-
-        <!-- Input Form -->
-        <form id="chatForm" onsubmit="handleChatSubmit(event)" class="chat-input-row">
-            <input 
-                type="text" 
-                id="chatInput" 
-                class="chat-input" 
-                placeholder="Tanyakan apa saja kepada AI XiaoZhi (tekan Enter)..." 
-                autocomplete="off"
-                required
-            >
-            <button type="submit" id="chatSendBtn" class="app-button app-button-primary chat-send-btn">
-                <span>Kirim</span>
-                <span id="sendIcon">➤</span>
-            </button>
-        </form>
     </div>
 </div>
 

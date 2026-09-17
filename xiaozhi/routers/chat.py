@@ -32,14 +32,24 @@ async def ai_chat_page(request: Request):
         token_preview=token_info.get("preview", "") if token_info else "",
         token_hash=token_hash,
     )
-    # Quick suggestion prompts based on user's knowledge materials
+    # User-isolated context data
+    user_mac = store.get_user_mac_address(user["id"])
+    quota = store.user_quota(user["id"])
     materials = store.list_materials(user["id"])
+    devices = store.list_registered_devices(user["id"])
+    relay_rooms = store.list_relay_rooms(user["id"])
     suggestions = [m.get("title") for m in materials[:4] if m.get("title")]
+
     return render(
         request,
         "chat.html",
         {
             "user": user,
+            "user_mac": user_mac,
+            "quota": quota,
+            "materials": materials,
+            "devices": devices,
+            "relay_rooms": relay_rooms,
             "mcp_status": mcp_status,
             "suggestions": suggestions,
             "active_page": "chat",
