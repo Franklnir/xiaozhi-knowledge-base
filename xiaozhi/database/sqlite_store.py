@@ -1192,30 +1192,31 @@ class SQLiteStore:
     def list_devices(self, owner_id: int) -> List[Dict[str, Any]]:
         return self.list_registered_devices(owner_id)
 
-    def register_device(self, owner_id: int, device_id: str = "", name: str = "", device_type: str = "") -> Dict[str, Any]:
+    def register_device(self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = "") -> Dict[str, Any]:
         conn = self._get_conn()
-        normalized_id = normalize_mac_address(device_id)
+        raw_mac = device_id or mac_address
+        normalized_id = normalize_mac_address(raw_mac)
         if not normalized_id:
             raise ValueError("Device ID / MAC address diperlukan.")
-        device_name = name.strip() if name else f"ESP32 ({normalized_id[-5:]})"
-        device_type = device_type.strip() if device_type else "esp32"
+        dev_name = (name or device_name).strip() if (name or device_name) else f"ESP32 ({normalized_id[-5:]})"
+        dev_type = device_type.strip() if device_type else "esp32"
         existing = conn.execute(
-            "SELECT id, owner_id, device_name FROM registered_devices WHERE LOWER(device_id) = ?",
-            (normalized_id.lower(),)
+            "SELECT id, owner_id, device_name FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ?",
+            (normalized_id.lower(), normalized_id.replace(":", "").replace("-", "").lower())
         ).fetchone()
         if existing:
             conn.execute(
                 "UPDATE registered_devices SET owner_id = ?, device_id = ?, device_name = ?, device_type = ? WHERE id = ?",
-                (int(owner_id), normalized_id, device_name, device_type, existing["id"])
+                (int(owner_id), normalized_id, dev_name, dev_type, existing["id"])
             )
             conn.commit()
-            return {"id": existing["id"], "device_id": normalized_id, "name": device_name, "updated": True}
+            return {"id": existing["id"], "device_id": normalized_id, "name": dev_name, "updated": True}
         cursor = conn.execute(
             "INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, created_at) VALUES (?, ?, ?, ?, ?)",
-            (int(owner_id), normalized_id, device_name, device_type, utc_now())
+            (int(owner_id), normalized_id, dev_name, dev_type, utc_now())
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "device_id": normalized_id, "name": device_name, "created": True}
+        return {"id": cursor.lastrowid, "device_id": normalized_id, "name": dev_name, "created": True}
 
     def delete_device(self, owner_id: int, device_id: str) -> bool:
         conn = self._get_conn()
@@ -1392,6 +1393,21 @@ class SQLiteStore:
             if not device_mac and active_session and active_session.device_mac:
                 device_mac = str(active_session.device_mac).upper()
                 device_name = f"ESP32 ({device_mac[-5:]})"
+                try:
+                    self.register_device(user_id, device_id=device_mac, name=device_name)
+                except Exception:
+                    pass
+
+            if not device_mac:
+                try:
+                    from xiaozhi.services.playback_tracker import playback_tracker
+                    last = playback_tracker.get_last_played(user_id)
+                    if last and last.get("device_mac"):
+                        device_mac = str(last["device_mac"]).upper()
+                        device_name = f"ESP32 ({device_mac[-5:]})"
+                        self.register_device(user_id, device_id=device_mac, name=device_name)
+                except Exception:
+                    pass
 
             # Check MCP status from real-time connection states
             mcp_state = all_mcp_states.get(user_id, {})
