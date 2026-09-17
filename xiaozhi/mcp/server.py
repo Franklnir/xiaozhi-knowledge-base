@@ -66,6 +66,14 @@ def setup_mode_filtering(store):
             return None
         return bool(store.get_feature_settings(owner_id).get("virtual_smarthome_enabled", True))
 
+    def tool_allowed_for_active_mode(tool_name: str) -> bool:
+        virtual_enabled = active_virtual_smarthome_enabled()
+        if virtual_enabled is None:
+            return tool_name not in VIRTUAL_SMARTHOME_MCP_TOOLS and tool_name not in REAL_RELAY_MCP_TOOLS
+        if virtual_enabled:
+            return tool_name not in REAL_RELAY_MCP_TOOLS
+        return tool_name not in VIRTUAL_SMARTHOME_MCP_TOOLS
+
     def is_tool_allowed_for_user(owner_id: Optional[int], tool_name: str) -> bool:
         if not tool_allowed_for_active_mode(tool_name):
             return False
