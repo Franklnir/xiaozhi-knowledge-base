@@ -149,7 +149,17 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
         mcp_active_owner_ctx.reset(ctx_token)
         mcp_request_id_ctx.reset(req_token)
         mcp_bridge_tasks.pop(user_id, None)
+        set_mcp_connection_state(user_id, token_hash, connected=False, message="MCP terputus (mencoba hubungkan kembali...)", request_id=request_id)
         logger.info("[%s] MCP bridge selesai: user_id=%s", request_id, user_id)
+
+        # Trigger background task to reconnect after 2s delay
+        async def _quick_reload():
+            try:
+                await asyncio.sleep(2)
+                signal_mcp_reload()
+            except Exception:
+                pass
+        asyncio.create_task(_quick_reload())
 
 
 @asynccontextmanager
