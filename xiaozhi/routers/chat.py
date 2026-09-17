@@ -158,6 +158,7 @@ async def profile_page(request: Request):
         token_hash=token_hash,
     )
     persona_analysis = store.get_user_persona_analysis(user["id"])
+    device_mac = store.get_user_mac_address(user["id"]) if hasattr(store, "get_user_mac_address") else None
 
     # Load MCP tool toggles for this user
     toggles = store.get_mcp_tool_toggles(user["id"]) if hasattr(store, "get_mcp_tool_toggles") else {}
@@ -182,6 +183,7 @@ async def profile_page(request: Request):
             "persona_analysis": persona_analysis,
             "tools_catalog": tools_catalog,
             "total_tools": len(tools_catalog),
+            "device_mac": device_mac,
             "active_page": "profile",
         },
     )
