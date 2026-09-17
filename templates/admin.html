@@ -455,6 +455,28 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- 🌟 Slide ke Samping / Pagination 15 User -->
+        <div id="userPaginationBar" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--app-border);flex-wrap:wrap;gap:12px;">
+            <div style="font-size:13px;color:var(--app-muted);font-weight:600;display:flex;align-items:center;gap:8px;">
+                <span>Menampilkan</span>
+                <span class="app-chip app-chip-small app-chip-neutral" style="font-weight:800;font-size:12px;" id="userPageRange">1 - 15</span>
+                <span>dari <strong id="userTotalCount" style="color:var(--app-text);">{{ managed_users|length }}</strong> user</span>
+                <span class="app-chip app-chip-small app-chip-info" style="font-size:11px;font-weight:700;">15 per slide</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <button type="button" id="userPrevSlideBtn" class="app-button app-button-small" onclick="slideUserPage(-1)" style="font-size:12.5px;font-weight:800;padding:7px 14px;border-radius:6px;">
+                    ◀ Geser Kiri (Prev)
+                </button>
+                <div id="userSlidePills" style="display:flex;align-items:center;gap:4px;overflow-x:auto;max-width:280px;padding:2px 0;">
+                    <!-- Slide numbers rendered by JS -->
+                </div>
+                <button type="button" id="userNextSlideBtn" class="app-button app-button-small" onclick="slideUserPage(1)" style="font-size:12.5px;font-weight:800;padding:7px 14px;border-radius:6px;">
+                    Geser Kanan (Next) ▶
+                </button>
+            </div>
+        </div>
     </section>
 
     <!-- ⚡ Live Server & MCP Console (SSE) -->
@@ -789,21 +811,95 @@
         }
     }
 
-    // ── Search & Multi-criteria Filter ───────────────────────────────────
+    // ── Search, Multi-criteria Filter & Slide Pagination (15 Users / Slide) ───
 
+    const USERS_PER_PAGE = 15;
+    let currentUserPage = 1;
     let currentFilter = 'all';
     const searchInput = document.getElementById("adminUserSearch");
     const noMatchRow = document.getElementById("adminNoMatchRow");
 
     function setQuickFilter(filter) {
         currentFilter = filter;
+        currentUserPage = 1;
         document.querySelectorAll('.filter-pill').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.filter === filter);
         });
-        applyFilters();
+        applyFilters(true);
     }
 
-    function applyFilters() {
+    function slideUserPage(delta) {
+        currentUserPage += delta;
+        applyFilters(false);
+        const wrap = document.querySelector(".app-table-wrap");
+        if (wrap) {
+            wrap.classList.add("app-live-flash");
+            setTimeout(() => wrap.classList.remove("app-live-flash"), 350);
+        }
+    }
+
+    function goToUserPage(page) {
+        currentUserPage = page;
+        applyFilters(false);
+        const wrap = document.querySelector(".app-table-wrap");
+        if (wrap) {
+            wrap.classList.add("app-live-flash");
+            setTimeout(() => wrap.classList.remove("app-live-flash"), 350);
+        }
+    }
+
+    function renderUserPagination(totalMatching, totalPages, startIndex, endIndex) {
+        const bar = document.getElementById("userPaginationBar");
+        const rangeEl = document.getElementById("userPageRange");
+        const totalEl = document.getElementById("userTotalCount");
+        const prevBtn = document.getElementById("userPrevSlideBtn");
+        const nextBtn = document.getElementById("userNextSlideBtn");
+        const pillsContainer = document.getElementById("userSlidePills");
+
+        if (!bar) return;
+
+        if (totalMatching === 0) {
+            bar.style.display = "none";
+            return;
+        }
+
+        bar.style.display = "flex";
+        if (rangeEl) rangeEl.textContent = `${startIndex + 1} - ${endIndex}`;
+        if (totalEl) totalEl.textContent = totalMatching;
+
+        if (prevBtn) {
+            prevBtn.disabled = currentUserPage <= 1;
+            prevBtn.style.opacity = currentUserPage <= 1 ? "0.4" : "1";
+            prevBtn.style.cursor = currentUserPage <= 1 ? "not-allowed" : "pointer";
+        }
+        if (nextBtn) {
+            nextBtn.disabled = currentUserPage >= totalPages;
+            nextBtn.style.opacity = currentUserPage >= totalPages ? "0.4" : "1";
+            nextBtn.style.cursor = currentUserPage >= totalPages ? "not-allowed" : "pointer";
+        }
+
+        if (pillsContainer) {
+            let pillsHtml = "";
+            for (let p = 1; p <= totalPages; p++) {
+                const isActive = p === currentUserPage;
+                pillsHtml += `
+                    <button type="button" 
+                        class="filter-pill ${isActive ? 'active' : ''}" 
+                        style="min-width:32px;height:30px;padding:2px 8px;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;"
+                        onclick="goToUserPage(${p})"
+                        title="Halaman ${p}">
+                        ${p}
+                    </button>
+                `;
+            }
+            pillsContainer.innerHTML = pillsHtml;
+        }
+    }
+
+    function applyFilters(resetPage = false) {
+        if (resetPage) {
+            currentUserPage = 1;
+        }
         const q = (searchInput?.value || "").trim().toLowerCase();
         let effectiveFilter = currentFilter;
 
@@ -826,7 +922,7 @@
         if (!tbody) return;
 
         const rows = Array.from(tbody.querySelectorAll(".admin-user-row"));
-        let visible = 0;
+        const matchingRows = [];
 
         rows.forEach(row => {
             const isPlaying = row.dataset.playing === "true";
@@ -850,19 +946,21 @@
                 filterMatch = !isConnected;
             }
 
-            const show = textMatch && filterMatch;
-            row.style.display = show ? "" : "none";
-            if (show) visible++;
+            if (textMatch && filterMatch) {
+                matchingRows.push(row);
+            } else {
+                row.style.display = "none";
+            }
         });
 
         // Smart Priority Sorting
         if (effectiveFilter === "oldest") {
-            rows.sort((a, b) => parseInt(a.dataset.userId || 0) - parseInt(b.dataset.userId || 0));
+            matchingRows.sort((a, b) => parseInt(a.dataset.userId || 0) - parseInt(b.dataset.userId || 0));
         } else if (effectiveFilter === "newest") {
-            rows.sort((a, b) => parseInt(b.dataset.userId || 0) - parseInt(a.dataset.userId || 0));
+            matchingRows.sort((a, b) => parseInt(b.dataset.userId || 0) - parseInt(a.dataset.userId || 0));
         } else if (effectiveFilter === "mac_saved") {
             // Prioritize users with saved MAC, then active playing, then newest ID
-            rows.sort((a, b) => {
+            matchingRows.sort((a, b) => {
                 const macA = a.dataset.hasMac === "true" ? 0 : 1;
                 const macB = b.dataset.hasMac === "true" ? 0 : 1;
                 if (macA !== macB) return macA - macB;
@@ -874,11 +972,11 @@
                 return parseInt(b.dataset.userId || 0) - parseInt(a.dataset.userId || 0);
             });
         } else {
-            // Default Priority:
+            // Default Priority (Semua User):
             // 1. Paling atas: Sedang memutar YouTube
             // 2. Kedua: Sudah terhubung ke MCP
             // 3. Ketiga: User lainnya (terbaru lebih dahulu)
-            rows.sort((a, b) => {
+            matchingRows.sort((a, b) => {
                 const playA = a.dataset.playing === "true" ? 0 : 1;
                 const playB = b.dataset.playing === "true" ? 0 : 1;
                 if (playA !== playB) return playA - playB;
@@ -891,18 +989,73 @@
             });
         }
 
-        // Re-append rows in sorted order
-        rows.forEach(r => tbody.appendChild(r));
+        // Apply 15 Users per slide
+        const totalMatching = matchingRows.length;
+        const totalPages = Math.max(1, Math.ceil(totalMatching / USERS_PER_PAGE));
+        currentUserPage = Math.min(Math.max(1, currentUserPage), totalPages);
+
+        const startIndex = (currentUserPage - 1) * USERS_PER_PAGE;
+        const endIndex = startIndex + USERS_PER_PAGE;
+
+        matchingRows.forEach((row, idx) => {
+            const inCurrentSlide = (idx >= startIndex && idx < endIndex);
+            row.style.display = inCurrentSlide ? "" : "none";
+            tbody.appendChild(row);
+        });
 
         if (noMatchRow) {
-            noMatchRow.classList.toggle("hidden", visible !== 0);
+            noMatchRow.classList.toggle("hidden", totalMatching !== 0);
             tbody.appendChild(noMatchRow);
         }
+
+        renderUserPagination(totalMatching, totalPages, startIndex, Math.min(endIndex, totalMatching));
     }
 
     if (searchInput) {
-        searchInput.addEventListener("input", applyFilters);
+        searchInput.addEventListener("input", () => applyFilters(true));
     }
+
+    // Touch swipe & Keyboard arrow navigation for sliding sideways
+    (function initTableSlideGestures() {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const tableWrap = document.querySelector(".app-table-wrap");
+        if (tableWrap) {
+            tableWrap.addEventListener("touchstart", function(e) {
+                if (e.touches.length > 0) {
+                    touchStartX = e.touches[0].clientX;
+                    touchStartY = e.touches[0].clientY;
+                }
+            }, { passive: true });
+
+            tableWrap.addEventListener("touchend", function(e) {
+                if (e.changedTouches.length > 0) {
+                    const touchEndX = e.changedTouches[0].clientX;
+                    const touchEndY = e.changedTouches[0].clientY;
+                    const dx = touchEndX - touchStartX;
+                    const dy = touchEndY - touchStartY;
+                    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                        if (dx < 0) {
+                            slideUserPage(1); // Swipe left -> Next 15
+                        } else {
+                            slideUserPage(-1); // Swipe right -> Prev 15
+                        }
+                    }
+                }
+            }, { passive: true });
+        }
+
+        // Keyboard arrow navigation
+        document.addEventListener("keydown", function(e) {
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+            if (tag === "input" || tag === "textarea" || tag === "select") return;
+            if (e.key === "ArrowRight") {
+                slideUserPage(1);
+            } else if (e.key === "ArrowLeft") {
+                slideUserPage(-1);
+            }
+        });
+    })();
 
     // ── Real-time WebSocket Dashboard Sync ────────────────────────────────
 
@@ -1104,8 +1257,8 @@
                 }
             });
 
-            // Re-apply filters to ensure sorting priority is maintained in real-time
-            applyFilters();
+            // Re-apply filters to ensure sorting priority is maintained in real-time without resetting page
+            applyFilters(false);
         }
     }
 
