@@ -133,7 +133,10 @@ async def stream_video_to_websocket(websocket, video_id: str, title: str = "", s
         "-ac", "1",
         "-ar", str(sample_rate),
         "-c:a", "libopus",
-        "-b:a", "40k",
+        "-b:a", "16k",
+        "-vbr", "on",
+        "-compression_level", "10",
+        "-application", "audio",
         "-frame_duration", "60",
         "-f", "ogg",
         "pipe:1"
