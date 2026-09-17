@@ -1,6 +1,6 @@
 {% set current_theme = user.ui_theme if user and user.ui_theme in ['default', 'dark', 'neo'] else 'neo' %}
 <!DOCTYPE html>
-<html lang="id"{% if current_theme != 'default' %} data-theme="{{ current_theme }}"{% endif %}>
+<html lang="id" {% if current_theme != 'default' %}data-theme="{{ current_theme }}" {% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,8 +16,8 @@
 
     <!-- SEO Primary Meta Tags -->
     <title>{% block title %}Xiaozhi Indonesia - Asisten Suara Cerdas IoT, AI & Knowledge Base{% endblock %}</title>
-    <meta name="title"{% block meta_title_attr %} content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT, AI & Knowledge Base"{% endblock %}>
-    <meta name="description"{% block meta_desc_attr %} content="Platform resmi Xiaozhi Indonesia: asisten suara cerdas berbasis IoT ESP32, integrasi 35 MCP tools, Smart Home, dan manajemen materi edukasi."{% endblock %}>
+    <meta name="title" content="{% block meta_title %}Xiaozhi Indonesia - Asisten Suara Cerdas IoT, AI & Knowledge Base{% endblock %}">
+    <meta name="description" content="{% block meta_desc %}Platform resmi Xiaozhi Indonesia: asisten suara cerdas berbasis IoT ESP32, integrasi 35 MCP tools, Smart Home, dan manajemen materi edukasi.{% endblock %}">
     <meta name="keywords" content="Xiaozhi, Xiaozhi Indonesia, Asisten Suara AI, ESP32, Smart Home IoT, FastMCP, Knowledge Base, AI Voice Assistant, EduSmart, Model Context Protocol">
     <meta name="author" content="Xiaozhi Indonesia Team">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
@@ -27,8 +27,8 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Xiaozhi Indonesia">
     <meta property="og:url" content="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
-    <meta property="og:title"{% block og_title_attr %} content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT & Knowledge Base"{% endblock %}>
-    <meta property="og:description"{% block og_desc_attr %} content="Kelola materi belajar, kontrol perangkat smart home virtual & relay nyata, serta akses 35 tools cerdas terintegrasi untuk asisten suara Xiaozhi."{% endblock %}>
+    <meta property="og:title" content="{% block og_title %}Xiaozhi Indonesia - Asisten Suara Cerdas IoT & Knowledge Base{% endblock %}">
+    <meta property="og:description" content="{% block og_desc %}Kelola materi belajar, kontrol perangkat smart home virtual & relay nyata, serta akses 35 tools cerdas terintegrasi untuk asisten suara Xiaozhi.{% endblock %}">
     <meta property="og:image" content="https://xiaozhiscig.biz.id/static/img/og-preview.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -36,8 +36,8 @@
 
     <!-- Twitter Cards -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title"{% block tw_title_attr %} content="Xiaozhi Indonesia - Asisten Suara Cerdas IoT & AI"{% endblock %}>
-    <meta name="twitter:description"{% block tw_desc_attr %} content="Platform IoT & Voice Assistant Xiaozhi dengan 35 Tools Cerdas dan integrasi Smart Home."{% endblock %}>
+    <meta name="twitter:title" content="{% block tw_title %}Xiaozhi Indonesia - Asisten Suara Cerdas IoT & AI{% endblock %}">
+    <meta name="twitter:description" content="{% block tw_desc %}Platform IoT & Voice Assistant Xiaozhi dengan 35 Tools Cerdas dan integrasi Smart Home.{% endblock %}">
     <meta name="twitter:image" content="https://xiaozhiscig.biz.id/static/img/og-preview.png">
 
     <!-- hreflang (bilingual) -->
@@ -300,12 +300,33 @@
             display: flex;
             flex-direction: column;
         }
+        .app-main-wrapper.is-guest {
+            margin-left: 0;
+            padding-top: 60px;
+        }
         .app-main {
             flex: 1;
             padding: clamp(20px, 2.5vw, 32px);
             padding-bottom: 40px;
             max-width: var(--app-wide-max);
             width: 100%;
+        }
+        .app-main.is-guest {
+            max-width: var(--app-normal-max);
+            margin: 0 auto;
+        }
+        .app-main.has-overlay {
+            filter: blur(6px);
+            pointer-events: none;
+            user-select: none;
+        }
+        .app-footer-guest {
+            background: var(--app-surface);
+            border-top: 1px solid var(--app-border);
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--app-muted);
         }
 
         /* MOBILE TOGGLE */
@@ -1016,17 +1037,17 @@
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
                 Dashboard
             </a>
-            <a href="/simulasi-smarthome-virtual" class="app-sidebar-link {% if page == 'smarthome' %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Simulasi Smarthome')"{% endif %}>
+            <a href="/simulasi-smarthome-virtual" class="app-sidebar-link {% if page == 'smarthome' %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Simulasi Smarthome')" {% endif %}>
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
                 Simulasi Smarthome
                 {% if user and user.role != 'admin' and not mcp_connected %}<span class="app-mcp-lock-badge">🔒 Perlu MCP</span>{% endif %}
             </a>
-            <a href="/relay-nyata" class="app-sidebar-link {% if page == 'relay_nyata' %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Relay Nyata')"{% endif %}>
+            <a href="/relay-nyata" class="app-sidebar-link {% if page == 'relay_nyata' %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Relay Nyata')" {% endif %}>
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
                 Relay Nyata
                 {% if user and user.role != 'admin' and not mcp_connected %}<span class="app-mcp-lock-badge">🔒 Perlu MCP</span>{% endif %}
             </a>
-            <a href="/riwayat-chat" class="app-sidebar-link {% if page == 'chat_history' %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Riwayat Chat')"{% endif %}>
+            <a href="/riwayat-chat" class="app-sidebar-link {% if page == 'chat_history' %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Riwayat Chat')" {% endif %}>
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
                 Riwayat Chat
                 {% if user and user.role != 'admin' and not mcp_connected %}<span class="app-mcp-lock-badge">🔒 Perlu MCP</span>{% endif %}
@@ -1083,12 +1104,12 @@
     {% endif %}
 
     <!-- Main Content (defined once) -->
-    <div class="app-main-wrapper" style="{% if not user %}margin-left:0; padding-top:60px;{% endif %}">
-        <main class="app-main" style="{% if not user %}max-width:var(--app-normal-max); margin:0 auto;{% endif %}{% if show_mcp_block_overlay %}filter:blur(6px); pointer-events:none; user-select:none;{% endif %}">
+    <div class="app-main-wrapper{% if not user %} is-guest{% endif %}">
+        <main class="app-main{% if not user %} is-guest{% endif %}{% if show_mcp_block_overlay %} has-overlay{% endif %}">
             {% block content %}{% endblock %}
         </main>
         {% if not user %}
-        <footer style="background:var(--app-surface); border-top:1px solid var(--app-border); padding:20px; text-align:center; font-size:12px; color:var(--app-muted);">
+        <footer class="app-footer-guest">
             &copy; 2026 Xiaozhi Indonesia. Platform Asisten Suara Cerdas IoT & FastMCP Knowledge Base.
         </footer>
         {% endif %}
