@@ -768,6 +768,8 @@
         <!-- Filter Categories -->
         <div class="profile-tool-filter-bar" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
             <button type="button" class="tool-filter-btn active" onclick="filterToolCategory('all', this)">Semua ({{ total_tools if total_tools else 39 }})</button>
+            <button type="button" class="tool-filter-btn" style="color: #10b981; border-color: rgba(16, 185, 129, 0.3);" onclick="filterToolCategory('active', this)">✓ Aktif ({{ total_active if total_active is not none else 39 }})</button>
+            <button type="button" class="tool-filter-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" onclick="filterToolCategory('disabled', this)">🚫 Dinonaktifkan ({{ total_disabled if total_disabled is not none else 0 }})</button>
             <button type="button" class="tool-filter-btn" onclick="filterToolCategory('knowledge', this)">Knowledge & Memori</button>
             <button type="button" class="tool-filter-btn" onclick="filterToolCategory('iot', this)">Smart Home & IoT</button>
             <button type="button" class="tool-filter-btn" onclick="filterToolCategory('education', this)">Edukasi & Kuliah</button>
@@ -781,7 +783,7 @@
         <div class="tool-grid" id="profileToolGrid">
             {% if tools_catalog %}
                 {% for tool in tools_catalog %}
-                <div class="tool-item profile-tool-card" data-category="{{ tool.category }}" data-name="{{ (tool.title ~ ' ' ~ tool.name ~ ' ' ~ tool.category_label ~ ' ' ~ tool.description)|lower }}">
+                <div class="tool-item profile-tool-card {% if not tool.enabled %}tool-item-disabled{% endif %}" data-category="{{ tool.category }}" data-enabled="{{ 'true' if tool.enabled else 'false' }}" data-name="{{ (tool.title ~ ' ' ~ tool.name ~ ' ' ~ tool.category_label ~ ' ' ~ tool.description ~ (' nonaktif dinonaktifkan' if not tool.enabled else ' aktif'))|lower }}" style="{% if not tool.enabled %}opacity: 0.72; border: 1px dashed rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.03);{% endif %}">
                     <div class="tool-icon">{{ tool.icon }}</div>
                     <div class="tool-info">
                         <div class="tool-name" title="{{ tool.title }}">{{ tool.title }}</div>
@@ -789,9 +791,9 @@
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
                             <span class="app-chip app-chip-small app-chip-neutral" style="font-size: 10px; padding: 1px 6px;">{{ tool.category_label }}</span>
                             {% if tool.enabled %}
-                            <span class="tool-status" style="color: var(--app-accent);">✓ Aktif</span>
+                            <span class="tool-status" style="color: #10b981; font-weight: 600; font-size: 11.5px;">✓ Aktif</span>
                             {% else %}
-                            <span class="tool-status" style="color: var(--app-muted);">✗ Nonaktif</span>
+                            <span class="tool-status" style="color: #ef4444; font-weight: 700; font-size: 10.5px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.25); padding: 1px 7px; border-radius: 6px;" title="Fitur tool ini dinonaktifkan oleh administrator untuk akun Anda">🚫 Nonaktif (Admin)</span>
                             {% endif %}
                         </div>
                     </div>
@@ -1043,8 +1045,18 @@
         cards.forEach(card => {
             const cat = card.getAttribute('data-category') || '';
             const searchData = card.getAttribute('data-name') || '';
+            const isEnabled = card.getAttribute('data-enabled') === 'true';
 
-            const matchCat = (currentCategoryFilter === 'all' || cat === currentCategoryFilter);
+            let matchCat = false;
+            if (currentCategoryFilter === 'all') {
+                matchCat = true;
+            } else if (currentCategoryFilter === 'active') {
+                matchCat = isEnabled;
+            } else if (currentCategoryFilter === 'disabled') {
+                matchCat = !isEnabled;
+            } else {
+                matchCat = (cat === currentCategoryFilter);
+            }
             const matchQuery = (!q || searchData.includes(q));
 
             if (matchCat && matchQuery) {

@@ -66,17 +66,25 @@ def setup_mode_filtering(store):
             return None
         return bool(store.get_feature_settings(owner_id).get("virtual_smarthome_enabled", True))
 
-    def tool_allowed_for_active_mode(tool_name: str) -> bool:
-        virtual_enabled = active_virtual_smarthome_enabled()
-        if virtual_enabled is None:
-            return tool_name not in VIRTUAL_SMARTHOME_MCP_TOOLS and tool_name not in REAL_RELAY_MCP_TOOLS
-        if virtual_enabled:
-            return tool_name not in REAL_RELAY_MCP_TOOLS
-        return tool_name not in VIRTUAL_SMARTHOME_MCP_TOOLS
+    def is_tool_allowed_for_user(owner_id: Optional[int], tool_name: str) -> bool:
+        if not tool_allowed_for_active_mode(tool_name):
+            return False
+        if owner_id is not None:
+            # Check user features (e.g. youtube_music)
+            features = store.get_user_features(owner_id)
+            if tool_name == "play_youtube_song" and not features.get("youtube_music", True):
+                return False
+            # Check tool toggles set by admin
+            if hasattr(store, "get_mcp_tool_toggles"):
+                toggles = store.get_mcp_tool_toggles(owner_id)
+                if not toggles.get(tool_name, True):
+                    return False
+        return True
 
     async def list_mode_filtered_tools():
         tools = await original_mcp_list_tools()
-        return [tool for tool in tools if tool_allowed_for_active_mode(tool.name)]
+        owner_id = mcp_active_owner_ctx.get()
+        return [tool for tool in tools if is_tool_allowed_for_user(owner_id, tool.name)]
 
     def handle_virtual_tool_with_real_relay(owner_id: int, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         from xiaozhi.routers.relay_nyata import control_real_relay, control_all_real_relays, real_relay_status_payload, match_real_relay_for_target
@@ -121,11 +129,20 @@ def setup_mode_filtering(store):
         return response
 
     async def call_mode_filtered_tool(name: str, arguments: Dict[str, Any]):
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is not None:
+            features = store.get_user_features(owner_id)
+            if name == "play_youtube_song" and not features.get("youtube_music", True):
+                return {"success": False, "message": "Anda tidak diizinkan putar lagu YouTube. Fitur YouTube Music telah dinonaktifkan oleh administrator."}
+            if hasattr(store, "get_mcp_tool_toggles"):
+                toggles = store.get_mcp_tool_toggles(owner_id)
+                if not toggles.get(name, True):
+                    return {"success": False, "message": f"Tool '{name}' telah dinonaktifkan oleh administrator untuk akun Anda."}
+
         if not tool_allowed_for_active_mode(name):
             virtual_enabled = active_virtual_smarthome_enabled()
             if virtual_enabled:
                 return {"success": False, "message": "Relay Nyata sedang nonaktif karena Simulasi Smart Home Virtual aktif."}
-            owner_id = mcp_active_owner_ctx.get()
             if owner_id is not None and name in VIRTUAL_SMARTHOME_MCP_TOOLS:
                 return handle_virtual_tool_with_real_relay(int(owner_id), name, arguments or {})
             return {"success": False, "message": "Tool Simulasi Smart Home Virtual sedang nonaktif agar tidak mengganggu Relay Nyata."}

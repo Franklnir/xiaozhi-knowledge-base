@@ -167,11 +167,17 @@ async def profile_page(request: Request):
     # Load MCP tool toggles for this user
     toggles = store.get_mcp_tool_toggles(user["id"]) if hasattr(store, "get_mcp_tool_toggles") else {}
     tools_catalog = []
+    total_active = 0
+    total_disabled = 0
     for tool_info in ALL_MCP_TOOLS_CATALOG:
         tool_name = tool_info["name"]
         is_enabled = toggles.get(tool_name, True)
         if tool_name == "play_youtube_song" and not features.get("youtube_music", True):
             is_enabled = False
+        if is_enabled:
+            total_active += 1
+        else:
+            total_disabled += 1
         tools_catalog.append({
             **tool_info,
             "enabled": is_enabled,
@@ -187,6 +193,8 @@ async def profile_page(request: Request):
             "persona_analysis": persona_analysis,
             "tools_catalog": tools_catalog,
             "total_tools": len(tools_catalog),
+            "total_active": total_active,
+            "total_disabled": total_disabled,
             "device_mac": device_mac,
             "active_page": "profile",
         },
