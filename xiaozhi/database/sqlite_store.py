@@ -58,10 +58,11 @@ class SQLiteStore:
         """Get thread-local connection."""
         if not hasattr(self._local, "conn") or self._local.conn is None:
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-            self._local.conn = sqlite3.connect(self.db_path)
+            self._local.conn = sqlite3.connect(self.db_path, timeout=30.0)
             self._local.conn.row_factory = sqlite3.Row
             self._local.conn.execute("PRAGMA journal_mode=WAL")
             self._local.conn.execute("PRAGMA synchronous=NORMAL")
+            self._local.conn.execute("PRAGMA busy_timeout=30000")
             self._local.conn.execute("PRAGMA cache_size=-64000")  # 64MB cache
             self._local.conn.execute("PRAGMA foreign_keys=ON")
         return self._local.conn
@@ -1391,10 +1392,6 @@ class SQLiteStore:
             if not device_mac and active_session and active_session.device_mac:
                 device_mac = str(active_session.device_mac).upper()
                 device_name = f"ESP32 ({device_mac[-5:]})"
-                try:
-                    self.register_device(user_id, device_id=device_mac, name=device_name, device_type="esp32")
-                except Exception:
-                    pass
 
             # Check MCP status from real-time connection states
             mcp_state = all_mcp_states.get(user_id, {})

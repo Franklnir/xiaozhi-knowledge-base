@@ -713,9 +713,15 @@
         fd.append("enabled", enabled ? "true" : "false");
         try {
             const r = await fetch(`/admin/users/${userId}/feature`, {method:"POST", body:fd, credentials:"same-origin"});
-            const d = await r.json();
-            if (!d.success) {
-                alert(d.detail || "Gagal mengubah fitur");
+            let d;
+            const text = await r.text();
+            try {
+                d = JSON.parse(text);
+            } catch(jsonErr) {
+                throw new Error(r.ok ? "Respon server tidak valid" : `Server error (${r.status}): ${r.statusText || 'Gagal memproses'}`);
+            }
+            if (!r.ok || !d.success) {
+                alert(d && d.detail ? d.detail : "Gagal mengubah fitur");
                 // Revert checkbox state
                 const cb = document.querySelector(`#user-row-${userId} input[type="checkbox"]`);
                 if (cb) cb.checked = !enabled;
@@ -726,7 +732,7 @@
                 }
             }
         } catch(e) { 
-            alert("Error: " + e.message); 
+            alert("Perhatian: " + e.message); 
             const cb = document.querySelector(`#user-row-${userId} input[type="checkbox"]`);
             if (cb) cb.checked = !enabled;
         }
@@ -1021,7 +1027,12 @@
         if (!confirm('Hentikan pemutaran musik untuk user ini?')) return;
         try {
             const res = await fetch(`/admin/api/youtube/stop/${sessionId}`, { method: 'POST' });
-            const data = await res.json();
+            let data;
+            try {
+                data = await res.json();
+            } catch(_) {
+                throw new Error(res.ok ? "Respon tidak valid" : `Server error (${res.status})`);
+            }
             if (data.success) {
                 // If WS is active, send refresh request
                 if (adminWs && adminWs.readyState === WebSocket.OPEN) {
@@ -1033,7 +1044,7 @@
                 alert(data.message || 'Gagal menghentikan pemutaran');
             }
         } catch (err) {
-            alert('Error: ' + err.message);
+            alert('Perhatian: ' + err.message);
         }
     }
 
