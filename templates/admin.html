@@ -308,10 +308,14 @@
         </div>
 
         <!-- Quick Filter Pills -->
+        {% set mac_count = managed_users|selectattr('device_mac')|list|length %}
         <div class="user-filter-pills" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
             <span style="font-size:12px;font-weight:600;color:#64748b;margin-right:2px">Filter:</span>
             <button type="button" class="filter-pill active" data-filter="all" onclick="setQuickFilter('all')">Semua User</button>
             <button type="button" class="filter-pill" data-filter="stream_youtube" onclick="setQuickFilter('stream_youtube')">🎵 Stream YouTube</button>
+            <button type="button" class="filter-pill" data-filter="mac_saved" onclick="setQuickFilter('mac_saved')">
+                📟 MAC Tersimpan {% if mac_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ mac_count }}</span>{% endif %}
+            </button>
             <button type="button" class="filter-pill" data-filter="mcp_connected" onclick="setQuickFilter('mcp_connected')">🟢 MCP Konek</button>
             <button type="button" class="filter-pill" data-filter="mcp_disconnected" onclick="setQuickFilter('mcp_disconnected')">⚪ Blom Konek MCP</button>
             <button type="button" class="filter-pill" data-filter="newest" onclick="setQuickFilter('newest')">⏱ Baru Terdaftar</button>
@@ -341,7 +345,8 @@
                         data-username="{{ item.username|lower }}"
                         data-playing="{% if item.is_playing or item.youtube_stream %}true{% else %}false{% endif %}"
                         data-mcp="{% if item.mcp_status and item.mcp_status.connected %}true{% else %}false{% endif %}"
-                        data-search="{{ (item.username ~ ' ' ~ item.id ~ ' ' ~ (item.device_mac or '') ~ ' ' ~ ('mcp konek terhubung' if item.mcp_status and item.mcp_status.connected else 'blom belum terhubung mcp') ~ ' ' ~ ('stream youtube playing memutar' if item.is_playing or item.youtube_stream else ''))|lower|e }}">
+                        data-has-mac="{% if item.device_mac %}true{% else %}false{% endif %}"
+                        data-search="{{ (item.username ~ ' ' ~ item.id ~ ' ' ~ (item.device_mac or '') ~ ' ' ~ ('mac tersimpan ada mac' if item.device_mac else '') ~ ' ' ~ ('mcp konek terhubung' if item.mcp_status and item.mcp_status.connected else 'blom belum terhubung mcp') ~ ' ' ~ ('stream youtube playing memutar' if item.is_playing or item.youtube_stream else ''))|lower|e }}">
                         <td><span class="app-table-subtext">{{ item.id }}</span></td>
                         <td>
                             <span class="app-table-title">{{ item.username }}</span>
@@ -765,6 +770,8 @@
         // Auto-detect filter intent from search query keywords
         if (q === "stream" || q === "youtube" || q.includes("stream youtube")) {
             effectiveFilter = "stream_youtube";
+        } else if (q === "mac" || q.includes("mac tersimpan") || q.includes("tersimpan mac") || q.includes("ada mac")) {
+            effectiveFilter = "mac_saved";
         } else if (q === "mcp" || q === "konek" || q.includes("mcp konek")) {
             effectiveFilter = "mcp_connected";
         } else if (q.includes("blom") || q.includes("belum") || q.includes("tidak konek")) {
@@ -784,16 +791,19 @@
         rows.forEach(row => {
             const isPlaying = row.dataset.playing === "true";
             const isConnected = row.dataset.mcp === "true";
+            const hasMac = row.dataset.hasMac === "true";
             const searchData = row.dataset.search || "";
 
             // Check keyword text match
-            const isSpecialKeyword = ["stream", "youtube", "mcp", "konek", "blom", "belum", "baru", "lama"].some(k => q === k || q.includes(k));
+            const isSpecialKeyword = ["stream", "youtube", "mac", "konek", "blom", "belum", "baru", "lama"].some(k => q === k || q.includes(k));
             const textMatch = !q || isSpecialKeyword || searchData.includes(q);
 
             // Check pill filter condition
             let filterMatch = true;
             if (effectiveFilter === "stream_youtube") {
                 filterMatch = isPlaying;
+            } else if (effectiveFilter === "mac_saved") {
+                filterMatch = hasMac;
             } else if (effectiveFilter === "mcp_connected") {
                 filterMatch = isConnected;
             } else if (effectiveFilter === "mcp_disconnected") {
@@ -810,6 +820,19 @@
             rows.sort((a, b) => parseInt(a.dataset.userId || 0) - parseInt(b.dataset.userId || 0));
         } else if (effectiveFilter === "newest") {
             rows.sort((a, b) => parseInt(b.dataset.userId || 0) - parseInt(a.dataset.userId || 0));
+        } else if (effectiveFilter === "mac_saved") {
+            // Prioritize users with saved MAC, then active playing, then newest ID
+            rows.sort((a, b) => {
+                const macA = a.dataset.hasMac === "true" ? 0 : 1;
+                const macB = b.dataset.hasMac === "true" ? 0 : 1;
+                if (macA !== macB) return macA - macB;
+
+                const playA = a.dataset.playing === "true" ? 0 : 1;
+                const playB = b.dataset.playing === "true" ? 0 : 1;
+                if (playA !== playB) return playA - playB;
+
+                return parseInt(b.dataset.userId || 0) - parseInt(a.dataset.userId || 0);
+            });
         } else {
             // Default Priority:
             // 1. Paling atas: Sedang memutar YouTube
@@ -963,6 +986,13 @@
         streams.forEach(s => { activeUserMap[parseInt(s.user_id)] = s; });
 
         if (data.users && Array.isArray(data.users)) {
+            // Update MAC count badge on filter pill dynamically
+            const macCount = data.users.filter(u => Boolean(u.device_mac)).length;
+            const macPill = document.querySelector('.filter-pill[data-filter="mac_saved"]');
+            if (macPill) {
+                macPill.innerHTML = `📟 MAC Tersimpan ${macCount > 0 ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${macCount}</span>` : ''}`;
+            }
+
             data.users.forEach(u => {
                 const uid = u.id;
                 const row = document.getElementById(`user-row-${uid}`);
@@ -971,10 +1001,12 @@
                 const isStream = activeUserMap[uid] !== undefined;
                 const isPlaying = u.is_playing || isStream;
                 const isConnected = u.mcp_status && u.mcp_status.connected;
+                const hasMac = Boolean(u.device_mac);
 
                 row.dataset.playing = isPlaying ? "true" : "false";
                 row.dataset.mcp = isConnected ? "true" : "false";
-                row.dataset.search = `${u.username} ${u.id} ${u.device_mac || ''} ${isConnected ? 'mcp konek terhubung' : 'blom belum terhubung mcp'} ${isPlaying ? 'stream youtube playing memutar' : ''}`.toLowerCase();
+                row.dataset.hasMac = hasMac ? "true" : "false";
+                row.dataset.search = `${u.username} ${u.id} ${u.device_mac || ''} ${hasMac ? 'mac tersimpan ada mac' : ''} ${isConnected ? 'mcp konek terhubung' : 'blom belum terhubung mcp'} ${isPlaying ? 'stream youtube playing memutar' : ''}`.toLowerCase();
 
                 // Update playback badge in username column
                 const badge = document.getElementById(`user-playback-badge-${uid}`);
