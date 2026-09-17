@@ -122,15 +122,21 @@ def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None
         except Exception:
             mcp_connected = False
 
+    role = str(user.get("role") or "user").lower() if user and isinstance(user, dict) else ""
+    mcp_required = (role != "admin") if user else False
+
     merged = {
         "user": user,
         "csrf_token": make_csrf_token(user),
         "mcp_connected": mcp_connected,
+        "mcp_required": mcp_required,
     }
     if context:
         merged.update(context)
         if "mcp_connected" not in context:
             merged["mcp_connected"] = mcp_connected
+        if "mcp_required" not in context:
+            merged["mcp_required"] = mcp_required
     return templates.TemplateResponse(
         request=request,
         name=name,
