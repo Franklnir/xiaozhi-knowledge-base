@@ -1,5 +1,5 @@
 from xiaozhi.services.playback_tracker import playback_tracker
-from xiaozhi.services.youtube_streamer import stream_video_to_websocket
+from xiaozhi.services.youtube_streamer import stream_video_to_websocket, extract_audio_url
 import asyncio
 import base64
 import io
@@ -207,47 +207,46 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
     return user, title, device_mac
 
 
+def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None) -> str:
+    """
+    Intelligently select the optimal Opus bitrate based on requested value and ESP32 Wi-Fi RSSI.
+    - >= -65 dBm: Sinyal sangat kuat -> 12k
+    - -75 to -65 dBm: Sinyal stabil -> 11k
+    - -85 to -75 dBm: Sinyal lemah -> 8k (menghemat bandwidth 27%)
+    - < -85 dBm: Sinyal sangat lemah / 1 bar -> 6k (menghemat bandwidth 45%, anti tersendat)
+    """
+    br_str = (requested_br or "").lower().strip()
+    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "32k"}
+    if br_str and br_str in valid_bitrates and br_str != "auto":
+        return br_str
+
+    if rssi is not None and rssi < 0:
+        if rssi >= -65:
+            return "12k"
+        elif rssi >= -75:
+            return "11k"
+        elif rssi >= -85:
+            return "8k"
+        else:
+            return "6k"
+    return "11k"
+
+
 async def _stream_opus_audio(
     video_id: str,
-    bitrate: str = "12k",
+    source_url: str,
+    bitrate: str = "11k",
+    rssi: Optional[int] = None,
     start_sec: float = 0.0,
     user_id: Optional[int] = None,
     username: str = "",
     title: str = "",
     device_mac: str = "",
 ) -> AsyncGenerator[bytes, None]:
-    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "32k"}
-    br = bitrate.lower().strip() if bitrate and bitrate.lower().strip() in valid_bitrates else "11k"
-    if not yt_dlp:
-        raise HTTPException(status_code=503, detail="yt_dlp tidak tersedia.")
-
+    br = resolve_adaptive_bitrate(bitrate, rssi)
     ffmpeg_bin = _FFMPEG_PATH or shutil.which("ffmpeg")
     if not ffmpeg_bin:
-        raise HTTPException(status_code=500, detail="FFmpeg tidak terpasang di server.")
-
-    loop = asyncio.get_running_loop()
-
-    def _extract_url():
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "format": "bestaudio/best",
-            "extractaudio": True,
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            return info.get("url"), info.get("title", "")
-
-    try:
-        source_url, extracted_title = await loop.run_in_executor(None, _extract_url)
-        if not title:
-            title = extracted_title
-    except Exception as exc:
-        logger.error("Failed to extract audio URL for video %s: %s", video_id, exc)
-        raise HTTPException(status_code=500, detail=f"Gagal mengekstrak audio: {exc}")
-
-    if not source_url:
-        raise HTTPException(status_code=404, detail="Audio stream tidak ditemukan.")
+        raise RuntimeError("FFmpeg tidak terpasang di server.")
 
     session = None
     if user_id:
@@ -330,21 +329,47 @@ async def _stream_opus_audio(
 async def audio_stream_ogg_opus(
     video_id: str,
     request: Request,
-    br: str = "12k",
+    br: str = "auto",
+    rssi: Optional[int] = Query(None),
     start: float = 0.0,
     owner_id: Optional[int] = Query(None),
     mac: Optional[str] = Query(None),
     token: Optional[str] = Query(None),
 ):
     """Real-time Ogg/Opus mono 24kHz transcoding stream for ESP32 hardware decoder with adaptive bitrate and seek resume support."""
+    # Read RSSI from query param or header
+    if rssi is None:
+        header_rssi = request.headers.get("X-WiFi-RSSI", "")
+        if header_rssi:
+            try:
+                rssi = int(header_rssi.strip())
+            except ValueError:
+                rssi = None
+
+    selected_br = resolve_adaptive_bitrate(br, rssi)
     store = get_store()
     user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request, owner_id=owner_id, mac=mac, token=token)
     user_id = user["id"] if user else None
     username = user["username"] if user else ""
+
+    logger.info(f"Stream request for {video_id}: requested_br={br}, rssi={rssi} dBm -> selected_br={selected_br}")
+
+    try:
+        source_url, extracted_title = await extract_audio_url(video_id)
+        if not source_url:
+            raise ValueError("Direct audio stream tidak ditemukan.")
+        if not title:
+            title = extracted_title
+    except Exception as exc:
+        logger.warning("Extraction failed for video %s: %s", video_id, exc)
+        raise HTTPException(status_code=404, detail=f"Gagal mengekstrak audio YouTube: {exc}")
+
     return StreamingResponse(
         _stream_opus_audio(
             video_id,
-            bitrate=br,
+            source_url=source_url,
+            bitrate=selected_br,
+            rssi=rssi,
             start_sec=start,
             user_id=user_id,
             username=username,
@@ -357,6 +382,8 @@ async def audio_stream_ogg_opus(
             "Pragma": "no-cache",
             "Expires": "0",
             "Accept-Ranges": "none",
+            "X-Adaptive-Bitrate": selected_br,
+            "X-Adaptive-RSSI": str(rssi if rssi is not None else "N/A"),
         }
     )
 

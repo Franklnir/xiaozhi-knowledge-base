@@ -432,6 +432,11 @@ class SQLiteStore:
         ).fetchall()
         return [{"username": row["username"]} for row in rows]
 
+    def has_admin_user(self) -> bool:
+        conn = self._get_conn()
+        row = conn.execute("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1").fetchone()
+        return row is not None
+
     def ensure_admin_user(self, username: str, password: str) -> Dict[str, Any]:
         username = normalize_username(username)
         conn = self._get_conn()

@@ -336,6 +336,11 @@ class HFJsonStore:
         if limit and current + additional > limit:
             raise ValueError(f"Batas perangkat Relay Nyata akun ini adalah {limit} ruangan.")
 
+    def has_admin_user(self) -> bool:
+        with self._lock:
+            data = self._load()
+            return any(u.get("role") == "admin" for u in data.get("users", []))
+
     def ensure_admin_user(self, username: str, password: str) -> Dict[str, Any]:
         username = normalize_username(username)
         with self._lock:

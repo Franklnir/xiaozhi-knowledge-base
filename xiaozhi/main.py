@@ -12,6 +12,8 @@ from fastapi.templating import Jinja2Templates
 from xiaozhi.config import (
     ADMIN_PASSWORD,
     ADMIN_USERNAME,
+    ALLOWED_ORIGINS,
+    ALLOWED_ORIGIN_REGEX,
     IS_PRODUCTION,
     RESTORED_USER_PASSWORD,
     RESTORED_USER_USERNAME,
@@ -42,9 +44,28 @@ set_store_ref(store)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting Xiaozhi Indonesia...")
-    store.ensure_admin_user(ADMIN_USERNAME, ADMIN_PASSWORD)
-    store.restore_regular_user_account(RESTORED_USER_USERNAME, RESTORED_USER_PASSWORD)
+    # Admin initialization / startup verification
+    if ADMIN_PASSWORD:
+        store.ensure_admin_user(ADMIN_USERNAME, ADMIN_PASSWORD)
+        logger.info("Admin account '%s' verified from environment variable.", ADMIN_USERNAME)
+    elif store.has_admin_user():
+        logger.info("Admin account verified in database.")
+    else:
+        # Fresh installation: No admin exists, and no ADMIN_PASSWORD set in environment
+        import secrets
+        generated_pw = secrets.token_urlsafe(16)
+        store.ensure_admin_user(ADMIN_USERNAME, generated_pw)
+        logger.warning("=" * 76)
+        logger.warning("[SECURITY NOTICE] Fresh install: No admin found & ADMIN_PASSWORD not in .env")
+        logger.warning("An initial admin account has been created with a generated secure password:")
+        logger.warning("  Username : %s", ADMIN_USERNAME)
+        logger.warning("  Password : %s", generated_pw)
+        logger.warning("Please copy this password immediately or set ADMIN_PASSWORD in your .env file!")
+        logger.warning("=" * 76)
+
+    # Only restore test account if explicitly configured in environment
+    if RESTORED_USER_USERNAME and RESTORED_USER_PASSWORD:
+        store.restore_regular_user_account(RESTORED_USER_USERNAME, RESTORED_USER_PASSWORD)
 
     # Initialize task queue
     await init_task_queue(max_workers=3)
@@ -108,13 +129,14 @@ if STATIC_DIR.exists():
 # Setup API documentation
 setup_api_docs(app)
 
-# Middleware
+# Middleware - W3C Standard Compliant CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Authorization", "Content-Type", "X-Device-Token", "X-EDUSMART-API-KEY"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "X-Device-Token", "X-EDUSMART-API-KEY", "Accept", "Origin"],
 )
 
 
@@ -255,3 +277,16 @@ async def sitemap_xml():
     </url>
 </urlset>"""
     return Response(content=xml_content, media_type="application/xml")
+
+
+@app.get("/download/app.apk", include_in_schema=False)
+@app.get("/download/xichi.apk", include_in_schema=False)
+@app.get("/download", include_in_schema=False)
+async def download_apk():
+    """Direct download redirect for Xichi Companion App APK."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(
+        url="https://github.com/Franklnir/Chronchi/releases/download/v1.4.0/Xichi-v1.4.0-debug.apk",
+        status_code=302
+    )
+

@@ -95,6 +95,13 @@ async def get_dashboard_data(request: Request):
         "materi": sum(1 for m in materials if "materi" in m.get("category", "").lower()),
     }
 
+    device_mac = ""
+    if hasattr(store, "get_user_mac_address"):
+        try:
+            device_mac = store.get_user_mac_address(user["id"]) or ""
+        except Exception:
+            pass
+
     return DashboardDataResponse(
         success=True,
         data={
@@ -104,6 +111,7 @@ async def get_dashboard_data(request: Request):
                 "role": user.get("role", "user"),
                 "ui_theme": user.get("ui_theme", "neo"),
                 "created_at": user.get("created_at", ""),
+                "device_mac": device_mac,
             },
             "stats": stats,
             "quota": quota,
@@ -258,6 +266,13 @@ async def get_profile_data(request: Request):
             "enabled": is_enabled,
         })
 
+    device_mac = ""
+    if hasattr(store, "get_user_mac_address"):
+        try:
+            device_mac = store.get_user_mac_address(user["id"]) or ""
+        except Exception:
+            pass
+
     return ProfileDataResponse(
         success=True,
         user={
@@ -269,6 +284,7 @@ async def get_profile_data(request: Request):
             "google_id": user.get("google_id"),
             "google_email": user.get("google_email"),
             "registered_with_google": bool(user.get("registered_with_google", False)),
+            "device_mac": device_mac,
         },
         persona_analysis=persona_analysis,
         tools_catalog=tools_catalog,

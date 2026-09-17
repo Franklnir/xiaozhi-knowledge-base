@@ -62,10 +62,10 @@ REAL_RELAY_POLL_INTERVAL_MS = int(os.getenv("REAL_RELAY_POLL_INTERVAL_MS", "1000
 REAL_RELAY_DEVICE_ONLINE_SECONDS = int(os.getenv("REAL_RELAY_DEVICE_ONLINE_SECONDS", "45"))
 
 # ── Auth Defaults ──────────────────────────────────────────────────────────
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "irsyad03")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "irsyad031226")
-RESTORED_USER_USERNAME = os.getenv("RESTORED_USER_USERNAME", "irsyad26")
-RESTORED_USER_PASSWORD = os.getenv("RESTORED_USER_PASSWORD", "irsyad261203")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip() or "admin"
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+RESTORED_USER_USERNAME = os.getenv("RESTORED_USER_USERNAME", "").strip()
+RESTORED_USER_PASSWORD = os.getenv("RESTORED_USER_PASSWORD", "").strip()
 
 # ── User Limits & Features ─────────────────────────────────────────────────
 USER_LIMIT_DEFAULTS = {
@@ -488,6 +488,19 @@ DEFAULT_UI_THEME = "neo"
 
 # ── Production Detection ───────────────────────────────────────────────────
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production" or bool(os.getenv("SPACE_ID"))
+
+# ── CORS Origins ───────────────────────────────────────────────────────────
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+if _raw_origins:
+    ALLOWED_ORIGINS = [orig.strip() for orig in _raw_origins.split(",") if orig.strip()]
+else:
+    ALLOWED_ORIGINS = [
+        "https://xiaozhiscig.biz.id",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+    ]
+ALLOWED_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|xiaozhiscig\.biz\.id)(:\d+)?$"
 
 # ── Secret Key ─────────────────────────────────────────────────────────────
 APP_SECRET_KEY = os.getenv("APP_SECRET_KEY")

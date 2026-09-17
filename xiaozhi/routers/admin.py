@@ -564,3 +564,18 @@ async def admin_scrape_url(
         return redirect_with_message("/dashboard", f"URL berhasil di-scrape: {result['title'][:50]}")
     except Exception as e:
         return redirect_with_message("/dashboard", f"Gagal scrape URL: {str(e)[:100]}")
+
+
+@router.get("/api/v1/admin/users")
+async def api_v1_admin_users(request: Request):
+    """API endpoint for mobile app: get manageable users with real-time status."""
+    admin = require_admin(request)
+    store = get_store()
+    users = store.list_admin_manageable_users(admin["username"])
+    return {
+        "success": True,
+        "users": users,
+        "total": len(users),
+        "message": "Daftar pengguna berhasil dimuat."
+    }
+
