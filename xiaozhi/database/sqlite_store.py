@@ -297,6 +297,35 @@ class SQLiteStore:
             );
             CREATE INDEX IF NOT EXISTS idx_persona_owner ON user_persona(owner_id);
             CREATE INDEX IF NOT EXISTS idx_persona_owner_cat ON user_persona(owner_id, category);
+
+            -- Community Chats (Interactive Chat Room with voice notes and replies)
+            CREATE TABLE IF NOT EXISTS community_chats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                username TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'user',
+                content TEXT,
+                msg_type TEXT NOT NULL DEFAULT 'text',
+                voice_filename TEXT,
+                voice_duration INTEGER DEFAULT 0,
+                reply_to_id INTEGER,
+                created_at TEXT NOT NULL,
+                created_date TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (reply_to_id) REFERENCES community_chats(id) ON DELETE SET NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_community_chats_created ON community_chats(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_community_chats_date ON community_chats(created_date);
+            CREATE INDEX IF NOT EXISTS idx_community_chats_user ON community_chats(user_id);
+            CREATE INDEX IF NOT EXISTS idx_community_chats_reply ON community_chats(reply_to_id);
+
+            -- User chat read state (tracking last read message per user for notification badges)
+            CREATE TABLE IF NOT EXISTS user_chat_read_state (
+                user_id INTEGER PRIMARY KEY,
+                last_read_message_id INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
         """)
 
         # Migration check: Ensure google_id, google_email, and registered_with_google exist in users table
@@ -1595,3 +1624,208 @@ class SQLiteStore:
             ORDER BY u.username
         """).fetchall()
         return [dict(row) for row in rows]
+
+    # ── Community Chat ────────────────────────────────────────────────────
+
+    def add_community_chat(
+        self,
+        user_id: int,
+        username: str,
+        role: str,
+        content: str = "",
+        msg_type: str = "text",
+        voice_filename: Optional[str] = None,
+        voice_duration: int = 0,
+        reply_to_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Add a new community chat message and return full message dictionary."""
+        conn = self._get_conn()
+        now_dt = datetime.now()
+        created_at = utc_now()
+        created_date = now_dt.strftime("%Y-%m-%d")
+
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO community_chats (
+                user_id, username, role, content, msg_type,
+                voice_filename, voice_duration, reply_to_id, created_at, created_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                username,
+                role,
+                content or "",
+                msg_type,
+                voice_filename,
+                int(voice_duration or 0),
+                reply_to_id,
+                created_at,
+                created_date,
+            ),
+        )
+        message_id = cursor.lastrowid
+        conn.commit()
+
+        # Resolve reply_to if present
+        reply_to = None
+        if reply_to_id:
+            reply_to = self.get_community_chat(reply_to_id)
+
+        return {
+            "id": message_id,
+            "user_id": user_id,
+            "username": username,
+            "role": role,
+            "content": content or "",
+            "msg_type": msg_type,
+            "voice_filename": voice_filename,
+            "voice_duration": int(voice_duration or 0),
+            "reply_to_id": reply_to_id,
+            "reply_to": reply_to,
+            "created_at": created_at,
+            "created_date": created_date,
+        }
+
+    def get_community_chat(self, message_id: int) -> Optional[Dict[str, Any]]:
+        """Get a specific community chat message by ID."""
+        conn = self._get_conn()
+        row = conn.execute(
+            """
+            SELECT c.*,
+                   r.username AS reply_username,
+                   r.role AS reply_role,
+                   r.content AS reply_content,
+                   r.msg_type AS reply_msg_type
+            FROM community_chats c
+            LEFT JOIN community_chats r ON c.reply_to_id = r.id
+            WHERE c.id = ?
+            """,
+            (message_id,),
+        ).fetchone()
+        if not row:
+            return None
+
+        data = dict(row)
+        reply_data = None
+        if data.get("reply_to_id") and data.get("reply_username"):
+            reply_data = {
+                "id": data["reply_to_id"],
+                "username": data["reply_username"],
+                "role": data["reply_role"],
+                "content": data["reply_content"],
+                "msg_type": data["reply_msg_type"],
+            }
+        data["reply_to"] = reply_data
+        return data
+
+    def list_community_chats(
+        self, limit: int = 100, before_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """List community chat messages in chronological order (oldest to newest)."""
+        conn = self._get_conn()
+        if before_id:
+            rows = conn.execute(
+                """
+                SELECT c.*,
+                       r.username AS reply_username,
+                       r.role AS reply_role,
+                       r.content AS reply_content,
+                       r.msg_type AS reply_msg_type
+                FROM community_chats c
+                LEFT JOIN community_chats r ON c.reply_to_id = r.id
+                WHERE c.id < ?
+                ORDER BY c.id DESC
+                LIMIT ?
+                """,
+                (before_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT c.*,
+                       r.username AS reply_username,
+                       r.role AS reply_role,
+                       r.content AS reply_content,
+                       r.msg_type AS reply_msg_type
+                FROM community_chats c
+                LEFT JOIN community_chats r ON c.reply_to_id = r.id
+                ORDER BY c.id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        messages = []
+        for r in rows:
+            data = dict(r)
+            reply_data = None
+            if data.get("reply_to_id") and data.get("reply_username"):
+                reply_data = {
+                    "id": data["reply_to_id"],
+                    "username": data["reply_username"],
+                    "role": data["reply_role"],
+                    "content": data["reply_content"],
+                    "msg_type": data["reply_msg_type"],
+                }
+            data["reply_to"] = reply_data
+            messages.append(data)
+
+        # Reverse so that oldest is first in the list (chronological order)
+        messages.reverse()
+        return messages
+
+    def delete_community_chat(
+        self, message_id: int, user_id: int, is_admin: bool = False
+    ) -> bool:
+        """Delete a community chat message if owned by user or if caller is admin."""
+        conn = self._get_conn()
+        msg = conn.execute(
+            "SELECT user_id FROM community_chats WHERE id = ?", (message_id,)
+        ).fetchone()
+        if not msg:
+            return False
+
+        if not is_admin and msg["user_id"] != user_id:
+            return False
+
+        conn.execute("DELETE FROM community_chats WHERE id = ?", (message_id,))
+        conn.commit()
+        return True
+
+    def get_unread_chat_count(self, user_id: int) -> int:
+        """Get number of new community messages since user's last read message."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT last_read_message_id FROM user_chat_read_state WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        last_id = row["last_read_message_id"] if row else 0
+
+        unread = conn.execute(
+            "SELECT COUNT(*) as cnt FROM community_chats WHERE id > ? AND user_id != ?",
+            (last_id, user_id),
+        ).fetchone()
+        return int(unread["cnt"]) if unread else 0
+
+    def mark_chat_read(self, user_id: int, last_message_id: Optional[int] = None) -> None:
+        """Update the user's last read community message ID."""
+        conn = self._get_conn()
+        now = utc_now()
+        if last_message_id is None:
+            max_row = conn.execute("SELECT MAX(id) as max_id FROM community_chats").fetchone()
+            last_message_id = max_row["max_id"] if (max_row and max_row["max_id"]) else 0
+
+        conn.execute(
+            """
+            INSERT INTO user_chat_read_state (user_id, last_read_message_id, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                last_read_message_id = MAX(user_chat_read_state.last_read_message_id, excluded.last_read_message_id),
+                updated_at = excluded.updated_at
+            """,
+            (user_id, int(last_message_id or 0), now),
+        )
+        conn.commit()
+

@@ -2,547 +2,924 @@
 
 {% block content %}
 <style>
-    .chat-messages-box {
-        flex: 1;
-        overflow-y: auto;
-        padding: 20px;
+    /* Chat Container Styles */
+    .chat-main-container {
         display: flex;
         flex-direction: column;
-        gap: 16px;
-        scroll-behavior: smooth;
+        height: calc(100vh - 270px);
+        min-height: 600px;
         background: var(--app-surface);
-        border: 2px solid var(--app-border-strong);
-        border-radius: var(--app-radius);
-    }
-    :root[data-theme="neo"] .chat-messages-box {
         border: 2.5px solid #111;
+        border-radius: var(--app-radius);
         box-shadow: 4px 4px 0 #111;
+        overflow: hidden;
+        position: relative;
     }
-    .chat-bubble {
+
+    .chat-header-bar {
+        padding: 12px 18px;
+        background: var(--app-surface-muted, #f8fafc);
+        border-bottom: 2px solid #111;
         display: flex;
-        gap: 12px;
-        max-width: 90%;
-        animation: chatFadeIn 0.2s ease-out;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
     }
-    @keyframes chatFadeIn {
+
+    .chat-scroll-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: var(--app-bg, #f1f5f9);
+        scroll-behavior: smooth;
+    }
+
+    :root[data-theme="dark"] .chat-scroll-area {
+        background: #090d16;
+    }
+
+    /* Date Divider (WhatsApp Style) */
+    .chat-date-divider {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 16px 0 10px 0;
+        position: relative;
+        user-select: none;
+    }
+    .chat-date-pill {
+        background: #e2e8f0;
+        color: #334155;
+        font-size: 11px;
+        font-weight: 800;
+        padding: 4px 14px;
+        border-radius: 999px;
+        letter-spacing: 0.5px;
+        border: 1.5px solid #94a3b8;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        text-transform: uppercase;
+    }
+    :root[data-theme="dark"] .chat-date-pill {
+        background: #1e293b;
+        color: #cbd5e1;
+        border-color: #475569;
+    }
+    :root[data-theme="neo"] .chat-date-pill {
+        border: 2px solid #111;
+        box-shadow: 2px 2px 0 #111;
+    }
+
+    /* Message Item Wrapper */
+    .chat-row {
+        display: flex;
+        width: 100%;
+        margin-bottom: 4px;
+        animation: chatSlideIn 0.2s ease-out;
+    }
+    @keyframes chatSlideIn {
         from { opacity: 0; transform: translateY(6px); }
         to { opacity: 1; transform: translateY(0); }
     }
-    .chat-bubble.user {
-        align-self: flex-end;
-        flex-direction: row-reverse;
+    .chat-row.align-right {
+        justify-content: flex-end;
     }
-    .chat-bubble.assistant {
-        align-self: flex-start;
+    .chat-row.align-left {
+        justify-content: flex-start;
     }
-    .chat-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: grid;
-        place-items: center;
-        font-size: 14px;
-        font-weight: 800;
-        flex-shrink: 0;
-        border: 1.5px solid #111;
-    }
-    .chat-bubble.user .chat-avatar {
-        background: var(--app-accent, #047857);
-        color: white;
-    }
-    .chat-bubble.assistant .chat-avatar {
-        background: #fef08a;
-        color: #854d0e;
-    }
-    .chat-bubble-content {
-        padding: 12px 16px;
-        border-radius: 12px;
-        font-size: 14px;
-        line-height: 1.6;
+
+    /* Base Bubble */
+    .chat-bubble {
+        max-width: 78%;
+        min-width: 160px;
+        padding: 10px 14px;
+        border-radius: 14px;
+        position: relative;
         word-break: break-word;
-        box-shadow: var(--app-shadow);
-        border: 1.5px solid var(--app-border-strong);
+        line-height: 1.5;
+        font-size: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
     }
-    :root[data-theme="neo"] .chat-bubble-content {
-        border: 2px solid #111;
-        box-shadow: 3px 3px 0 #111;
+
+    /* 🔵 1. ADMIN BUBBLE (Always Blue in everyone's view) */
+    .msg-bubble-admin {
+        background: #2563eb !important;
+        color: #ffffff !important;
+        border: 2.5px solid #1d4ed8 !important;
+        box-shadow: 3px 3px 0 #1e3a8a !important;
     }
-    .chat-bubble.user .chat-bubble-content {
-        background: #0f172a;
-        color: #f8fafc;
-        border-bottom-right-radius: 2px;
+    .msg-bubble-admin .msg-username {
+        color: #bae6fd !important;
+        font-weight: 800;
     }
-    :root[data-theme="dark"] .chat-bubble.user .chat-bubble-content {
+    .msg-bubble-admin .msg-meta-text {
+        color: #dbeafe !important;
+    }
+    .msg-bubble-admin .msg-id-tag {
+        background: #1d4ed8 !important;
+        color: #eff6ff !important;
+        border: 1px solid #3b82f6;
+    }
+
+    /* 🟡 2. PESAN USER SENDIRI (Non-Admin: Yellow) */
+    .msg-bubble-me {
+        background: #fde047 !important;
+        color: #0f172a !important;
+        border: 2.5px solid #ca8a04 !important;
+        box-shadow: 3px 3px 0 #854d0e !important;
+        border-bottom-right-radius: 2px !important;
+    }
+    .msg-bubble-me .msg-username {
+        color: #713f12 !important;
+        font-weight: 800;
+    }
+    .msg-bubble-me .msg-meta-text {
+        color: #78350f !important;
+    }
+    .msg-bubble-me .msg-id-tag {
+        background: #fef08a !important;
+        color: #713f12 !important;
+        border: 1px solid #ca8a04;
+    }
+
+    /* ⚫ 3. PESAN USER LAIN (Non-Admin: Black / Deep Slate) */
+    .msg-bubble-other {
+        background: #0f172a !important;
+        color: #f8fafc !important;
+        border: 2.5px solid #020617 !important;
+        box-shadow: 3px 3px 0 #000000 !important;
+        border-bottom-left-radius: 2px !important;
+    }
+    .msg-bubble-other .msg-username {
+        color: #38bdf8 !important;
+        font-weight: 800;
+    }
+    .msg-bubble-other .msg-meta-text {
+        color: #94a3b8 !important;
+    }
+    .msg-bubble-other .msg-id-tag {
+        background: #1e293b !important;
+        color: #cbd5e1 !important;
+        border: 1px solid #334155;
+    }
+
+    /* ⚪ 4. REPLY QUOTE BOX (Abu-abu / Gray) */
+    .chat-reply-quote {
+        border-radius: 8px;
+        padding: 6px 10px;
+        margin-bottom: 6px;
+        font-size: 12px;
+        line-height: 1.4;
+        cursor: pointer;
+        transition: opacity 0.15s;
+    }
+    .chat-reply-quote:hover {
+        opacity: 0.9;
+    }
+    .msg-bubble-admin .chat-reply-quote {
+        background: rgba(255, 255, 255, 0.2) !important;
+        color: #ffffff !important;
+        border-left: 4px solid #93c5fd !important;
+    }
+    .msg-bubble-me .chat-reply-quote {
+        background: #f1f5f9 !important;
+        color: #1e293b !important;
+        border-left: 4px solid #64748b !important;
+    }
+    .msg-bubble-other .chat-reply-quote {
+        background: #334155 !important;
+        color: #f1f5f9 !important;
+        border-left: 4px solid #94a3b8 !important;
+    }
+
+    /* Admin Label Badge */
+    .badge-admin-label {
+        background: #ef4444;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 900;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.2);
+        letter-spacing: 0.5px;
+        margin-left: 6px;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    /* Bubble Header & Footer */
+    .msg-bubble-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 3px;
+        gap: 8px;
+    }
+    .msg-id-tag {
+        font-size: 10.5px;
+        font-family: monospace;
+        font-weight: 800;
+        padding: 1px 6px;
+        border-radius: 4px;
+    }
+    .msg-content-body {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 14px;
+    }
+    .msg-bubble-footer {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+        margin-top: 4px;
+        font-size: 11px;
+    }
+
+    /* Action Buttons (Reply / Delete) */
+    .msg-action-btn {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        opacity: 0.7;
+        font-size: 11.5px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 4px;
+        border-radius: 4px;
+        transition: all 0.15s;
+        color: inherit;
+    }
+    .msg-action-btn:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.2);
+    }
+    .msg-bubble-me .msg-action-btn:hover {
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    /* Reply Preview Banner above Input */
+    .reply-active-banner {
+        background: #f1f5f9;
+        border-top: 2px solid #111;
+        border-left: 5px solid #2563eb;
+        padding: 8px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12.5px;
+        color: #0f172a;
+    }
+    :root[data-theme="dark"] .reply-active-banner {
         background: #1e293b;
         color: #f8fafc;
         border-color: #334155;
+        border-left-color: #38bdf8;
     }
-    .chat-bubble.assistant .chat-bubble-content {
-        background: var(--app-surface-muted, #f8fafc);
-        color: var(--app-text);
-        border-bottom-left-radius: 2px;
-    }
-    .typing-cursor {
-        display: inline-block;
-        width: 7px;
-        height: 15px;
-        background: currentColor;
-        margin-left: 3px;
-        vertical-align: middle;
-        animation: blinkCursor 0.8s infinite;
-    }
-    @keyframes blinkCursor {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0; }
-    }
-    .chat-sources-panel {
-        margin-top: 10px;
-        padding-top: 8px;
-        border-top: 1px dashed var(--app-border-strong);
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        align-items: center;
-        font-size: 11px;
-    }
-    .chat-input-area {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-    .chat-suggestions {
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        padding-bottom: 4px;
-    }
-    .suggestion-pill {
-        padding: 5px 12px;
-        font-size: 12px;
-        font-weight: 700;
+
+    /* Chat Input Form */
+    .chat-input-container {
+        padding: 12px 18px;
         background: var(--app-surface);
-        border: 1.5px solid var(--app-border-strong);
-        border-radius: 99px;
-        cursor: pointer;
-        white-space: nowrap;
-        color: var(--app-text);
-        transition: all 0.15s ease;
-    }
-    .suggestion-pill:hover {
-        background: var(--app-soft, #f1f5f9);
-        border-color: var(--app-text);
-        transform: translateY(-1px);
-    }
-    :root[data-theme="neo"] .suggestion-pill {
-        border: 2px solid #111;
-        box-shadow: 2px 2px 0 #111;
-    }
-    .chat-input-row {
+        border-top: 2px solid #111;
         display: flex;
         gap: 10px;
         align-items: center;
     }
-    .chat-input {
+    .chat-text-input {
         flex: 1;
         min-height: 46px;
         padding: 10px 16px;
-        font-size: 14px;
-        border-radius: var(--app-radius);
-        border: 2px solid var(--app-border-strong);
-        background: var(--app-input-bg);
-        color: var(--app-text);
-        font-family: inherit;
-    }
-    :root[data-theme="neo"] .chat-input {
+        font-size: 14.5px;
         border: 2.5px solid #111;
+        border-radius: var(--app-radius);
+        background: var(--app-input-bg, #ffffff);
+        color: var(--app-text, #111);
         box-shadow: 3px 3px 0 #111;
+        outline: none;
+        transition: transform 0.1s;
     }
-    .chat-send-btn {
+    .chat-text-input:focus {
+        border-color: var(--app-primary, #047857);
+    }
+    .chat-submit-btn {
         min-height: 46px;
-        padding: 0 22px;
+        padding: 0 24px;
         font-size: 14px;
         font-weight: 800;
+        background: #2563eb;
+        color: #ffffff;
+        border: 2.5px solid #111;
+        box-shadow: 3px 3px 0 #111;
+        border-radius: var(--app-radius);
+        cursor: pointer;
         display: inline-flex;
         align-items: center;
         gap: 8px;
+        transition: all 0.15s;
     }
-    :root[data-theme="neo"] .chat-send-btn {
-        border: 2.5px solid #111;
-        box-shadow: 3px 3px 0 #111;
-    }
-    .chat-send-btn:hover {
+    .chat-submit-btn:hover:not(:disabled) {
         transform: translate(-1px, -1px);
+        box-shadow: 4px 4px 0 #111;
+        background: #1d4ed8;
     }
-    .quick-data-btn {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        text-align: left;
-        padding: 8px 12px;
-        font-size: 12px;
-        font-weight: 600;
+    .chat-submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* Scroll-to-bottom Floating Button */
+    .scroll-down-btn {
+        position: absolute;
+        bottom: 80px;
+        right: 24px;
         background: var(--app-surface);
-        border: 1.5px solid var(--app-border);
-        border-radius: var(--app-radius);
-        cursor: pointer;
         color: var(--app-text);
-        transition: all 0.15s ease;
-    }
-    .quick-data-btn:hover {
-        background: var(--app-surface-muted, #f8fafc);
-        border-color: var(--app-accent);
-        transform: translateY(-1px);
-    }
-    :root[data-theme="neo"] .quick-data-btn {
         border: 2px solid #111;
-        box-shadow: 2px 2px 0 #111;
+        box-shadow: 3px 3px 0 #111;
+        border-radius: 50%;
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.15s;
+        z-index: 10;
+        display: none;
+    }
+    .scroll-down-btn:hover {
+        transform: scale(1.05);
     }
 </style>
 
 <div class="app-page">
-    <!-- Page Header (Standard XiaoZhi Design System) -->
+    <!-- Page Header -->
     <header class="app-page-header">
         <div>
-            <p class="app-eyebrow">Asisten Virtual Cerdas</p>
-            <h1 class="app-title">Tanya AI XiaoZhi</h1>
+            <p class="app-eyebrow">Komunitas Real-Time</p>
+            <h1 class="app-title">Ruang Chat Komunitas</h1>
             <p class="app-subtitle">
-                Asisten cerdas berbasis protokol real-time SSE, terintegrasi dengan Knowledge Base dan perangkat ESP32 Anda. Data Anda 100% terisolasi.
+                Forum obrolan langsung antar-pengguna dan admin secara real-time. Dilengkapi sistem balasan ber-ID dan pembagian tanggal otomatis.
             </p>
         </div>
         <div class="app-toolbar">
-            <span class="app-status-pill {% if mcp_status.connected %}is-online{% elif not mcp_status.tokenSaved %}is-offline{% endif %}" id="mcpStatusPill">
+            <span id="wsStatusBadge" class="app-status-pill is-online">
                 <span class="app-status-dot"></span>
-                <span id="mcpStatusText">{{ mcp_status.statusText }}</span>
+                <span id="wsStatusText">WebSocket Live</span>
             </span>
-            <span id="chatStatusBadge" class="app-chip app-chip-small app-chip-success" style="font-weight:800;">
-                ● Siap Menjawab
-            </span>
-            <button type="button" onclick="clearChat()" class="app-button app-button-small" title="Bersihkan Layar Chat">
-                🗑️ Bersihkan
+            <button type="button" onclick="scrollToBottom(true)" class="app-button app-button-small" title="Scroll ke Pesan Terbawah">
+                ⬇️ Pesan Terbaru
+            </button>
+            <button type="button" onclick="refreshMessages()" class="app-button app-button-small" title="Muat Ulang Pesan">
+                🔄 Muat Ulang
             </button>
         </div>
     </header>
 
-    <!-- Stat Grid (Shows Current User Isolated Context) -->
-    <section class="app-stat-grid">
-        <div class="app-stat-card">
-            <p class="app-stat-label">Akun Anda</p>
-            <p class="app-stat-value" style="font-size:20px;margin-top:6px;">{{ user.username }}</p>
-            <span class="app-chip app-chip-small app-chip-info" style="margin-top:6px;font-size:11px;">
-                Role: {{ user.role|capitalize }}
-            </span>
+    <!-- Color Legend & Account Status Banner -->
+    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; align-items:center; justify-content:space-between; background:var(--app-surface); padding:10px 16px; border:2px solid #111; box-shadow:3px 3px 0 #111; border-radius:var(--app-radius);">
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700;">
+            <span>Akun Anda:</span>
+            <span style="font-family:monospace; background:var(--app-soft, #e2e8f0); padding:2px 8px; border-radius:4px; border:1px solid #111;">{{ user.username }}</span>
+            {% if user.role == 'admin' %}
+            <span class="badge-admin-label">ADMIN</span>
+            {% else %}
+            <span class="app-chip app-chip-small app-chip-neutral" style="font-size:10.5px;">User</span>
+            {% endif %}
         </div>
-        <div class="app-stat-card">
-            <p class="app-stat-label">MAC ESP32 Anda</p>
-            <p class="app-stat-value" style="font-size:17px;margin-top:6px;font-family:monospace;">
-                {{ user_mac if user_mac else "Belum Disetel" }}
-            </p>
-            <span class="app-chip app-chip-small {% if user_mac %}app-chip-success{% else %}app-chip-neutral{% endif %}" style="margin-top:6px;font-size:11px;">
-                {{ "Terhubung ke Board" if user_mac else "Atur di Menu Profil" }}
-            </span>
+        <!-- Color Scheme Legend -->
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:11.5px; font-weight:700;">
+            <span style="color:var(--app-muted);">Panduan Warna:</span>
+            <span style="background:#2563eb; color:#fff; padding:2px 8px; border-radius:4px; border:1px solid #111;">🔵 Admin [ADMIN]</span>
+            <span style="background:#fde047; color:#000; padding:2px 8px; border-radius:4px; border:1px solid #111;">🟡 Pesan Anda</span>
+            <span style="background:#0f172a; color:#fff; padding:2px 8px; border-radius:4px; border:1px solid #111;">⚫ Pesan User Lain</span>
+            <span style="background:#e2e8f0; color:#1e293b; padding:2px 8px; border-radius:4px; border:1px solid #111;">⚪ Kotak Balasan</span>
         </div>
-        <div class="app-stat-card">
-            <p class="app-stat-label">Materi Pengetahuan</p>
-            <p class="app-stat-value" style="font-size:20px;margin-top:6px;">{{ materials|length }} Materi</p>
-            <span class="app-chip app-chip-small app-chip-neutral" style="margin-top:6px;font-size:11px;">
-                {{ quota.usage.materials if quota else 0 }}/{{ quota.materials.label if quota and quota.materials else "Maksimal" }}
-            </span>
-        </div>
-        <div class="app-stat-card">
-            <p class="app-stat-label">FastMCP Bridge</p>
-            <p class="app-stat-value" style="font-size:20px;margin-top:6px;">{{ "Online" if mcp_status.connected else "Standby" }}</p>
-            <span class="app-chip app-chip-small {% if mcp_status.connected %}app-chip-success{% else %}app-chip-warning{% endif %}" style="margin-top:6px;font-size:11px;">
-                {{ "38 Tools Aktif" if mcp_status.connected else "Token Tersedia" if mcp_status.tokenSaved else "Perlu Token" }}
-            </span>
-        </div>
-    </section>
+    </div>
 
-    <!-- Main Content Grid (Left: Chat Room, Right: Isolated Context & Quick Questions) -->
-    <div class="app-content-grid">
-        <!-- Main Chat Box Area (Left Column) -->
-        <div class="app-card" style="display:flex;flex-direction:column;height:calc(100vh - 300px);min-height:580px;gap:14px;">
-            <!-- Message Stream Area -->
-            <div class="chat-messages-box" id="chatMessagesBox">
-                <!-- Welcome Message -->
-                <div class="chat-bubble assistant">
-                    <div class="chat-avatar">🤖</div>
-                    <div class="chat-bubble-content">
-                        <strong>Halo {{ user.username }}!</strong> Selamat datang di asisten AI XiaoZhi.<br>
-                        Saya memiliki akses ke data akun Anda (**{{ user.username }}**), perangkat hardware ESP32, dan materi Knowledge Base milik Anda sendiri.
-                        <div style="margin-top:8px;font-size:12px;color:var(--app-muted);">
-                            💡 <em>Ajukan pertanyaan seputar data Anda, materi kuliah, perintah musik YouTube, maupun simulasi perangkat pintar. Privasi multi-tenant Anda 100% terlindungi.</em>
-                        </div>
-                    </div>
+    <!-- Main Chat Room Card -->
+    <div class="chat-main-container">
+        <!-- Header Bar -->
+        <div class="chat-header-bar">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:18px;">💬</span>
+                <div>
+                    <span style="font-weight:800; font-size:14.5px;">Obrolan Global</span>
+                    <span id="chatCountSubtitle" style="font-size:12px; color:var(--app-muted); margin-left:8px;">
+                        ({{ messages|length }} pesan)
+                    </span>
                 </div>
             </div>
-
-            <!-- Input & Suggestions Area -->
-            <div class="chat-input-area">
-                <!-- Quick Suggestions -->
-                <div class="chat-suggestions">
-                    <span style="font-size:11.5px;font-weight:700;color:var(--app-muted);display:flex;align-items:center;white-space:nowrap;">💡 Saran:</span>
-                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Siapa nama akun saya dan apa role saya?')">👤 Data Akun Saya</button>
-                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Apa MAC address ESP32 saya dan apakah sudah terdaftar?')">📟 MAC ESP32 Saya</button>
-                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Jelaskan panduan setup koneksi MCP dari awal')">🔌 Setup FastMCP</button>
-                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Apa saja 41 tools MCP yang tersedia dan apa saja fungsinya?')">🛠️ 41 Tools FastMCP</button>
-                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Berapa kuota dan materi yang saya miliki di Knowledge Base?')">📚 Materi & Kuota Saya</button>
-                    {% for s in suggestions %}
-                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Jelaskan materi tentang {{ s }}')">📖 {{ s }}</button>
-                    {% endfor %}
-                    <button type="button" class="suggestion-pill" onclick="useSuggestion('Bagaimana cara memutar musik YouTube di speaker ESP32 saya?')">🎵 Putar YouTube di ESP32</button>
-                </div>
-
-                <!-- Input Form -->
-                <form id="chatForm" onsubmit="handleChatSubmit(event)" class="chat-input-row">
-                    <input 
-                        type="text" 
-                        id="chatInput" 
-                        class="chat-input" 
-                        placeholder="Tanyakan data Anda atau ketik pertanyaan ke AI XiaoZhi (tekan Enter)..." 
-                        autocomplete="off"
-                        required
-                    >
-                    <button type="submit" id="chatSendBtn" class="app-button app-button-primary chat-send-btn">
-                        <span>Kirim</span>
-                        <span id="sendIcon">➤</span>
-                    </button>
-                </form>
+            <div style="font-size:12px; color:var(--app-muted); font-weight:600;">
+                Tekan <kbd style="background:#e2e8f0; color:#000; padding:1px 5px; border-radius:3px; border:1px solid #94a3b8;">Enter</kbd> untuk mengirim teks
             </div>
         </div>
 
-        <!-- Sidebar Column (Right Column) -->
-        <div class="app-nav-sidebar-content">
-            <!-- Privacy & Multi-Tenant Guard Card -->
-            <div class="app-card">
-                <div class="app-card-header is-compact">
-                    <div>
-                        <h3 class="app-section-title" style="font-size:15px;display:flex;align-items:center;gap:6px;">
-                            🛡️ Data Akun Terisolasi
-                        </h3>
-                        <p class="app-section-subtitle" style="font-size:12px;">
-                            Multi-tenant guard aktif. AI hanya diizinkan membaca data milik akun Anda sendiri.
-                        </p>
-                    </div>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px;">
-                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--app-border);">
-                        <span style="color:var(--app-muted);">User ID:</span>
-                        <strong style="font-family:monospace;">#{{ user.id }}</strong>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--app-border);">
-                        <span style="color:var(--app-muted);">Username:</span>
-                        <strong>{{ user.username }}</strong>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--app-border);">
-                        <span style="color:var(--app-muted);">MAC ESP32:</span>
-                        <strong style="font-family:monospace;">{{ user_mac if user_mac else "Belum disetel" }}</strong>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--app-border);">
-                        <span style="color:var(--app-muted);">Token MCP:</span>
-                        <span class="app-chip app-chip-small app-chip-neutral" style="font-family:monospace;font-size:11px;">
-                            {{ mcp_status.tokenPreview if mcp_status.tokenPreview else "Belum ada" }}
-                        </span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;padding:6px 0;">
-                        <span style="color:var(--app-muted);">Smart Home:</span>
-                        <strong>{{ relay_rooms|length }} Ruangan</strong>
-                    </div>
-                </div>
+        <!-- Chat Stream Scroll Area -->
+        <div class="chat-scroll-area" id="chatScrollArea">
+            {% if not messages %}
+            <div id="chatEmptyPlaceholder" style="text-align:center; padding:50px 20px; color:var(--app-muted);">
+                <div style="font-size:40px; margin-bottom:10px;">💬</div>
+                <h3 style="font-size:16px; font-weight:800; color:var(--app-text); margin-bottom:6px;">Belum Ada Obrolan</h3>
+                <p style="font-size:13px; max-width:400px; margin:0 auto;">
+                    Jadilah yang pertama memulai percakapan di Ruang Chat Komunitas XiaoZhi! Ketik pesan di kolom bawah ini.
+                </p>
             </div>
-
-            <!-- Quick Personal Data Questions Card -->
-            <div class="app-card">
-                <div class="app-card-header is-compact">
-                    <div>
-                        <h3 class="app-section-title" style="font-size:15px;display:flex;align-items:center;gap:6px;">
-                            ⚡ Pintasan Tanya Data Saya
-                        </h3>
-                        <p class="app-section-subtitle" style="font-size:12px;">
-                            Klik pertanyaan untuk mengecek data pribadi Anda ke AI:
-                        </p>
-                    </div>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:8px;">
-                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Siapa nama akun saya dan apa role saya?')">
-                        👤 Siapa nama akun & role saya?
-                    </button>
-                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Apa MAC address ESP32 dan perangkat terdaftar saya?')">
-                        📟 Cek MAC address & ESP32 saya
-                    </button>
-                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Berapa kuota dan materi yang saya miliki?')">
-                        📊 Cek kuota & materi pengetahuan saya
-                    </button>
-                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Apa status token dan koneksi MCP saya?')">
-                        🔑 Cek status token MCP saya
-                    </button>
-                    <button type="button" class="quick-data-btn" onclick="useSuggestion('Apakah saya memiliki perangkat smart home atau saklar relay?')">
-                        💡 Cek perangkat smart home saya
-                    </button>
-                    <button type="button" class="quick-data-btn" style="border-color:var(--app-accent);color:var(--app-accent);" onclick="useSuggestion('Jelaskan panduan lengkap dan fitur apa saja yang ada di dokumentasi XiaoZhi')">
-                        📖 Panduan & Fitur Dokumentasi
-                    </button>
-                </div>
-            </div>
+            {% endif %}
         </div>
+
+        <!-- Floating Scroll Down Button -->
+        <button type="button" id="scrollDownBtn" class="scroll-down-btn" onclick="scrollToBottom(true)" title="Scroll ke bawah">
+            ⬇️
+        </button>
+
+        <!-- Reply Active Banner -->
+        <div id="replyActiveBanner" class="reply-active-banner" style="display:none;">
+            <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+                <span style="font-weight:800; color:#2563eb;">↩️ Membalas #<span id="replyTargetId"></span></span>
+                <span id="replyTargetAuthor" style="font-weight:700;"></span>:
+                <span id="replyTargetPreview" style="white-space:nowrap; text-overflow:ellipsis; overflow:hidden; max-width:350px; opacity:0.85;"></span>
+            </div>
+            <button type="button" onclick="cancelReply()" style="background:transparent; border:none; cursor:pointer; font-size:14px; font-weight:800; color:#ef4444; padding:2px 6px;" title="Batalkan Balasan">
+                ✖️ Batal
+            </button>
+        </div>
+
+        <!-- Chat Input Form (Pure Text Only) -->
+        <form id="chatForm" onsubmit="handleChatSubmit(event)" class="chat-input-container">
+            <input 
+                type="text" 
+                id="chatInput" 
+                class="chat-text-input" 
+                placeholder="Tulis pesan teks Anda di sini... (Enter untuk kirim)" 
+                autocomplete="off" 
+                maxlength="2000"
+                required
+            />
+            <button type="submit" id="chatSubmitBtn" class="chat-submit-btn">
+                <span>Kirim</span>
+                <span>🚀</span>
+            </button>
+        </form>
     </div>
 </div>
 
 <script>
-    let isStreaming = false;
-    let activeReader = null;
+    // Initial data injected from backend
+    const CURRENT_USER = {
+        id: {{ user.id|tojson }},
+        username: {{ user.username|tojson }},
+        role: {{ (user.role or 'user')|tojson }}.toLowerCase()
+    };
+    const INITIAL_MESSAGES = {{ messages|tojson }};
 
-    function useSuggestion(text) {
-        if (isStreaming) return;
-        const input = document.getElementById('chatInput');
-        input.value = text;
-        input.focus();
-        document.getElementById('chatForm').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    // State
+    let currentReplyTo = null; // { id, username, role, content }
+    let lastRenderedDate = null;
+    let ws = null;
+    let wsHeartbeat = null;
+
+    const scrollArea = document.getElementById('chatScrollArea');
+    const chatInput = document.getElementById('chatInput');
+    const submitBtn = document.getElementById('chatSubmitBtn');
+    const scrollDownBtn = document.getElementById('scrollDownBtn');
+    const replyBanner = document.getElementById('replyActiveBanner');
+    const replyTargetId = document.getElementById('replyTargetId');
+    const replyTargetAuthor = document.getElementById('replyTargetAuthor');
+    const replyTargetPreview = document.getElementById('replyTargetPreview');
+    const wsStatusBadge = document.getElementById('wsStatusBadge');
+    const wsStatusText = document.getElementById('wsStatusText');
+    const countSubtitle = document.getElementById('chatCountSubtitle');
+
+    // Date formatting helper (WhatsApp Style: "HARI INI", "KEMARIN", or "DD MMMM YYYY")
+    const MONTH_NAMES = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    function getLocalTodayDateStr() {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
-    function clearChat() {
-        if (isStreaming) return;
-        const box = document.getElementById('chatMessagesBox');
-        box.innerHTML = `
-            <div class="chat-bubble assistant">
-                <div class="chat-avatar">🤖</div>
-                <div class="chat-bubble-content">
-                    Riwayat obrolan layar telah dibersihkan. Silakan ajukan pertanyaan baru!
+    function getLocalYesterdayDateStr() {
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function formatDateDividerLabel(dateStr) {
+        if (!dateStr) return "HARI INI";
+        const todayStr = getLocalTodayDateStr();
+        const yestStr = getLocalYesterdayDateStr();
+
+        if (dateStr === todayStr) {
+            return "HARI INI";
+        }
+        if (dateStr === yestStr) {
+            return "KEMARIN";
+        }
+        // Format YYYY-MM-DD to readable date
+        try {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const day = parseInt(parts[2], 10);
+                const monthIdx = parseInt(parts[1], 10) - 1;
+                const year = parts[0];
+                return `${day} ${MONTH_NAMES[monthIdx] || ''} ${year}`;
+            }
+        } catch (e) {}
+        return dateStr;
+    }
+
+    function formatTime(isoStr) {
+        if (!isoStr) return "";
+        try {
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return "";
+            const hours = String(d.getHours()).padStart(2, '0');
+            const mins = String(d.getMinutes()).padStart(2, '0');
+            return `${hours}:${mins}`;
+        } catch (e) {
+            return "";
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return "";
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // Determine bubble style based on strict instructions
+    // 1. Admin: Always Blue with [ADMIN] badge
+    // 2. User sendiri: Yellow, right aligned
+    // 3. User lain: Black / Deep Slate, left aligned
+    // 4. Balasan: Gray
+    function getBubbleConfig(msg) {
+        const isMsgAdmin = (String(msg.role || '').toLowerCase() === 'admin');
+        const isMe = (msg.user_id === CURRENT_USER.id);
+
+        if (isMsgAdmin) {
+            return {
+                bubbleClass: 'msg-bubble-admin',
+                alignClass: isMe ? 'align-right' : 'align-left',
+                isAdmin: true,
+                isMe: isMe
+            };
+        } else if (isMe) {
+            return {
+                bubbleClass: 'msg-bubble-me',
+                alignClass: 'align-right',
+                isAdmin: false,
+                isMe: true
+            };
+        } else {
+            return {
+                bubbleClass: 'msg-bubble-other',
+                alignClass: 'align-left',
+                isAdmin: false,
+                isMe: false
+            };
+        }
+    }
+
+    // Build DOM element for a chat message
+    function createMessageElement(msg) {
+        const config = getBubbleConfig(msg);
+        const timeStr = formatTime(msg.created_at);
+
+        const row = document.createElement('div');
+        row.className = `chat-row ${config.alignClass}`;
+        row.id = `chat-row-${msg.id}`;
+
+        let adminBadgeHtml = '';
+        if (config.isAdmin) {
+            adminBadgeHtml = `<span class="badge-admin-label">ADMIN</span>`;
+        }
+
+        // Reply quote HTML (if this message is replying to another message)
+        let replyQuoteHtml = '';
+        if (msg.reply_to && msg.reply_to.id) {
+            const rAuthor = escapeHtml(msg.reply_to.username || 'User');
+            const rAdmin = (String(msg.reply_to.role || '').toLowerCase() === 'admin') ? ' [ADMIN]' : '';
+            const rContent = escapeHtml(msg.reply_to.content || '');
+            replyQuoteHtml = `
+                <div class="chat-reply-quote" onclick="scrollToMessage(${msg.reply_to.id})">
+                    <div style="font-weight:800; font-size:11px; margin-bottom:2px; display:flex; align-items:center; gap:4px;">
+                        <span>↩️ #<b>${msg.reply_to.id}</b> ${rAuthor}${rAdmin}</span>
+                    </div>
+                    <div style="opacity:0.9; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:320px;">
+                        ${rContent}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Delete button for owner or admin
+        const canDelete = (CURRENT_USER.role === 'admin' || CURRENT_USER.id === msg.user_id);
+        let deleteBtnHtml = '';
+        if (canDelete) {
+            deleteBtnHtml = `
+                <button type="button" class="msg-action-btn" onclick="deleteMessage(${msg.id})" title="Hapus Pesan">
+                    🗑️
+                </button>
+            `;
+        }
+
+        row.innerHTML = `
+            <div class="chat-bubble ${config.bubbleClass}">
+                <div class="msg-bubble-header">
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span class="msg-id-tag">#${msg.id}</span>
+                        <span class="msg-username">${escapeHtml(msg.username)}</span>
+                        ${adminBadgeHtml}
+                    </div>
+                    <div style="display:flex; align-items:center; gap:2px;">
+                        <button type="button" class="msg-action-btn" onclick="setReplyTo(${msg.id}, '${escapeHtml(msg.username)}', '${escapeHtml(msg.role)}', '${encodeURIComponent(msg.content)}')" title="Balas Pesan">
+                            ↩️ Balas
+                        </button>
+                        ${deleteBtnHtml}
+                    </div>
+                </div>
+
+                ${replyQuoteHtml}
+
+                <div class="msg-content-body">${escapeHtml(msg.content)}</div>
+
+                <div class="msg-bubble-footer">
+                    <span class="msg-meta-text">${timeStr}</span>
                 </div>
             </div>
         `;
+        return row;
     }
 
-    function scrollChatToBottom() {
-        const box = document.getElementById('chatMessagesBox');
-        box.scrollTop = box.scrollHeight;
+    // Insert date divider if date changed
+    function ensureDateDivider(dateStr) {
+        if (!dateStr) return;
+        if (lastRenderedDate !== dateStr) {
+            lastRenderedDate = dateStr;
+            const divider = document.createElement('div');
+            divider.className = 'chat-date-divider';
+            divider.innerHTML = `<span class="chat-date-pill">${formatDateDividerLabel(dateStr)}</span>`;
+            scrollArea.appendChild(divider);
+        }
     }
 
-    async function handleChatSubmit(event) {
-        event.preventDefault();
-        const input = document.getElementById('chatInput');
-        const sendBtn = document.getElementById('chatSendBtn');
-        const statusBadge = document.getElementById('chatStatusBadge');
-        const query = input.value.trim();
+    // Append single message to DOM
+    function appendMessage(msg, shouldScroll = true) {
+        const emptyEl = document.getElementById('chatEmptyPlaceholder');
+        if (emptyEl) emptyEl.remove();
 
-        if (!query || isStreaming) return;
+        const dateStr = msg.created_date || (msg.created_at ? msg.created_at.substring(0, 10) : getLocalTodayDateStr());
+        ensureDateDivider(dateStr);
 
-        isStreaming = true;
-        input.value = '';
-        input.disabled = true;
-        sendBtn.disabled = true;
-        statusBadge.className = 'app-chip app-chip-small app-chip-info';
-        statusBadge.innerHTML = '● Streaming Jawaban...';
+        const el = createMessageElement(msg);
+        scrollArea.appendChild(el);
 
-        const box = document.getElementById('chatMessagesBox');
+        if (shouldScroll) {
+            scrollToBottom();
+        }
+    }
 
-        // 1. Append User Message
-        const userBubble = document.createElement('div');
-        userBubble.className = 'chat-bubble user';
-        userBubble.innerHTML = `
-            <div class="chat-avatar">{{ user.username[0]|upper }}</div>
-            <div class="chat-bubble-content"></div>
-        `;
-        userBubble.querySelector('.chat-bubble-content').textContent = query;
-        box.appendChild(userBubble);
-        scrollChatToBottom();
+    // Render initial messages list
+    function renderInitialMessages() {
+        scrollArea.innerHTML = '';
+        lastRenderedDate = null;
 
-        // 2. Append Assistant Message Placeholder
-        const assistantBubble = document.createElement('div');
-        assistantBubble.className = 'chat-bubble assistant';
-        const msgContentId = 'msg-' + Date.now();
-        assistantBubble.innerHTML = `
-            <div class="chat-avatar">🤖</div>
-            <div class="chat-bubble-content">
-                <span id="${msgContentId}"></span><span class="typing-cursor" id="cursor-${msgContentId}"></span>
-                <div class="chat-sources-panel" id="sources-${msgContentId}" style="display:none;"></div>
-            </div>
-        `;
-        box.appendChild(assistantBubble);
-        scrollChatToBottom();
+        if (!INITIAL_MESSAGES || INITIAL_MESSAGES.length === 0) {
+            scrollArea.innerHTML = `
+                <div id="chatEmptyPlaceholder" style="text-align:center; padding:50px 20px; color:var(--app-muted);">
+                    <div style="font-size:40px; margin-bottom:10px;">💬</div>
+                    <h3 style="font-size:16px; font-weight:800; color:var(--app-text); margin-bottom:6px;">Belum Ada Obrolan</h3>
+                    <p style="font-size:13px; max-width:400px; margin:0 auto;">
+                        Jadilah yang pertama memulai percakapan di Ruang Chat Komunitas XiaoZhi! Ketik pesan di kolom bawah ini.
+                    </p>
+                </div>
+            `;
+            return;
+        }
 
-        const textSpan = document.getElementById(msgContentId);
-        const cursor = document.getElementById('cursor-' + msgContentId);
-        const sourcesPanel = document.getElementById('sources-' + msgContentId);
+        INITIAL_MESSAGES.forEach(msg => {
+            appendMessage(msg, false);
+        });
+
+        setTimeout(() => {
+            scrollToBottom(false);
+        }, 100);
+    }
+
+    // Scroll helpers
+    function scrollToBottom(smooth = true) {
+        scrollArea.scrollTo({
+            top: scrollArea.scrollHeight,
+            behavior: smooth ? 'smooth' : 'auto'
+        });
+    }
+
+    function scrollToMessage(msgId) {
+        const target = document.getElementById(`chat-row-${msgId}`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.style.transition = 'background 0.3s';
+            target.style.background = 'rgba(37, 99, 235, 0.15)';
+            target.style.borderRadius = '8px';
+            setTimeout(() => {
+                target.style.background = 'transparent';
+            }, 1500);
+        } else {
+            alert(`Pesan #${msgId} berada di riwayat sebelumnya.`);
+        }
+    }
+
+    // Toggle scroll-to-bottom floating button
+    scrollArea.addEventListener('scroll', () => {
+        const distFromBottom = scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight;
+        if (distFromBottom > 150) {
+            scrollDownBtn.style.display = 'grid';
+        } else {
+            scrollDownBtn.style.display = 'none';
+        }
+    });
+
+    // Reply handlers
+    function setReplyTo(id, username, role, encodedContent) {
+        currentReplyTo = {
+            id: id,
+            username: username,
+            role: role,
+            content: decodeURIComponent(encodedContent || '')
+        };
+        replyTargetId.textContent = id;
+        replyTargetAuthor.textContent = username;
+        replyTargetPreview.textContent = currentReplyTo.content;
+        replyBanner.style.display = 'flex';
+        chatInput.focus();
+    }
+
+    function cancelReply() {
+        currentReplyTo = null;
+        replyBanner.style.display = 'none';
+    }
+
+    // Send text message
+    async function handleChatSubmit(e) {
+        if (e) e.preventDefault();
+        const content = chatInput.value.trim();
+        if (!content) return;
+
+        submitBtn.disabled = true;
+        const payload = {
+            content: content,
+            reply_to_id: currentReplyTo ? currentReplyTo.id : null
+        };
 
         try {
-            const response = await fetch('/api/chat/stream', {
+            const res = await fetch('/api/community/chat/send', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'text/event-stream'
+                    'Accept': 'application/json'
                 },
-                body: JSON.stringify({ query: query })
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
             });
 
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status + ' ' + response.statusText);
-            }
-
-            const reader = response.body.getReader();
-            activeReader = reader;
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const parts = buffer.split('\n\n');
-                buffer = parts.pop(); // Keep last partial chunk
-
-                for (const part of parts) {
-                    if (!part.trim() || part.startsWith(':')) continue; // Skip heartbeat pings
-
-                    let currentEvent = 'message';
-                    let dataText = '';
-
-                    const lines = part.split('\n');
-                    for (const line of lines) {
-                        if (line.startsWith('event:')) {
-                            currentEvent = line.replace('event:', '').trim();
-                        } else if (line.startsWith('data:')) {
-                            dataText += line.replace('data:', '').trim();
-                        }
-                    }
-
-                    if (!dataText) continue;
-
-                    try {
-                        const parsed = JSON.parse(dataText);
-
-                        if (currentEvent === 'token') {
-                            textSpan.textContent += parsed.token || '';
-                            scrollChatToBottom();
-                        } else if (currentEvent === 'done') {
-                            if (parsed.sources && parsed.sources.length > 0) {
-                                sourcesPanel.style.display = 'flex';
-                                sourcesPanel.innerHTML = '<span style="font-weight:700;">📚 Sumber:</span> ' + 
-                                    parsed.sources.map(s => `<span class="app-chip app-chip-small app-chip-neutral">${s.title} (${s.category})</span>`).join(' ');
-                            }
-                        } else if (currentEvent === 'error') {
-                            textSpan.innerHTML += `<br><span style="color:#dc2626;">⚠️ ${parsed.message || 'Terjadi kesalahan'}</span>`;
-                        }
-                    } catch (e) {
-                        // Plain text fallback
-                        textSpan.textContent += dataText;
-                    }
+            const data = await res.json();
+            if (data.success && data.message) {
+                chatInput.value = '';
+                cancelReply();
+                // If WS is not active, render directly
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    appendMessage(data.message, true);
                 }
+            } else {
+                alert(data.message || 'Gagal mengirim pesan.');
             }
         } catch (err) {
-            console.error('SSE Stream error:', err);
-            textSpan.innerHTML += `<br><span style="color:#dc2626;font-weight:700;">⚠️ Gagal memuat stream: ${err.message}. Pastikan server aktif.</span>`;
+            alert('Terjadi kesalahan jaringan saat mengirim pesan.');
         } finally {
-            if (cursor) cursor.remove();
-            isStreaming = false;
-            activeReader = null;
-            input.disabled = false;
-            sendBtn.disabled = false;
-            statusBadge.className = 'app-chip app-chip-small app-chip-success';
-            statusBadge.innerHTML = '● Siap Menjawab';
-            input.focus();
-            scrollChatToBottom();
+            submitBtn.disabled = false;
+            chatInput.focus();
         }
     }
+
+    // Delete message
+    async function deleteMessage(messageId) {
+        if (!confirm(`Hapus pesan #${messageId}?`)) return;
+        try {
+            const res = await fetch(`/api/community/chat/delete/${messageId}`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (data.success) {
+                const el = document.getElementById(`chat-row-${messageId}`);
+                if (el) el.remove();
+            } else {
+                alert(data.message || 'Gagal menghapus pesan.');
+            }
+        } catch (err) {
+            alert('Kesalahan saat menghapus pesan.');
+        }
+    }
+
+    // Refresh messages
+    async function refreshMessages() {
+        try {
+            const res = await fetch('/api/community/chat/messages?limit=100', {
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.messages)) {
+                INITIAL_MESSAGES.length = 0;
+                INITIAL_MESSAGES.push(...data.messages);
+                renderInitialMessages();
+            }
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    // WebSocket real-time connection
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/community/chat`;
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            wsStatusBadge.className = 'app-status-pill is-online';
+            wsStatusText.textContent = 'WebSocket Live';
+            if (wsHeartbeat) clearInterval(wsHeartbeat);
+            wsHeartbeat = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 15000);
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'new_message' && data.message) {
+                    // Check if already rendered
+                    if (!document.getElementById(`chat-row-${data.message.id}`)) {
+                        appendMessage(data.message, true);
+                    }
+                } else if (data.type === 'delete_message' && data.message_id) {
+                    const row = document.getElementById(`chat-row-${data.message_id}`);
+                    if (row) row.remove();
+                }
+            } catch (err) {
+                // ignore
+            }
+        };
+
+        ws.onclose = () => {
+            wsStatusBadge.className = 'app-status-pill is-offline';
+            wsStatusText.textContent = 'Menyambungkan...';
+            if (wsHeartbeat) clearInterval(wsHeartbeat);
+            // Reconnect after 3s
+            setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = () => {
+            ws.close();
+        };
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        renderInitialMessages();
+        connectWebSocket();
+        chatInput.focus();
+
+        // Clear unread badge immediately since we are in chat room
+        fetch('/api/community/chat/read', { method: 'POST', credentials: 'same-origin' });
+        const badge = document.getElementById('navChatBadge');
+        if (badge) badge.style.display = 'none';
+    });
 </script>
 {% endblock %}
