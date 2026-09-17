@@ -346,6 +346,8 @@ class SQLiteStore:
             "created_at": row["created_at"] if "created_at" in keys else None,
         }
 
+    get_user_by_id = get_user
+
     def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
         username = normalize_username(username)
         conn = self._get_conn()

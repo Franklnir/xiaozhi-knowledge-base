@@ -54,7 +54,7 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
     if conn is not None:
         try:
             pending_row = conn.execute(
-                "SELECT owner_id FROM audio_queue WHERE status = 'pending' ORDER BY id DESC LIMIT 1"
+                "SELECT owner_id FROM audio_queue WHERE status IN ('pending', 'playing') ORDER BY id DESC LIMIT 1"
             ).fetchone()
             if pending_row and pending_row["owner_id"]:
                 return int(pending_row["owner_id"])
@@ -131,6 +131,20 @@ def youtube_search(query: str, max_results: int = 5) -> list:
         return items
 
 
+def _fetch_user(store, user_id: Optional[int]) -> Optional[Dict[str, Any]]:
+    if not user_id:
+        return None
+    try:
+        uid = int(user_id)
+        if hasattr(store, "get_user"):
+            return store.get_user(uid)
+        if hasattr(store, "get_user_by_id"):
+            return store.get_user_by_id(uid)
+    except Exception:
+        pass
+    return None
+
+
 def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_id: Optional[int] = None, mac: Optional[str] = None, token: Optional[str] = None):
     user = None
     title = ""
@@ -143,16 +157,13 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
         device_mac = request.headers.get("X-MAC-Address", "").strip()
 
     if owner_id:
-        try:
-            user = store.get_user_by_id(int(owner_id)) if hasattr(store, "get_user_by_id") else None
-        except Exception:
-            pass
+        user = _fetch_user(store, owner_id)
 
     if not user and token:
         try:
             owner = store.find_user_by_mcp_token(token)
             if owner and owner.get("user_id"):
-                user = store.get_user_by_id(int(owner["user_id"])) if hasattr(store, "get_user_by_id") else None
+                user = _fetch_user(store, owner["user_id"])
         except Exception:
             pass
 
@@ -160,7 +171,7 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
         try:
             resolved_id = _resolve_owner_for_device(store, device_mac)
             if resolved_id:
-                user = store.get_user_by_id(int(resolved_id)) if hasattr(store, "get_user_by_id") else None
+                user = _fetch_user(store, resolved_id)
         except Exception:
             pass
 
@@ -182,9 +193,31 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
             ).fetchone()
             if row:
                 if not user and row["owner_id"]:
-                    user = store.get_user_by_id(int(row["owner_id"])) if hasattr(store, "get_user_by_id") else None
+                    user = _fetch_user(store, row["owner_id"])
                 if row["title"] and not title:
                     title = row["title"]
+                # Mark pending item as playing
+                try:
+                    conn.execute(
+                        "UPDATE audio_queue SET status = 'playing' WHERE video_id = ? AND status = 'pending'",
+                        (video_id,)
+                    )
+                    conn.commit()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    elif hasattr(store, "_load"):
+        try:
+            with store._lock:
+                data = store._load()
+                for cmd in reversed(data.get("audio_queue", [])):
+                    if cmd.get("video_id") == video_id:
+                        if not user and cmd.get("owner_id"):
+                            user = _fetch_user(store, cmd["owner_id"])
+                        if cmd.get("title") and not title:
+                            title = cmd["title"]
+                        break
         except Exception:
             pass
 
@@ -248,17 +281,15 @@ async def _stream_opus_audio(
     if not ffmpeg_bin:
         raise RuntimeError("FFmpeg tidak terpasang di server.")
 
-    session = None
-    if user_id:
-        session = playback_tracker.start_session(
-            user_id=user_id,
-            username=username or f"user-{user_id}",
-            video_id=video_id,
-            title=title or f"Video {video_id}",
-            stream_type="HTTP Stream",
-            device_mac=device_mac,
-            bitrate=br
-        )
+    session = playback_tracker.start_session(
+        user_id=user_id if user_id is not None else 0,
+        username=username or (f"user-{user_id}" if user_id else "ESP32 Board"),
+        video_id=video_id,
+        title=title or f"Video {video_id}",
+        stream_type="HTTP Stream",
+        device_mac=device_mac or "ESP32 Board",
+        bitrate=br
+    )
 
     cmd = [
         ffmpeg_bin,
@@ -699,7 +730,7 @@ async def ws_device_audio_channel(websocket: WebSocket, device_id: str):
                 store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
             except Exception:
                 pass
-    user = store.get_user_by_id(owner_id) if owner_id and hasattr(store, "get_user_by_id") else None
+    user = _fetch_user(store, owner_id)
     username = user["username"] if user else f"user-{owner_id}"
     logger.info("Device connected to persistent audio channel: %s (owner=%s)", device_id, owner_id)
     

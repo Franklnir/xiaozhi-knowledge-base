@@ -609,10 +609,17 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     response = {"success": False, "message": "Fitur putar lagu YouTube dinonaktifkan oleh admin.", "results": []}
                     record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query}, response)
                     return response
+                user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
+                mac_param = f"&mac={user_mac}" if user_mac else ""
+                for item in results:
+                    vid = item.get("video_id", "")
+                    item["stream_url"] = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
                 np = results[0]
                 try:
                     base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
-                    full_stream = f"{base}{np['stream_url']}" if np.get("stream_url", "").startswith("/") else np.get("stream_url", "")
+                    stream_path = np.get("stream_url", "")
+                    full_stream = f"{base}{stream_path}" if stream_path.startswith("/") else stream_path
+                    response["instructions"] = f"Panggil tool perangkat `self.audio.play` dengan url='{full_stream}' atau `self.audio.play_youtube` dengan video_id='{np.get('video_id', '')}' dan title='{np.get('title', '')}' agar speaker XiaoZhi langsung memutar lagunya."
                     store.queue_audio_command(owner_id, title=np.get("title", ""), stream_url=full_stream, video_url=np.get("video_url", ""), duration=np.get("duration", ""), video_id=np.get("video_id", ""))
                 except Exception:
                     logger.warning("Failed to queue audio for ESP32")
