@@ -68,7 +68,7 @@ class PlaybackSession:
 
 class PlaybackTracker:
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._sessions: Dict[str, PlaybackSession] = {}
         # Mapping user_id -> active session_id
         self._user_sessions: Dict[int, str] = {}
@@ -130,8 +130,17 @@ class PlaybackTracker:
     def stop_user_playback(self, user_id: int) -> bool:
         with self._lock:
             sid = self._user_sessions.get(user_id)
-            if sid:
-                return self.stop_session(sid)
+            if sid and sid in self._sessions:
+                session = self._sessions[sid]
+                session.abort_event.set()
+                logger.info("Playback session abort requested by user_id %s: %s", user_id, sid)
+                return True
+            # Also check if any session has this user_id
+            for s in list(self._sessions.values()):
+                if s.user_id == user_id:
+                    s.abort_event.set()
+                    logger.info("Playback session abort requested by user_id %s: %s", user_id, s.session_id)
+                    return True
             return False
 
     def get_active_sessions(self) -> List[Dict[str, Any]]:
