@@ -736,3 +736,19 @@ def preview_live_api_content(api_url: str, previous_hash: str = "") -> Dict[str,
         **size_metadata,
         "updated_at": utc_now(),
     }
+
+
+def normalize_mac_address(raw_mac: str) -> str:
+    """Normalize ESP32 MAC address to standard AA:BB:CC:DD:EE:FF format."""
+    raw = str(raw_mac or "").strip()
+    if not raw:
+        return ""
+    clean_prefix = re.sub(r"^(esp32[-_]|board[-_])", "", raw, flags=re.IGNORECASE)
+    parts = re.split(r"[:-]", clean_prefix)
+    if len(parts) == 6 and all(len(p) in (1, 2) and all(c in "0123456789abcdefABCDEF" for c in p) for p in parts):
+        return ":".join(p.zfill(2).upper() for p in parts)
+    hex_only = re.sub(r"[^0-9A-Fa-f]", "", clean_prefix)
+    if len(hex_only) == 12:
+        return ":".join(hex_only[i:i+2].upper() for i in range(0, 12, 2))
+    return raw.strip().upper()
+
