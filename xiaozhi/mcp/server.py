@@ -154,7 +154,18 @@ def setup_mode_filtering(store):
             if owner_id is not None and name in VIRTUAL_SMARTHOME_MCP_TOOLS:
                 return handle_virtual_tool_with_real_relay(int(owner_id), name, arguments or {})
             return {"success": False, "message": "Tool Simulasi Smart Home Virtual sedang nonaktif agar tidak mengganggu Relay Nyata."}
-        return await original_mcp_call_tool(name, arguments)
+        res = await original_mcp_call_tool(name, arguments)
+        try:
+            from xiaozhi.services.sse_service import log_admin_event
+            log_admin_event("mcp", f"Tool '{name}' dipanggil oleh User {owner_id}", {
+                "user_id": owner_id,
+                "tool": name,
+                "arguments": arguments or {},
+            })
+        except Exception:
+            pass
+        return res
 
     mcp_server._mcp_server.list_tools()(list_mode_filtered_tools)
     mcp_server._mcp_server.call_tool(validate_input=False)(call_mode_filtered_tool)
+

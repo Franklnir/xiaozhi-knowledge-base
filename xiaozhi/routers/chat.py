@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from xiaozhi.config import CHAT_HISTORY_DEFAULT_LIMIT, ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
@@ -11,15 +11,66 @@ from xiaozhi.dependencies import (
     redirect_with_message,
 )
 from xiaozhi.services.mcp_service import is_mcp_connected, mcp_status_payload
+from xiaozhi.services.sse_service import stream_ai_chat
 from xiaozhi.core.utils import utc_now
 
 router = APIRouter()
 
 
-def _recent_date_range(days: int = 5) -> str:
-    """Return YYYY-MM-DD for N days ago."""
-    from datetime import date, timedelta
-    return (date.today() - timedelta(days=days)).isoformat()
+@router.get("/chat", response_class=HTMLResponse)
+async def ai_chat_page(request: Request):
+    """Dedicated interactive AI Chat Assistant page with real-time SSE streaming."""
+    user = get_current_user(request)
+    if not user:
+        return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
+    store = get_store()
+    token_info = store.get_xiaozhi_token_info(user["id"])
+    token_hash = token_info.get("token_hash", "") if token_info else ""
+    mcp_status = mcp_status_payload(
+        user["id"],
+        token_saved=bool(token_info),
+        token_preview=token_info.get("preview", "") if token_info else "",
+        token_hash=token_hash,
+    )
+    # Quick suggestion prompts based on user's knowledge materials
+    materials = store.list_materials(user["id"])
+    suggestions = [m.get("title") for m in materials[:4] if m.get("title")]
+    return render(
+        request,
+        "chat.html",
+        {
+            "user": user,
+            "mcp_status": mcp_status,
+            "suggestions": suggestions,
+            "active_page": "chat",
+        },
+    )
+
+
+@router.post("/api/chat/stream")
+async def api_chat_stream(request: Request):
+    """Real-time SSE token-by-token streaming endpoint for AI Chat."""
+    user = require_user(request)
+    store = get_store()
+
+    # Extract query from JSON or Form
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        body = await request.json()
+        query = body.get("query", "")
+    else:
+        form = await request.form()
+        query = form.get("query", "")
+
+    return StreamingResponse(
+        stream_ai_chat(query, user["id"], store, request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/riwayat-chat", response_class=HTMLResponse)

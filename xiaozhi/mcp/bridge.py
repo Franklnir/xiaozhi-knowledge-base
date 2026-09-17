@@ -129,6 +129,11 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
         async with websocket_client_server(user_id, url, token_hash) as (read_stream, write_stream):
             set_mcp_connection_state(user_id, token_hash, connected=True, message="MCP terhubung ke XiaoZhi", request_id=request_id)
             logger.info("[%s] MCP bridge CONNECTED: user_id=%s", request_id, user_id)
+            try:
+                from xiaozhi.services.sse_service import log_admin_event
+                log_admin_event("mcp", f"WebSocket MCP Terhubung (User ID: {user_id})", {"user_id": user_id, "request_id": request_id, "status": "connected"})
+            except Exception:
+                pass
             await mcp_server._mcp_server.run(
                 read_stream, write_stream,
                 mcp_server._mcp_server.create_initialization_options(),
@@ -150,6 +155,11 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
         mcp_request_id_ctx.reset(req_token)
         mcp_bridge_tasks.pop(user_id, None)
         set_mcp_connection_state(user_id, token_hash, connected=False, message="MCP terputus (mencoba hubungkan kembali...)", request_id=request_id)
+        try:
+            from xiaozhi.services.sse_service import log_admin_event
+            log_admin_event("mcp", f"WebSocket MCP Terputus (User ID: {user_id})", {"user_id": user_id, "request_id": request_id, "status": "disconnected"})
+        except Exception:
+            pass
         logger.info("[%s] MCP bridge selesai: user_id=%s", request_id, user_id)
 
         # Trigger background task to reconnect after 2s delay
