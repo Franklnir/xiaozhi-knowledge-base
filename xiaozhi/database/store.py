@@ -66,6 +66,7 @@ from xiaozhi.core.utils import (
     truncate_material_content,
     utc_now,
     utf8_size,
+    normalize_mac_address,
     validate_external_api_url,
 )
 from xiaozhi.database.helpers import empty_database, normalize_database
@@ -465,7 +466,7 @@ class HFJsonStore:
                         },
                     }
                 )
-            return sorted(rows, key=lambda item: item["username"])
+            return sorted(rows, key=lambda item: int(item.get("id", 0)), reverse=True)
 
     @staticmethod
     def _quota_item(used: int, limit: int) -> Dict[str, Any]:
@@ -1962,34 +1963,39 @@ class HFJsonStore:
                     return True
             return False
 
-    def register_device(self, owner_id: int, mac_address: str, device_name: str = "") -> Dict[str, Any]:
-        mac_address = str(mac_address or "").strip().upper().replace("-", ":")
-        if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac_address):
-            raise ValueError("MAC address tidak valid. Format: AA:BB:CC:DD:EE:FF")
-        device_name = clean_text(device_name or f"ESP32-{mac_address[-5:]}", max_len=80, min_len=1, field="Nama device")
+    def register_device(self, owner_id: int, mac_address: str = "", device_name: str = "", device_type: str = "") -> Dict[str, Any]:
+        normalized_id = normalize_mac_address(mac_address)
+        if not normalized_id:
+            raise ValueError("Device ID / MAC address diperlukan.")
+        device_name = clean_text(device_name or f"ESP32 ({normalized_id[-5:]})", max_len=80, min_len=1, field="Nama device")
+        device_type = str(device_type or "esp32").strip()
         with self._lock:
             data = self._load()
             data.setdefault("registered_devices", [])
             existing_by_owner = None
             existing_by_other = None
             for d in data["registered_devices"]:
-                if d.get("mac_address") == mac_address:
+                stored_mac = normalize_mac_address(d.get("mac_address", "") or d.get("device_id", ""))
+                if stored_mac and stored_mac.lower() == normalized_id.lower():
                     if int(d.get("owner_id", 0)) == int(owner_id):
                         existing_by_owner = d
                     else:
                         existing_by_other = d
             if existing_by_other:
-                raise ValueError(f"Device MAC '{mac_address}' sudah terdaftar di akun lain. 1 ESP32 hanya bisa terikat ke 1 akun.")
+                raise ValueError(f"Device MAC '{normalized_id}' sudah terdaftar di akun lain. 1 ESP32 hanya bisa terikat ke 1 akun.")
             if existing_by_owner:
+                existing_by_owner["mac_address"] = normalized_id
                 existing_by_owner["device_name"] = device_name
+                existing_by_owner["device_type"] = device_type
                 existing_by_owner["last_seen_at"] = utc_now()
                 self._commit(data, "Update registered device")
                 return existing_by_owner
             device = {
                 "id": secrets.token_hex(8),
                 "owner_id": int(owner_id),
-                "mac_address": mac_address,
+                "mac_address": normalized_id,
                 "device_name": device_name,
+                "device_type": device_type,
                 "is_audio_player": True,
                 "created_at": utc_now(),
                 "last_seen_at": utc_now(),
@@ -2015,11 +2021,14 @@ class HFJsonStore:
         return self.list_devices(owner_id)
 
     def find_device_by_mac(self, mac_address: str) -> Optional[Dict[str, Any]]:
-        mac_address = str(mac_address or "").strip().upper().replace("-", ":")
+        normalized_id = normalize_mac_address(mac_address)
+        if not normalized_id:
+            return None
         with self._lock:
             data = self._load()
             for d in data.get("registered_devices", []):
-                if d.get("mac_address") == mac_address:
+                stored_mac = normalize_mac_address(d.get("mac_address", "") or d.get("device_id", ""))
+                if stored_mac and stored_mac.lower() == normalized_id.lower():
                     d["last_seen_at"] = utc_now()
                     self._commit(data, "Device heartbeat")
                     return d

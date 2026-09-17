@@ -36,6 +36,7 @@ from xiaozhi.core.utils import (
     compact_text,
     count_text_words,
     is_live_api_category,
+    normalize_mac_address,
     parse_int_range,
     parse_limit_value,
     utc_now,
@@ -1185,28 +1186,28 @@ class SQLiteStore:
 
     def register_device(self, owner_id: int, device_id: str = "", name: str = "", device_type: str = "") -> Dict[str, Any]:
         conn = self._get_conn()
-        normalized_id = str(device_id or "").strip()
+        normalized_id = normalize_mac_address(device_id)
         if not normalized_id:
-            raise ValueError("Device ID diperlukan.")
+            raise ValueError("Device ID / MAC address diperlukan.")
+        device_name = name.strip() if name else f"ESP32 ({normalized_id[-5:]})"
+        device_type = device_type.strip() if device_type else "esp32"
         existing = conn.execute(
             "SELECT id, owner_id, device_name FROM registered_devices WHERE LOWER(device_id) = ?",
             (normalized_id.lower(),)
         ).fetchone()
         if existing:
-            if int(existing["owner_id"]) == int(owner_id):
-                conn.execute(
-                    "UPDATE registered_devices SET device_name = ?, device_type = ? WHERE id = ?",
-                    (name or existing["device_name"], device_type, existing["id"])
-                )
-                conn.commit()
-                return {"id": existing["id"], "device_id": device_id, "name": name or existing["device_name"], "reused": True}
-            raise ValueError(f"Device '{normalized_id}' sudah terdaftar di akun lain. 1 ESP32 hanya bisa terikat ke 1 akun.")
+            conn.execute(
+                "UPDATE registered_devices SET owner_id = ?, device_id = ?, device_name = ?, device_type = ? WHERE id = ?",
+                (int(owner_id), normalized_id, device_name, device_type, existing["id"])
+            )
+            conn.commit()
+            return {"id": existing["id"], "device_id": normalized_id, "name": device_name, "updated": True}
         cursor = conn.execute(
             "INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, created_at) VALUES (?, ?, ?, ?, ?)",
-            (owner_id, normalized_id, name, device_type, utc_now())
+            (int(owner_id), normalized_id, device_name, device_type, utc_now())
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "device_id": device_id, "name": name}
+        return {"id": cursor.lastrowid, "device_id": normalized_id, "name": device_name, "created": True}
 
     def delete_device(self, owner_id: int, device_id: str) -> bool:
         conn = self._get_conn()
@@ -1338,7 +1339,7 @@ class SQLiteStore:
 
     def list_admin_manageable_users(self, admin_username: str = "") -> List[Dict[str, Any]]:
         conn = self._get_conn()
-        rows = conn.execute("SELECT * FROM users WHERE role != 'admin' ORDER BY username").fetchall()
+        rows = conn.execute("SELECT * FROM users WHERE role != 'admin' ORDER BY id DESC").fetchall()
         result = []
 
         # Get all MCP connection states (import here to avoid circular import)
