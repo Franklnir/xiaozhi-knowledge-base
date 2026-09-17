@@ -263,22 +263,41 @@ class PlaybackTracker:
                 "message": "Saat ini tidak ada lagu yang sedang atau baru saja diputar di perangkat Anda.",
             }
 
-    def handle_device_status(self, user_id: int, status: str, video_id: str = "") -> bool:
+    def handle_device_status(self, user_id: int, status: str, video_id: str = "", device_mac: str = "") -> bool:
         """Handle playback status reported directly from ESP32 board."""
         with self._lock:
             status_lower = status.strip().lower()
             sid = self._user_sessions.get(user_id)
+            clean_mac = ""
+            if device_mac:
+                clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+                clean_mac = clean_mac.strip().upper()
+                if len(clean_mac) >= 11:
+                    try:
+                        from xiaozhi.dependencies import get_store
+                        st = get_store()
+                        if hasattr(st, "register_device"):
+                            st.register_device(user_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+                    except Exception:
+                        pass
+
             if status_lower in {"finished", "stopped", "aborted", "idle"}:
                 if sid and sid in self._sessions:
+                    if clean_mac:
+                        self._sessions[sid].device_mac = clean_mac
                     self.end_session(sid, reason=status_lower)
-                    logger.info("Device reported %s for user %s, session %s ended", status_lower, user_id, sid)
+                    logger.info("Device reported %s for user %s (mac: %s), session %s ended", status_lower, user_id, clean_mac, sid)
                     return True
                 elif user_id in self._last_played:
                     self._last_played[user_id]["end_reason"] = status_lower
+                    if clean_mac:
+                        self._last_played[user_id]["device_mac"] = clean_mac
                     return True
             elif status_lower == "playing":
                 if sid and sid in self._sessions:
                     self._sessions[sid].last_active_at = time.time()
+                    if clean_mac:
+                        self._sessions[sid].device_mac = clean_mac
                     return True
             return False
 

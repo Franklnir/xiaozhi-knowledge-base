@@ -1420,21 +1420,31 @@ class SQLiteStore:
             is_playing = active_session is not None
             current_track = active_session.title if active_session else ""
             if not device_mac and active_session and active_session.device_mac:
-                device_mac = str(active_session.device_mac).upper()
-                device_name = f"ESP32 ({device_mac[-5:]})"
-                try:
-                    self.register_device(user_id, device_id=device_mac, name=device_name)
-                except Exception:
-                    pass
+                sess_mac = str(active_session.device_mac).strip()
+                if len(sess_mac) >= 11 and not sess_mac.lower().startswith("esp32 board"):
+                    clean_mac = sess_mac[6:] if sess_mac.lower().startswith("esp32-") else sess_mac
+                    clean_mac = clean_mac.strip().upper()
+                    if len(clean_mac) >= 11:
+                        device_mac = clean_mac
+                        device_name = f"ESP32 ({device_mac[-5:]})"
+                        try:
+                            self.register_device(user_id, device_id=device_mac, name=device_name)
+                        except Exception:
+                            pass
 
             if not device_mac:
                 try:
                     from xiaozhi.services.playback_tracker import playback_tracker
                     last = playback_tracker.get_last_played(user_id)
                     if last and last.get("device_mac"):
-                        device_mac = str(last["device_mac"]).upper()
-                        device_name = f"ESP32 ({device_mac[-5:]})"
-                        self.register_device(user_id, device_id=device_mac, name=device_name)
+                        last_mac = str(last["device_mac"]).strip()
+                        if len(last_mac) >= 11 and not last_mac.lower().startswith("esp32 board"):
+                            clean_mac = last_mac[6:] if last_mac.lower().startswith("esp32-") else last_mac
+                            clean_mac = clean_mac.strip().upper()
+                            if len(clean_mac) >= 11:
+                                device_mac = clean_mac
+                                device_name = f"ESP32 ({device_mac[-5:]})"
+                                self.register_device(user_id, device_id=device_mac, name=device_name)
                 except Exception:
                     pass
 
