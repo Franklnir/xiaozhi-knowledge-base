@@ -8,14 +8,21 @@ services:
     ports:
       - "127.0.0.1:8080:7860"
     environment:
-      - APP_SECRET_KEY=Zb6fyD2dkYd7pSSGNk1RBqTt+DQXf18elJ7euA0r5qw=
-      - DATA_ENCRYPTION_KEY=dbaxtyENVdPRoCcRhWEArO2UhWWhx14nh6XE3+xQh0o=
-      - ADMIN_USERNAME=irsyad03
-      - ADMIN_PASSWORD=irsyad031226
-      - RESTORED_USER_USERNAME=irsyad26
-      - RESTORED_USER_PASSWORD=irsyad261203
-      - DB_BACKEND=sqlite
-      - SQLITE_DB_PATH=/app/data/xiaozhi.db
+      - APP_SECRET_KEY=${APP_SECRET_KEY:-Zb6fyD2dkYd7pSSGNk1RBqTt+DQXf18elJ7euA0r5qw=}
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:-dbaxtyENVdPRoCcRhWEArO2UhWWhx14nh6XE3+xQh0o=}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-irsyad03}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-irsyad031226}
+      - RESTORED_USER_USERNAME=${RESTORED_USER_USERNAME:-irsyad26}
+      - RESTORED_USER_PASSWORD=${RESTORED_USER_PASSWORD:-irsyad261203}
+      - DB_BACKEND=${DB_BACKEND:-sqlite}
+      - SQLITE_DB_PATH=${SQLITE_DB_PATH:-/app/data/xiaozhi.db}
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-xiaozhi}
+      - POSTGRES_USER=${POSTGRES_USER:-xiaozhi_app}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-xiaozhi_secret}
+      - PG_POOL_MIN=${PG_POOL_MIN:-3}
+      - PG_POOL_MAX=${PG_POOL_MAX:-10}
       - ENVIRONMENT=production
       - ALLOWED_HOSTS=163.61.58.235,localhost,xiaozhiscig.biz.id,www.xiaozhiscig.biz.id
     volumes:
@@ -23,6 +30,9 @@ services:
     mem_limit: 512m
     memswap_limit: 1g
     cpus: 1.0
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7860/login"]
       interval: 30s
@@ -34,3 +44,34 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: xiaozhi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-xiaozhi}
+      POSTGRES_USER: ${POSTGRES_USER:-xiaozhi_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xiaozhi_secret}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xiaozhi_app -d xiaozhi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  pgdata:
+    driver: local

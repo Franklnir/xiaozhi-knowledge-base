@@ -2,6 +2,7 @@
 Community Chat Hub and Voice Note Service.
 Handles WebSocket broadcasting and voice note storage for interactive community chat.
 """
+import asyncio
 import json
 import logging
 import os
@@ -114,3 +115,48 @@ def get_voice_note_path(filename: str) -> Optional[Path]:
     if target.is_file():
         return target
     return None
+
+
+async def start_pg_chat_listener(store) -> None:
+    """
+    Background worker that listens to PostgreSQL NOTIFY community_chat signals
+    and broadcasts them across all connected WebSocket clients in this process.
+    Provides Redis-free multi-worker WebSocket synchronization!
+    Runs via thread-safe listener compatible with all OSes and event loops.
+    """
+    if not hasattr(store, "dsn"):
+        return
+    import threading
+    import time
+    import psycopg
+    from psycopg.rows import dict_row
+
+    loop = asyncio.get_running_loop()
+
+    def listen_loop():
+        while True:
+            try:
+                logger.info("Connecting PostgreSQL LISTEN on 'community_chat' channel...")
+                with psycopg.connect(store.dsn, autocommit=True) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("LISTEN community_chat;")
+                    logger.info("PostgreSQL LISTEN 'community_chat' active.")
+                    for notify in conn.notifies(timeout=5):
+                        payload_raw = notify.payload
+                        try:
+                            data = json.loads(payload_raw)
+                            if "id" in data:
+                                msg = store.get_community_chat(int(data["id"]))
+                                if msg:
+                                    asyncio.run_coroutine_threadsafe(chat_hub.broadcast_new_message(msg), loop)
+                            elif "delete_id" in data:
+                                asyncio.run_coroutine_threadsafe(chat_hub.broadcast_delete_message(int(data["delete_id"])), loop)
+                        except Exception as err:
+                            logger.error("Error processing community_chat notify signal: %s", err)
+            except Exception as exc:
+                logger.warning("PostgreSQL chat listener disconnected (%s). Reconnecting in 5s...", exc)
+                time.sleep(5)
+
+    thread = threading.Thread(target=listen_loop, daemon=True, name="pg-chat-listener")
+    thread.start()
+

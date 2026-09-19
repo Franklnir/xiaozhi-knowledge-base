@@ -252,18 +252,65 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
     return user, title, device_mac
 
 
-def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None) -> str:
+def resolve_chip_audio_profile(chip: Optional[str] = None, requested_sr: Optional[int] = None) -> int:
     """
-    Intelligently select the optimal Opus bitrate based on requested value and ESP32 Wi-Fi RSSI.
-    - >= -65 dBm: Sinyal sangat kuat -> 12k
-    - -75 to -65 dBm: Sinyal stabil -> 11k
-    - -85 to -75 dBm: Sinyal lemah -> 8k (menghemat bandwidth 27%)
-    - < -85 dBm: Sinyal sangat lemah / 1 bar -> 6k (menghemat bandwidth 45%, anti tersendat)
+    Menentukan sample_rate transcode Ogg/Opus berdasarkan tipe chip ESP32:
+    - esp32-c3 / esp32c3:
+      Codec hardware native 16kHz, single-core 160MHz tanpa PSRAM.
+      Menggunakan sample_rate=16000 (16k) agar tidak ada overhead resampler di CPU C3,
+      mencegah suara down/patah-patah dan audio jernih optimal.
+    - esp32-s3 / esp32s3 / esp32-p4:
+      Dual-core 240MHz + PSRAM, codec hi-fi.
+      Menggunakan sample_rate=24000 (24k) untuk fidelity suara maksimal.
+    - default / lain-lain: 24000 (atau sesuai requested_sr jika ada)
+    """
+    if requested_sr in (16000, 24000, 48000):
+        return requested_sr
+
+    chip_str = (chip or "").lower().strip()
+    if "c3" in chip_str:
+        return 16000
+    if "s3" in chip_str or "p4" in chip_str:
+        return 24000
+    return 24000
+
+
+def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip: Optional[str] = None) -> str:
+    """
+    Intelligently select the optimal Opus bitrate based on requested value, ESP32 Wi-Fi RSSI, and chip profile.
+    ESP32-S3 (Dual Core 240MHz, 8MB PSRAM):
+      - RSSI >= -65 dBm (Sinyal Sangat Kuat): 48k (Studio Quality Mono)
+      - -75 to -65 dBm (Sinyal Kuat): 32k (High Quality)
+      - -82 to -75 dBm (Sinyal Sedang): 24k
+      - -88 to -82 dBm (Sinyal Lemah): 16k
+      - < -88 dBm (Sinyal Sangat Lemah): 12k (Batas minimum aman S3)
+    ESP32-C3 (Single Core 160MHz, No PSRAM):
+      - RSSI >= -65 dBm: 12k
+      - -75 to -65 dBm: 11k
+      - -85 to -75 dBm: 8k
+      - < -85 dBm: 6k
     """
     br_str = (requested_br or "").lower().strip()
-    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "32k"}
+    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "30k", "32k", "48k"}
     if br_str and br_str in valid_bitrates and br_str != "auto":
         return br_str
+
+    is_s3 = bool(chip and "s3" in chip.lower())
+    is_c3 = bool(chip and "c3" in chip.lower())
+
+    if is_s3:
+        if rssi is not None and rssi < 0:
+            if rssi >= -65:
+                return "48k"
+            elif rssi >= -75:
+                return "32k"
+            elif rssi >= -82:
+                return "24k"
+            elif rssi >= -88:
+                return "16k"
+            else:
+                return "12k"
+        return "48k"
 
     if rssi is not None and rssi < 0:
         if rssi >= -65:
@@ -274,21 +321,23 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None) -> s
             return "8k"
         else:
             return "6k"
-    return "11k"
+    return "12k" if is_c3 else "24k"
 
 
 async def _stream_opus_audio(
     video_id: str,
     source_url: str,
     bitrate: str = "11k",
+    sample_rate: int = 24000,
     rssi: Optional[int] = None,
     start_sec: float = 0.0,
     user_id: Optional[int] = None,
     username: str = "",
     title: str = "",
     device_mac: str = "",
+    chip: str = "",
 ) -> AsyncGenerator[bytes, None]:
-    br = resolve_adaptive_bitrate(bitrate, rssi)
+    br = resolve_adaptive_bitrate(bitrate, rssi, chip=chip)
     ffmpeg_bin = _FFMPEG_PATH or shutil.which("ffmpeg")
     if not ffmpeg_bin:
         raise RuntimeError("FFmpeg tidak terpasang di server.")
@@ -300,7 +349,7 @@ async def _stream_opus_audio(
         title=title or f"Video {video_id}",
         stream_type="HTTP Stream",
         device_mac=device_mac or "ESP32 Board",
-        bitrate=br
+        bitrate=f"{br}@{sample_rate//1000}kHz"
     )
 
     cmd = [
@@ -316,7 +365,7 @@ async def _stream_opus_audio(
         "-i", source_url,
         "-vn",
         "-ac", "1",
-        "-ar", "24000",
+        "-ar", str(sample_rate),
         "-c:a", "libopus",
         "-b:a", br,
         "-vbr", "on",
@@ -373,13 +422,22 @@ async def audio_stream_ogg_opus(
     video_id: str,
     request: Request,
     br: str = "auto",
+    chip: Optional[str] = Query(None),
     rssi: Optional[int] = Query(None),
     start: float = 0.0,
     owner_id: Optional[int] = Query(None),
     mac: Optional[str] = Query(None),
     token: Optional[str] = Query(None),
 ):
-    """Real-time Ogg/Opus mono 24kHz transcoding stream for ESP32 hardware decoder with adaptive bitrate and seek resume support."""
+    """Real-time Ogg/Opus transcoding stream for ESP32 hardware decoder with adaptive bitrate, chip profiling, and seek resume support."""
+    # Resolve chip from query or header
+    detected_chip = (
+        chip or
+        request.headers.get("X-Device-Chip", "") or
+        request.headers.get("Device-Chip", "") or
+        request.headers.get("X-Chip", "")
+    ).strip().lower()
+
     # Read RSSI from query param or header
     if rssi is None:
         header_rssi = request.headers.get("X-WiFi-RSSI", "")
@@ -389,7 +447,9 @@ async def audio_stream_ogg_opus(
             except ValueError:
                 rssi = None
 
-    selected_br = resolve_adaptive_bitrate(br, rssi)
+    selected_br = resolve_adaptive_bitrate(br, rssi, chip=detected_chip)
+    sample_rate = resolve_chip_audio_profile(detected_chip)
+
     store = get_store()
     user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request, owner_id=owner_id, mac=mac, token=token)
     user_id = user["id"] if user else None
@@ -405,7 +465,10 @@ async def audio_stream_ogg_opus(
                 detail="Anda tidak diizinkan putar lagu YouTube. Fitur YouTube Music telah dinonaktifkan oleh administrator."
             )
 
-    logger.info(f"Stream request for {video_id}: requested_br={br}, rssi={rssi} dBm -> selected_br={selected_br}")
+    logger.info(
+        f"Stream request for {video_id}: chip={detected_chip or 'default'} -> sample_rate={sample_rate}Hz, "
+        f"requested_br={br}, rssi={rssi} dBm -> selected_br={selected_br}"
+    )
 
     try:
         source_url, extracted_title = await extract_audio_url(video_id)
@@ -422,12 +485,14 @@ async def audio_stream_ogg_opus(
             video_id,
             source_url=source_url,
             bitrate=selected_br,
+            sample_rate=sample_rate,
             rssi=rssi,
             start_sec=start,
             user_id=user_id,
             username=username,
             title=title,
-            device_mac=device_mac
+            device_mac=device_mac,
+            chip=detected_chip
         ),
         media_type="audio/ogg",
         headers={
@@ -438,6 +503,8 @@ async def audio_stream_ogg_opus(
             "X-Adaptive-Bitrate": selected_br,
             "X-Adaptive-RSSI": str(rssi if rssi is not None else "N/A"),
             "X-Device-MAC": device_mac or "none",
+            "X-Device-Chip": detected_chip or "unknown",
+            "X-Audio-Sample-Rate": str(sample_rate),
             "X-MAC-Status": "Tersimpan OK" if device_mac else "none",
         }
     )
@@ -672,8 +739,20 @@ async def audio_play_direct(
 
 
 @router.get("/api/device/audio/commands")
-async def device_audio_commands(request: Request, token: str = Query(""), mac: str = Query("")):
+async def device_audio_commands(
+    request: Request,
+    token: str = Query(""),
+    mac: str = Query(""),
+    chip: str = Query("")
+):
     store = get_store()
+    detected_chip = (
+        chip or
+        request.headers.get("X-Device-Chip", "") or
+        request.headers.get("Device-Chip", "") or
+        request.headers.get("X-Chip", "")
+    ).strip().lower()
+
     conn = getattr(store, "_get_conn", lambda: None)()
     if conn is not None:
         try:
@@ -717,9 +796,15 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
         clean_mac = clean_mac.strip().upper()
         if len(clean_mac) >= 11:
             try:
-                store.register_device(owner_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+                dev_name = f"ESP32-{detected_chip.upper()} ({clean_mac[-5:]})" if detected_chip else f"ESP32 ({clean_mac[-5:]})"
+                store.register_device(
+                    owner_id,
+                    device_id=clean_mac,
+                    name=dev_name,
+                    device_type=detected_chip or "esp32"
+                )
                 mac_saved_ok = True
-                logger.info(f"[COMMAND POLL] Device MAC {clean_mac} berhasil disimpan OK untuk owner {owner_id}")
+                logger.info(f"[COMMAND POLL] Device MAC {clean_mac} ({detected_chip or 'esp32'}) berhasil disimpan OK untuk owner {owner_id}")
             except Exception as exc:
                 logger.error(f"[COMMAND POLL ERROR] Gagal menyimpan MAC {clean_mac}: {exc}")
 
@@ -746,10 +831,19 @@ async def device_audio_commands(request: Request, token: str = Query(""), mac: s
             sep = "&"
         if "mac=" not in surl and device_mac:
             surl = f"{surl}{sep}mac={device_mac}"
+            sep = "&"
+        if "chip=" not in surl and detected_chip:
+            surl = f"{surl}{sep}chip={detected_chip}"
+            sep = "&"
         c["stream_url"] = surl
         formatted_commands.append(c)
 
-    return {"success": True, "commands": formatted_commands, "mac_status": "Tersimpan OK" if mac_saved_ok else None}
+    return {
+        "success": True,
+        "commands": formatted_commands,
+        "chip": detected_chip or "unknown",
+        "mac_status": "Tersimpan OK" if mac_saved_ok else None
+    }
 
 
 @router.post("/api/device/audio/ack")

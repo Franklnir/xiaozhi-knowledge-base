@@ -4,6 +4,7 @@ Supports HuggingFace (for HF Spaces) and SQLite (for VPS).
 """
 import os
 import logging
+import xiaozhi.config
 
 logger = logging.getLogger("xiaozhi.factory")
 
@@ -26,7 +27,11 @@ def create_store():
     has_hf_token = bool(os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN"))
 
     # Explicit backend selection
-    if backend == "sqlite":
+    if backend == "postgres":
+        logger.info("Using PostgreSQL backend (explicit)")
+        from xiaozhi.database.postgres_store import PostgresStore
+        return PostgresStore()
+    elif backend == "sqlite":
         logger.info("Using SQLite backend (explicit)")
         from xiaozhi.database.sqlite_store import SQLiteStore
         return SQLiteStore()
@@ -34,6 +39,15 @@ def create_store():
         logger.info("Using HuggingFace backend (explicit)")
         from xiaozhi.database.store import HFJsonStore
         return HFJsonStore()
+
+    # Auto-detect: if DATABASE_URL or POSTGRES_DB set, prefer Postgres
+    if os.getenv("DATABASE_URL") or os.getenv("POSTGRES_DB"):
+        try:
+            logger.info("Using PostgreSQL backend (auto-detected from environment)")
+            from xiaozhi.database.postgres_store import PostgresStore
+            return PostgresStore()
+        except Exception as exc:
+            logger.warning("PostgreSQL backend auto-detect failed (%s), falling back...", exc)
 
     # Auto-detect
     if is_hf_space or has_hf_token:
