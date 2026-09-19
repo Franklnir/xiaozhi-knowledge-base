@@ -709,224 +709,317 @@ Untuk registrasi otomatis tanpa login, cukup gunakan parameter <code>mac</code> 
             <!-- Firmware Setup Guide -->
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>💻</span> Panduan Setup Firmware ESP32 (Arduino)
+                    <span>💻</span> Panduan Konfigurasi Firmware XiaoZhi (ESP32-C3 & ESP32-S3)
+                </div>
+                <p class="doc-step-desc">
+                    Halaman ini menjelaskan secara lengkap arsitektur dan cara mengkonfigurasi <strong>Source Code Firmware Resmi XiaoZhi (C++/ESP-IDF)</strong> maupun firmware kustom (Arduino) agar dapat mencari dan memutar lagu dari YouTube secara real-time, adaptif, dan stabil.
+                </p>
+
+                <!-- Comparison Table: ESP32-C3 vs ESP32-S3 -->
+                <div style="background: var(--app-surface); border: 1px solid var(--app-border); border-radius: var(--app-radius); padding: 16px; margin: 16px 0;">
+                    <div style="font-weight: 700; font-size: 15px; color: var(--app-text); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <span>⚖️</span> Perbandingan Profil Audio & Kemampuan Chip
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid var(--app-border); background: var(--app-surface-muted);">
+                                    <th style="padding: 10px 12px; color: var(--app-text);">Parameter</th>
+                                    <th style="padding: 10px 12px; color: var(--app-brand);"><span class="app-chip app-chip-small app-chip-info" style="font-size:11px;">ESP32-C3 (Mini / INMP441)</span></th>
+                                    <th style="padding: 10px 12px; color: #10b981;"><span class="app-chip app-chip-small app-chip-success" style="font-size:11px;">ESP32-S3 (Korvo / Box / AI)</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom: 1px solid var(--app-border);">
+                                    <td style="padding: 10px 12px; font-weight: 600;">Arsitektur CPU</td>
+                                    <td style="padding: 10px 12px;">Single-Core RISC-V 32-bit (160 MHz)</td>
+                                    <td style="padding: 10px 12px;">Dual-Core Xtensa LX7 (240 MHz) + SIMD</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid var(--app-border);">
+                                    <td style="padding: 10px 12px; font-weight: 600;">Dukungan PSRAM</td>
+                                    <td style="padding: 10px 12px; color: #ef4444;">Tidak ada (Hanya internal SRAM ~380KB)</td>
+                                    <td style="padding: 10px 12px; color: #10b981;">Ada (2MB – 8MB Octal/Quad PSRAM)</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid var(--app-border);">
+                                    <td style="padding: 10px 12px; font-weight: 600;">Audio Sample Rate</td>
+                                    <td style="padding: 10px 12px;"><strong>16.000 Hz (16 kHz Mono)</strong><br><span style="font-size:11px; color:var(--app-muted);">Dioptimasi hemat memory tanpa stutter</span></td>
+                                    <td style="padding: 10px 12px;"><strong>24.000 Hz (24 kHz Mono/Stereo)</strong><br><span style="font-size:11px; color:var(--app-muted);">Resolusi tinggi, kristal jernih</span></td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid var(--app-border);">
+                                    <td style="padding: 10px 12px; font-weight: 600;">Bitrate Adaptif</td>
+                                    <td style="padding: 10px 12px;"><strong>6 kbps – 16 kbps</strong> (Default 12k/16k)</td>
+                                    <td style="padding: 10px 12px;"><strong>16 kbps – 32 kbps</strong> (Default 24k)</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid var(--app-border);">
+                                    <td style="padding: 10px 12px; font-weight: 600;">Wake-Word Detection</td>
+                                    <td style="padding: 10px 12px;">Push-To-Talk Tombol (GPIO 3) disarankan</td>
+                                    <td style="padding: 10px 12px;">Continuous Voice ("Hi Jason" / "Nihao Xiaozhi")</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 12px; font-weight: 600;">Header Identitas Chip</td>
+                                    <td style="padding: 10px 12px;"><code>X-Device-Chip: esp32c3</code></td>
+                                    <td style="padding: 10px 12px;"><code>X-Device-Chip: esp32s3</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
-                <div class="doc-step">
+                <!-- Bagian 1: Konfigurasi Source Code Firmware XiaoZhi (ESP-IDF C++) -->
+                <div class="doc-step" style="border-left: 3px solid var(--app-brand);">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Persyaratan Hardware</div>
+                        <div class="doc-step-title">1. 📦 Struktur Modul YouTube Audio Poller (C++)</div>
                         <div class="doc-step-desc">
-                            <ul style="margin:4px 0 0 18px">
-                                <li><strong>ESP32 / ESP32-S3 / ESP32-C3</strong> (minimal 4MB Flash, 320KB+ SRAM)</li>
-                                <li><strong>I2S DAC module</strong> (PCM5102, MAX98357A, atau built-in DAC)</li>
-                                <li><strong>Speaker</strong> (3W-5W recommended)</li>
-                                <li><strong>WiFi</strong> dengan akses internet (HTTPS required)</li>
+                            Pada firmware resmi XiaoZhi, pemutar musik YouTube dijalankan melalui komponen background task <code>YouTubeAudioPoller</code> yang terintegrasi langsung dengan <code>AudioService</code> dan <code>Application</code> event loop.
+                            Pastikan file <code>main/youtube_audio_poller.h</code> dan <code>main/youtube_audio_poller.cc</code> terdaftar pada <code>main/CMakeLists.txt</code>:
+                        </div>
+                        <div class="doc-code">
+# main/CMakeLists.txt
+set(SOURCES ...
+            "youtube_audio_poller.cc"
+            "application.cc"
+            "mcp_server.cc"
+            ...
+)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step" style="border-left: 3px solid #10b981;">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">2. 🏷️ Identifikasi Chip &amp; MAC Address di HTTP Request</div>
+                        <div class="doc-step-desc">
+                            Server Xiaozhi Indonesia secara otomatis mendeteksi arsitektur board melalui header <code>X-Device-Chip</code> atau query parameter <code>chip=</code>.
+                            Ini memastikan server mengirimkan stream Opus <strong>16kHz untuk ESP32-C3</strong> (agar tidak kehabisan RAM) dan <strong>24kHz untuk ESP32-S3</strong> (agar suara maksimal).
+                            <br><br>
+                            Di dalam <code>main/youtube_audio_poller.cc</code> fungsi <code>StreamAudio()</code>:
+                        </div>
+                        <div class="doc-code" style="font-size: 11px; line-height: 1.55;">
+// Mengambil MAC address dan nama arsitektur chip saat kompilasi
+std::string mac = SystemInfo::GetMacAddress();
+std::string chip = CONFIG_IDF_TARGET; // "esp32c3" atau "esp32s3"
+
+char url_buf[256];
+snprintf(url_buf, sizeof(url_buf),
+         "%s/api/audio/stream/%s?br=%s&amp;mac=%s&amp;chip=%s",
+         GetStreamUrl().c_str(), video_id.c_str(), current_bitrate.c_str(), mac.c_str(), chip.c_str());
+
+// Header Wajib Identitas Perangkat
+http->SetTimeout(15000);
+http->SetHeader("User-Agent", "ESP32-XiaoZhi");
+http->SetHeader("Device-Id", mac.c_str());       // Mengikat board ke akun user
+http->SetHeader("X-Device-Mac", mac.c_str());
+http->SetHeader("X-Device-Chip", chip.c_str());   // Identifikasi esp32c3 vs esp32s3
+http->SetHeader("Device-Chip", chip.c_str());
+                        </div>
+                        <div class="doc-tip">
+                            <strong>💡 Keuntungan Auto-Binding:</strong><br>
+                            Dengan mengirimkan <code>Device-Id: {MAC}</code> dan <code>X-Device-Chip: {CHIP}</code>, server langsung mengenali pemilik board dan menampilkan status streaming aktif di dashboard admin secara instan!
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step" style="border-left: 3px solid #8b5cf6;">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">3. 🔊 Sinkronisasi Volume Suara &amp; Dynamic Sample Rate</div>
+                        <div class="doc-step-desc">
+                            Agar lagu YouTube diputar dengan volume yang disetel oleh pengguna (bukan volume default 100% atau bisu), dan agar sample rate beradaptasi otomatis antara C3 dan S3:
+                        </div>
+                        <div class="doc-code" style="font-size: 11px; line-height: 1.55;">
+// 1. Menjaga volume audio speaker tetap sesuai pengaturan pengguna
+auto codec = Board::GetInstance().GetAudioCodec();
+if (codec != nullptr) {
+    if (!codec->output_enabled()) {
+        codec->EnableOutput(true);
+    }
+    ESP_LOGI(TAG, "Playback menggunakan volume aktif: %d%%", codec->output_volume());
+}
+
+// 2. Membaca header OpusHead dari container OGG
+if (!seen_head) {
+    if (pkt_len >= 19 &amp;&amp; memcmp(pkt_ptr, "OpusHead", 8) == 0) {
+        seen_head = true;
+        sample_rate = pkt_ptr[12] | (pkt_ptr[13] << 8) | (pkt_ptr[14] << 16) | (pkt_ptr[15] << 24);
+        ESP_LOGI(TAG, "OpusHead dideteksi: sample_rate=%d Hz", sample_rate);
+    }
+    continue;
+}
+
+// 3. Mengirim frame Opus ke audio decode queue
+auto packet = std::make_unique&lt;AudioStreamPacket&gt;();
+packet->sample_rate = (sample_rate > 0) ? sample_rate : 16000; // 16k untuk C3, 24k untuk S3
+packet->frame_duration = 60; // 60ms Opus frame duration
+packet->payload.assign(pkt_ptr, pkt_ptr + pkt_len);
+app.GetAudioService().PushPacketToDecodeQueue(std::move(packet), true);
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step" style="border-left: 3px solid #f59e0b;">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">4. 🛡️ Pencegahan Watchdog Lockup &amp; Safe GUI Scheduling (Khusus ESP32-C3)</div>
+                        <div class="doc-step-desc">
+                            Pada ESP32-C3 yang bertipe <strong>single-core</strong>, terdapat 2 hal krusial yang harus diperhatikan agar ESP32 tidak "nge-stuck" atau mengalami <em>Task Watchdog Triggered (`task_wdt`)</em>:
+                            <ul style="margin: 8px 0 0 18px; line-height: 1.6;">
+                                <li><strong>Hindari Dispatch GUI di <code>esp_timer</code>:</strong> Callback timer berprioritas tinggi (priority 22). Jangan memanggil <code>DisplayLockGuard</code> langsung di dalam timer callback. Jadwalkan update GUI ke main application thread via <code>Application::GetInstance().Schedule(...)</code>.</li>
+                                <li><strong>Sanitasi Judul Lagu (ASCII Safe):</strong> Jangan sertakan emoji unicode 4-byte seperti <code>🎵</code> pada string judul label OLED monokrom. Gunakan teks ASCII bersih seperti <code>[PLAY] </code> untuk menghindari infinite loop pada font fallback traversal LVGL.</li>
+                                <li><strong>WiFi Power Save Standby:</strong> Gunakan <code>WIFI_PS_MIN_MODEM</code> saat idle agar ESP32 tetap responsif menerima ping &amp; pesan MQTT dari router.</li>
                             </ul>
                         </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Library yang Dibutuhkan (Arduino IDE)</div>
-                        <div class="doc-code">
-// Arduino Board Manager:<br>
-// ESP32 by Espressif Systems (versi 2.x atau 3.x)<br><br>
-
-// Library yang diperlukan:<br>
-#include &lt;WiFi.h&gt;           // Koneksi WiFi<br>
-#include &lt;HTTPClient.h&gt;     // HTTP request ke server<br>
-#include &lt;ArduinoJson.h&gt;    // Parsing JSON response<br>
-#include &lt;driver/i2s.h&gt;     // Output audio via I2S<br><br>
-
-// Untuk decode Opus (pilih salah satu):<br>
-// Opsi 1: Library "ESP32-Opus-Decoder" (recommended)<br>
-// Opsi 2: Library "libopus" port untuk ESP32<br>
-// Opsi 3: Gunakan AudioCodecs / ESP8266Audio
-                        </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Konfigurasi Firmware</div>
                         <div class="doc-code" style="font-size: 11px; line-height: 1.55;">
-// ═══════════════════════════════════════════════
-// KONFIGURASI - Sesuaikan dengan setup kamu
-// ═══════════════════════════════════════════════
-
-// Server Xiaozhi Indonesia
-const char* BASE_URL = "https://xiaozhiscig.biz.id";
-
-// WiFi
-const char* WIFI_SSID     = "NamaWiFi";
-const char* WIFI_PASSWORD  = "PasswordWiFi";
-
-// Identifikasi Device
-// Gunakan MAC address ESP32 (otomatis terbaca)
-// atau MCP token dari dashboard Xiaozhi Indonesia
-String DEVICE_MAC = "";  // Auto-detect dari WiFi.macAddress()
-String MCP_TOKEN  = "";  // Opsional: ambil dari dashboard
-
-// Interval polling (milliseconds)
-const int POLL_INTERVAL = 3000;  // 3 detik
-
-// I2S Pin Configuration (sesuaikan board kamu)
-#define I2S_BCLK_PIN  26
-#define I2S_LRCLK_PIN 25
-#define I2S_DOUT_PIN  22
+// Contoh Safe GUI Scheduling di main/display/lvgl_display/lvgl_display.cc:
+esp_timer_create_args_t notification_timer_args = {
+    .callback = [](void *arg) {
+        LvglDisplay *display = static_cast&lt;LvglDisplay*&gt;(arg);
+        // Jadwalkan ke thread aplikasi, jangan jalankan di task esp_timer!
+        Application::GetInstance().Schedule([display]() {
+            DisplayLockGuard lock(display);
+            if (display->notification_label_ != nullptr) {
+                lv_obj_add_flag(display->notification_label_, LV_OBJ_FLAG_HIDDEN);
+            }
+            if (display->status_label_ != nullptr) {
+                lv_obj_remove_flag(display->status_label_, LV_OBJ_FLAG_HIDDEN);
+            }
+        });
+    },
+    .arg = this,
+    .dispatch_method = ESP_TIMER_TASK,
+    .name = "notification_timer",
+    .skip_unhandled_events = false,
+};
                         </div>
                     </div>
                 </div>
 
-                <div class="doc-step">
+                <div class="doc-step" style="border-left: 3px solid #ec4899;">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Contoh Kode Polling & Playback</div>
+                        <div class="doc-step-title">5. ⚡ Registrasi MCP Tool <code>self.audio.play_youtube</code></div>
+                        <div class="doc-step-desc">
+                            Agar asisten suara XiaoZhi dapat memicu pemutaran lagu langsung dari AI model, daftarkan tool pada <code>main/mcp_server.cc</code>:
+                        </div>
+                        <div class="doc-code" style="font-size: 11px; line-height: 1.55;">
+// main/mcp_server.cc
+AddTool("self.audio.play_youtube", "Mencari dan memutar musik/lagu dari YouTube ke speaker",
+    PropertyList({
+        {"query", PropertyType::kString, "Judul lagu atau artis yang ingin diputar", true},
+        {"video_id", PropertyType::kString, "ID video YouTube opsional jika sudah diketahui", false}
+    }),
+    [](const PropertyList&amp; params) -> ReturnResult {
+        std::string query = params.at("query").value&lt;std::string&gt;();
+        std::string video_id = params.count("video_id") ? params.at("video_id").value&lt;std::string&gt;() : "";
+        
+        // Teruskan ke YouTubeAudioPoller
+        if (!video_id.empty()) {
+            YouTubeAudioPoller::GetInstance().PlaySong(video_id, query);
+        } else {
+            YouTubeAudioPoller::GetInstance().QueryAndPlay(query);
+        }
+        return ReturnResult("Memulai pemutaran lagu YouTube: " + query);
+    }
+);
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step" style="border-left: 3px solid #0284c7;">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">6. 🚀 Perintah Build &amp; Flash Firmware (ESP-IDF)</div>
+                        <div class="doc-step-desc">
+                            Gunakan terminal ESP-IDF (v5.x atau terbaru) untuk build dan upload firmware ke board:
+                        </div>
+                        <div class="doc-code" style="font-size: 11px; line-height: 1.6;">
+<strong>─── Untuk ESP32-C3 ───</strong><br>
+idf.py set-target esp32c3<br>
+idf.py build<br>
+python -m esptool --chip esp32c3 -p COM19 -b 460800 write_flash 0x10000 build/xiaozhi.bin<br><br>
+
+<strong>─── Untuk ESP32-S3 ───</strong><br>
+idf.py set-target esp32s3<br>
+idf.py build<br>
+python -m esptool --chip esp32s3 -p COMxx -b 460800 write_flash 0x10000 build/xiaozhi.bin
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bagian 2: Panduan Alternatif Custom Firmware (Arduino IDE) -->
+                <div class="doc-step" style="border-left: 3px solid #64748b; margin-top: 24px;">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Alternatif: Firmware Custom Sederhana (Arduino IDE)</div>
+                        <div class="doc-step-desc">
+                            Bagi kamu yang merakit speaker pintar DIY sederhana menggunakan Arduino IDE:
+                        </div>
                         <div class="doc-code" style="font-size: 11px; line-height: 1.5;">
-// ═══════════════════════════════════════════════
-// LOOP UTAMA: Polling perintah audio dari server
-// ═══════════════════════════════════════════════
+#include &lt;WiFi.h&gt;
+#include &lt;HTTPClient.h&gt;
+#include &lt;ArduinoJson.h&gt;
+#include &lt;driver/i2s.h&gt;
+
+const char* BASE_URL  = "https://xiaozhiscig.biz.id";
+const char* WIFI_SSID = "NamaWiFi";
+const char* WIFI_PASS = "PasswordWiFi";
+String DEVICE_MAC     = "";
 
 void setup() {
     Serial.begin(115200);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    while (WiFi.status() != WL_CONNECTED) delay(500);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    while (WiFi.status() != WL_CONNECTED) delay(300);
 
-    // Auto-detect MAC address
-    DEVICE_MAC = WiFi.macAddress(); // format: AA:BB:CC:DD:EE:FF
-    Serial.println("MAC: " + DEVICE_MAC);
-
-    setupI2S();  // Inisialisasi I2S output
+    DEVICE_MAC = WiFi.macAddress();
+    Serial.println("Device MAC: " + DEVICE_MAC);
 }
 
 void loop() {
-    pollAudioCommands();
-    delay(POLL_INTERVAL);
-}
-
-void pollAudioCommands() {
     HTTPClient http;
-
-    // Sertakan MAC address & token di query URL
-    String url = String(BASE_URL)
-        + "/api/device/audio/commands"
-        + "?mac=" + urlencode(DEVICE_MAC);
-    if (MCP_TOKEN.length() > 0) {
-        url += "&amp;token=" + urlencode(MCP_TOKEN);
-    }
-
+    // Sertakan parameter mac dan chip (esp32c3 / esp32s3)
+    String url = String(BASE_URL) + "/api/device/audio/commands?mac=" + DEVICE_MAC + "&amp;chip=esp32c3";
     http.begin(url);
-    // Kirim header identitas perangkat
     http.addHeader("Device-Id", DEVICE_MAC);
     http.addHeader("X-Device-Mac", DEVICE_MAC);
-    if (MCP_TOKEN.length() > 0) {
-        http.addHeader("X-Device-Token", MCP_TOKEN);
-    }
-    int httpCode = http.GET();
+    http.addHeader("X-Device-Chip", "esp32c3");
 
-    if (httpCode == 200) {
-        String payload = http.getString();
+    int code = http.GET();
+    if (code == 200) {
         JsonDocument doc;
-        deserializeJson(doc, payload);
+        deserializeJson(doc, http.getString());
+        JsonArray cmds = doc["commands"];
+        if (cmds.size() > 0) {
+            String cmdId = cmds[0]["id"].as&lt;String&gt;();
+            String title = cmds[0]["title"].as&lt;String&gt;();
+            String streamUrl = cmds[0]["stream_url"].as&lt;String&gt;();
 
-        JsonArray commands = doc["commands"];
-        if (commands.size() > 0) {
-            // Ambil perintah pertama
-            String commandId = commands[0]["id"].as&lt;String&gt;();
-            String title     = commands[0]["title"].as&lt;String&gt;();
-            String streamUrl = commands[0]["stream_url"].as&lt;String&gt;();
-            String videoId   = commands[0]["video_id"].as&lt;String&gt;();
-
-            Serial.println("🎵 Playing: " + title);
-
-            // Stream dan putar audio
-            playAudioStream(streamUrl);
-
-            // Kirim ACK setelah selesai
-            acknowledgeCommand(commandId);
+            Serial.println("Memutar: " + title);
+            playStream(streamUrl);
+            ackCommand(cmdId);
         }
     }
     http.end();
+    delay(3000);
 }
 
-// Stream audio Ogg/Opus dari server ke I2S speaker
-void playAudioStream(String streamUrl) {
+void playStream(String streamUrl) {
     HTTPClient http;
     http.begin(streamUrl);
     http.addHeader("Device-Id", DEVICE_MAC);
-    http.addHeader("X-Device-Mac", DEVICE_MAC);
-    int httpCode = http.GET();
-
-    if (httpCode == 200) {
+    http.addHeader("X-Device-Chip", "esp32c3");
+    if (http.GET() == 200) {
         WiFiClient* stream = http.getStreamPtr();
-        // Baca Ogg/Opus stream, decode, kirim ke I2S
-        while (http.connected() && stream->available()) {
-            uint8_t buffer[1536];
-            int bytesRead = stream->readBytes(buffer, sizeof(buffer));
-            if (bytesRead > 0) {
-                size_t written = 0;
-                i2s_write(I2S_PORT, buffer, bytesRead, &amp;written, portMAX_DELAY);
+        uint8_t buf[1024];
+        while (http.connected() &amp;&amp; stream->available()) {
+            int len = stream->readBytes(buf, sizeof(buf));
+            if (len > 0) {
+                // Decode frame Opus dan kirim ke I2S DAC
             }
-            yield(); // Feed watchdog timer ESP32
+            yield();
         }
     }
     http.end();
 }
 
-// Kirim konfirmasi setelah audio selesai diputar
-void acknowledgeCommand(String commandId) {
+void ackCommand(String cmdId) {
     HTTPClient http;
     http.begin(String(BASE_URL) + "/api/device/audio/ack");
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("Device-Id", DEVICE_MAC);
-
-    String body = "{\"command_id\":\"" + commandId
-                + "\",\"mac\":\"" + DEVICE_MAC + "\"";
-    if (MCP_TOKEN.length() > 0) {
-        body += ",\"token\":\"" + MCP_TOKEN + "\"";
-    }
-    body += "}";
-
-    http.POST(body);
-    http.end();
-    Serial.println("✅ ACK sent for: " + commandId);
-}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Alternatif: Contoh Direct Play (Tanpa Queue)</div>
-                        <div class="doc-step-desc">
-                            Jika ingin ESP32 bisa cari dan putar lagu langsung tanpa melalui perintah suara XiaoZhi:
-                        </div>
-                        <div class="doc-code" style="font-size: 11px; line-height: 1.5;">
-// Cari lagu langsung dari ESP32
-void searchAndPlay(String query) {
-    HTTPClient http;
-    String url = String(BASE_URL) + "/api/audio/play_direct?q="
-                 + urlencode(query);
-    http.begin(url);
-    http.addHeader("Device-Id", DEVICE_MAC);
-    int httpCode = http.GET();
-
-    if (httpCode == 200) {
-        String payload = http.getString();
-        JsonDocument doc;
-        deserializeJson(doc, payload);
-
-        if (doc["success"] == true) {
-            String videoId = doc["video_id"].as&lt;String&gt;();
-            String title   = doc["title"].as&lt;String&gt;();
-            Serial.println("Found: " + title);
-
-            // Stream langsung dari endpoint audio
-            String streamUrl = String(BASE_URL)
-                + "/api/audio/stream/" + videoId + "?br=11k&amp;mac=" + urlencode(DEVICE_MAC);
-            playAudioStream(streamUrl);
-        }
-    }
+    http.POST("{"command_id":"" + cmdId + "","mac":"" + DEVICE_MAC + ""}");
     http.end();
 }
                         </div>
@@ -939,137 +1032,51 @@ void searchAndPlay(String query) {
                         <div class="doc-step-title" style="color: #ef4444;">🔧 Tanya Jawab &amp; Solusi Kendala (Troubleshooting)</div>
                         <div class="doc-step-desc">
                             <div style="margin-bottom: 12px;">
-                                <strong>❓ Kenapa di panel Admin muncul tulisan "Menunggu Board (Belum kirim MAC)" padahal musik sudah play?</strong><br>
-                                <span>Penyebabnya adalah firmware ESP32 belum mengirimkan parameter <code>mac</code> atau header <code>Device-Id</code> saat polling atau streaming. Server butuh MAC Address untuk mengikat board ke akun kamu. Di firmware versi terbaru, pastikan kode memanggil <code>WiFi.macAddress()</code> dan menyertakannya di URL <code>/api/device/audio/commands?mac=...</code>. Begitu request masuk, server otomatis mencatatnya di database dan status berubah menjadi hijau! Selain itu, saat lagu sedang aktif diputar, admin langsung menampilkan indikator <strong>🔊 Sedang Memutar</strong>.</span>
+                                <strong>❓ Kenapa ESP32-C3 sempat "nge-stuck" atau watchdog reboot saat lagu dimulai?</strong><br>
+                                <span>Penyebab utamanya adalah: (1) Menjalankan callback GUI berdurasi panjang di dalam <code>esp_timer</code> task (prioritas 22) yang menyebabkan IDLE task kelaparan, dan (2) Mengirimkan emoji <code>🎵</code> ke label OLED monokrom yang tidak memiliki glyph sehingga terjadi infinite loop pada traversal fallback font LVGL. Solusinya: gunakan <code>Schedule()</code> untuk update GUI dan hindari karakter emoji 4-byte di judul OLED.</span>
                             </div>
                             <div style="margin-bottom: 12px;">
-                                <strong>❓ Kenapa lagu mengulang terus dari awal setelah selesai?</strong><br>
-                                <span>Fungsi <code>acknowledgeCommand(commandId)</code> belum terpanggil atau gagal kirim. Pastikan setelah loop streaming selesai, firmware mengirim request POST ke <code>/api/device/audio/ack</code>.</span>
+                                <strong>❓ Kenapa suara di ESP32-C3 putus-putus atau pecah?</strong><br>
+                                <span>ESP32-C3 memiliki memori internal yang terbatas (tanpa PSRAM). Pastikan firmware mengirim header <code>X-Device-Chip: esp32c3</code> agar server mengaktifkan profil <strong>16kHz Mono</strong> dengan bitrate adaptif 6k–16k. Profil ini membutuhkan alokasi memori minimal dan bekerja lancar tanpa kehabisan SRAM.</span>
                             </div>
                             <div style="margin-bottom: 12px;">
-                                <strong>❓ ESP32 sering reboot (Watchdog Reset / WDT) saat streaming audio?</strong><br>
-                                <span>Di dalam loop <code>while (stream-&gt;available())</code>, selalu panggil <code>yield();</code> agar Task Watchdog ESP32 tidak terpicu.</span>
+                                <strong>❓ Bagaimana dengan ESP32-S3? Apakah bisa langsung 24kHz?</strong><br>
+                                <span>Ya! ESP32-S3 memiliki dual-core dan PSRAM yang melimpah. Saat mengirimkan <code>X-Device-Chip: esp32s3</code>, server otomatis mentranscode audio ke <strong>24kHz Mono/Stereo</strong> pada bitrate 16k–32k untuk kejernihan suara maksimal.</span>
                             </div>
-                            <div>
-                                <strong>❓ Bagaimana cara menguji stream lagu tanpa menggunakan board ESP32?</strong><br>
-                                <span>Buka browser di HP/Laptop kamu dan kunjungi URL: <code>{BASE_URL}/api/audio/stream/{video_id}?br=11k</code>. Browser akan langsung memutar audio real-time transcoded dari YouTube!</span>
+                            <div style="margin-bottom: 12px;">
+                                <strong>❓ Di panel Admin masih tertulis "Menunggu Board (Belum kirim MAC)"?</strong><br>
+                                <span>Pastikan firmware menyertakan header <code>Device-Id: {MAC}</code> atau parameter <code>?mac={MAC}</code> saat melakukan polling/streaming. Begitu request masuk, server otomatis mendaftarkan MAC ke database akun Anda dan badge berubah menjadi hijau aktif.</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- WebSocket Alternative -->
+            <!-- Requirements -->
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🌐</span> Panduan WebSocket (Metode Advanced)
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Persistent Audio Channel via WebSocket</div>
-                        <div class="doc-step-desc">
-                            Metode ini paling efisien: ESP32 membuka <strong>1 koneksi WebSocket</strong> yang tetap aktif.
-                            Server otomatis mengirim audio stream saat ada perintah baru. Tidak perlu HTTP polling terpisah.
-                        </div>
-                        <div class="doc-code" style="font-size: 11px; line-height: 1.5;">
-// WebSocket Persistent Channel
-// URL: wss://xiaozhiscig.biz.id/ws/device/audio/{MAC_ADDRESS}
-
-#include &lt;WebSocketsClient.h&gt;
-
-WebSocketsClient ws;
-
-void setupWebSocket() {
-    // Ganti dengan domain server kamu
-    ws.beginSSL("xiaozhiscig.biz.id", 443,
-                "/ws/device/audio/" + DEVICE_MAC);
-
-    ws.onEvent([](WStype_t type, uint8_t* payload, size_t length) {
-        switch (type) {
-            case WStype_CONNECTED:
-                Serial.println("WS Connected!");
-                break;
-
-            case WStype_TEXT: {
-                // Parse JSON state messages
-                String msg = String((char*)payload);
-                // {"type":"tts","state":"start"} → mulai stream
-                // {"type":"tts","state":"stop"}  → selesai
-                break;
-            }
-
-            case WStype_BIN: {
-                // Binary frame: XiaoZhi BinaryProtocol3
-                // Byte 0: type (0x00 = audio)
-                // Byte 1: reserved
-                // Byte 2-3: payload size (uint16 BE)
-                // Byte 4+: raw Opus frame
-                if (length >= 4 && payload[0] == 0x00) {
-                    uint16_t opusLen = (payload[2] << 8) | payload[3];
-                    uint8_t* opusData = &amp;payload[4];
-                    // Decode opus frame dan output ke I2S
-                    decodeAndPlayOpus(opusData, opusLen);
-                }
-                break;
-            }
-        }
-    });
-}
-
-void loop() {
-    ws.loop();  // Proses WebSocket events
-}
-                        </div>
-                        <div class="doc-tip">
-                            <strong>💡 Keuntungan WebSocket:</strong><br>
-                            • Latency rendah (tidak perlu polling berulang)<br>
-                            • Hemat bandwidth (1 koneksi persistent)<br>
-                            • Audio dikirim sebagai raw Opus frames (lebih ringan dari Ogg container)<br>
-                            • Pacing otomatis 60ms per frame dari server
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Requirements & Troubleshooting -->
-            <div class="doc-section">
-                <div class="doc-section-title">
-                    <span>📋</span> Persyaratan & Troubleshooting
+                    <span>📋</span> Persyaratan Sistem
                 </div>
 
                 <div class="doc-warning">
-                    <strong>⚠️ Persyaratan Penting:</strong>
+                    <strong>⚠️ Persyaratan Server &amp; Board:</strong>
                     <ul style="margin:8px 0 0 20px">
-                        <li>Fitur YouTube Music harus <strong>diaktifkan oleh admin</strong> di panel admin (bisa di-enable/disable per user)</li>
-                        <li>MCP harus dalam status <strong>Online/Terhubung</strong></li>
-                        <li>ESP32 harus <strong>support HTTPS</strong> (gunakan WiFiClientSecure)</li>
-                        <li>Server harus punya <strong>FFmpeg</strong> terinstall (untuk transcoding Opus)</li>
-                        <li>Server harus punya library <strong>yt-dlp</strong> (untuk mencari/extract YouTube)</li>
-                    </ul>
-                </div>
-
-                <div class="doc-tip">
-                    <strong>💡 Tips Troubleshooting:</strong>
-                    <ul style="margin:8px 0 0 20px">
-                        <li><strong>Tidak ada perintah saat polling?</strong> Pastikan MAC address di firmware sama dengan yang terdaftar di server. Cek format MAC.</li>
-                        <li><strong>Audio tidak terdengar?</strong> Cek koneksi I2S (BCLK, LRCLK, DOUT), pastikan volume speaker tidak mati.</li>
-                        <li><strong>Stream putus-putus?</strong> Turunkan bitrate ke <code>?br=8k</code> atau <code>?br=6k</code>. Cek kecepatan WiFi.</li>
-                        <li><strong>Error HTTPS?</strong> Pastikan root CA certificate di-bundle di firmware, atau gunakan <code>client.setInsecure()</code> (tidak recommended untuk production).</li>
-                        <li><strong>"yt_dlp tidak tersedia"?</strong> Install di server: <code>pip install yt-dlp</code></li>
-                        <li><strong>"FFmpeg tidak terpasang"?</strong> Install di server: <code>pip install imageio-ffmpeg</code> atau <code>apt install ffmpeg</code></li>
+                        <li>Fitur YouTube Music harus <strong>diaktifkan oleh admin</strong> di panel admin per akun user.</li>
+                        <li>ESP32 wajib terhubung ke Wi-Fi dengan akses HTTPS ke server.</li>
+                        <li>Server Linux backend telah terpasang library <code>yt-dlp</code> dan <code>ffmpeg</code> untuk real-time transcoding.</li>
+                        <li>Dukungan DAC I2S: MAX98357A, PCM5102, ES8311, atau AC101.</li>
                     </ul>
                 </div>
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Perintah Suara yang Didukung</div>
+                        <div class="doc-step-title">Contoh Perintah Suara yang Didukung</div>
                         <div class="doc-step-desc">
                             <em>"Putar lagu Bohemian Rhapsody"</em><br>
-                            <em>"Putarkan musik lofi hip hop"</em><br>
-                            <em>"Mainkan lagu Indonesia terbaru"</em><br>
+                            <em>"Putarkan musik lofi hip hop santai"</em><br>
+                            <em>"Mainkan lagu Indonesia viral terbaru"</em><br>
                             <em>"Putar lagu Sheila on 7 Dan"</em><br>
-                            <em>"Carikan lagu jazz santai"</em>
+                            <em>"Setel instrumen piano pengantar tidur"</em>
                         </div>
                     </div>
                 </div>

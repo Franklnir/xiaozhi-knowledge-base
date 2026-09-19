@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -78,6 +79,15 @@ async def lifespan(app: FastAPI):
         logger.info("Reminder checker started")
     except Exception:
         logger.warning("Reminder checker not available")
+
+    # Start PostgreSQL LISTEN/NOTIFY multi-worker sync listener
+    if hasattr(store, "dsn"):
+        try:
+            from xiaozhi.services.community_chat_service import start_pg_chat_listener
+            asyncio.create_task(start_pg_chat_listener(store))
+            logger.info("PostgreSQL multi-worker chat sync listener started")
+        except Exception as exc:
+            logger.warning("Failed to start PostgreSQL chat sync listener: %s", exc)
 
     # Start MCP background task
     try:
@@ -283,14 +293,33 @@ async def sitemap_xml():
     return Response(content=xml_content, media_type="application/xml")
 
 
-@app.get("/download/app.apk", include_in_schema=False)
-@app.get("/download/xichi.apk", include_in_schema=False)
-@app.get("/download", include_in_schema=False)
-async def download_apk():
-    """Direct download redirect for Xichi Companion App APK."""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(
-        url="https://github.com/Franklnir/Chronchi/releases/download/v1.4.0/Xichi-v1.4.0-debug.apk",
-        status_code=302
-    )
+@app.get("/health/db", tags=["Health"])
+async def health_check_db():
+    """Check database connection latency and backend health."""
+    start = time.perf_counter()
+    backend = os.getenv("DB_BACKEND", "auto")
+    try:
+        if hasattr(store, "_get_conn"):
+            with store._get_conn() as conn:
+                # Works for both psycopg Connection and sqlite3 Connection
+                if hasattr(conn, "cursor"):
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT 1")
+                else:
+                    conn.execute("SELECT 1")
+        latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        return {
+            "status": "healthy",
+            "backend": backend,
+            "latency_ms": latency_ms,
+            "store_class": store.__class__.__name__,
+        }
+    except Exception as exc:
+        logger.error("DB health check failed: %s", exc)
+        return {
+            "status": "unhealthy",
+            "backend": backend,
+            "error": str(exc),
+            "store_class": store.__class__.__name__,
+        }
 

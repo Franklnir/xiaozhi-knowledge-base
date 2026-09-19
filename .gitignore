@@ -21,3 +21,14 @@ nginx-temp.conf
 
 # Docker compose with secrets (use docker-compose.prod.yml instead)
 docker-compose.yml
+
+# Database backups
+backups/
+*.dump
+
+# Local Portable PostgreSQL
+pgsql/
+pgdata_local/
+pgsql_dl.zip
+pg_server.log
+
