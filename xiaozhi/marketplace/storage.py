@@ -74,8 +74,8 @@ class StorageService:
         """
         if len(file_bytes) == 0:
             raise ValueError("File gambar tidak boleh kosong.")
-        if len(file_bytes) > 5 * 1024 * 1024:  # Initial raw upload guard 5MB
-            raise ValueError("Ukuran file gambar mentah terlalu besar. Maksimal 5 MB.")
+        if len(file_bytes) > 10 * 1024 * 1024:  # Initial raw upload guard 10MB
+            raise ValueError("Ukuran file gambar mentah terlalu besar. Maksimal 10 MB per foto.")
 
         try:
             with Image.open(io.BytesIO(file_bytes)) as img:
@@ -83,8 +83,8 @@ class StorageService:
                 if img.format not in ("JPEG", "PNG", "WEBP", "JPG"):
                     raise ValueError(f"Format gambar {img.format} tidak didukung. Gunakan PNG, JPEG, atau WebP.")
                 
-                # Resize if excessively large to save VPS RAM
-                max_dim = 1600
+                # Resize if excessively large to save memory
+                max_dim = 1400
                 if img.width > max_dim or img.height > max_dim:
                     img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
@@ -94,24 +94,37 @@ class StorageService:
                 else:
                     converted = img.convert("RGB")
 
-                # Recompress to WebP without EXIF
+                # Initial compression pass
+                quality = 82
                 out_buffer = io.BytesIO()
-                converted.save(out_buffer, format="WEBP", quality=82, method=4)
+                converted.save(out_buffer, format="WEBP", quality=quality, method=4)
                 processed_bytes = out_buffer.getvalue()
+
+                # Adaptive multi-pass compression: reduce quality and dimension if > 500 KB
+                while len(processed_bytes) > MAX_IMAGE_SIZE_BYTES and quality > 35:
+                    quality -= 15
+                    out_buffer = io.BytesIO()
+                    converted.save(out_buffer, format="WEBP", quality=quality, method=5)
+                    processed_bytes = out_buffer.getvalue()
+
+                # If still over 500 KB after quality drop, downscale dimensions
+                if len(processed_bytes) > MAX_IMAGE_SIZE_BYTES:
+                    converted.thumbnail((1000, 1000), Image.Resampling.LANCZOS)
+                    out_buffer = io.BytesIO()
+                    converted.save(out_buffer, format="WEBP", quality=60, method=5)
+                    processed_bytes = out_buffer.getvalue()
+
+                if len(processed_bytes) > MAX_IMAGE_SIZE_BYTES:
+                    converted.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                    out_buffer = io.BytesIO()
+                    converted.save(out_buffer, format="WEBP", quality=50, method=5)
+                    processed_bytes = out_buffer.getvalue()
+
                 width, height = converted.size
         except Exception as e:
             if "decompression bomb" in str(e).lower():
                 raise ValueError("Gambar terdeteksi berbahaya (decompression bomb).")
             raise ValueError(f"Gagal memproses gambar: {str(e)}")
-
-        if len(processed_bytes) > MAX_IMAGE_SIZE_BYTES:
-            # Try stronger compression to meet 500KB strict constraint
-            try:
-                out_buffer = io.BytesIO()
-                converted.save(out_buffer, format="WEBP", quality=65, method=5)
-                processed_bytes = out_buffer.getvalue()
-            except Exception:
-                pass
 
         if len(processed_bytes) > MAX_IMAGE_SIZE_BYTES:
             raise ValueError(f"Ukuran gambar hasil kompresi ({len(processed_bytes)} bytes) melebihi batas 500 KB (512000 bytes).")

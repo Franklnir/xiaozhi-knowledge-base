@@ -145,13 +145,15 @@
             {% endif %}
 
             <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:6px; color:var(--app-muted);">
-                Ganti Foto Produk (Opsional - maksimal 3 foto baru)
+                📷 Ganti Foto Produk (Opsional - maksimal 3 foto baru • Kompresi Otomatis Aktif)
             </label>
-            <input type="file" name="images" accept="image/png, image/jpeg, image/webp" multiple class="app-input" style="width:100%;">
+            <input type="file" name="images" id="editProductImagesInput" accept="image/png, image/jpeg, image/webp" multiple class="app-input" onchange="previewSelectedImages(this)" style="width:100%;">
+            <div id="imagePreviewRow" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
             <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0;">
-                Kosongkan jika tidak ingin mengganti foto saat ini.
+                Kosongkan jika tidak ingin mengganti foto saat ini. Foto otomatis dioptimalkan ke format WebP super ringan (&lt; 500 KB).
             </p>
         </div>
+
 
         <!-- Firmware Binary & 3D Model Section -->
         <div style="margin-bottom:24px; border-top:1px dashed var(--app-border); padding-top:16px;">
@@ -275,9 +277,9 @@
             }
             for (let i = 0; i < imgInput.files.length; i++) {
                 const file = imgInput.files[i];
-                if (file.size > 512000) {
-                    const kb = (file.size / 1024).toFixed(0);
-                    return showError(`Foto "${file.name}" terlalu besar (${kb} KB). Maksimal 500 KB per foto.`, imgInput);
+                if (file.size > 10 * 1024 * 1024) {
+                    const mb = (file.size / (1024 * 1024)).toFixed(1);
+                    return showError(`Foto "${file.name}" terlalu besar (${mb} MB). Maksimal 10 MB per foto untuk diproses otomatis.`, imgInput);
                 }
                 const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
                 if (file.type && !validTypes.includes(file.type.toLowerCase())) {
@@ -285,6 +287,7 @@
                 }
             }
         }
+
 
         // 6. Validasi Firmware Baru (Jika ada yang dipilih)
         const fwInput = form.querySelector('input[name="firmware_file"]');
@@ -323,5 +326,139 @@
 
         return true;
     }
+
+    // ── Kompresi & Preview Cerdas Foto Produk (Multi-Pass Auto Compress) ──
+    async function compressImageToBlob(file, maxDimension = 1280, initialQuality = 0.80) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > maxDimension || h > maxDimension) {
+                        if (w > h) {
+                            h = Math.round((h * maxDimension) / w);
+                            w = maxDimension;
+                        } else {
+                            w = Math.round((w * maxDimension) / h);
+                            h = maxDimension;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+
+                    const tryCompress = (quality, dimReduction = 1.0) => {
+                        let targetCanvas = canvas;
+                        if (dimReduction < 1.0) {
+                            targetCanvas = document.createElement('canvas');
+                            targetCanvas.width = Math.round(w * dimReduction);
+                            targetCanvas.height = Math.round(h * dimReduction);
+                            const tCtx = targetCanvas.getContext('2d');
+                            tCtx.drawImage(canvas, 0, 0, targetCanvas.width, targetCanvas.height);
+                        }
+                        targetCanvas.toBlob(
+                            (blob) => {
+                                if (!blob) {
+                                    resolve(file);
+                                    return;
+                                }
+                                // If blob still > 480 KB (491520 bytes), compress stronger
+                                if (blob.size > 491520 && quality > 0.45) {
+                                    tryCompress(quality - 0.15, dimReduction * 0.85);
+                                    return;
+                                }
+                                const newName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+                                const compressedFile = new File([blob], newName, {
+                                    type: 'image/webp',
+                                    lastModified: Date.now(),
+                                });
+                                resolve(compressedFile);
+                            },
+                            'image/webp',
+                            quality
+                        );
+                    };
+
+                    tryCompress(initialQuality, 1.0);
+                };
+                img.onerror = () => resolve(file);
+                img.src = e.target.result;
+            };
+            reader.onerror = () => resolve(file);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function previewSelectedImages(input) {
+        const row = document.getElementById('imagePreviewRow');
+        if (!row) return;
+
+        if (input.files && input.files.length > 0) {
+            row.innerHTML = '<div style="font-size:12px; color:var(--app-brand); font-weight:700; padding:6px 0;">⚡ Mengompresi & mengoptimalkan foto otomatis ke WebP...</div>';
+            const rawFiles = Array.from(input.files).slice(0, 3);
+            const dt = new DataTransfer();
+
+            const processedFiles = [];
+            for (let i = 0; i < rawFiles.length; i++) {
+                const f = rawFiles[i];
+                let finalFile = f;
+                if (f.type && f.type.startsWith('image/')) {
+                    finalFile = await compressImageToBlob(f, 1280, 0.80);
+                }
+                dt.items.add(finalFile);
+                processedFiles.push({ original: f, final: finalFile });
+            }
+
+            try {
+                input.files = dt.files;
+            } catch(e) {}
+
+            row.innerHTML = '';
+            processedFiles.forEach(({ original, final }) => {
+                const originalKb = (original.size / 1024).toFixed(0);
+                const compressedKb = (final.size / 1024).toFixed(0);
+
+                const thumbWrap = document.createElement('div');
+                thumbWrap.style.display = 'inline-flex';
+                thumbWrap.style.flexDirection = 'column';
+                thumbWrap.style.alignItems = 'center';
+                thumbWrap.style.gap = '4px';
+
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(final);
+                img.style.width = '75px';
+                img.style.height = '75px';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '6px';
+                img.style.border = '2px solid var(--app-border-strong)';
+                thumbWrap.appendChild(img);
+
+                const badge = document.createElement('span');
+                badge.style.fontSize = '10px';
+                badge.style.fontWeight = '800';
+                badge.style.padding = '2px 6px';
+                badge.style.borderRadius = '999px';
+                badge.style.background = '#dcfce7';
+                badge.style.color = '#15803d';
+                badge.style.border = '1px solid #bbf7d0';
+                let txt = `${compressedKb} KB`;
+                if (original.size > final.size) {
+                    const pct = Math.round((1 - final.size / original.size) * 100);
+                    txt += ` (-${pct}%)`;
+                    badge.title = `Sebelum dikompresi: ${originalKb} KB`;
+                }
+                badge.innerText = txt;
+                thumbWrap.appendChild(badge);
+                row.appendChild(thumbWrap);
+            });
+        } else {
+            row.innerHTML = '';
+        }
+    }
 </script>
+
 {% endblock %}
