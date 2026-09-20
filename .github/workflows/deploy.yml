@@ -65,62 +65,47 @@ jobs:
               echo "=== DIAGNOSTIC REPORT ===" > "$DIAG"
               date >> "$DIAG"
 
-              echo "--- PS AUX NGINX ---" >> "$DIAG"
-              ps aux | grep -i nginx | grep -v grep >> "$DIAG" || true
+              echo "--- CONTENT OF /etc/nginx/sites-available/xiaozhi ---" >> "$DIAG"
+              cat /host/etc/nginx/sites-available/xiaozhi >> "$DIAG" 2>&1 || true
 
-              echo "--- ALL NGINX CONFIG FILES FOUND ---" >> "$DIAG"
-              find /host/etc /host/www /host/usr -name "*nginx*.conf" -o -name "*xiaozhi*" 2>/dev/null >> "$DIAG" || true
+              echo "--- CONFIGURING NGINX 100M ---" >> "$DIAG"
+              # 1. Update /etc/nginx/nginx.conf
+              if [ -f /host/etc/nginx/nginx.conf ]; then
+                if grep -q "client_max_body_size" /host/etc/nginx/nginx.conf; then
+                  sed -i "s/client_max_body_size [^;]*;/client_max_body_size 100M;/g" /host/etc/nginx/nginx.conf
+                else
+                  sed -i "/http {/a \    client_max_body_size 100M;" /host/etc/nginx/nginx.conf
+                fi
+              fi
 
-              echo "--- SEARCHING PROXY PASS 8080 ---" >> "$DIAG"
-              grep -rnl "8080" /host/etc/ /host/www/ 2>/dev/null >> "$DIAG" || true
-
-              echo "--- SEARCHING CLIENT_MAX_BODY_SIZE ---" >> "$DIAG"
-              grep -rn "client_max_body_size" /host/etc/ /host/www/ 2>/dev/null >> "$DIAG" || true
-
-              # Update every config file that proxies to 8080 or mentions xiaozhi or is nginx.conf
-              for f in $(find /host/etc /host/www -name "*.conf" 2>/dev/null; grep -rnl "8080" /host/etc/ /host/www/ 2>/dev/null); do
+              # 2. Update sites-available and sites-enabled
+              for f in /host/etc/nginx/sites-available/* /host/etc/nginx/sites-enabled/*; do
                 if [ -f "$f" ]; then
                   if grep -q "client_max_body_size" "$f"; then
                     sed -i "s/client_max_body_size [^;]*;/client_max_body_size 100M;/g" "$f"
                   else
-                    if grep -q "server {" "$f"; then
-                      sed -i "/server {/a \    client_max_body_size 100M;" "$f"
-                    elif grep -q "http {" "$f"; then
-                      sed -i "/http {/a \    client_max_body_size 100M;" "$f"
-                    fi
+                    sed -i "/server {/a \    client_max_body_size 100M;" "$f"
                   fi
-                  echo "Updated: $f" >> "$DIAG"
+                  echo "Configured 100M in $f" >> "$DIAG"
                 fi
               done
 
-              # Ensure /etc/nginx/conf.d/upload_size.conf exists if /etc/nginx exists
-              if [ -d /host/etc/nginx ]; then
-                mkdir -p /host/etc/nginx/conf.d
-                echo "client_max_body_size 100M;" > /host/etc/nginx/conf.d/upload_size.conf
-              fi
+              # 3. Create conf.d/upload_size.conf
+              mkdir -p /host/etc/nginx/conf.d
+              echo "client_max_body_size 100M;" > /host/etc/nginx/conf.d/upload_size.conf
 
-              echo "--- RELOADING NGINX PROCESSES ---" >> "$DIAG"
-              # Find all master PIDs from ps
-              for p in $(ps -o pid,args | grep -E "nginx: master process" | grep -v grep | awk "{print \$1}"); do
-                echo "Signaling master PID $p with HUP..." >> "$DIAG"
-                kill -HUP "$p" 2>&1 >> "$DIAG" || true
-              done
+              echo "--- CONTENT OF sites-available/xiaozhi AFTER UPDATE ---" >> "$DIAG"
+              cat /host/etc/nginx/sites-available/xiaozhi >> "$DIAG" 2>&1 || true
 
-              # Also signal standard PID files
-              for pf in /host/run/nginx.pid /host/var/run/nginx.pid /host/www/server/nginx/logs/nginx.pid; do
-                if [ -f "$pf" ]; then
-                  P=$(cat "$pf" 2>/dev/null | tr -d " \t\n\r")
-                  if [ -n "$P" ]; then
-                    echo "Signaling PID file $pf ($P) with HUP..." >> "$DIAG"
-                    kill -HUP "$P" 2>&1 >> "$DIAG" || true
-                  fi
-                fi
-              done
+              echo "--- NSENTER NGINX -T ---" >> "$DIAG"
+              nsenter -t 1 -m -u -i -n -p -- /usr/sbin/nginx -t >> "$DIAG" 2>&1 || true
 
-              echo "--- TESTING HOST NGINX SYNTAX ---" >> "$DIAG"
-              chroot /host /usr/sbin/nginx -t 2>&1 >> "$DIAG" || true
-              chroot /host /usr/sbin/nginx -s reload 2>&1 >> "$DIAG" || true
-              chroot /host systemctl reload nginx 2>&1 >> "$DIAG" || true
+              echo "--- NSENTER SYSTEMCTL RESTART NGINX ---" >> "$DIAG"
+              nsenter -t 1 -m -u -i -n -p -- systemctl restart nginx >> "$DIAG" 2>&1 || true
+              nsenter -t 1 -m -u -i -n -p -- systemctl status nginx --no-pager >> "$DIAG" 2>&1 || true
+
+              echo "--- NGINX ERROR LOG ---" >> "$DIAG"
+              tail -n 25 /host/var/log/nginx/error.log >> "$DIAG" 2>&1 || true
             ' || true
 
             # Reload any Docker-based proxy containers if present
