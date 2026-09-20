@@ -76,7 +76,10 @@
     {% endif %}
 
     <!-- FORM EDIT PRODUK -->
-    <form method="POST" action="/firmware/seller/products/{{ product.id }}/edit" enctype="multipart/form-data" class="edit-card">
+    <form method="POST" action="/firmware/seller/products/{{ product.id }}/edit" enctype="multipart/form-data" class="edit-card" id="editProductForm" onsubmit="return validateEditProductForm(event)">
+        <!-- Validation Error Alert Box -->
+        <div id="editProductErrorAlert" class="app-alert app-alert-danger" style="display:none; margin-bottom:16px; font-size:13px; line-height:1.5;"></div>
+
         <div style="margin-bottom:16px;">
             <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:6px;">
                 Judul Produk Firmware <span style="color:#dc2626;">*</span>
@@ -114,13 +117,13 @@
         <div style="display:grid; grid-template-columns:1fr 2fr; gap:12px; margin-bottom:18px;">
             <div>
                 <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:6px;">
-                    Label Dokumentasi
+                    Label Dokumentasi <span style="font-weight:normal; font-size:11.5px; color:var(--app-muted);">(Opsional)</span>
                 </label>
                 <input type="text" name="doc_label" value="{{ product.links[0].label if product.links and product.links|length > 0 else 'Dokumentasi & GitHub' }}" class="app-input" style="width:100%;">
             </div>
             <div>
                 <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:6px;">
-                    URL Tautan Eksternal
+                    URL Tautan Eksternal HTTPS <span style="font-weight:normal; font-size:11.5px; color:var(--app-muted);">(Opsional)</span>
                 </label>
                 <input type="url" name="doc_url" value="{{ product.links[0].url if product.links and product.links|length > 0 else '' }}" placeholder="https://github.com/... atau https://docs..." class="app-input" style="width:100%;">
             </div>
@@ -197,4 +200,96 @@
         </form>
     </div>
 </div>
+
+<script>
+    function validateEditProductForm(event) {
+        const form = document.getElementById('editProductForm');
+        const errBox = document.getElementById('editProductErrorAlert');
+        const showError = (msg, inputElem) => {
+            if (event) event.preventDefault();
+            if (errBox) {
+                errBox.innerHTML = '<strong>⚠️ Perhatian:</strong> ' + msg;
+                errBox.style.display = 'block';
+                errBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                alert(msg);
+            }
+            if (inputElem) {
+                inputElem.focus();
+                inputElem.style.borderColor = '#dc2626';
+                setTimeout(() => { inputElem.style.borderColor = ''; }, 4000);
+            }
+            return false;
+        };
+
+        if (errBox) errBox.style.display = 'none';
+
+        // 1. Validasi Judul
+        const titleInput = form.querySelector('input[name="title"]');
+        if (!titleInput || !titleInput.value.trim()) {
+            return showError('Judul produk firmware wajib diisi.', titleInput);
+        }
+
+        // 2. Validasi Harga
+        const priceInput = form.querySelector('input[name="price_amount"]');
+        if (!priceInput || priceInput.value === '' || isNaN(priceInput.value) || Number(priceInput.value) < 0) {
+            return showError('Harga jual wajib diisi nominal valid (isi 0 jika gratis).', priceInput);
+        }
+
+        // 3. Validasi Deskripsi Singkat
+        const shortDesc = form.querySelector('input[name="short_description"]');
+        if (!shortDesc || !shortDesc.value.trim()) {
+            return showError('Ringkasan singkat firmware wajib diisi.', shortDesc);
+        }
+
+        // 4. Validasi Deskripsi Lengkap
+        const fullDesc = form.querySelector('textarea[name="full_description"]');
+        if (!fullDesc || !fullDesc.value.trim()) {
+            return showError('Deskripsi lengkap dan panduan flashing wajib diisi.', fullDesc);
+        }
+
+        // 5. Validasi Foto Baru (Jika ada yang dipilih)
+        const imgInput = form.querySelector('input[name="images"]');
+        if (imgInput && imgInput.files && imgInput.files.length > 0) {
+            if (imgInput.files.length > 3) {
+                return showError('Maksimal 3 foto produk baru yang dapat diunggah.', imgInput);
+            }
+            for (let i = 0; i < imgInput.files.length; i++) {
+                const file = imgInput.files[i];
+                if (file.size > 512000) {
+                    const kb = (file.size / 1024).toFixed(0);
+                    return showError(`Foto "${file.name}" terlalu besar (${kb} KB). Maksimal 500 KB per foto.`, imgInput);
+                }
+                const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                if (file.type && !validTypes.includes(file.type.toLowerCase())) {
+                    return showError(`Format file "${file.name}" tidak didukung. Harap gunakan PNG, JPG, atau WebP.`, imgInput);
+                }
+            }
+        }
+
+        // 6. Validasi Firmware Baru (Jika ada yang dipilih)
+        const fwInput = form.querySelector('input[name="firmware_file"]');
+        if (fwInput && fwInput.files && fwInput.files.length > 0) {
+            const fwFile = fwInput.files[0];
+            if (!fwFile.name.toLowerCase().endsWith('.bin')) {
+                return showError('File firmware harus berformat .bin (binary flash ESP32).', fwInput);
+            }
+            if (fwFile.size > 32 * 1024 * 1024) {
+                const mb = (fwFile.size / (1024 * 1024)).toFixed(1);
+                return showError(`Ukuran binary firmware (${mb} MB) melebihi batas sistem 32 MB.`, fwInput);
+            }
+        }
+
+        // 7. Validasi Opsional: doc_url
+        const docUrlInput = form.querySelector('input[name="doc_url"]');
+        if (docUrlInput && docUrlInput.value.trim()) {
+            const val = docUrlInput.value.trim().toLowerCase();
+            if (!val.startsWith('http://') && !val.startsWith('https://')) {
+                return showError('URL tautan eksternal harus diawali dengan http:// atau https://.', docUrlInput);
+            }
+        }
+
+        return true;
+    }
+</script>
 {% endblock %}
