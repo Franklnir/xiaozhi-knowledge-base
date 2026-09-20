@@ -1927,7 +1927,7 @@ class PostgresStore:
                 if reminders:
                     ids = [r["id"] for r in reminders]
                     cur.execute(
-                        "UPDATE reminders SET status = 'triggered' WHERE id = ANY(%s)",
+                        "UPDATE reminders SET status = 'processing' WHERE id = ANY(%s)",
                         (ids,),
                     )
             conn.commit()

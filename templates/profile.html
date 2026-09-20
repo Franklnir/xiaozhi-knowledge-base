@@ -1767,7 +1767,7 @@
                 <!-- Validation Error Alert Box -->
                 <div id="addProductErrorAlert" class="app-alert app-alert-danger" style="display:none; margin-bottom:16px; font-size:13px; line-height:1.5;"></div>
 
-                <form method="POST" action="/firmware/seller/products" enctype="multipart/form-data" id="addProductForm" onsubmit="return validateAddProductForm(event)">
+                <form method="POST" action="/firmware/seller/products" enctype="multipart/form-data" id="addProductForm" onsubmit="return handleAddProductSubmit(event)">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <!-- Photos (1-3) -->
                     <div style="margin-bottom:14px;">
@@ -2709,6 +2709,7 @@
 
     // ── 3-Slot Photo Manager State ──
     const slotFiles = [null, null, null];
+    let compressingCount = 0;
 
     function triggerSlot(idx) {
         const inp = document.getElementById(`slotInput_${idx}`);
@@ -2725,14 +2726,12 @@
                 await setSlotFile(i, files[i]);
             }
             syncRealImagesInput();
-            input.value = '';
             return;
         }
 
         // Single file chosen for this slot
         await setSlotFile(idx, input.files[0]);
         syncRealImagesInput();
-        input.value = '';
     }
 
     async function setSlotFile(idx, file) {
@@ -2751,9 +2750,17 @@
             box.innerHTML = '<div style="font-size:12px; font-weight:800; color:var(--app-brand); padding:30px 0;">⚡ Mengompresi...</div>';
         }
 
-        const finalFile = await compressImageToBlob(file, 1280, 0.80);
-        slotFiles[idx] = finalFile;
-        renderSlot(idx, file, finalFile);
+        compressingCount++;
+        try {
+            const finalFile = await compressImageToBlob(file, 1280, 0.80);
+            slotFiles[idx] = finalFile;
+            renderSlot(idx, file, finalFile);
+        } catch (e) {
+            slotFiles[idx] = file;
+            renderSlot(idx, file, file);
+        } finally {
+            compressingCount--;
+        }
     }
 
     function renderSlot(idx, originalFile, compressedFile) {
@@ -2874,25 +2881,28 @@
 
         if (errBox) errBox.style.display = 'none';
 
+        if (compressingCount > 0) {
+            return showError('Foto produk masih dalam proses kompresi. Mohon tunggu beberapa detik...', document.getElementById('slotBox_0'));
+        }
+
         // 1. Validasi Foto Produk (Wajib, 1-3 foto)
         syncRealImagesInput();
-        const imgInput = document.getElementById('productImagesInput');
         const activeFiles = slotFiles.filter(Boolean);
-        if (activeFiles.length === 0 || !imgInput || !imgInput.files || imgInput.files.length === 0) {
+        if (activeFiles.length === 0) {
             return showError('Silakan pilih minimal 1 foto produk (Foto Utama).', document.getElementById('slotBox_0'));
         }
-        if (imgInput.files.length > 3) {
+        if (activeFiles.length > 3) {
             return showError('Maksimal 3 foto produk yang dapat diunggah.', document.getElementById('slotBox_0'));
         }
-        for (let i = 0; i < imgInput.files.length; i++) {
-            const file = imgInput.files[i];
+        for (let i = 0; i < activeFiles.length; i++) {
+            const file = activeFiles[i];
             if (file.size > 10 * 1024 * 1024) {
                 const mb = (file.size / (1024 * 1024)).toFixed(1);
-                return showError(`Foto "${file.name}" terlalu besar (${mb} MB). Maksimal 10 MB per foto untuk diproses otomatis.`, imgInput);
+                return showError(`Foto "${file.name}" terlalu besar (${mb} MB). Maksimal 10 MB per foto untuk diproses otomatis.`, document.getElementById(`slotBox_${i}`));
             }
             const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
             if (file.type && !validTypes.includes(file.type.toLowerCase())) {
-                return showError(`Format file "${file.name}" tidak didukung. Harap gunakan format PNG, JPG, atau WebP.`, imgInput);
+                return showError(`Format file "${file.name}" tidak didukung. Harap gunakan format PNG, JPG, atau WebP.`, document.getElementById(`slotBox_${i}`));
             }
         }
 
@@ -2962,13 +2972,80 @@
             }
         }
 
-        // State submit: disable button dan tunjukkan progres
-        const submitBtn = form.querySelector('#btnSubmitProduct');
+        return true;
+    }
+
+    async function handleAddProductSubmit(event) {
+        if (event) event.preventDefault();
+        if (!validateAddProductForm(event)) return false;
+
+        const form = document.getElementById('addProductForm');
+        const submitBtn = document.getElementById('btnSubmitProduct');
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '⏳ Mengunggah Firmware... Mohon Tunggu';
+            submitBtn.innerHTML = '⏳ Mengunggah Firmware & Data... Mohon Tunggu';
         }
-        return true;
+
+        const errBox = document.getElementById('addProductErrorAlert');
+        if (errBox) errBox.style.display = 'none';
+
+        try {
+            const fd = new FormData(form);
+            // Replace images with active slotFiles directly
+            fd.delete('images');
+            const activeFiles = slotFiles.filter(Boolean);
+            for (let i = 0; i < activeFiles.length; i++) {
+                const f = activeFiles[i];
+                fd.append('images', f, f.name || `product_photo_${i+1}.webp`);
+            }
+
+            const res = await fetch(form.action, {
+                method: 'POST',
+                body: fd,
+                headers: { 'Accept': 'text/html,application/json' },
+                redirect: 'follow',
+            });
+
+            if (res.redirected) {
+                window.location.href = res.url;
+                return false;
+            }
+
+            if (!res.ok) {
+                let errorText = 'Terjadi kesalahan saat mengunggah produk.';
+                try {
+                    const text = await res.text();
+                    try {
+                        const j = JSON.parse(text);
+                        if (j.detail) {
+                            errorText = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail);
+                        }
+                    } catch(e) {
+                        if (text.includes('Gagal:')) {
+                            const m = text.match(/Gagal:[^<"]+/);
+                            if (m) errorText = m[0];
+                        }
+                    }
+                } catch(e) {}
+                throw new Error(errorText);
+            }
+
+            window.location.href = '/profil?mode=marketplace&sub=products&message=' + encodeURIComponent('Produk firmware berhasil disimpan!');
+        } catch(err) {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+            if (errBox) {
+                errBox.innerHTML = '<strong>⚠️ Gagal Mengunggah:</strong> ' + err.message;
+                errBox.style.display = 'block';
+                errBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                alert('Gagal: ' + err.message);
+            }
+        }
+        return false;
     }
 
     // ── 3D STL INTERACTIVE VIEWER LOGIC ──

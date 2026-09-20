@@ -1488,7 +1488,7 @@ class MarketplaceRepository:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT COUNT(*) 
+                    SELECT COUNT(*) AS count
                     FROM chat_messages m
                     JOIN chat_conversations c ON c.id = m.conversation_id
                     WHERE (c.seller_id = %s OR c.buyer_id = %s)
@@ -1496,6 +1496,10 @@ class MarketplaceRepository:
                       AND m.read_at IS NULL;
                 """, (user_id, user_id, user_id))
                 row = cur.fetchone()
+                if not row:
+                    return 0
+                if isinstance(row, dict):
+                    return int(row.get("count", 0))
                 return int(row[0] if row else 0)
 
     def mark_conversation_as_read(self, conversation_id: str, user_id: int) -> int:

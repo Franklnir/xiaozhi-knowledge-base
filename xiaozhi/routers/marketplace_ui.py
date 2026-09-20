@@ -86,7 +86,7 @@ async def create_seller_product_action(
     price_amount: int = Form(...),
     doc_label: Optional[str] = Form(None),
     doc_url: Optional[str] = Form(None),
-    images: List[Union[UploadFile, str]] = File(...),
+    images: Optional[List[Union[UploadFile, str]]] = File(None),
     firmware_file: Optional[UploadFile] = File(None),
     stl_file: Optional[UploadFile] = File(None),
 ):
@@ -95,11 +95,12 @@ async def create_seller_product_action(
 
     # Read images bytes
     images_data = []
-    for img in images[:3]:
-        if isinstance(img, UploadFile) and img.filename:
-            b = await img.read()
-            if len(b) > 0:
-                images_data.append(b)
+    if images:
+        for img in images[:3]:
+            if isinstance(img, UploadFile) and img.filename:
+                b = await img.read()
+                if len(b) > 0:
+                    images_data.append(b)
 
     # Read firmware bytes if provided
     firmware_bytes = None
