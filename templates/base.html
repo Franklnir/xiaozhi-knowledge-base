@@ -1073,6 +1073,14 @@
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
                 Katalog Firmware
             </a>
+            <a href="/profil?mode=marketplace&sub=chats" class="app-sidebar-link {% if page == 'marketplace_chats' or (active_mode == 'marketplace' and active_sub == 'chats') %}is-active{% endif %}" style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                    <span>Pesan Produk</span>
+                </div>
+                <span id="globalMktChatBadge" class="app-chip app-chip-small" style="display:none; font-size:10px; padding:1px 6px; background:#ef4444; color:#fff; font-weight:800; border-radius:10px;">0</span>
+            </a>
+
 
             {% if user.role == 'admin' %}
             <div class="app-sidebar-section">Admin</div>
@@ -1372,8 +1380,40 @@
             if (!isChatPage) {
                 setInterval(checkUnreadChat, 10000);
             }
+
+            // Real-time unread product chat badge updater
+            const mktChatBadge = document.getElementById('globalMktChatBadge');
+            async function checkUnreadMarketplaceChat() {
+                try {
+                    const r = await fetch('/api/v1/marketplace/chats/unread-count', { credentials: 'same-origin' });
+                    if (r.ok) {
+                        const d = await r.json();
+                        const count = parseInt(d.unread_count || 0, 10);
+                        if (mktChatBadge) {
+                            if (count > 0) {
+                                mktChatBadge.textContent = count > 99 ? '99+' : count;
+                                mktChatBadge.style.display = 'inline-block';
+                            } else {
+                                mktChatBadge.style.display = 'none';
+                            }
+                        }
+                        const subBadge = document.getElementById('chatUnreadBadgeSubTab');
+                        if (subBadge) {
+                            if (count > 0) {
+                                subBadge.textContent = count > 99 ? '99+' : count;
+                                subBadge.style.display = 'inline-block';
+                            } else {
+                                subBadge.style.display = 'none';
+                            }
+                        }
+                    }
+                } catch (err) {}
+            }
+            checkUnreadMarketplaceChat();
+            setInterval(checkUnreadMarketplaceChat, 8000);
             {% endif %}
         })();
     </script>
+
 </body>
 </html>

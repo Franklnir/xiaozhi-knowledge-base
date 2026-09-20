@@ -355,3 +355,31 @@ async def confirm_simulated_checkout_action(request: Request, order_number: str 
     )
 
     return redirect_with_message("/profil?mode=marketplace&sub=purchases", f"Pembayaran pesanan #{order_number} berhasil dikonfirmasi!")
+
+
+# ── CHAT REDIRECTS & STARTER ────────────────────────────────────────────────
+@router.get("/chats", response_class=HTMLResponse)
+async def chats_redirect(request: Request):
+    return RedirectResponse(url="/profil?mode=marketplace&sub=chats", status_code=303)
+
+
+@router.get("/chats/start/{product_id_or_slug}")
+async def start_chat_from_product(request: Request, product_id_or_slug: str):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url=f"/login?redirect=/firmware/marketplace/{product_id_or_slug}", status_code=303)
+
+    product_service = get_product_service()
+    product = product_service.get_product_detail(product_id_or_slug)
+    if not product:
+        return redirect_with_message("/firmware/marketplace", "Produk tidak ditemukan.")
+
+    seller_id = int(product["seller_id"])
+    buyer_id = int(user["id"])
+    if seller_id == buyer_id:
+        return redirect_with_message(f"/firmware/marketplace/{product_id_or_slug}", "Ini adalah produk milik Anda sendiri.")
+
+    chat_service = get_chat_service()
+    conv = chat_service.get_or_start_chat(str(product["id"]), seller_id, buyer_id)
+    return RedirectResponse(url=f"/profil?mode=marketplace&sub=chats&conv_id={conv['id']}", status_code=303)
+

@@ -42,8 +42,16 @@ class BankInquiryRequest(BaseModel):
 
 
 class ChatSendMessageRequest(BaseModel):
-    conversation_id: str
-    message: str = Field(..., min_length=1, max_length=2000)
+    message: str = Field(..., min_length=1, max_length=3000)
+
+
+class ChatStartRequest(BaseModel):
+    product_id: str
+
+
+class ChatShareProductRequest(BaseModel):
+    product_id: str
+    note: Optional[str] = None
 
 
 # ── BANK INQUIRY & SUPPORTED LIST ───────────────────────────────────────────
@@ -221,3 +229,95 @@ async def serve_local_firmware_download(token: str, filename: Optional[str] = No
         filename=safe_filename,
         headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
     )
+
+
+# ── PRODUCT CHATS (1-ON-1 PRIVATE) ──────────────────────────────────────────
+@router.get("/chats/unread-count")
+async def get_chat_unread_count(request: Request):
+    user = require_user(request)
+    service = get_chat_service()
+    count = service.get_total_unread_count(int(user["id"]))
+    return {"success": True, "unread_count": count}
+
+
+@router.get("/chats/conversations")
+async def list_chat_conversations(request: Request):
+    user = require_user(request)
+    service = get_chat_service()
+    convs = service.get_user_conversations(int(user["id"]))
+    return {"success": True, "conversations": convs}
+
+
+@router.post("/chats/start")
+async def start_product_chat(request: Request, payload: ChatStartRequest):
+    user = require_user(request)
+    product_service = get_product_service()
+    chat_service = get_chat_service()
+
+    product = product_service.get_product_detail(payload.product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Produk tidak ditemukan.")
+
+    seller_id = int(product["seller_id"])
+    buyer_id = int(user["id"])
+    if seller_id == buyer_id:
+        raise HTTPException(status_code=400, detail="Anda tidak dapat memulai percakapan pada produk milik Anda sendiri.")
+
+    conv = chat_service.get_or_start_chat(str(product["id"]), seller_id, buyer_id)
+    return {"success": True, "conversation": conv}
+
+
+@router.get("/chats/conversations/{conversation_id}/messages")
+async def get_chat_messages(request: Request, conversation_id: str):
+    user = require_user(request)
+    service = get_chat_service()
+    try:
+        conv = service.get_conversation(conversation_id, int(user["id"]))
+        msgs = service.get_messages(conversation_id, int(user["id"]))
+        return {"success": True, "conversation": conv, "messages": msgs}
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.post("/chats/conversations/{conversation_id}/messages")
+async def send_chat_message(request: Request, conversation_id: str, payload: ChatSendMessageRequest):
+    user = require_user(request)
+    service = get_chat_service()
+    try:
+        msg = service.send_message(conversation_id, int(user["id"]), payload.message)
+        return {"success": True, "message": msg}
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/chats/my-shareable-products")
+async def list_shareable_products(request: Request):
+    user = require_user(request)
+    service = get_chat_service()
+    products = service.get_seller_shareable_products(int(user["id"]))
+    return {"success": True, "products": products}
+
+
+@router.post("/chats/conversations/{conversation_id}/share-product")
+async def share_product_in_chat(request: Request, conversation_id: str, payload: ChatShareProductRequest):
+    user = require_user(request)
+    service = get_chat_service()
+    try:
+        msg = service.send_product_card(
+            conversation_id=conversation_id,
+            sender_id=int(user["id"]),
+            product_id=payload.product_id,
+            note=payload.note
+        )
+        return {"success": True, "message": msg}
+    except (LookupError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+

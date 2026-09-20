@@ -1380,25 +1380,165 @@ class MarketplaceRepository:
                     INSERT INTO chat_conversations (product_id, seller_id, buyer_id)
                     VALUES (%s, %s, %s)
                     ON CONFLICT (product_id, seller_id, buyer_id) DO UPDATE 
-                    SET last_message_at = CURRENT_TIMESTAMP
-                    RETURNING *;
+                    SET last_message_at = chat_conversations.last_message_at
+                    RETURNING id::text, product_id::text, seller_id, buyer_id, created_at, last_message_at;
                 """, (product_id, seller_id, buyer_id))
                 conv = dict(cur.fetchone())
                 conn.commit()
                 return conv
 
-    def get_messages(self, conversation_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_conversation_by_id(self, conversation_id: str) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT m.*, u.username AS sender_username
+                    SELECT c.id::text,
+                           c.product_id::text,
+                           c.seller_id,
+                           c.buyer_id,
+                           c.created_at,
+                           c.last_message_at,
+                           p.title AS product_title,
+                           p.slug AS product_slug,
+                           p.price_amount AS product_price,
+                           p.status AS product_status,
+                           seller.username AS seller_username,
+                           buyer.username AS buyer_username
+                    FROM chat_conversations c
+                    JOIN firmware_products p ON p.id = c.product_id
+                    JOIN users seller ON seller.id = c.seller_id
+                    JOIN users buyer ON buyer.id = c.buyer_id
+                    WHERE c.id = %s;
+                """, (conversation_id,))
+                row = cur.fetchone()
+                return dict(row) if row else None
+
+    def get_user_conversations(self, user_id: int) -> List[Dict[str, Any]]:
+        from xiaozhi.marketplace.storage import storage_service
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        c.id::text,
+                        c.product_id::text,
+                        c.seller_id,
+                        c.buyer_id,
+                        c.created_at,
+                        c.last_message_at,
+                        p.title AS product_title,
+                        p.slug AS product_slug,
+                        p.price_amount AS product_price,
+                        p.status AS product_status,
+                        seller.username AS seller_username,
+                        buyer.username AS buyer_username,
+                        (
+                            SELECT m.body 
+                            FROM chat_messages m 
+                            WHERE m.conversation_id = c.id 
+                            ORDER BY m.created_at DESC LIMIT 1
+                        ) AS last_message_body,
+                        (
+                            SELECT m.created_at 
+                            FROM chat_messages m 
+                            WHERE m.conversation_id = c.id 
+                            ORDER BY m.created_at DESC LIMIT 1
+                        ) AS last_message_time,
+                        (
+                            SELECT COUNT(*) 
+                            FROM chat_messages m 
+                            WHERE m.conversation_id = c.id 
+                              AND m.sender_id != %s 
+                              AND m.read_at IS NULL
+                        ) AS unread_count,
+                        (
+                            SELECT img.storage_key 
+                            FROM firmware_product_images img 
+                            WHERE img.product_id = p.id 
+                            ORDER BY img.display_order ASC LIMIT 1
+                        ) AS product_image_key
+                    FROM chat_conversations c
+                    JOIN firmware_products p ON p.id = c.product_id
+                    JOIN users seller ON seller.id = c.seller_id
+                    JOIN users buyer ON buyer.id = c.buyer_id
+                    WHERE c.seller_id = %s OR c.buyer_id = %s
+                    ORDER BY c.last_message_at DESC;
+                """, (user_id, user_id, user_id))
+                rows = [dict(r) for r in cur.fetchall()]
+                for r in rows:
+                    r["unread_count"] = int(r["unread_count"] or 0)
+                    r["is_seller"] = (r["seller_id"] == user_id)
+                    r["other_username"] = r["buyer_username"] if r["is_seller"] else r["seller_username"]
+                    r["other_role"] = "Pembeli" if r["is_seller"] else "Penjual"
+                    if r.get("product_image_key"):
+                        r["product_image_url"] = storage_service.get_image_url(r["product_image_key"])
+                    else:
+                        r["product_image_url"] = None
+
+                    l_body = r.get("last_message_body") or ""
+                    if l_body.startswith('{"type":"product_card"') or l_body.startswith('{"type": "product_card"'):
+                        try:
+                            card_data = json.loads(l_body)
+                            r["last_message_preview"] = f"📦 Berbagi Produk: {card_data.get('title', '')}"
+                        except Exception:
+                            r["last_message_preview"] = "📦 Berbagi Produk"
+                    else:
+                        r["last_message_preview"] = l_body
+                return rows
+
+    def get_total_unread_chat_count(self, user_id: int) -> int:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT COUNT(*) 
+                    FROM chat_messages m
+                    JOIN chat_conversations c ON c.id = m.conversation_id
+                    WHERE (c.seller_id = %s OR c.buyer_id = %s)
+                      AND m.sender_id != %s
+                      AND m.read_at IS NULL;
+                """, (user_id, user_id, user_id))
+                row = cur.fetchone()
+                return int(row[0] if row else 0)
+
+    def mark_conversation_as_read(self, conversation_id: str, user_id: int) -> int:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE chat_messages
+                    SET read_at = CURRENT_TIMESTAMP
+                    WHERE conversation_id = %s
+                      AND sender_id != %s
+                      AND read_at IS NULL;
+                """, (conversation_id, user_id))
+                count = cur.rowcount
+                conn.commit()
+                return count
+
+    def get_messages(self, conversation_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT m.id::text, m.conversation_id::text, m.sender_id, m.body, 
+                           m.created_at, m.read_at, u.username AS sender_username
                     FROM chat_messages m
                     JOIN users u ON u.id = m.sender_id
                     WHERE m.conversation_id = %s
                     ORDER BY m.created_at ASC
                     LIMIT %s;
                 """, (conversation_id, limit))
-                return [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
+                for r in rows:
+                    b = r.get("body", "")
+                    if b.startswith('{"type":"product_card"') or b.startswith('{"type": "product_card"'):
+                        try:
+                            card = json.loads(b)
+                            r["is_product_card"] = True
+                            r["card_data"] = card
+                        except Exception:
+                            r["is_product_card"] = False
+                            r["card_data"] = None
+                    else:
+                        r["is_product_card"] = False
+                        r["card_data"] = None
+                return rows
 
     def send_message(self, conversation_id: str, sender_id: int, body: str) -> Dict[str, Any]:
         with self._get_conn() as conn:
@@ -1406,7 +1546,7 @@ class MarketplaceRepository:
                 cur.execute("""
                     INSERT INTO chat_messages (conversation_id, sender_id, body)
                     VALUES (%s, %s, %s)
-                    RETURNING *;
+                    RETURNING id::text, conversation_id::text, sender_id, body, created_at, read_at;
                 """, (conversation_id, sender_id, body.strip()))
                 msg = dict(cur.fetchone())
                 cur.execute("""
@@ -1416,3 +1556,4 @@ class MarketplaceRepository:
                 """, (conversation_id,))
                 conn.commit()
                 return msg
+
