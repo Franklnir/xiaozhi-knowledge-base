@@ -152,7 +152,8 @@ def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None
 
 
 def redirect_with_message(url: str, message: str, status_code: int = 303) -> RedirectResponse:
-    return RedirectResponse(url=f"{url}?{urlencode({'message': message})}", status_code=status_code)
+    sep = "&" if "?" in url else "?"
+    return RedirectResponse(url=f"{url}{sep}{urlencode({'message': message})}", status_code=status_code)
 
 
 def require_user(request: Request) -> Dict[str, Any]:
