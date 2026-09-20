@@ -3186,7 +3186,9 @@
             });
 
             if (res.redirected) {
-                clearProductDraft(false);
+                if (!res.url.includes('Gagal')) {
+                    clearProductDraft(false);
+                }
                 window.location.href = res.url;
                 return false;
             }

@@ -3,6 +3,7 @@ import logging
 from typing import Optional, List, Union
 from fastapi import APIRouter, Request, Form, UploadFile, File, HTTPException, status, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from xiaozhi.dependencies import render, get_current_user, require_user, redirect_with_message
 from xiaozhi.marketplace.deps import (
@@ -18,6 +19,14 @@ from xiaozhi.marketplace.services.bank_service import verify_account
 
 logger = logging.getLogger("xiaozhi.marketplace.ui")
 router = APIRouter(prefix="/firmware", tags=["Marketplace Web UI"])
+
+
+def is_valid_upload_file(item) -> bool:
+    if not item:
+        return False
+    if isinstance(item, (UploadFile, StarletteUploadFile)):
+        return bool(item.filename and len(item.filename.strip()) > 0)
+    return bool(hasattr(item, "read") and getattr(item, "filename", None))
 
 
 # ── MARKETPLACE CATALOG ──────────────────────────────────────────────────────
@@ -95,30 +104,59 @@ async def create_seller_product_action(
 
     # Read images bytes
     images_data = []
-    if images:
-        for img in images[:3]:
-            if isinstance(img, UploadFile) and img.filename:
-                b = await img.read()
-                if len(b) > 0:
-                    images_data.append(b)
+    candidate_images = images if images else []
+    if not candidate_images:
+        try:
+            form_data = await request.form()
+            candidate_images = form_data.getlist("images")
+        except Exception:
+            candidate_images = []
+
+    for img in candidate_images[:3]:
+        if is_valid_upload_file(img):
+            b = await img.read()
+            if len(b) > 0:
+                images_data.append(b)
 
     # Read firmware bytes if provided
     firmware_bytes = None
     firmware_filename = None
-    if firmware_file and firmware_file.filename:
+    if is_valid_upload_file(firmware_file):
         b = await firmware_file.read()
         if len(b) > 0:
             firmware_bytes = b
             firmware_filename = firmware_file.filename
+    else:
+        try:
+            form_data = await request.form()
+            fw_cand = form_data.get("firmware_file")
+            if is_valid_upload_file(fw_cand):
+                b = await fw_cand.read()
+                if len(b) > 0:
+                    firmware_bytes = b
+                    firmware_filename = fw_cand.filename
+        except Exception:
+            pass
 
     # Read stl bytes if provided
     stl_bytes = None
     stl_filename = None
-    if stl_file and stl_file.filename:
+    if is_valid_upload_file(stl_file):
         b = await stl_file.read()
         if len(b) > 0:
             stl_bytes = b
             stl_filename = stl_file.filename
+    else:
+        try:
+            form_data = await request.form()
+            stl_cand = form_data.get("stl_file")
+            if is_valid_upload_file(stl_cand):
+                b = await stl_cand.read()
+                if len(b) > 0:
+                    stl_bytes = b
+                    stl_filename = stl_cand.filename
+        except Exception:
+            pass
 
     links = []
     if doc_url and doc_url.strip():
@@ -210,30 +248,59 @@ async def update_seller_product_action(
 
     # Read images bytes if uploaded
     images_data = []
-    if images:
-        for img in images[:3]:
-            if isinstance(img, UploadFile) and img.filename:
-                b = await img.read()
-                if len(b) > 0:
-                    images_data.append(b)
+    candidate_images = images if images else []
+    if not candidate_images:
+        try:
+            form_data = await request.form()
+            candidate_images = form_data.getlist("images")
+        except Exception:
+            candidate_images = []
+
+    for img in candidate_images[:3]:
+        if is_valid_upload_file(img):
+            b = await img.read()
+            if len(b) > 0:
+                images_data.append(b)
 
     # Read firmware bytes if new file uploaded
     firmware_bytes = None
     firmware_filename = None
-    if firmware_file and firmware_file.filename:
+    if is_valid_upload_file(firmware_file):
         b = await firmware_file.read()
         if len(b) > 0:
             firmware_bytes = b
             firmware_filename = firmware_file.filename
+    else:
+        try:
+            form_data = await request.form()
+            fw_cand = form_data.get("firmware_file")
+            if is_valid_upload_file(fw_cand):
+                b = await fw_cand.read()
+                if len(b) > 0:
+                    firmware_bytes = b
+                    firmware_filename = fw_cand.filename
+        except Exception:
+            pass
 
     # Read stl bytes if new file uploaded
     stl_bytes = None
     stl_filename = None
-    if stl_file and stl_file.filename:
+    if is_valid_upload_file(stl_file):
         b = await stl_file.read()
         if len(b) > 0:
             stl_bytes = b
             stl_filename = stl_file.filename
+    else:
+        try:
+            form_data = await request.form()
+            stl_cand = form_data.get("stl_file")
+            if is_valid_upload_file(stl_cand):
+                b = await stl_cand.read()
+                if len(b) > 0:
+                    stl_bytes = b
+                    stl_filename = stl_cand.filename
+        except Exception:
+            pass
 
     links = []
     if doc_url and doc_url.strip():
