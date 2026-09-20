@@ -1088,60 +1088,87 @@ class PostgresStore:
     def list_chat_history(
         self,
         owner_id: int,
+        query: str = "",
+        limit: int = 100,
         token_hash: str = "",
+        semantic: bool = False,
         date: str = "",
-        tool_name: str = "",
-        limit: int = 50,
         offset: int = 0,
+        tool_name: str = "",
     ) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 sql = "SELECT * FROM chat_history WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
-                if token_hash:
-                    sql += " AND token_hash = %s"
-                    params.append(token_hash)
                 if date:
                     sql += " AND TO_CHAR(created_at, 'YYYY-MM-DD') = %s"
                     params.append(date)
+                if token_hash:
+                    sql += " AND (token_hash = %s OR token_hash = '')"
+                    params.append(token_hash)
                 if tool_name:
                     sql += " AND tool_name = %s"
                     params.append(tool_name)
+
+                # Semantic search support
+                if semantic and query.strip():
+                    sql += " ORDER BY id DESC LIMIT %s"
+                    params.append(max(int(limit or 100) * 20, 250))
+                    cur.execute(sql, params)
+                    records = [dict(row) for row in cur.fetchall()]
+                    for r in records:
+                        if "created_at" in r:
+                            r["created_at"] = _format_ts(r["created_at"]) or ""
+                    try:
+                        from xiaozhi.services.semantic_memory_service import rank_chat_history_semantically
+                        return rank_chat_history_semantically(query.strip(), records, top_k=limit)
+                    except Exception as e:
+                        logger.warning("Fallback semantic search to standard filter: %s", e)
+
+                if query:
+                    sql += " AND (user_message ILIKE %s OR xiaozhi_answer ILIKE %s)"
+                    params.extend([f"%{query}%", f"%{query}%"])
+
                 sql += " ORDER BY id DESC LIMIT %s OFFSET %s"
-                params.extend([limit, offset])
+                params.extend([int(limit or 100), int(offset or 0)])
                 cur.execute(sql, params)
-                return cur.fetchall()
+                rows = [dict(row) for row in cur.fetchall()]
+                for r in rows:
+                    if "created_at" in r:
+                        r["created_at"] = _format_ts(r["created_at"]) or ""
+                return rows
 
     def chat_history_dates(self, owner_id: int, token_hash: str = "") -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 sql = """
-                    SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, COUNT(*) as count
+                    SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COUNT(*) as count
                     FROM chat_history
                     WHERE owner_id = %s
                 """
                 params: List[Any] = [int(owner_id)]
                 if token_hash:
-                    sql += " AND token_hash = %s"
+                    sql += " AND (token_hash = %s OR token_hash = '')"
                     params.append(token_hash)
-                sql += " GROUP BY date_str ORDER BY date_str DESC"
+                sql += " GROUP BY date ORDER BY date DESC LIMIT 60"
                 cur.execute(sql, params)
-                return cur.fetchall()
+                return [dict(r) for r in cur.fetchall()]
 
     def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "") -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                sql = "SELECT COUNT(*) as total_calls FROM chat_history WHERE owner_id = %s"
+                sql = "SELECT COUNT(*) as total FROM chat_history WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
-                if token_hash:
-                    sql += " AND token_hash = %s"
-                    params.append(token_hash)
                 if date:
                     sql += " AND TO_CHAR(created_at, 'YYYY-MM-DD') = %s"
                     params.append(date)
+                if token_hash:
+                    sql += " AND (token_hash = %s OR token_hash = '')"
+                    params.append(token_hash)
                 cur.execute(sql, params)
                 row = cur.fetchone()
-                return {"total_calls": row["total_calls"] if row else 0}
+                total = row["total"] if row and "total" in row else 0
+                return {"total": total, "total_calls": total}
 
     def clear_chat_history(self, owner_id: int) -> int:
         with self._get_conn() as conn:
@@ -1201,7 +1228,13 @@ class PostgresStore:
                     params.append(category.strip().lower())
                 sql += " ORDER BY category ASC, updated_at DESC"
                 cur.execute(sql, params)
-                return cur.fetchall()
+                rows = [dict(r) for r in cur.fetchall()]
+                for r in rows:
+                    if "created_at" in r:
+                        r["created_at"] = _format_ts(r["created_at"]) or ""
+                    if "updated_at" in r:
+                        r["updated_at"] = _format_ts(r["updated_at"]) or ""
+                return rows
 
     def delete_user_preference(self, owner_id: int, preference_key: str) -> bool:
         with self._get_conn() as conn:
@@ -1227,6 +1260,8 @@ class PostgresStore:
                         "nama_tempat": room["nama_tempat"],
                         "api_slug": room["api_slug"],
                         "api_client_id": room["api_client_id"],
+                        "created_at": _format_ts(room.get("created_at")) or "",
+                        "updated_at": _format_ts(room.get("updated_at")) or "",
                         "relays": devices,
                     })
                 return result
@@ -1289,6 +1324,8 @@ class PostgresStore:
                     "id": room["id"],
                     "nama_tempat": room["nama_tempat"],
                     "api_slug": room["api_slug"],
+                    "created_at": _format_ts(room.get("created_at")) or "",
+                    "updated_at": _format_ts(room.get("updated_at")) or "",
                     "relays": cur.fetchall(),
                 }
 
@@ -1381,7 +1418,11 @@ class PostgresStore:
                     "SELECT * FROM audio_queue WHERE owner_id = %s AND status = 'pending' ORDER BY id ASC",
                     (int(owner_id),),
                 )
-                return cur.fetchall()
+                rows = [dict(r) for r in cur.fetchall()]
+                for r in rows:
+                    if "created_at" in r:
+                        r["created_at"] = _format_ts(r["created_at"]) or ""
+                return rows
 
     def get_pending_audio_commands(self, owner_id: int) -> List[Dict[str, Any]]:
         return self.get_audio_commands(owner_id)
@@ -1399,7 +1440,13 @@ class PostgresStore:
                     "SELECT * FROM audio_queue WHERE owner_id = %s AND status = 'pending' ORDER BY id DESC LIMIT 1",
                     (int(owner_id),),
                 )
-                return cur.fetchone()
+                row = cur.fetchone()
+                if not row:
+                    return None
+                d = dict(row)
+                if "created_at" in d:
+                    d["created_at"] = _format_ts(d["created_at"]) or ""
+                return d
 
     def get_now_playing(self, owner_id: int) -> Optional[Dict[str, Any]]:
         return self.get_current_audio(owner_id)
@@ -1754,7 +1801,11 @@ class PostgresStore:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM reminders WHERE owner_id = %s ORDER BY scheduled_at ASC", (int(owner_id),))
-                return cur.fetchall()
+                rows = [dict(r) for r in cur.fetchall()]
+                for r in rows:
+                    if "created_at" in r:
+                        r["created_at"] = _format_ts(r["created_at"]) or ""
+                return rows
 
     def delete_reminder(self, owner_id: int, reminder_id: str) -> bool:
         with self._get_conn() as conn:
@@ -1772,7 +1823,10 @@ class PostgresStore:
                     "SELECT * FROM reminders WHERE status = 'pending' AND scheduled_at <= %s ORDER BY scheduled_at ASC",
                     (now,),
                 )
-                reminders = cur.fetchall()
+                reminders = [dict(r) for r in cur.fetchall()]
+                for r in reminders:
+                    if "created_at" in r:
+                        r["created_at"] = _format_ts(r["created_at"]) or ""
                 if reminders:
                     ids = [r["id"] for r in reminders]
                     cur.execute(
@@ -1962,6 +2016,8 @@ class PostgresStore:
                 if not row:
                     return None
                 data = dict(row)
+                if "created_at" in data:
+                    data["created_at"] = _format_ts(data["created_at"]) or ""
                 reply_data = None
                 if data.get("reply_to_id") and data.get("reply_username"):
                     reply_data = {
@@ -2014,6 +2070,8 @@ class PostgresStore:
         messages = []
         for r in rows:
             data = dict(r)
+            if "created_at" in data:
+                data["created_at"] = _format_ts(data["created_at"]) or ""
             reply_data = None
             if data.get("reply_to_id") and data.get("reply_username"):
                 reply_data = {

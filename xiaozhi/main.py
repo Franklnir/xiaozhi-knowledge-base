@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import time
@@ -31,6 +32,25 @@ from xiaozhi.services.mcp_service import set_store_ref
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR) if TEMPLATES_DIR.exists() else "templates")
+
+# Configure Jinja2 environment to safely serialize datetimes/complex objects in {{ ...|tojson }}
+def _jinja_json_serializer(obj):
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
+    return str(obj)
+
+templates.env.policies["json.dumps_kwargs"] = {"default": _jinja_json_serializer}
+try:
+    from jinja2.utils import htmlsafe_json_dumps
+    from markupsafe import Markup
+
+    def _safe_tojson_filter(val, *args, **kwargs):
+        kwargs.setdefault("default", _jinja_json_serializer)
+        return Markup(htmlsafe_json_dumps(val, dumps=json.dumps, **kwargs))
+
+    templates.env.filters["tojson"] = _safe_tojson_filter
+except Exception:
+    pass
 
 # Store - auto-detect backend (HF for Spaces, SQLite for VPS)
 store = create_store()
