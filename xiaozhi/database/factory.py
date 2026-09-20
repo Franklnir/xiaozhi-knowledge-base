@@ -1,6 +1,6 @@
 """
 Store factory for selecting the appropriate database backend.
-Supports HuggingFace (for HF Spaces) and SQLite (for VPS).
+Supports PostgreSQL (production VPS), HuggingFace (for HF Spaces), and SQLite (for local testing/fallback).
 """
 import os
 import logging
@@ -14,10 +14,12 @@ def create_store():
     Create the appropriate store based on environment configuration.
 
     Environment variables:
-        DB_BACKEND: "sqlite" or "huggingface" (default: auto-detect)
+        DB_BACKEND: "postgres", "sqlite", or "huggingface" (default: auto-detect)
+        DATABASE_URL / POSTGRES_*: PostgreSQL connection parameters
         SQLITE_DB_PATH: Path to SQLite database file (default: data/xiaozhi.db)
 
     Auto-detection logic:
+        - If DATABASE_URL or POSTGRES_DB is set → use PostgresStore
         - If running on HuggingFace Spaces (SPACE_ID env var exists) → use HFJsonStore (fallback SQLite)
         - If HF_TOKEN is set → use HFJsonStore (fallback SQLite)
         - Otherwise → use SQLiteStore
