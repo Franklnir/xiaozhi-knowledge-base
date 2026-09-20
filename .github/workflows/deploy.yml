@@ -58,27 +58,60 @@ jobs:
             # Fix permissions using Docker (runs as root without needing sudo)
             docker run --rm -v ${{ env.APP_DIR }}:${{ env.APP_DIR }} alpine chown -R $(id -u):$(id -g) ${{ env.APP_DIR }}
 
-            # Gather full system diagnosis and configure all Nginx instances
+            # EMERGENCY: Restore corrupted non-nginx configs + configure Nginx 100M
             docker run --rm --privileged --pid=host -v /:/host alpine sh -c '
               DIAG="/host${{ env.APP_DIR }}/data/nginx_diag.txt"
               mkdir -p "$(dirname "$DIAG")"
-              echo "=== DIAGNOSTIC REPORT ===" > "$DIAG"
+              echo "=== EMERGENCY RESTORE + NGINX 100M CONFIG ===" > "$DIAG"
               date >> "$DIAG"
 
-              echo "--- CONTENT OF /etc/nginx/sites-available/xiaozhi ---" >> "$DIAG"
-              cat /host/etc/nginx/sites-available/xiaozhi >> "$DIAG" 2>&1 || true
+              # STEP 0: Remove rogue client_max_body_size from NON-nginx files
+              echo "--- REMOVING client_max_body_size FROM NON-NGINX FILES ---" >> "$DIAG"
+              for d in /host/etc/fail2ban /host/etc/letsencrypt /host/etc/ssl /host/etc/ufw /host/etc/ssh /host/etc/NetworkManager /host/etc/init /host/etc/sysctl.d /host/etc/logrotate.conf /host/etc/resolv.conf /host/etc/sysctl.conf /host/etc/adduser.conf /host/etc/sudo.conf /host/etc/ca-certificates.conf /host/etc/reportbug.conf /host/etc/ucf.conf /host/etc/ldap /host/etc/lighttpd /host/etc/initramfs-tools /host/etc/apparmor /host/etc/dhcpcd.conf /host/etc/vconsole.conf /host/etc/mke2fs.conf /host/etc/e2scrub.conf /host/etc/nftables.conf /host/etc/rsyslog.d /host/etc/modules-load.d /host/etc/sudo_logsrvd.conf; do
+                if [ -e "$d" ]; then
+                  find "$d" -type f 2>/dev/null | while read f; do
+                    if grep -q "client_max_body_size" "$f" 2>/dev/null; then
+                      sed -i "/client_max_body_size/d" "$f"
+                      echo "Cleaned: $f" >> "$DIAG"
+                    fi
+                  done
+                fi
+              done
+              # Clean /host/etc/services and /host/etc/ssh/moduli if corrupted
+              for f in /host/etc/services /host/etc/ssh/moduli; do
+                if [ -f "$f" ] && grep -q "client_max_body_size" "$f" 2>/dev/null; then
+                  sed -i "/client_max_body_size/d" "$f"
+                  echo "Cleaned: $f" >> "$DIAG"
+                fi
+              done
 
-              echo "--- CONFIGURING NGINX 100M ---" >> "$DIAG"
-              # 1. Update /etc/nginx/nginx.conf
+              # Restore letsencrypt options-ssl-nginx.conf from certbot if corrupted
+              CERTBOT_SRC="/host/usr/lib/python3/dist-packages/certbot_nginx/_internal/tls_configs"
+              if [ -d "$CERTBOT_SRC" ]; then
+                for src in "$CERTBOT_SRC"/options-ssl-nginx*.conf; do
+                  if [ -f "$src" ]; then
+                    bn=$(basename "$src")
+                    dest="/host/etc/letsencrypt/$bn"
+                    if [ -f "$dest" ]; then
+                      cp "$src" "$dest"
+                      echo "Restored from certbot: $dest" >> "$DIAG"
+                    fi
+                  fi
+                done
+              fi
+
+              echo "--- CONFIGURING ONLY NGINX FILES ---" >> "$DIAG"
+              # 1. nginx.conf
               if [ -f /host/etc/nginx/nginx.conf ]; then
                 if grep -q "client_max_body_size" /host/etc/nginx/nginx.conf; then
                   sed -i "s/client_max_body_size [^;]*;/client_max_body_size 100M;/g" /host/etc/nginx/nginx.conf
                 else
                   sed -i "/http {/a \    client_max_body_size 100M;" /host/etc/nginx/nginx.conf
                 fi
+                echo "Configured nginx.conf" >> "$DIAG"
               fi
 
-              # 2. Update sites-available and sites-enabled
+              # 2. sites-available and sites-enabled
               for f in /host/etc/nginx/sites-available/* /host/etc/nginx/sites-enabled/*; do
                 if [ -f "$f" ]; then
                   if grep -q "client_max_body_size" "$f"; then
@@ -86,26 +119,32 @@ jobs:
                   else
                     sed -i "/server {/a \    client_max_body_size 100M;" "$f"
                   fi
-                  echo "Configured 100M in $f" >> "$DIAG"
+                  echo "Configured: $f" >> "$DIAG"
                 fi
               done
 
-              # 3. Create conf.d/upload_size.conf
+              # 3. conf.d/upload_size.conf
               mkdir -p /host/etc/nginx/conf.d
               echo "client_max_body_size 100M;" > /host/etc/nginx/conf.d/upload_size.conf
 
-              echo "--- CONTENT OF sites-available/xiaozhi AFTER UPDATE ---" >> "$DIAG"
-              cat /host/etc/nginx/sites-available/xiaozhi >> "$DIAG" 2>&1 || true
+              # Remove snippets corruption
+              for f in /host/etc/nginx/snippets/*.conf /host/etc/nginx/fastcgi.conf; do
+                if [ -f "$f" ] && grep -q "client_max_body_size" "$f"; then
+                  sed -i "/client_max_body_size/d" "$f"
+                  echo "Cleaned snippet: $f" >> "$DIAG"
+                fi
+              done
 
-              echo "--- NSENTER NGINX -T ---" >> "$DIAG"
+              echo "--- NGINX -T TEST ---" >> "$DIAG"
               nsenter -t 1 -m -u -i -n -p -- /usr/sbin/nginx -t >> "$DIAG" 2>&1 || true
 
-              echo "--- NSENTER SYSTEMCTL RESTART NGINX ---" >> "$DIAG"
+              echo "--- RESTARTING NGINX ---" >> "$DIAG"
               nsenter -t 1 -m -u -i -n -p -- systemctl restart nginx >> "$DIAG" 2>&1 || true
+              sleep 2
               nsenter -t 1 -m -u -i -n -p -- systemctl status nginx --no-pager >> "$DIAG" 2>&1 || true
 
-              echo "--- NGINX ERROR LOG ---" >> "$DIAG"
-              tail -n 25 /host/var/log/nginx/error.log >> "$DIAG" 2>&1 || true
+              echo "--- NGINX ERROR LOG (last 10) ---" >> "$DIAG"
+              tail -n 10 /host/var/log/nginx/error.log >> "$DIAG" 2>&1 || true
             ' || true
 
             # Reload any Docker-based proxy containers if present
