@@ -26,6 +26,20 @@ services:
       - PG_POOL_MAX=${PG_POOL_MAX:-10}
       - ENVIRONMENT=production
       - ALLOWED_HOSTS=163.61.58.235,localhost,xiaozhiscig.biz.id,www.xiaozhiscig.biz.id
+      # S3 / Object Storage (NevaObjects / AWS / MinIO)
+      - S3_ENDPOINT=${S3_ENDPOINT:-https://s3.nevaobjects.id}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_BUCKET_PUBLIC=${S3_BUCKET_PUBLIC:-xiaozhi-public}
+      - S3_BUCKET_PRIVATE=${S3_BUCKET_PRIVATE:-xiaozhi-private}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - S3_USE_SSL=${S3_USE_SSL:-true}
+      # Payment Gateway
+      - XENDIT_SECRET_KEY=${XENDIT_SECRET_KEY:-}
+      - XENDIT_WEBHOOK_TOKEN=${XENDIT_WEBHOOK_TOKEN:-}
+      - MIDTRANS_SERVER_KEY=${MIDTRANS_SERVER_KEY:-}
+      - MIDTRANS_CLIENT_KEY=${MIDTRANS_CLIENT_KEY:-}
+      - MIDTRANS_IS_PRODUCTION=${MIDTRANS_IS_PRODUCTION:-false}
     volumes:
       - ./data:/app/data
     mem_limit: 512m
