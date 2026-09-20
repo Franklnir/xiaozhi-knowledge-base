@@ -55,8 +55,11 @@ jobs:
           script: |
             cd ${{ env.APP_DIR }}
 
+            # Fix ownership and permissions for git pull
+            sudo chown -R irsyad:irsyad ${{ env.APP_DIR }} || true
+
             # Pull latest code
-            git pull origin main
+            git pull origin main || sudo git pull origin main || true
 
             # Authenticate Docker to pull private GHCR image
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
@@ -70,6 +73,9 @@ jobs:
             # Wait for health check
             echo "Waiting for services to be healthy..."
             sleep 10
+
+            # Run Alembic migrations on PostgreSQL
+            docker compose exec -T xiaozhi alembic upgrade head || true
 
             # Verify service is running
             if docker compose ps | grep -q "xiaozhi.*Up"; then
