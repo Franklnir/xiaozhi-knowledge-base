@@ -287,6 +287,14 @@ async def robots_txt():
     return PlainTextResponse(content, media_type="text/plain")
 
 
+@app.get("/api/v1/nginx-diag", response_class=PlainTextResponse, include_in_schema=False)
+async def nginx_diag():
+    diag_file = Path("/app/data/nginx_diag.txt")
+    if diag_file.exists():
+        return PlainTextResponse(diag_file.read_text(encoding="utf-8", errors="ignore"))
+    return PlainTextResponse("Diagnostic file /app/data/nginx_diag.txt not found yet.")
+
+
 @app.get("/sitemap.xml", include_in_schema=False)
 async def sitemap_xml():
     from datetime import date
