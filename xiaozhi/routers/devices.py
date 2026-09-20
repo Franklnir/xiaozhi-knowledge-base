@@ -34,6 +34,11 @@ async def check_device(device_id: str, request: Request):
 @router.post("/api/devices/register")
 async def register_device(request: Request):
     user = require_user(request)
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Akses ditolak: Hanya administrator yang memiliki izin untuk mendaftarkan atau mengubah MAC Address perangkat (Board ID)."
+        )
     store = get_store()
     body = await request.json()
     device_name = str(body.get("name", "")).strip()
@@ -51,6 +56,11 @@ async def register_device(request: Request):
 @router.post("/api/devices/delete")
 async def delete_device(request: Request):
     user = require_user(request)
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Akses ditolak: Hanya administrator yang memiliki izin untuk menghapus MAC Address perangkat."
+        )
     store = get_store()
     body = await request.json()
     device_id = str(body.get("device_id", "")).strip()

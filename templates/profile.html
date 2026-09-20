@@ -612,19 +612,25 @@
                     <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 2px 7px; font-weight: 700; background: #10b981; color: #ffffff; border-radius: 999px;">Tersimpan OK</span>
                     <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
                 </div>
+                {% if user.role == 'admin' %}
                 <button type="button" onclick="promptSaveMac('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">✏️ Ubah MAC</button>
+                {% endif %}
                 {% elif mcp_status.connected %}
                 <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 999px; font-size: 12px; font-weight: 650; color: #3b82f6;">
                     <span style="font-size: 14px;">📟</span>
                     <span>MCP Aktif (Menunggu board ESP32 terhubung)</span>
                 </div>
+                {% if user.role == 'admin' %}
                 <button type="button" onclick="promptSaveMac('')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: #10b981; color: #ffffff; cursor: pointer;">➕ Simpan MAC Board</button>
+                {% endif %}
                 {% else %}
                 <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: var(--app-soft); border: 1px solid var(--app-border); border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--app-muted);">
                     <span style="font-size: 14px;">📟</span>
                     <span>ESP32: Belum terhubung</span>
                 </div>
+                {% if user.role == 'admin' %}
                 <button type="button" onclick="promptSaveMac('')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">➕ Simpan MAC Board</button>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -1135,7 +1141,7 @@
                             {{ p.title }}
                         </h3>
                         <div style="font-size:13px; color:var(--app-muted); margin-bottom:8px;">
-                            Harga: <strong style="color:var(--app-text);">Rp {{ "{:,}".format(p.price_amount) }}</strong> • Terjual: <strong>{{ p.sales_count }}x</strong>
+                            Harga: <strong style="color:var(--app-text);">Rp {{ "{:,}".format(p.price_amount) }}</strong>{% if p.sales_count and p.sales_count > 0 %} • Terjual: <strong>{{ p.sales_count }}x</strong>{% endif %}
                         </div>
 
                         {% if p.status == 'REJECTED' and p.reject_reason %}
