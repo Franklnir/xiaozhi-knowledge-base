@@ -220,6 +220,20 @@ class PlaybackTracker:
                 return self._sessions[sid]
             return None
 
+    def get_session_by_mac(self, mac: str) -> Optional[PlaybackSession]:
+        if not mac:
+            return None
+        target = str(mac).replace(":", "").replace("-", "").strip().lower()
+        if not target or target.startswith("esp32board"):
+            return None
+        with self._lock:
+            for s in self._sessions.values():
+                if s.device_mac:
+                    s_clean = str(s.device_mac).replace(":", "").replace("-", "").strip().lower()
+                    if s_clean == target or s_clean.endswith(target) or target.endswith(s_clean):
+                        return s
+            return None
+
     def get_playback_status(self, user_id: int) -> Dict[str, Any]:
         """Get comprehensive playback status for AI tools and user queries."""
         with self._lock:
