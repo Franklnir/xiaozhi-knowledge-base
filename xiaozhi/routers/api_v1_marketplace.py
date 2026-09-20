@@ -16,6 +16,11 @@ from xiaozhi.marketplace.deps import (
 )
 from xiaozhi.marketplace.storage import storage_service
 from xiaozhi.marketplace.security import verify_download_token
+from xiaozhi.marketplace.services.bank_service import (
+    get_supported_banks,
+    verify_account,
+    find_bank_info,
+)
 
 router = APIRouter(prefix="/api/v1/marketplace", tags=["Marketplace REST API"])
 
@@ -31,9 +36,48 @@ class WithdrawalCreateRequest(BaseModel):
     destination_account_number: str = Field(..., min_length=4, max_length=50)
 
 
+class BankInquiryRequest(BaseModel):
+    bank_code: str = Field(..., min_length=1, max_length=50)
+    account_number: str = Field(..., min_length=1, max_length=50)
+
+
 class ChatSendMessageRequest(BaseModel):
     conversation_id: str
     message: str = Field(..., min_length=1, max_length=2000)
+
+
+# ── BANK INQUIRY & SUPPORTED LIST ───────────────────────────────────────────
+@router.get("/supported-banks")
+async def list_supported_banks():
+    """Returns list of supported banks and e-wallets with formatting metadata and svg icons."""
+    return {"success": True, "banks": get_supported_banks()}
+
+
+@router.post("/bank-inquiry")
+async def perform_bank_inquiry(request: Request, payload: BankInquiryRequest):
+    """
+    Validates bank account / e-wallet format and performs name inquiry.
+    Returns verified account name and bank details.
+    """
+    user = get_current_user(request)
+    try:
+        result = verify_account(
+            bank_code=payload.bank_code,
+            account_number=payload.account_number,
+            current_user=user,
+        )
+        return JSONResponse(status_code=200, content=result)
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": str(exc)},
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Gagal memeriksa rekening: {str(exc)}"},
+        )
+
 
 
 # ── CATALOG ──────────────────────────────────────────────────────────────────

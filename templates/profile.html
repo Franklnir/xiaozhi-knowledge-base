@@ -1566,34 +1566,104 @@
                     <div style="color:var(--app-muted); font-size:11.5px; margin-top:2px;">Minimal penarikan: Rp {{ "{:,}".format(financial_data.minimum_withdrawal if financial_data else 10000) }}</div>
                 </div>
 
-                <form method="POST" action="/firmware/seller/withdrawals">
+                <form method="POST" action="/firmware/seller/withdrawals" onsubmit="return validateWithdrawalForm(event)">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <div style="margin-bottom:12px;">
-                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Jumlah Penarikan (IDR)</label>
-                        <input type="number" name="amount" required min="{{ financial_data.minimum_withdrawal if financial_data else 10000 }}" max="{{ financial_data.wallet.available_balance if financial_data and financial_data.wallet else 0 }}" step="1000" placeholder="Minimal {{ financial_data.minimum_withdrawal if financial_data else 10000 }}" class="app-input" style="width:100%;">
+                    <div style="margin-bottom:14px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:5px;">Jumlah Penarikan (IDR)</label>
+                        <input type="number" name="amount" required min="{{ financial_data.minimum_withdrawal if financial_data else 10000 }}" max="{{ financial_data.wallet.available_balance if financial_data and financial_data.wallet else 0 }}" step="1000" placeholder="Minimal {{ financial_data.minimum_withdrawal if financial_data else 10000 }}" class="app-input" style="width:100%; font-weight:700;">
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Nama Bank / E-Wallet</label>
-                        <input type="text" name="destination_bank" required placeholder="BCA / Mandiri / BRI / GoPay / DANA" class="app-input" style="width:100%;">
+                    <!-- Dropdown Bank & E-Wallet dengan Icon -->
+                    <div style="margin-bottom:14px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:5px;">Pilih Bank / E-Wallet Tujuan</label>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div id="bankIconPreview" style="width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:var(--app-surface-muted); border:1px solid var(--app-border); flex-shrink:0; overflow:hidden;">
+                                <!-- Icon diinjeksi otomatis via JavaScript -->
+                            </div>
+                            <select id="destinationBankSelect" name="destination_bank" required class="app-input" style="flex:1; height:42px; font-weight:700; cursor:pointer;" onchange="onBankSelectionChanged()">
+                                <optgroup label="🏦 Bank Transfer (Indonesia)">
+                                    <option value="BCA" selected>Bank Central Asia (BCA)</option>
+                                    <option value="MANDIRI">Bank Mandiri</option>
+                                    <option value="BNI">Bank Negara Indonesia (BNI)</option>
+                                    <option value="BRI">Bank Rakyat Indonesia (BRI)</option>
+                                    <option value="BSI">Bank Syariah Indonesia (BSI)</option>
+                                    <option value="CIMB">CIMB Niaga</option>
+                                    <option value="PERMATA">Bank Permata</option>
+                                    <option value="DANAMON">Bank Danamon</option>
+                                    <option value="BTN">Bank Tabungan Negara (BTN)</option>
+                                    <option value="SEABANK">SeaBank Indonesia</option>
+                                    <option value="JAGO">Bank Jago</option>
+                                </optgroup>
+                                <optgroup label="📱 E-Wallet">
+                                    <option value="GOPAY">GoPay</option>
+                                    <option value="OVO">OVO</option>
+                                    <option value="DANA">DANA</option>
+                                    <option value="SHOPEEPAY">ShopeePay</option>
+                                    <option value="LINKAJA">LinkAja</option>
+                                </optgroup>
+                            </select>
+                        </div>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Nama Pemilik Rekening</label>
-                        <input type="text" name="destination_account_name" required placeholder="Nama lengkap sesuai buku tabungan" class="app-input" style="width:100%;">
-                    </div>
-
-                    <div style="margin-bottom:18px;">
-                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Nomor Rekening</label>
-                        <input type="text" name="destination_account_number" required placeholder="Contoh: 1234567890" class="app-input" style="width:100%;">
+                    <!-- Nomor Rekening + Tombol Cek Rekening -->
+                    <div style="margin-bottom:14px;">
+                        <label id="lblAccountNumber" class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:5px;">Nomor Rekening Bank</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="destinationAccountNumber" name="destination_account_number" required placeholder="Contoh: 1234567890 (10 digit)" class="app-input" style="flex:1; font-weight:700; letter-spacing:0.5px;" oninput="onAccountInputChanged()">
+                            <button type="button" id="btnCheckAccount" onclick="checkDestinationAccount()" class="app-button" style="background:var(--app-brand); color:white; font-weight:800; white-space:nowrap; padding:0 16px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                <span id="checkAccountSpinner" style="display:none;">⏳</span>
+                                <span id="checkAccountText">🔍 Cek Rekening</span>
+                            </button>
+                        </div>
                         <div style="font-size:11px; color:var(--app-muted); margin-top:3px;">
-                            *Nomor rekening dienkripsi secara aman (AES-256) pada database.
+                            *Wajib klik tombol <strong>"Cek Rekening"</strong> untuk memvalidasi nama pemilik akun.
+                        </div>
+                    </div>
+
+                    <!-- Status Validasi & Nama Pemilik Rekening -->
+                    <div style="margin-bottom:18px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:5px;">Nama Pemilik Rekening (Terverifikasi)</label>
+                        <input type="hidden" id="destinationAccountName" name="destination_account_name" value="">
+                        
+                        <div id="accountVerificationCard" style="border:1.5px dashed var(--app-border-strong); border-radius:10px; padding:12px 14px; background:var(--app-surface-muted); transition:all 0.2s ease;">
+                            <div id="accountStatusUnverified" style="display:flex; align-items:center; gap:10px; color:var(--app-muted); font-size:12px;">
+                                <span style="font-size:18px;">ℹ️</span>
+                                <span>Ketik nomor rekening di atas lalu klik <strong>"Cek Rekening"</strong> untuk memverifikasi nama pemilik akun secara otomatis.</span>
+                            </div>
+                            
+                            <div id="accountStatusLoading" style="display:none; align-items:center; gap:10px; color:var(--app-brand); font-size:12.5px; font-weight:700;">
+                                <span style="display:inline-block;">⏳</span>
+                                <span>Menghubungi jaringan perbankan untuk verifikasi...</span>
+                            </div>
+
+                            <div id="accountStatusVerified" style="display:none; align-items:flex-start; gap:10px;">
+                                <div style="color:#10b981; font-size:22px; line-height:1; font-weight:bold;">✓</div>
+                                <div style="flex:1;">
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <span style="font-size:10px; font-weight:900; background:#10b981; color:white; padding:2px 6px; border-radius:4px; letter-spacing:0.4px;">TERVERIFIKASI RESMI</span>
+                                        <span id="verifiedBankTag" style="font-size:11px; color:var(--app-muted); font-weight:700;">BCA</span>
+                                    </div>
+                                    <div id="verifiedAccountNameText" style="font-size:15px; font-weight:900; color:var(--app-text); margin-top:3px; word-break:break-all;">-</div>
+                                    <div id="verifiedAccountNumberText" style="font-size:11.5px; color:var(--app-muted); font-family:monospace;">-</div>
+                                </div>
+                            </div>
+
+                            <div id="accountStatusError" style="display:none; align-items:flex-start; gap:10px; color:#dc2626;">
+                                <div style="font-size:20px; line-height:1; font-weight:bold;">✕</div>
+                                <div style="flex:1;">
+                                    <div style="font-size:10.5px; font-weight:900; text-transform:uppercase; color:#dc2626;">Pengecekan Gagal</div>
+                                    <div id="accountErrorMessageText" style="font-size:12px; margin-top:2px; font-weight:600;">Nomor rekening tidak valid</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-size:11px; color:var(--app-muted); margin-top:4px;">
+                            *Nomor rekening dienkripsi secara aman (AES-256) pada database sistem.
                         </div>
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:10px;">
                         <button type="button" onclick="closeWithdrawModal()" class="app-button">Batal</button>
-                        <button type="submit" class="app-button app-button-primary" style="font-weight:800;">
+                        <button type="submit" id="btnSubmitWithdrawal" class="app-button app-button-primary" style="font-weight:800; opacity:0.5; cursor:not-allowed;" disabled>
                             Kirim Permintaan Penarikan
                         </button>
                     </div>
@@ -1881,9 +1951,310 @@
         if (m) m.style.display = 'none';
     }
 
+    // ── Bank & E-Wallet Metadata & Verification Logic ──
+    const BANK_METADATA = {
+        'BCA': {
+            name: 'Bank Central Asia (BCA)',
+            short_name: 'BCA',
+            type: 'BANK',
+            placeholder: 'Contoh: 1234567890 (10 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#003876"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="12" font-family="system-ui, sans-serif">BCA</text></svg>`
+        },
+        'MANDIRI': {
+            name: 'Bank Mandiri',
+            short_name: 'Mandiri',
+            type: 'BANK',
+            placeholder: 'Contoh: 1230004567890 (13 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#002d62"/><text x="50%" y="42%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="9" font-family="system-ui, sans-serif">bank</text><text x="50%" y="65%" dominant-baseline="middle" text-anchor="middle" fill="#e5a823" font-weight="900" font-size="9" font-family="system-ui, sans-serif">mandiri</text></svg>`
+        },
+        'BNI': {
+            name: 'Bank Negara Indonesia (BNI)',
+            short_name: 'BNI',
+            type: 'BANK',
+            placeholder: 'Contoh: 0123456789 (10 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#005e6a"/><text x="48%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="12" font-family="system-ui, sans-serif">BNI</text><circle cx="33" cy="27" r="3" fill="#f15a24"/></svg>`
+        },
+        'BRI': {
+            name: 'Bank Rakyat Indonesia (BRI)',
+            short_name: 'BRI',
+            type: 'BANK',
+            placeholder: 'Contoh: 123401000123504 (15 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#00529c"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="13" font-family="system-ui, sans-serif">BRI</text></svg>`
+        },
+        'BSI': {
+            name: 'Bank Syariah Indonesia (BSI)',
+            short_name: 'BSI',
+            type: 'BANK',
+            placeholder: 'Contoh: 7123456789 (10 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#00a39d"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="12" font-family="system-ui, sans-serif">BSI</text></svg>`
+        },
+        'CIMB': {
+            name: 'CIMB Niaga',
+            short_name: 'CIMB Niaga',
+            type: 'BANK',
+            placeholder: 'Contoh: 701234567890 (10-14 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#781113"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ed1b2d" font-weight="900" font-size="10" font-family="system-ui, sans-serif">CIMB</text></svg>`
+        },
+        'PERMATA': {
+            name: 'Bank Permata',
+            short_name: 'Permata',
+            type: 'BANK',
+            placeholder: 'Contoh: 0123456789 (10-16 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#008244"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="8.5" font-family="system-ui, sans-serif">PERMATA</text></svg>`
+        },
+        'DANAMON': {
+            name: 'Bank Danamon',
+            short_name: 'Danamon',
+            type: 'BANK',
+            placeholder: 'Contoh: 0012345678 (10 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#ff6f00"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="7.5" font-family="system-ui, sans-serif">DANAMON</text></svg>`
+        },
+        'BTN': {
+            name: 'Bank Tabungan Negara (BTN)',
+            short_name: 'BTN',
+            type: 'BANK',
+            placeholder: 'Contoh: 0001234567890123 (16 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#003366"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="12" font-family="system-ui, sans-serif">BTN</text></svg>`
+        },
+        'SEABANK': {
+            name: 'SeaBank Indonesia',
+            short_name: 'SeaBank',
+            type: 'BANK',
+            placeholder: 'Contoh: 90123456789 (11-12 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#ff5722"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="7.5" font-family="system-ui, sans-serif">SEABANK</text></svg>`
+        },
+        'JAGO': {
+            name: 'Bank Jago',
+            short_name: 'Bank Jago',
+            type: 'BANK',
+            placeholder: 'Contoh: 101234567890 (12 digit)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#ffbe00"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#332200" font-weight="900" font-size="11" font-family="system-ui, sans-serif">JAGO</text></svg>`
+        },
+        'GOPAY': {
+            name: 'GoPay',
+            short_name: 'GoPay',
+            type: 'EWALLET',
+            placeholder: 'Nomor HP GoPay (Contoh: 081234567890)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#00aed6"/><circle cx="20" cy="20" r="8" stroke="#ffffff" stroke-width="4"/><circle cx="20" cy="20" r="3" fill="#ffffff"/></svg>`
+        },
+        'OVO': {
+            name: 'OVO',
+            short_name: 'OVO',
+            type: 'EWALLET',
+            placeholder: 'Nomor HP OVO (Contoh: 081234567890)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#4c2a86"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="12" font-family="system-ui, sans-serif">OVO</text></svg>`
+        },
+        'DANA': {
+            name: 'DANA',
+            short_name: 'DANA',
+            type: 'EWALLET',
+            placeholder: 'Nomor HP DANA (Contoh: 081234567890)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#118eea"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="10" font-family="system-ui, sans-serif">DANA</text></svg>`
+        },
+        'SHOPEEPAY': {
+            name: 'ShopeePay',
+            short_name: 'ShopeePay',
+            type: 'EWALLET',
+            placeholder: 'Nomor HP ShopeePay (Contoh: 081234567890)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#ee4d2d"/><path d="M14 16 C14 12 26 12 26 16 C26 20 14 19 14 24 C14 28 26 28 26 24" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`
+        },
+        'LINKAJA': {
+            name: 'LinkAja',
+            short_name: 'LinkAja',
+            type: 'EWALLET',
+            placeholder: 'Nomor HP LinkAja (Contoh: 081234567890)',
+            icon: `<svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="#ed1c24"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-weight="900" font-size="8" font-family="system-ui, sans-serif">LinkAja!</text></svg>`
+        }
+    };
+
+    let isAccountVerified = false;
+
+    function initBankSelector() {
+        const sel = document.getElementById('destinationBankSelect');
+        if (!sel) return;
+        onBankSelectionChanged();
+    }
+
+    function onBankSelectionChanged() {
+        const sel = document.getElementById('destinationBankSelect');
+        const preview = document.getElementById('bankIconPreview');
+        const numInput = document.getElementById('destinationAccountNumber');
+        const lblNum = document.getElementById('lblAccountNumber');
+        if (!sel) return;
+
+        const code = sel.value;
+        const meta = BANK_METADATA[code];
+        if (meta) {
+            if (preview) preview.innerHTML = meta.icon;
+            if (numInput) numInput.placeholder = meta.placeholder;
+            if (lblNum) lblNum.textContent = meta.type === 'EWALLET' ? 'Nomor HP / Akun E-Wallet' : 'Nomor Rekening Bank';
+        }
+        resetAccountVerification();
+    }
+
+    function onAccountInputChanged() {
+        resetAccountVerification();
+    }
+
+    function resetAccountVerification() {
+        isAccountVerified = false;
+        const hiddenName = document.getElementById('destinationAccountName');
+        const card = document.getElementById('accountVerificationCard');
+        const stUnverified = document.getElementById('accountStatusUnverified');
+        const stLoading = document.getElementById('accountStatusLoading');
+        const stVerified = document.getElementById('accountStatusVerified');
+        const stError = document.getElementById('accountStatusError');
+        const submitBtn = document.getElementById('btnSubmitWithdrawal');
+
+        if (hiddenName) hiddenName.value = '';
+        if (card) {
+            card.style.borderColor = 'var(--app-border-strong)';
+            card.style.background = 'var(--app-surface-muted)';
+        }
+        if (stUnverified) stUnverified.style.display = 'flex';
+        if (stLoading) stLoading.style.display = 'none';
+        if (stVerified) stVerified.style.display = 'none';
+        if (stError) stError.style.display = 'none';
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.5';
+            submitBtn.style.cursor = 'not-allowed';
+        }
+    }
+
+    async function checkDestinationAccount() {
+        const sel = document.getElementById('destinationBankSelect');
+        const numInput = document.getElementById('destinationAccountNumber');
+        const hiddenName = document.getElementById('destinationAccountName');
+        const card = document.getElementById('accountVerificationCard');
+        const stUnverified = document.getElementById('accountStatusUnverified');
+        const stLoading = document.getElementById('accountStatusLoading');
+        const stVerified = document.getElementById('accountStatusVerified');
+        const stError = document.getElementById('accountStatusError');
+        const errorText = document.getElementById('accountErrorMessageText');
+        const verifiedNameText = document.getElementById('verifiedAccountNameText');
+        const verifiedNumberText = document.getElementById('verifiedAccountNumberText');
+        const verifiedBankTag = document.getElementById('verifiedBankTag');
+        const submitBtn = document.getElementById('btnSubmitWithdrawal');
+        const checkBtn = document.getElementById('btnCheckAccount');
+        const checkSpinner = document.getElementById('checkAccountSpinner');
+        const checkText = document.getElementById('checkAccountText');
+
+        if (!sel || !numInput) return;
+        const bankCode = sel.value;
+        const accountNumber = numInput.value.trim();
+
+        if (!accountNumber) {
+            if (stUnverified) stUnverified.style.display = 'none';
+            if (stLoading) stLoading.style.display = 'none';
+            if (stVerified) stVerified.style.display = 'none';
+            if (stError) stError.style.display = 'flex';
+            if (errorText) errorText.textContent = 'Silakan masukkan nomor rekening / nomor handphone terlebih dahulu.';
+            if (card) {
+                card.style.borderColor = '#ef4444';
+                card.style.background = 'rgba(239,68,68,0.06)';
+            }
+            numInput.focus();
+            return;
+        }
+
+        // Set Loading state
+        if (stUnverified) stUnverified.style.display = 'none';
+        if (stError) stError.style.display = 'none';
+        if (stVerified) stVerified.style.display = 'none';
+        if (stLoading) stLoading.style.display = 'flex';
+        if (card) {
+            card.style.borderColor = 'var(--app-brand)';
+            card.style.background = 'rgba(37,99,235,0.05)';
+        }
+        if (checkSpinner) checkSpinner.style.display = 'inline-block';
+        if (checkText) checkText.textContent = 'Memeriksa...';
+        if (checkBtn) checkBtn.disabled = true;
+
+        try {
+            const resp = await fetch('/api/v1/marketplace/bank-inquiry', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bank_code: bankCode,
+                    account_number: accountNumber
+                })
+            });
+            const data = await resp.json();
+
+            if (resp.ok && data.success) {
+                // Verified Success
+                isAccountVerified = true;
+                if (hiddenName) hiddenName.value = data.account_name;
+                if (verifiedNameText) verifiedNameText.textContent = data.account_name;
+                if (verifiedNumberText) verifiedNumberText.textContent = `${data.bank_name} • ${data.account_number}`;
+                if (verifiedBankTag) verifiedBankTag.textContent = data.short_name;
+
+                if (stLoading) stLoading.style.display = 'none';
+                if (stVerified) stVerified.style.display = 'flex';
+                if (card) {
+                    card.style.borderColor = '#10b981';
+                    card.style.background = 'rgba(16,185,129,0.08)';
+                }
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '1';
+                    submitBtn.style.cursor = 'pointer';
+                }
+            } else {
+                // Failed / Invalid
+                isAccountVerified = false;
+                const errMsg = data.error || 'Pemeriksaan rekening gagal. Pastikan nomor benar.';
+                if (stLoading) stLoading.style.display = 'none';
+                if (stError) stError.style.display = 'flex';
+                if (errorText) errorText.textContent = errMsg;
+                if (card) {
+                    card.style.borderColor = '#ef4444';
+                    card.style.background = 'rgba(239,68,68,0.06)';
+                }
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.style.opacity = '0.5';
+                    submitBtn.style.cursor = 'not-allowed';
+                }
+            }
+        } catch (err) {
+            isAccountVerified = false;
+            if (stLoading) stLoading.style.display = 'none';
+            if (stError) stError.style.display = 'flex';
+            if (errorText) errorText.textContent = 'Gagal terhubung ke server untuk verifikasi rekening.';
+            if (card) {
+                card.style.borderColor = '#ef4444';
+                card.style.background = 'rgba(239,68,68,0.06)';
+            }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.5';
+                submitBtn.style.cursor = 'not-allowed';
+            }
+        } finally {
+            if (checkSpinner) checkSpinner.style.display = 'none';
+            if (checkText) checkText.textContent = '🔍 Cek Rekening';
+            if (checkBtn) checkBtn.disabled = false;
+        }
+    }
+
+    function validateWithdrawalForm(event) {
+        if (!isAccountVerified) {
+            event.preventDefault();
+            alert('Wajib melakukan pengecekan rekening terlebih dahulu dengan menekan tombol "🔍 Cek Rekening".');
+            return false;
+        }
+        return true;
+    }
+
     function openWithdrawModal() {
         const m = document.getElementById('withdrawModal');
-        if (m) m.style.display = 'flex';
+        if (m) {
+            m.style.display = 'flex';
+            initBankSelector();
+        }
     }
     function closeWithdrawModal() {
         const m = document.getElementById('withdrawModal');
