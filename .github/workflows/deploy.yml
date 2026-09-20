@@ -61,64 +61,33 @@ jobs:
             # Configure host Nginx client_max_body_size to 100M (resolves 413 Entitas Terlalu Besar)
             docker run --rm --privileged --pid=host -v /:/host alpine sh -c '
               echo "=== CONFIGURING HOST NGINX (100M LIMIT) ==="
-              if [ -x /host/usr/bin/python3 ]; then
-                PYTHON_BIN="chroot /host /usr/bin/python3"
-              else
-                apk add --no-cache python3 >/dev/null 2>&1 || true
-                PYTHON_BIN="python3"
+              
+              # 1. Update /etc/nginx/nginx.conf inside http { }
+              if [ -f /host/etc/nginx/nginx.conf ]; then
+                if grep -q "client_max_body_size" /host/etc/nginx/nginx.conf; then
+                  sed -i "s/client_max_body_size [^;]*;/client_max_body_size 100M;/g" /host/etc/nginx/nginx.conf
+                else
+                  sed -i "/http {/a \    client_max_body_size 100M;" /host/etc/nginx/nginx.conf
+                fi
+                echo "Configured 100M in /host/etc/nginx/nginx.conf"
               fi
 
-              $PYTHON_BIN -c "
-              import os, re, glob
+              # 2. Create /etc/nginx/conf.d/upload_size.conf
+              mkdir -p /host/etc/nginx/conf.d
+              echo "client_max_body_size 100M;" > /host/etc/nginx/conf.d/upload_size.conf
+              echo "Created /host/etc/nginx/conf.d/upload_size.conf"
 
-              root_prefix = '' if os.path.exists('/etc/nginx') else '/host'
-              nginx_dir = root_prefix + '/etc/nginx'
-              print('Configuring Nginx in:', nginx_dir)
-
-              if os.path.exists(nginx_dir):
-                  # 1. Update nginx.conf
-                  nginx_conf = os.path.realpath(nginx_dir + '/nginx.conf')
-                  if os.path.exists(nginx_conf):
-                      with open(nginx_conf, 'r', encoding='utf-8', errors='ignore') as f:
-                          c = f.read()
-                      if 'client_max_body_size' in c:
-                          c = re.sub(r'client_max_body_size\s+[^;]+;', 'client_max_body_size 100M;', c)
-                      else:
-                          c = re.sub(r'(\bhttp\s*\{)', r'\1\n    client_max_body_size 100M;', c, count=1)
-                      with open(nginx_conf, 'w', encoding='utf-8') as f:
-                          f.write(c)
-                      print('Configured 100M in:', nginx_conf)
-
-                  # 2. Create conf.d/upload_size.conf
-                  conf_d = nginx_dir + '/conf.d'
-                  os.makedirs(conf_d, exist_ok=True)
-                  with open(conf_d + '/upload_size.conf', 'w', encoding='utf-8') as f:
-                      f.write('client_max_body_size 100M;\n')
-                  print('Created:', conf_d + '/upload_size.conf')
-
-                  # 3. Update all site configs
-                  raw_targets = (
-                      glob.glob(nginx_dir + '/sites-available/*') +
-                      glob.glob(nginx_dir + '/sites-enabled/*') +
-                      glob.glob(nginx_dir + '/conf.d/*.conf')
-                  )
-                  unique_files = set(os.path.realpath(p) for p in raw_targets if os.path.isfile(p))
-                  for uf in unique_files:
-                      if uf == nginx_conf:
-                          continue
-                      try:
-                          with open(uf, 'r', encoding='utf-8', errors='ignore') as f:
-                              c = f.read()
-                          if 'client_max_body_size' in c:
-                              c = re.sub(r'client_max_body_size\s+[^;]+;', 'client_max_body_size 100M;', c)
-                          else:
-                              c = re.sub(r'(\bserver\s*\{)', r'\1\n    client_max_body_size 100M;', c)
-                          with open(uf, 'w', encoding='utf-8') as f:
-                              f.write(c)
-                          print('Configured 100M in:', uf)
-                      except Exception as err:
-                          print('Error:', uf, err)
-              "
+              # 3. Update all sites in sites-available and sites-enabled
+              for f in /host/etc/nginx/sites-available/* /host/etc/nginx/sites-enabled/* /host/etc/nginx/conf.d/*.conf; do
+                if [ -f "$f" ]; then
+                  if grep -q "client_max_body_size" "$f"; then
+                    sed -i "s/client_max_body_size [^;]*;/client_max_body_size 100M;/g" "$f"
+                  else
+                    sed -i "/server {/a \    client_max_body_size 100M;" "$f"
+                  fi
+                  echo "Configured 100M in $f"
+                fi
+              done
 
               echo "=== TESTING NGINX CONFIGURATION ==="
               chroot /host /usr/sbin/nginx -t || true
@@ -130,7 +99,7 @@ jobs:
               # Send direct SIGHUP to master PID if available
               for pidf in /host/run/nginx.pid /host/var/run/nginx.pid; do
                 if [ -f "$pidf" ]; then
-                  PID=$(cat "$pidf" | tr -d " \t\n\r")
+                  PID=$(cat "$pidf" 2>/dev/null | tr -d " \t\n\r")
                   if [ -n "$PID" ]; then
                     kill -1 "$PID" 2>/dev/null || true
                     echo "Sent SIGHUP to Nginx master PID $PID"
@@ -149,8 +118,11 @@ jobs:
                     mkdir -p /etc/nginx/conf.d 2>/dev/null || true
                     echo "client_max_body_size 100M;" > /etc/nginx/conf.d/upload_size.conf 2>/dev/null || true
                     if [ -f /etc/nginx/nginx.conf ]; then
-                      sed -i "s/client_max_body_size [0-9]*[MmKkGg]*;/client_max_body_size 100M;/g" /etc/nginx/nginx.conf 2>/dev/null || true
-                      grep -q "client_max_body_size" /etc/nginx/nginx.conf 2>/dev/null || sed -i "/http {/a \    client_max_body_size 100M;" /etc/nginx/nginx.conf 2>/dev/null || true
+                      if grep -q "client_max_body_size" /etc/nginx/nginx.conf; then
+                        sed -i "s/client_max_body_size [^;]*;/client_max_body_size 100M;/g" /etc/nginx/nginx.conf
+                      else
+                        sed -i "/http {/a \    client_max_body_size 100M;" /etc/nginx/nginx.conf
+                      fi
                     fi
                     nginx -s reload 2>/dev/null || true
                   ' || true
@@ -187,24 +159,17 @@ jobs:
               exit 1
             fi
 
-            # Verify 3MB upload limit on live Nginx
+            # Verify 3MB upload limit on live Nginx using curl
             echo "=== TESTING 3MB UPLOAD TO VERIFY 413 IS RESOLVED ==="
-            python3 -c "
-            import urllib.request, urllib.error
-            boundary = '----TestBoundaryCheck123'
-            body = (f'--{boundary}\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nTest\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"firmware_file\"; filename=\"test.bin\"\r\nContent-Type: application/octet-stream\r\n\r\n' + ('A' * 3000000) + f'\r\n--{boundary}--\r\n').encode('latin1')
-            req = urllib.request.Request('https://xiaozhiscig.biz.id/firmware/seller/products', data=body, headers={'Content-Type': f'multipart/form-data; boundary={boundary}', 'User-Agent': 'DeployTest/1.0'})
-            try:
-                with urllib.request.urlopen(req, timeout=15) as res:
-                    print('Live Test HTTP Response:', res.status)
-            except urllib.error.HTTPError as e:
-                if e.code == 413:
-                    print('❌ Live Test: Still received HTTP 413!')
-                else:
-                    print(f'✅ Live Test SUCCESS: Passed Nginx gate! Received HTTP {e.code} ({e.reason})')
-            except Exception as e:
-                print('Live Test notice:', e)
-            " || true
+            dd if=/dev/zero of=/tmp/test_3m.bin bs=1M count=3 2>/dev/null
+            HTTP_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" -F "title=LimitTest" -F "firmware_file=@/tmp/test_3m.bin" https://xiaozhiscig.biz.id/firmware/seller/products || true)
+            echo "Live Test HTTP Response Code: $HTTP_CODE"
+            rm -f /tmp/test_3m.bin
+            if [ "$HTTP_CODE" = "413" ]; then
+              echo "❌ Still received HTTP 413"
+            else
+              echo "✅ Passed Nginx gate! Received HTTP $HTTP_CODE (non-413)"
+            fi
 
             # Clean up old unused images
             docker image prune -f
