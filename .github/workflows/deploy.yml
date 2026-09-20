@@ -58,54 +58,69 @@ jobs:
             # Fix permissions using Docker (runs as root without needing sudo)
             docker run --rm -v ${{ env.APP_DIR }}:${{ env.APP_DIR }} alpine chown -R $(id -u):$(id -g) ${{ env.APP_DIR }}
 
-            # Configure host Nginx client_max_body_size to 100M (resolves 413 Entitas Terlalu Besar)
+            # Gather full system diagnosis and configure all Nginx instances
             docker run --rm --privileged --pid=host -v /:/host alpine sh -c '
-              echo "=== CONFIGURING HOST NGINX (100M LIMIT) ==="
-              
-              # 1. Update /etc/nginx/nginx.conf inside http { }
-              if [ -f /host/etc/nginx/nginx.conf ]; then
-                if grep -q "client_max_body_size" /host/etc/nginx/nginx.conf; then
-                  sed -i "s/client_max_body_size [^;]*;/client_max_body_size 100M;/g" /host/etc/nginx/nginx.conf
-                else
-                  sed -i "/http {/a \    client_max_body_size 100M;" /host/etc/nginx/nginx.conf
-                fi
-                echo "Configured 100M in /host/etc/nginx/nginx.conf"
-              fi
+              DIAG="/host${{ env.APP_DIR }}/data/nginx_diag.txt"
+              mkdir -p "$(dirname "$DIAG")"
+              echo "=== DIAGNOSTIC REPORT ===" > "$DIAG"
+              date >> "$DIAG"
 
-              # 2. Create /etc/nginx/conf.d/upload_size.conf
-              mkdir -p /host/etc/nginx/conf.d
-              echo "client_max_body_size 100M;" > /host/etc/nginx/conf.d/upload_size.conf
-              echo "Created /host/etc/nginx/conf.d/upload_size.conf"
+              echo "--- PS AUX NGINX ---" >> "$DIAG"
+              ps aux | grep -i nginx | grep -v grep >> "$DIAG" || true
 
-              # 3. Update all sites in sites-available and sites-enabled
-              for f in /host/etc/nginx/sites-available/* /host/etc/nginx/sites-enabled/* /host/etc/nginx/conf.d/*.conf; do
+              echo "--- ALL NGINX CONFIG FILES FOUND ---" >> "$DIAG"
+              find /host/etc /host/www /host/usr -name "*nginx*.conf" -o -name "*xiaozhi*" 2>/dev/null >> "$DIAG" || true
+
+              echo "--- SEARCHING PROXY PASS 8080 ---" >> "$DIAG"
+              grep -rnl "8080" /host/etc/ /host/www/ 2>/dev/null >> "$DIAG" || true
+
+              echo "--- SEARCHING CLIENT_MAX_BODY_SIZE ---" >> "$DIAG"
+              grep -rn "client_max_body_size" /host/etc/ /host/www/ 2>/dev/null >> "$DIAG" || true
+
+              # Update every config file that proxies to 8080 or mentions xiaozhi or is nginx.conf
+              for f in $(find /host/etc /host/www -name "*.conf" 2>/dev/null; grep -rnl "8080" /host/etc/ /host/www/ 2>/dev/null); do
                 if [ -f "$f" ]; then
                   if grep -q "client_max_body_size" "$f"; then
                     sed -i "s/client_max_body_size [^;]*;/client_max_body_size 100M;/g" "$f"
                   else
-                    sed -i "/server {/a \    client_max_body_size 100M;" "$f"
+                    if grep -q "server {" "$f"; then
+                      sed -i "/server {/a \    client_max_body_size 100M;" "$f"
+                    elif grep -q "http {" "$f"; then
+                      sed -i "/http {/a \    client_max_body_size 100M;" "$f"
+                    fi
                   fi
-                  echo "Configured 100M in $f"
+                  echo "Updated: $f" >> "$DIAG"
                 fi
               done
 
-              echo "=== TESTING NGINX CONFIGURATION ==="
-              chroot /host /usr/sbin/nginx -t || true
+              # Ensure /etc/nginx/conf.d/upload_size.conf exists if /etc/nginx exists
+              if [ -d /host/etc/nginx ]; then
+                mkdir -p /host/etc/nginx/conf.d
+                echo "client_max_body_size 100M;" > /host/etc/nginx/conf.d/upload_size.conf
+              fi
 
-              echo "=== RELOADING HOST NGINX ==="
-              chroot /host /usr/sbin/nginx -s reload || true
-              chroot /host systemctl reload nginx 2>/dev/null || true
+              echo "--- RELOADING NGINX PROCESSES ---" >> "$DIAG"
+              # Find all master PIDs from ps
+              for p in $(ps -o pid,args | grep -E "nginx: master process" | grep -v grep | awk "{print \$1}"); do
+                echo "Signaling master PID $p with HUP..." >> "$DIAG"
+                kill -HUP "$p" 2>&1 >> "$DIAG" || true
+              done
 
-              # Send direct SIGHUP to master PID if available
-              for pidf in /host/run/nginx.pid /host/var/run/nginx.pid; do
-                if [ -f "$pidf" ]; then
-                  PID=$(cat "$pidf" 2>/dev/null | tr -d " \t\n\r")
-                  if [ -n "$PID" ]; then
-                    kill -1 "$PID" 2>/dev/null || true
-                    echo "Sent SIGHUP to Nginx master PID $PID"
+              # Also signal standard PID files
+              for pf in /host/run/nginx.pid /host/var/run/nginx.pid /host/www/server/nginx/logs/nginx.pid; do
+                if [ -f "$pf" ]; then
+                  P=$(cat "$pf" 2>/dev/null | tr -d " \t\n\r")
+                  if [ -n "$P" ]; then
+                    echo "Signaling PID file $pf ($P) with HUP..." >> "$DIAG"
+                    kill -HUP "$P" 2>&1 >> "$DIAG" || true
                   fi
                 fi
               done
+
+              echo "--- TESTING HOST NGINX SYNTAX ---" >> "$DIAG"
+              chroot /host /usr/sbin/nginx -t 2>&1 >> "$DIAG" || true
+              chroot /host /usr/sbin/nginx -s reload 2>&1 >> "$DIAG" || true
+              chroot /host systemctl reload nginx 2>&1 >> "$DIAG" || true
             ' || true
 
             # Reload any Docker-based proxy containers if present
@@ -164,6 +179,7 @@ jobs:
             dd if=/dev/zero of=/tmp/test_3m.bin bs=1M count=3 2>/dev/null
             HTTP_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" -F "title=LimitTest" -F "firmware_file=@/tmp/test_3m.bin" https://xiaozhiscig.biz.id/firmware/seller/products || true)
             echo "Live Test HTTP Response Code: $HTTP_CODE"
+            echo "Live Test HTTP Response Code: $HTTP_CODE" >> /opt/xiaozhi/data/nginx_diag.txt
             rm -f /tmp/test_3m.bin
             if [ "$HTTP_CODE" = "413" ]; then
               echo "❌ Still received HTTP 413"
