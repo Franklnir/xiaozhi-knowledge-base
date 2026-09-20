@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .fw-filter-tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+    .fw-tab {
+        padding: 8px 16px;
+        border-radius: var(--app-radius);
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        border: 1.5px solid var(--app-border);
+        background: var(--app-surface);
+        color: var(--app-muted);
+        transition: all .15s ease;
+    }
+    .fw-tab.is-active, .fw-tab:hover {
+        background: var(--app-brand);
+        color: white;
+        border-color: var(--app-brand);
+    }
+    :root[data-theme="dark"] .fw-tab.is-active {
+        color: #052e1a;
+    }
+</style>
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px;">
+    <div>
+        <h1 style="font-size:24px; font-weight:900; margin:0 0 6px; color:var(--app-text);">
+            Master Produk Firmware (Admin CRUD)
+        </h1>
+        <p style="font-size:13.5px; color:var(--app-muted); margin:0;">
+            Kelola, edit, dan pantau seluruh produk firmware dari semua pengguna di platform.
+        </p>
+    </div>
+    <a href="/firmware/seller/products" class="app-button app-button-primary" style="font-weight:800; font-size:13.5px;">
+        ➕ Upload Produk Sebagai Admin
+    </a>
+</div>
+
+<!-- Tabs -->
+<div class="fw-filter-tabs">
+    <a href="/admin/firmware/products" class="fw-tab {% if current_filter == 'all' %}is-active{% endif %}">Semua Produk</a>
+    <a href="/admin/firmware/products?status=PUBLISHED" class="fw-tab {% if current_filter == 'PUBLISHED' %}is-active{% endif %}">Published</a>
+    <a href="/admin/firmware/products?status=PENDING_REVIEW" class="fw-tab {% if current_filter == 'PENDING_REVIEW' %}is-active{% endif %}">Menunggu Review</a>
+    <a href="/admin/firmware/products?status=DRAFT" class="fw-tab {% if current_filter == 'DRAFT' %}is-active{% endif %}">Draft</a>
+    <a href="/admin/firmware/products?status=REJECTED" class="fw-tab {% if current_filter == 'REJECTED' %}is-active{% endif %}">Ditolak</a>
+    <a href="/admin/firmware/products?status=ARCHIVED" class="fw-tab {% if current_filter == 'ARCHIVED' %}is-active{% endif %}">Diarsipkan</a>
+</div>
+
+{% if not products %}
+<div class="app-muted-panel" style="text-align:center; padding:60px 20px;">
+    <div style="font-size:40px; margin-bottom:10px;">📦</div>
+    <h3 style="font-size:18px; font-weight:800; margin:0 0 6px;">Tidak Ada Produk</h3>
+    <p style="color:var(--app-muted); font-size:13.5px; margin:0;">
+        Tidak ada produk dengan kriteria filter yang dipilih.
+    </p>
+</div>
+{% else %}
+<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow);">
+    <div class="app-table-wrap">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th>Produk</th>
+                    <th>Seller</th>
+                    <th>Harga</th>
+                    <th>Terjual</th>
+                    <th>Status</th>
+                    <th>Dibuat</th>
+                    <th style="text-align:right;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            {% if p.primary_image_key %}
+                            <img src="/api/v1/marketplace/images/{{ p.primary_image_key }}" alt="{{ p.title }}" style="width:48px; height:36px; border-radius:var(--app-radius); object-fit:cover; border:1px solid var(--app-border);">
+                            {% else %}
+                            <div style="width:48px; height:36px; border-radius:var(--app-radius); background:var(--app-surface-muted); display:grid; place-items:center; font-size:18px;">💾</div>
+                            {% endif %}
+                            <div>
+                                <div style="font-weight:800; color:var(--app-text); font-size:14px;">{{ p.title }}</div>
+                                <div style="font-size:11.5px; color:var(--app-muted);">Slug: {{ p.slug }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-weight:700;">{{ p.seller_username }}</div>
+                        <div style="font-size:11.5px; color:var(--app-muted);">{{ p.seller_email }}</div>
+                        {% if p.is_admin_product %}
+                        <span class="app-chip" style="font-size:10px; padding:2px 6px; background:#fef08a; color:#854d0e; border:1px solid #ca8a04; margin-top:3px;">🛡️ ADMIN</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <strong style="color:var(--app-text);">Rp {{ "{:,}".format(p.price_amount) }}</strong>
+                    </td>
+                    <td>
+                        <span class="app-chip app-chip-neutral" style="font-size:11px;">{{ p.sales_count }}x</span>
+                    </td>
+                    <td>
+                        {% if p.status == 'PUBLISHED' %}
+                        <span class="app-chip app-chip-success" style="font-size:11px; padding:3px 8px;">✅ PUBLISHED</span>
+                        {% elif p.status == 'PENDING_REVIEW' %}
+                        <span class="app-chip app-chip-info" style="font-size:11px; padding:3px 8px;">⏳ REVIEW</span>
+                        {% elif p.status == 'REJECTED' %}
+                        <span class="app-chip" style="font-size:11px; padding:3px 8px; background:#fef2f2; color:#b91c1c; border:1px solid #f87171;">❌ DITOLAK</span>
+                        {% elif p.status == 'ARCHIVED' %}
+                        <span class="app-chip" style="font-size:11px; padding:3px 8px; background:#f3f4f6; color:#6b7280; border:1px solid #d1d5db;">📦 ARCHIVED</span>
+                        {% else %}
+                        <span class="app-chip app-chip-neutral" style="font-size:11px; padding:3px 8px;">📝 DRAFT</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:12px; color:var(--app-muted);">
+                        {{ p.created_at.strftime('%d %b %Y') if p.created_at else '-' }}
+                    </td>
+                    <td style="text-align:right;">
+                        <div style="display:inline-flex; gap:6px; align-items:center;">
+                            {% if p.status == 'PUBLISHED' %}
+                            <a href="/firmware/marketplace/{{ p.slug or p.id }}" target="_blank" class="app-button" style="padding:4px 8px; font-size:12px;" title="Lihat di Katalog">
+                                👁️
+                            </a>
+                            {% endif %}
+                            <a href="/firmware/seller/products/{{ p.id }}/edit" class="app-button" style="padding:4px 8px; font-size:12px;" title="Edit Produk">
+                                ✏️ Edit
+                            </a>
+                            <form method="POST" action="/admin/firmware/products/{{ p.id }}/delete" onsubmit="return confirm('Apakah Anda yakin ingin menghapus atau mengarsipkan produk ini?');" style="margin:0; display:inline;">
+                                <button type="submit" class="app-button" style="padding:4px 8px; font-size:12px; color:#dc2626; border-color:#fca5a5;" title="Hapus / Arsipkan">
+                                    🗑️
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

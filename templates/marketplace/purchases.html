@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .fw-purchase-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 20px;
+        margin-bottom: 18px;
+        box-shadow: var(--app-shadow);
+        display: grid;
+        grid-template-columns: 100px 1fr auto;
+        gap: 20px;
+        align-items: center;
+    }
+    @media (max-width: 768px) {
+        .fw-purchase-card { grid-template-columns: 1fr; }
+    }
+    .fw-purchase-img {
+        width: 100px;
+        height: 80px;
+        border-radius: var(--app-radius);
+        border: 1px solid var(--app-border);
+        object-fit: cover;
+        background: var(--app-surface-muted);
+    }
+</style>
+
+<div style="margin-bottom:24px;">
+    <h1 style="font-size:24px; font-weight:900; margin:0 0 6px; color:var(--app-text);">
+        Pembelian Saya
+    </h1>
+    <p style="font-size:13.5px; color:var(--app-muted); margin:0;">
+        Daftar lisensi firmware yang sudah Anda beli. File binary <code>.bin</code> dapat diunduh kapan pun.
+    </p>
+</div>
+
+{% if not purchases %}
+<div class="app-muted-panel" style="text-align:center; padding:60px 20px;">
+    <div style="font-size:44px; margin-bottom:12px;">🛒</div>
+    <h3 style="font-size:18px; font-weight:800; margin:0 0 6px;">Belum Ada Pembelian Firmware</h3>
+    <p style="color:var(--app-muted); font-size:13.5px; margin:0 0 18px;">
+        Jelajahi katalog marketplace dan temukan binary firmware terbaik untuk perangkat Anda.
+    </p>
+    <a href="/firmware/marketplace" class="app-button app-button-primary">Jelajahi Marketplace</a>
+</div>
+{% else %}
+<div>
+    {% for p in purchases %}
+    <div class="fw-purchase-card">
+        {% if p.image_url %}
+        <img src="{{ p.image_url }}" alt="{{ p.product_title_snapshot }}" class="fw-purchase-img">
+        {% else %}
+        <div class="fw-purchase-img" style="display:grid; place-items:center; font-size:28px;">💾</div>
+        {% endif %}
+
+        <div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+                <span class="app-chip app-chip-success" style="font-size:11px; padding:2px 8px;">✅ LISENSI AKTIF</span>
+                <span style="font-size:12px; color:var(--app-muted);">Order #{{ p.order_number }}</span>
+                <span style="font-size:12px; color:var(--app-muted);">• Dibeli: {{ p.paid_at.strftime('%d %b %Y, %H:%M') if p.paid_at else '-' }}</span>
+            </div>
+
+            <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--app-text);">
+                {{ p.product_title_snapshot }}
+            </h3>
+
+            <div style="font-size:13px; color:var(--app-muted); margin-bottom:8px;">
+                Penjual: <strong>{{ p.seller_name_snapshot }}</strong> • Versi: <strong>{{ p.version_label_snapshot }}</strong> • Ukuran: <strong>{{ (p.file_size / (1024*1024))|round(2) }} MB</strong>
+            </div>
+
+            <!-- SHA-256 Checksum -->
+            <div style="display:flex; align-items:center; gap:8px; font-size:11.5px; background:var(--app-surface-muted); padding:6px 10px; border-radius:4px; border:1px solid var(--app-border); width:fit-content;">
+                <span style="font-weight:700; color:var(--app-muted);">SHA-256:</span>
+                <code id="hash-{{ loop.index }}" style="font-family:monospace; color:var(--app-text);">{{ p.firmware_sha256_snapshot }}</code>
+                <button type="button" onclick="navigator.clipboard.writeText('{{ p.firmware_sha256_snapshot }}')" title="Salin SHA-256" style="background:none; border:none; cursor:pointer; font-size:14px; padding:0 4px;">📋</button>
+            </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px; min-width:170px;">
+            <a href="/firmware/purchases/{{ p.purchase_id }}/download" class="app-button app-button-primary" style="justify-content:center; font-weight:800; padding:11px 16px;">
+                🔓 Unduh Firmware .BIN
+            </a>
+            <a href="/firmware/marketplace/{{ p.slug or p.product_id }}" target="_blank" class="app-button" style="justify-content:center; font-size:12px;">
+                Lihat Halaman Produk ↗
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
