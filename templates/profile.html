@@ -43,6 +43,148 @@
         color: var(--app-muted);
         margin-top: 8px;
     }
+    /* Dual-Mode Profile Switcher */
+    .profile-mode-nav {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+        border-bottom: 2px solid var(--app-border);
+        padding-bottom: 14px;
+        flex-wrap: wrap;
+    }
+    .profile-mode-btn {
+        font-size: 14px;
+        font-weight: 800;
+        padding: 10px 22px;
+        border-radius: var(--app-radius);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.15s ease;
+        border: 2px solid var(--app-border-strong);
+        background: var(--app-surface);
+        color: var(--app-text);
+    }
+    .profile-mode-btn:hover {
+        border-color: var(--app-brand);
+    }
+    .profile-mode-btn.is-active {
+        background: var(--app-brand);
+        color: white;
+        border-color: var(--app-brand);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    :root[data-theme="neo"] .profile-mode-btn.is-active {
+        background: #000;
+        color: #fff;
+        box-shadow: 4px 4px 0 #000;
+    }
+    .mkt-sub-nav {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 22px;
+        flex-wrap: wrap;
+    }
+    .mkt-sub-btn {
+        padding: 8px 18px;
+        border-radius: var(--app-radius);
+        font-size: 13px;
+        font-weight: 750;
+        border: 1.5px solid var(--app-border);
+        background: var(--app-surface);
+        color: var(--app-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .mkt-sub-btn:hover {
+        background: var(--app-soft);
+        color: var(--app-text);
+    }
+    .mkt-sub-btn.is-active {
+        background: var(--app-accent);
+        color: white;
+        border-color: var(--app-accent);
+    }
+    :root[data-theme="neo"] .mkt-sub-btn.is-active {
+        background: #008f5f;
+        box-shadow: 2px 2px 0 #111;
+    }
+    .fw-seller-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--app-shadow);
+        display: flex;
+        gap: 20px;
+        align-items: center;
+    }
+    @media (max-width: 768px) {
+        .fw-seller-card { flex-direction: column; align-items: flex-start; }
+    }
+    .fw-seller-card-img {
+        width: 100px;
+        height: 75px;
+        border-radius: var(--app-radius);
+        border: 1px solid var(--app-border);
+        object-fit: cover;
+        background: var(--app-surface-muted);
+        flex-shrink: 0;
+    }
+    .fw-purchase-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--app-shadow);
+        display: grid;
+        grid-template-columns: 90px 1fr auto;
+        gap: 20px;
+        align-items: center;
+    }
+    @media (max-width: 768px) {
+        .fw-purchase-card { grid-template-columns: 1fr; }
+    }
+    .fw-purchase-img {
+        width: 90px;
+        height: 72px;
+        border-radius: var(--app-radius);
+        border: 1px solid var(--app-border);
+        object-fit: cover;
+        background: var(--app-surface-muted);
+    }
+    .fw-finance-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .fw-metric-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 18px;
+        box-shadow: var(--app-shadow);
+    }
+    .fw-metric-label {
+        font-size: 11.5px;
+        font-weight: 800;
+        color: var(--app-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+    }
+    .fw-metric-val {
+        font-size: 22px;
+        font-weight: 900;
+        color: var(--app-text);
+    }
     .profile-section {
         margin-bottom: 24px;
     }
@@ -488,8 +630,31 @@
         </div>
     </div>
 
-    <!-- 🧠 AI Persona & Vector Profiling Dashboard -->
-    <div class="persona-container">
+    <!-- 🎛️ Dual-Mode Switcher: Profil vs Marketplace Firmware -->
+    <div class="profile-mode-nav">
+        <button type="button" 
+                class="profile-mode-btn {% if active_mode != 'marketplace' %}is-active{% endif %}" 
+                id="btnTabModeProfile" 
+                onclick="switchProfileTab('profile')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Mode Profil Saya</span>
+        </button>
+        <button type="button" 
+                class="profile-mode-btn {% if active_mode == 'marketplace' %}is-active{% endif %}" 
+                id="btnTabModeMarketplace" 
+                onclick="switchProfileTab('marketplace')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <span>Mode Marketplace Firmware</span>
+            <span style="background: var(--app-accent); color: white; font-size: 11px; padding: 2px 8px; border-radius: 999px; margin-left: 4px; font-weight: 800;">
+                {{ seller_products|length + purchases|length }}
+            </span>
+        </button>
+    </div>
+
+    <!-- 👤 Mode Profil Content -->
+    <div id="profileSectionProfile" style="{% if active_mode == 'marketplace' %}display:none;{% endif %}">
+        <!-- 🧠 AI Persona & Vector Profiling Dashboard -->
+        <div class="persona-container">
         <div class="persona-top-bar">
             <div class="persona-badge-wrap">
                 <div class="profile-section-title" style="margin-bottom: 0;">
@@ -877,6 +1042,509 @@
             </form>
         </div>
     </div>
+    </div><!-- /#profileSectionProfile -->
+
+    <!-- 🛒 Mode Marketplace Firmware Content -->
+    <div id="profileSectionMarketplace" style="{% if active_mode != 'marketplace' %}display:none;{% endif %}">
+        <!-- Sub-Navigation for Marketplace -->
+        <div class="mkt-sub-nav">
+            <button type="button" 
+                    class="mkt-sub-btn {% if active_sub == 'products' or not active_sub %}is-active{% endif %}" 
+                    id="subBtnProducts" 
+                    onclick="switchMarketplaceSubTab('products')">
+                <span>📦</span>
+                <span>Produk Saya (Jual)</span>
+                <span class="app-chip app-chip-small app-chip-neutral" style="font-size: 11px; padding: 1px 6px;">{{ seller_products|length }}</span>
+            </button>
+            <button type="button" 
+                    class="mkt-sub-btn {% if active_sub == 'purchases' %}is-active{% endif %}" 
+                    id="subBtnPurchases" 
+                    onclick="switchMarketplaceSubTab('purchases')">
+                <span>🔓</span>
+                <span>Pembelian Saya</span>
+                <span class="app-chip app-chip-small app-chip-neutral" style="font-size: 11px; padding: 1px 6px;">{{ purchases|length }}</span>
+            </button>
+            <button type="button" 
+                    class="mkt-sub-btn {% if active_sub == 'sales' %}is-active{% endif %}" 
+                    id="subBtnSales" 
+                    onclick="switchMarketplaceSubTab('sales')">
+                <span>💰</span>
+                <span>Penjualan & Saldo</span>
+                {% if financial_data and financial_data.wallet and financial_data.wallet.available_balance > 0 %}
+                <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 1px 6px;">Rp {{ "{:,}".format(financial_data.wallet.available_balance) }}</span>
+                {% endif %}
+            </button>
+        </div>
+
+        <!-- 📦 SUB-PANEL 1: PRODUK SAYA (JUAL) -->
+        <div id="mktSubPanelProducts" class="mkt-sub-panel" style="{% if active_sub and active_sub != 'products' %}display:none;{% endif %}">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+                <div>
+                    <h2 style="font-size:20px; font-weight:900; margin:0 0 4px; color:var(--app-text);">
+                        📦 Produk Firmware Saya
+                    </h2>
+                    <p style="font-size:13px; color:var(--app-muted); margin:0;">
+                        Kelola produk firmware Anda, ajukan untuk ditinjau, dan pantau status publikasi.
+                    </p>
+                </div>
+                <button type="button" onclick="openAddProductModal()" class="app-button app-button-primary" style="font-weight:800; font-size:13.5px; padding:9px 18px;">
+                    <span>➕</span> Tambah Produk Firmware
+                </button>
+            </div>
+
+            {% if not seller_products %}
+            <div class="app-muted-panel" style="text-align:center; padding:50px 20px; border:2px dashed var(--app-border); border-radius:var(--app-radius); background:var(--app-surface-muted);">
+                <div style="font-size:40px; margin-bottom:12px;">📦</div>
+                <h3 style="font-size:17px; font-weight:800; margin:0 0 6px;">Belum Ada Produk Firmware</h3>
+                <p style="color:var(--app-muted); font-size:13px; margin:0 0 16px;">
+                    Mulai jual binary firmware ESP32 atau Smart Device Anda kepada ribuan pengguna Xiaozhi.
+                </p>
+                <button type="button" onclick="openAddProductModal()" class="app-button app-button-primary">
+                    Buat Produk Firmware Pertama
+                </button>
+            </div>
+            {% else %}
+            <div>
+                {% for p in seller_products %}
+                <div class="fw-seller-card">
+                    {% if p.primary_image_key %}
+                    <img src="/api/v1/marketplace/images/{{ p.primary_image_key }}" alt="{{ p.title }}" class="fw-seller-card-img">
+                    {% else %}
+                    <div class="fw-seller-card-img" style="display:grid; place-items:center; font-size:26px;">💾</div>
+                    {% endif %}
+
+                    <div style="flex:1;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+                            {% if p.status == 'PUBLISHED' %}
+                            <span class="app-chip app-chip-success" style="font-size:11px; padding:3px 8px;">✅ PUBLISHED</span>
+                            {% elif p.status == 'PENDING_REVIEW' %}
+                            <span class="app-chip app-chip-info" style="font-size:11px; padding:3px 8px;">⏳ MENUNGGU REVIEW</span>
+                            {% elif p.status == 'REJECTED' %}
+                            <span class="app-chip" style="font-size:11px; padding:3px 8px; background:#fef2f2; color:#b91c1c; border:1px solid #f87171;">❌ DITOLAK</span>
+                            {% else %}
+                            <span class="app-chip app-chip-neutral" style="font-size:11px; padding:3px 8px;">📝 DRAFT</span>
+                            {% endif %}
+
+                            {% if p.is_admin_product %}
+                            <span class="app-chip" style="font-size:11px; padding:3px 8px; background:#fef08a; color:#854d0e; border:1px solid #ca8a04;">🛡️ OFFICIAL ADMIN</span>
+                            {% endif %}
+                            <span style="font-size:12px; color:var(--app-muted);">Diperbarui: {{ p.updated_at.strftime('%d %b %Y') if p.updated_at else p.created_at.strftime('%d %b %Y') }}</span>
+                        </div>
+
+                        <h3 style="font-size:17px; font-weight:800; margin:0 0 6px; color:var(--app-text);">
+                            {{ p.title }}
+                        </h3>
+                        <div style="font-size:13px; color:var(--app-muted); margin-bottom:8px;">
+                            Harga: <strong style="color:var(--app-text);">Rp {{ "{:,}".format(p.price_amount) }}</strong> • Terjual: <strong>{{ p.sales_count }}x</strong>
+                        </div>
+
+                        {% if p.status == 'REJECTED' and p.reject_reason %}
+                        <div class="app-alert app-alert-danger" style="margin-top:8px; font-size:12.5px;">
+                            <strong>Alasan Penolakan dari Admin:</strong> {{ p.reject_reason }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:8px; min-width:140px;">
+                        {% if p.status == 'PUBLISHED' %}
+                        <a href="/firmware/marketplace/{{ p.slug or p.id }}" class="app-button" target="_blank" style="justify-content:center;">Lihat di Marketplace ↗</a>
+                        {% elif p.status in ('DRAFT', 'REJECTED') %}
+                        <form method="POST" action="/firmware/seller/products/{{ p.id }}/submit">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="app-button app-button-primary" style="width:100%; justify-content:center;">
+                                🚀 Ajukan Review
+                            </button>
+                        </form>
+                        {% elif p.status == 'PENDING_REVIEW' %}
+                        <button class="app-button" disabled style="opacity:0.6; justify-content:center;">Sedang Ditinjau</button>
+                        {% endif %}
+
+                        <div style="display:flex; gap:6px;">
+                            <a href="/firmware/seller/products/{{ p.id }}/edit" class="app-button" style="flex:1; justify-content:center; font-size:12px; padding:6px 10px;">
+                                ✏️ Edit
+                            </a>
+                            <form method="POST" action="/firmware/seller/products/{{ p.id }}/delete" onsubmit="return confirm('Hapus atau arsipkan produk firmware ini?');" style="margin:0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="app-button" style="font-size:12px; padding:6px 10px; color:#dc2626; border-color:#fca5a5;" title="Hapus Produk">
+                                    🗑️
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 🔓 SUB-PANEL 2: PEMBELIAN SAYA -->
+        <div id="mktSubPanelPurchases" class="mkt-sub-panel" style="{% if active_sub != 'purchases' %}display:none;{% endif %}">
+            <div style="margin-bottom:20px;">
+                <h2 style="font-size:20px; font-weight:900; margin:0 0 4px; color:var(--app-text);">
+                    🔓 Pembelian Saya
+                </h2>
+                <p style="font-size:13px; color:var(--app-muted); margin:0;">
+                    Daftar lisensi firmware yang sudah Anda beli. File binary <code>.bin</code> dapat diunduh kapan pun.
+                </p>
+            </div>
+
+            {% if not purchases %}
+            <div class="app-muted-panel" style="text-align:center; padding:50px 20px; border:2px dashed var(--app-border); border-radius:var(--app-radius); background:var(--app-surface-muted);">
+                <div style="font-size:40px; margin-bottom:12px;">🛒</div>
+                <h3 style="font-size:17px; font-weight:800; margin:0 0 6px;">Belum Ada Pembelian Firmware</h3>
+                <p style="color:var(--app-muted); font-size:13px; margin:0 0 16px;">
+                    Jelajahi katalog marketplace dan temukan binary firmware terbaik untuk perangkat Anda.
+                </p>
+                <a href="/firmware/marketplace" class="app-button app-button-primary">Jelajahi Katalog Firmware</a>
+            </div>
+            {% else %}
+            <div>
+                {% for p in purchases %}
+                <div class="fw-purchase-card">
+                    {% if p.image_url %}
+                    <img src="{{ p.image_url }}" alt="{{ p.product_title_snapshot }}" class="fw-purchase-img">
+                    {% else %}
+                    <div class="fw-purchase-img" style="display:grid; place-items:center; font-size:28px;">💾</div>
+                    {% endif %}
+
+                    <div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+                            <span class="app-chip app-chip-success" style="font-size:11px; padding:2px 8px;">✅ LISENSI AKTIF</span>
+                            <span style="font-size:12px; color:var(--app-muted);">Order #{{ p.order_number }}</span>
+                            <span style="font-size:12px; color:var(--app-muted);">• Dibeli: {{ p.paid_at.strftime('%d %b %Y, %H:%M') if p.paid_at else '-' }}</span>
+                        </div>
+
+                        <h3 style="font-size:17px; font-weight:800; margin:0 0 4px; color:var(--app-text);">
+                            {{ p.product_title_snapshot }}
+                        </h3>
+
+                        <div style="font-size:13px; color:var(--app-muted); margin-bottom:8px;">
+                            Penjual: <strong>{{ p.seller_name_snapshot }}</strong> • Versi: <strong>{{ p.version_label_snapshot }}</strong> • Ukuran: <strong>{{ (p.file_size / (1024*1024))|round(2) }} MB</strong>
+                        </div>
+
+                        <!-- SHA-256 Checksum -->
+                        <div style="display:flex; align-items:center; gap:8px; font-size:11.5px; background:var(--app-surface-muted); padding:6px 10px; border-radius:4px; border:1px solid var(--app-border); width:fit-content;">
+                            <span style="font-weight:700; color:var(--app-muted);">SHA-256:</span>
+                            <code id="hash-{{ loop.index }}" style="font-family:monospace; color:var(--app-text);">{{ p.firmware_sha256_snapshot }}</code>
+                            <button type="button" onclick="navigator.clipboard.writeText('{{ p.firmware_sha256_snapshot }}'); alert('SHA-256 disalin!');" title="Salin SHA-256" style="background:none; border:none; cursor:pointer; font-size:14px; padding:0 4px;">📋</button>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:8px; min-width:170px;">
+                        <a href="/firmware/purchases/{{ p.purchase_id }}/download" class="app-button app-button-primary" style="justify-content:center; font-weight:800; padding:10px 16px;">
+                            🔓 Unduh Firmware .BIN
+                        </a>
+                        <a href="/firmware/marketplace/{{ p.slug or p.product_id }}" target="_blank" class="app-button" style="justify-content:center; font-size:12px;">
+                            Lihat Halaman Produk ↗
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 💰 SUB-PANEL 3: PENJUALAN & SALDO -->
+        <div id="mktSubPanelSales" class="mkt-sub-panel" style="{% if active_sub != 'sales' %}display:none;{% endif %}">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+                <div>
+                    <h2 style="font-size:20px; font-weight:900; margin:0 0 4px; color:var(--app-text);">
+                        💰 Penjualan & Saldo Dompet
+                    </h2>
+                    <p style="font-size:13px; color:var(--app-muted); margin:0;">
+                        Pantau pendapatan dari penjualan firmware dan lakukan penarikan saldo secara transparan.
+                    </p>
+                </div>
+                <button type="button" onclick="openWithdrawModal()" class="app-button app-button-primary" style="font-weight:800; padding:9px 18px;">
+                    💳 Tarik Saldo Penjualan
+                </button>
+            </div>
+
+            <!-- Metrics Cards -->
+            <div class="fw-finance-grid">
+                <div class="fw-metric-card">
+                    <div class="fw-metric-label">Saldo Tersedia</div>
+                    <div class="fw-metric-val" style="color:var(--app-brand);">
+                        Rp {{ "{:,}".format(financial_data.wallet.available_balance if financial_data and financial_data.wallet else 0) }}
+                    </div>
+                    <div style="font-size:11.5px; color:var(--app-muted); margin-top:4px;">Siap ditarik ke rekening Anda</div>
+                </div>
+                <div class="fw-metric-card">
+                    <div class="fw-metric-label">Total Omset Kotor</div>
+                    <div class="fw-metric-val">
+                        Rp {{ "{:,}".format(financial_data.summary.gross_sales if financial_data and financial_data.summary else 0) }}
+                    </div>
+                    <div style="font-size:11.5px; color:var(--app-muted); margin-top:4px;">Dari {{ financial_data.summary.total_orders if financial_data and financial_data.summary else 0 }} transaksi sukses</div>
+                </div>
+                <div class="fw-metric-card">
+                    <div class="fw-metric-label">Total Fee Platform</div>
+                    <div class="fw-metric-val" style="color:#b45309;">
+                        Rp {{ "{:,}".format(financial_data.summary.total_fees if financial_data and financial_data.summary else 0) }}
+                    </div>
+                    <div style="font-size:11.5px; color:var(--app-muted); margin-top:4px;">Biaya admin Rp 1.500 per pesanan</div>
+                </div>
+                <div class="fw-metric-card">
+                    <div class="fw-metric-label">Total Bersih Diterima</div>
+                    <div class="fw-metric-val" style="color:var(--app-accent);">
+                        Rp {{ "{:,}".format(financial_data.summary.net_sales if financial_data and financial_data.summary else 0) }}
+                    </div>
+                    <div style="font-size:11.5px; color:var(--app-muted); margin-top:4px;">Akumulasi pendapatan bersih</div>
+                </div>
+            </div>
+
+            <!-- Transparent Transactions Table -->
+            <div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:24px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <h3 style="font-size:16px; font-weight:800; margin:0; color:var(--app-text);">
+                        Riwayat Transaksi Penjualan (Transparan)
+                    </h3>
+                    <span style="font-size:12px; color:var(--app-muted);">Semua potongan biaya tercatat jelas</span>
+                </div>
+
+                {% if not financial_data or not financial_data.orders %}
+                <div style="text-align:center; padding:30px 10px; color:var(--app-muted); font-size:13.5px;">
+                    Belum ada riwayat transaksi penjualan.
+                </div>
+                {% else %}
+                <div class="app-table-wrap">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Tanggal</th>
+                                <th>Produk Firmware</th>
+                                <th>Pembeli</th>
+                                <th>Harga Jual</th>
+                                <th>Fee Admin</th>
+                                <th>Bersih Diterima</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for o in financial_data.orders %}
+                            <tr>
+                                <td style="font-weight:700; font-family:monospace;">#{{ o.order_number }}</td>
+                                <td style="color:var(--app-muted); font-size:12px;">{{ o.paid_at.strftime('%d %b %Y, %H:%M') if o.paid_at else '-' }}</td>
+                                <td style="font-weight:800;">{{ o.product_title_snapshot }}</td>
+                                <td>{{ o.buyer_username }}</td>
+                                <td style="font-weight:700;">Rp {{ "{:,}".format(o.subtotal_amount) }}</td>
+                                <td style="color:#b45309; font-weight:700;">- Rp {{ "{:,}".format(o.platform_fee_amount) }}</td>
+                                <td style="color:var(--app-brand); font-weight:800;">Rp {{ "{:,}".format(o.seller_net_amount) }}</td>
+                                <td><span class="app-chip app-chip-success" style="font-size:11px; padding:2px 6px;">PAID</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Ledger & Withdrawal History -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                <!-- Ledger -->
+                <div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow);">
+                    <h3 style="font-size:16px; font-weight:800; margin:0 0 12px; color:var(--app-text);">
+                        Buku Kas Dompet (Append-Only Ledger)
+                    </h3>
+                    {% if not financial_data or not financial_data.ledger %}
+                    <div style="text-align:center; padding:20px; color:var(--app-muted); font-size:13px;">Belum ada entri ledger.</div>
+                    {% else %}
+                    <div style="max-height:300px; overflow-y:auto;">
+                        {% for l in financial_data.ledger %}
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed var(--app-border); font-size:12.5px;">
+                            <div>
+                                <div style="font-weight:700;">{{ l.description }}</div>
+                                <div style="font-size:11px; color:var(--app-muted);">{{ l.created_at.strftime('%d %b %Y, %H:%M') if l.created_at else '-' }}</div>
+                            </div>
+                            <div style="font-weight:800; {% if l.direction == 'CREDIT' %}color:var(--app-brand);{% else %}color:#dc2626;{% endif %}">
+                                {% if l.direction == 'CREDIT' %}+{% else %}-{% endif %} Rp {{ "{:,}".format(l.amount) }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Withdrawals -->
+                <div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow);">
+                    <h3 style="font-size:16px; font-weight:800; margin:0 0 12px; color:var(--app-text);">
+                        Riwayat Penarikan Dana
+                    </h3>
+                    {% if not financial_data or not financial_data.withdrawals %}
+                    <div style="text-align:center; padding:20px; color:var(--app-muted); font-size:13px;">Belum ada permintaan penarikan dana.</div>
+                    {% else %}
+                    <div style="max-height:300px; overflow-y:auto;">
+                        {% for w in financial_data.withdrawals %}
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed var(--app-border); font-size:12.5px;">
+                            <div>
+                                <div style="font-weight:700;">{{ w.destination_bank }} - {{ w.destination_account_name }}</div>
+                                <div style="font-size:11px; color:var(--app-muted);">{{ w.created_at.strftime('%d %b %Y, %H:%M') if w.created_at else '-' }}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-weight:800; color:var(--app-text);">Rp {{ "{:,}".format(w.amount) }}</div>
+                                <span class="app-chip app-chip-info" style="font-size:10px; padding:1px 5px;">{{ w.status }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Product Modal -->
+        <div id="addProductModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
+            <div class="mcp-blocking-box" style="max-width:620px; text-align:left; max-height:90vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2 style="font-size:20px; font-weight:900; margin:0; color:var(--app-text);">
+                        Tambah Produk Firmware
+                    </h2>
+                    <button type="button" onclick="closeAddProductModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
+                </div>
+
+                {% if user.role == 'admin' %}
+                <div class="app-alert app-alert-warning" style="margin-bottom:16px; font-size:12.5px;">
+                    <strong>Mode Admin:</strong> Produk yang Anda upload akan langsung berstatus <strong>PUBLISHED</strong> tanpa melalui antrean review approval dan memiliki lencana <strong>OFFICIAL ADMIN</strong>.
+                </div>
+                {% endif %}
+
+                <form method="POST" action="/firmware/seller/products" enctype="multipart/form-data" id="addProductForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <!-- Photos (1-3) -->
+                    <div style="margin-bottom:14px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
+                            Foto Produk (Maksimal 3 foto • Maks 500 KB per foto) <span style="color:#dc2626;">*</span>
+                        </label>
+                        <input type="file" name="images" id="productImagesInput" accept="image/png, image/jpeg, image/webp" multiple required class="app-input" onchange="previewSelectedImages(this)" style="width:100%;">
+                        <div id="imagePreviewRow" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
+                    </div>
+
+                    <!-- Title -->
+                    <div style="margin-bottom:14px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
+                            Judul Produk Firmware <span style="color:#dc2626;">*</span>
+                        </label>
+                        <input type="text" name="title" required maxlength="160" placeholder="Contoh: ESP32 Voice Assistant Pro v2" class="app-input" style="width:100%;">
+                    </div>
+
+                    <!-- Short Desc -->
+                    <div style="margin-bottom:14px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
+                            Deskripsi Singkat (Maks 500 karakter) <span style="color:#dc2626;">*</span>
+                        </label>
+                        <input type="text" name="short_description" required maxlength="500" placeholder="Ringkasan fitur firmware dalam 1-2 kalimat" class="app-input" style="width:100%;">
+                    </div>
+
+                    <!-- Full Desc -->
+                    <div style="margin-bottom:14px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
+                            Deskripsi Lengkap & Panduan Pinout <span style="color:#dc2626;">*</span>
+                        </label>
+                        <textarea name="full_description" required rows="5" placeholder="Jelaskan spesifikasi hardware (ESP32-S3 / C3), pinout, fitur, dan catatan instalasi..." class="app-input" style="width:100%;"></textarea>
+                    </div>
+
+                    <!-- Documentation Link -->
+                    <div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-bottom:14px;">
+                        <div>
+                            <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">Label Link</label>
+                            <input type="text" name="doc_label" placeholder="GitHub / Skema" class="app-input" style="width:100%;">
+                        </div>
+                        <div>
+                            <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">URL Panduan (HTTPS)</label>
+                            <input type="url" name="doc_url" placeholder="https://github.com/..." class="app-input" style="width:100%;">
+                        </div>
+                    </div>
+
+                    <!-- Price -->
+                    <div style="margin-bottom:14px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
+                            Harga Jual (IDR) <span style="color:#dc2626;">*</span>
+                        </label>
+                        <input type="number" name="price_amount" required min="0" step="1000" placeholder="35000 (Isi 0 jika gratis)" class="app-input" style="width:100%;">
+                        <div style="font-size:11.5px; color:var(--app-muted); margin-top:4px;">
+                            *Biaya administrasi platform sebesar Rp 1.500 akan dipotong dari saldo penjualan saat pesanan berhasil.
+                        </div>
+                    </div>
+
+                    <!-- Firmware Binary Upload & Realtime Checksum -->
+                    <div style="background:var(--app-surface-muted); padding:14px; border:1.5px dashed var(--app-border-strong); border-radius:var(--app-radius); margin-bottom:18px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
+                            Binary Firmware (.bin only) <span style="color:#dc2626;">*</span>
+                        </label>
+                        <input type="file" name="firmware_file" id="firmwareFileInput" accept=".bin" required class="app-input" onchange="calculateClientSha256(this)" style="width:100%;">
+                        
+                        <!-- Realtime Client SHA-256 feedback -->
+                        <div id="sha256Box" style="display:none; margin-top:10px; font-size:12px; color:var(--app-text);">
+                            <div style="font-weight:800; color:var(--app-brand);">✓ SHA-256 Terhitung:</div>
+                            <code id="sha256Value" style="word-break:break-all; font-family:monospace; background:var(--app-surface); padding:4px 8px; border-radius:4px; display:block; margin-top:3px; border:1px solid var(--app-border);">Menghitung...</code>
+                        </div>
+                    </div>
+
+                    <!-- Submit buttons -->
+                    <div style="display:flex; justify-content:flex-end; gap:10px;">
+                        <button type="button" onclick="closeAddProductModal()" class="app-button">Batal</button>
+                        <button type="submit" id="btnSubmitProduct" class="app-button app-button-primary" style="font-weight:800;">
+                            {% if user.role == 'admin' %}
+                            ⚡ Terbitkan Sekarang (Official Admin)
+                            {% else %}
+                            Simpan & Lanjutkan
+                            {% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Withdrawal Modal -->
+        <div id="withdrawModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
+            <div class="mcp-blocking-box" style="max-width:480px; text-align:left;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2 style="font-size:19px; font-weight:900; margin:0; color:var(--app-text);">
+                        Tarik Saldo Penjualan
+                    </h2>
+                    <button type="button" onclick="closeWithdrawModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
+                </div>
+
+                <div style="background:var(--app-surface-muted); padding:12px; border-radius:var(--app-radius); margin-bottom:16px; font-size:13px;">
+                    <div>Saldo Tersedia: <strong style="color:var(--app-brand); font-size:15px;">Rp {{ "{:,}".format(financial_data.wallet.available_balance if financial_data and financial_data.wallet else 0) }}</strong></div>
+                    <div style="color:var(--app-muted); font-size:11.5px; margin-top:2px;">Minimal penarikan: Rp {{ "{:,}".format(financial_data.minimum_withdrawal if financial_data else 10000) }}</div>
+                </div>
+
+                <form method="POST" action="/firmware/seller/withdrawals">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div style="margin-bottom:12px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Jumlah Penarikan (IDR)</label>
+                        <input type="number" name="amount" required min="{{ financial_data.minimum_withdrawal if financial_data else 10000 }}" max="{{ financial_data.wallet.available_balance if financial_data and financial_data.wallet else 0 }}" step="1000" placeholder="Minimal {{ financial_data.minimum_withdrawal if financial_data else 10000 }}" class="app-input" style="width:100%;">
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Nama Bank / E-Wallet</label>
+                        <input type="text" name="destination_bank" required placeholder="BCA / Mandiri / BRI / GoPay / DANA" class="app-input" style="width:100%;">
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Nama Pemilik Rekening</label>
+                        <input type="text" name="destination_account_name" required placeholder="Nama lengkap sesuai buku tabungan" class="app-input" style="width:100%;">
+                    </div>
+
+                    <div style="margin-bottom:18px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Nomor Rekening</label>
+                        <input type="text" name="destination_account_number" required placeholder="Contoh: 1234567890" class="app-input" style="width:100%;">
+                        <div style="font-size:11px; color:var(--app-muted); margin-top:3px;">
+                            *Nomor rekening dienkripsi secara aman (AES-256) pada database.
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:10px;">
+                        <button type="button" onclick="closeWithdrawModal()" class="app-button">Batal</button>
+                        <button type="submit" class="app-button app-button-primary" style="font-weight:800;">
+                            Kirim Permintaan Penarikan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div><!-- /#profileSectionMarketplace -->
 </div>
 
 <script>
@@ -1098,5 +1766,135 @@
             alert("Terjadi kesalahan: " + err.message);
         }
     }
+
+    // ── Marketplace Tab & Sub-tab Switching ──
+    let currentProfileMode = '{{ active_mode or "profile" }}';
+    let currentMarketplaceSub = '{{ active_sub or "products" }}';
+
+    function switchProfileTab(mode, sub) {
+        currentProfileMode = mode;
+        const btnProfile = document.getElementById("btnTabModeProfile");
+        const btnMkt = document.getElementById("btnTabModeMarketplace");
+        const secProfile = document.getElementById("profileSectionProfile");
+        const secMkt = document.getElementById("profileSectionMarketplace");
+
+        if (mode === 'marketplace') {
+            if (btnProfile) btnProfile.classList.remove("is-active");
+            if (btnMkt) btnMkt.classList.add("is-active");
+            if (secProfile) secProfile.style.display = "none";
+            if (secMkt) secMkt.style.display = "block";
+            if (sub) {
+                switchMarketplaceSubTab(sub);
+            }
+            const newUrl = '/profil?mode=marketplace' + (currentMarketplaceSub ? '&sub=' + currentMarketplaceSub : '');
+            window.history.replaceState(null, '', newUrl);
+        } else {
+            if (btnProfile) btnProfile.classList.add("is-active");
+            if (btnMkt) btnMkt.classList.remove("is-active");
+            if (secProfile) secProfile.style.display = "block";
+            if (secMkt) secMkt.style.display = "none";
+            window.history.replaceState(null, '', '/profil');
+        }
+    }
+
+    function switchMarketplaceSubTab(subName) {
+        currentMarketplaceSub = subName;
+        ['products', 'purchases', 'sales'].forEach(s => {
+            const btn = document.getElementById('subBtn' + s.charAt(0).toUpperCase() + s.slice(1));
+            const panel = document.getElementById('mktSubPanel' + s.charAt(0).toUpperCase() + s.slice(1));
+            if (btn) {
+                if (s === subName) btn.classList.add('is-active');
+                else btn.classList.remove('is-active');
+            }
+            if (panel) {
+                if (s === subName) panel.style.display = 'block';
+                else panel.style.display = 'none';
+            }
+        });
+        if (currentProfileMode === 'marketplace') {
+            window.history.replaceState(null, '', '/profil?mode=marketplace&sub=' + subName);
+        }
+    }
+
+    function openAddProductModal() {
+        const m = document.getElementById('addProductModal');
+        if (m) m.style.display = 'flex';
+    }
+    function closeAddProductModal() {
+        const m = document.getElementById('addProductModal');
+        if (m) m.style.display = 'none';
+    }
+
+    function openWithdrawModal() {
+        const m = document.getElementById('withdrawModal');
+        if (m) m.style.display = 'flex';
+    }
+    function closeWithdrawModal() {
+        const m = document.getElementById('withdrawModal');
+        if (m) m.style.display = 'none';
+    }
+
+    function previewSelectedImages(input) {
+        const row = document.getElementById('imagePreviewRow');
+        if (!row) return;
+        row.innerHTML = '';
+        if (input.files) {
+            const files = Array.from(input.files).slice(0, 3);
+            files.forEach(f => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.width = '70px';
+                    img.style.height = '70px';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '4px';
+                    img.style.border = '2px solid var(--app-border)';
+                    row.appendChild(img);
+                };
+                reader.readAsDataURL(f);
+            });
+        }
+    }
+
+    async function calculateClientSha256(input) {
+        const file = input.files[0];
+        const box = document.getElementById('sha256Box');
+        const val = document.getElementById('sha256Value');
+        if (!file) {
+            if (box) box.style.display = 'none';
+            return;
+        }
+
+        if (box) box.style.display = 'block';
+        if (val) val.innerText = 'Menghitung SHA-256 file...';
+
+        try {
+            const buffer = await file.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            if (val) val.innerText = hashHex;
+        } catch (e) {
+            if (val) val.innerText = 'Kalkulasi otomatis selesai di server.';
+        }
+    }
+
+    window.addEventListener('click', function(e) {
+        const mAdd = document.getElementById('addProductModal');
+        if (e.target === mAdd) closeAddProductModal();
+        const mWith = document.getElementById('withdrawModal');
+        if (e.target === mWith) closeWithdrawModal();
+    });
+
+    // Auto-activate mode/sub on load if specified in URL query
+    document.addEventListener('DOMContentLoaded', function() {
+        const params = new URLSearchParams(window.location.search);
+        const mode = params.get('mode') || currentProfileMode;
+        const sub = params.get('sub') || currentMarketplaceSub;
+        if (mode === 'marketplace') {
+            switchProfileTab('marketplace', sub);
+        }
+    });
 </script>
 {% endblock %}
