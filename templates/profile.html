@@ -2588,22 +2588,39 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, w, h);
 
-                    canvas.toBlob(
-                        (blob) => {
-                            if (!blob) {
-                                resolve(file);
-                                return;
-                            }
-                            const newName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
-                            const compressedFile = new File([blob], newName, {
-                                type: 'image/webp',
-                                lastModified: Date.now(),
-                            });
-                            resolve(compressedFile);
-                        },
-                        'image/webp',
-                        quality
-                    );
+                    const tryCompress = (q, dimReduction = 1.0) => {
+                        let targetCanvas = canvas;
+                        if (dimReduction < 1.0) {
+                            targetCanvas = document.createElement('canvas');
+                            targetCanvas.width = Math.round(w * dimReduction);
+                            targetCanvas.height = Math.round(h * dimReduction);
+                            const tCtx = targetCanvas.getContext('2d');
+                            tCtx.drawImage(canvas, 0, 0, targetCanvas.width, targetCanvas.height);
+                        }
+                        targetCanvas.toBlob(
+                            (blob) => {
+                                if (!blob) {
+                                    resolve(file);
+                                    return;
+                                }
+                                // If blob still > 480 KB (491520 bytes), compress stronger
+                                if (blob.size > 491520 && q > 0.45) {
+                                    tryCompress(q - 0.15, dimReduction * 0.85);
+                                    return;
+                                }
+                                const newName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+                                const compressedFile = new File([blob], newName, {
+                                    type: 'image/webp',
+                                    lastModified: Date.now(),
+                                });
+                                resolve(compressedFile);
+                            },
+                            'image/webp',
+                            q
+                        );
+                    };
+
+                    tryCompress(quality, 1.0);
                 };
                 img.onerror = () => resolve(file);
                 img.src = e.target.result;
@@ -2750,9 +2767,9 @@
         }
         for (let i = 0; i < imgInput.files.length; i++) {
             const file = imgInput.files[i];
-            if (file.size > 512000) {
-                const kb = (file.size / 1024).toFixed(0);
-                return showError(`Foto "${file.name}" terlalu besar (${kb} KB). Maksimal ukuran per foto adalah 500 KB.`, imgInput);
+            if (file.size > 10 * 1024 * 1024) {
+                const mb = (file.size / (1024 * 1024)).toFixed(1);
+                return showError(`Foto "${file.name}" terlalu besar (${mb} MB). Maksimal 10 MB per foto untuk diproses otomatis.`, imgInput);
             }
             const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
             if (file.type && !validTypes.includes(file.type.toLowerCase())) {
