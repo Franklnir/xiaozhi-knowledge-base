@@ -7,19 +7,42 @@ from typing import Dict, Any, List, Optional, Tuple
 import psycopg
 from psycopg import sql
 
+from contextlib import contextmanager
+import os
+
 logger = logging.getLogger("xiaozhi.marketplace.repository")
 
 
 class MarketplaceRepository:
     """
     Database repository for Firmware Marketplace.
-    Uses the application's existing Psycopg 3 connection pool.
+    Uses the application's existing Psycopg 3 connection pool or creates a pool from DATABASE_URL.
     """
     def __init__(self, store):
         self.store = store
+        self._custom_pool = None
+        if not hasattr(self.store, "_get_conn"):
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                try:
+                    from psycopg_pool import ConnectionPool
+                    self._custom_pool = ConnectionPool(conninfo=db_url, min_size=1, max_size=5, open=True)
+                except Exception as e:
+                    logger.warning("Failed to open custom pool for marketplace: %s", e)
 
+    def is_db_ready(self) -> bool:
+        return hasattr(self.store, "_get_conn") or self._custom_pool is not None
+
+    @contextmanager
     def _get_conn(self):
-        return self.store._get_conn()
+        if hasattr(self.store, "_get_conn"):
+            with self.store._get_conn() as conn:
+                yield conn
+        elif self._custom_pool:
+            with self._custom_pool.connection() as conn:
+                yield conn
+        else:
+            raise RuntimeError("Database PostgreSQL belum terhubung. Pastikan DATABASE_URL diset di environment.")
 
     def set_rls_context(self, cur, user_id: Optional[int], user_role: Optional[str] = "user"):
         """Sets transaction-local configuration for PostgreSQL Row-Level Security."""
@@ -30,6 +53,8 @@ class MarketplaceRepository:
 
     # ── PRODUCTS ─────────────────────────────────────────────────────────────
     def get_published_products(self, limit: int = 20, cursor_time: Optional[str] = None, cursor_id: Optional[str] = None, search: Optional[str] = None) -> List[Dict[str, Any]]:
+        if not self.is_db_ready():
+            return []
         query = """
             SELECT 
                 p.id, p.title, p.slug, p.short_description, p.price_amount, p.currency,
@@ -54,35 +79,51 @@ class MarketplaceRepository:
         query += " ORDER BY p.published_at DESC, p.id DESC LIMIT %s;"
         params.append(min(max(1, limit), 50))
 
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, params)
-                rows = cur.fetchall()
-                return [dict(r) for r in rows]
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(query, params)
+                    rows = cur.fetchall()
+                    return [dict(r) for r in rows]
+        except Exception as exc:
+            logger.warning("get_published_products query failed: %s", exc)
+            return []
 
     def get_product_by_id(self, product_id: str) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT p.*, u.username AS seller_username, u.role AS seller_role
-                    FROM firmware_products p
-                    JOIN users u ON u.id = p.seller_id
-                    WHERE p.id = %s;
-                """, (product_id,))
-                row = cur.fetchone()
-                return dict(row) if row else None
+        if not self.is_db_ready():
+            return None
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT p.*, u.username AS seller_username, u.role AS seller_role
+                        FROM firmware_products p
+                        JOIN users u ON u.id = p.seller_id
+                        WHERE p.id = %s;
+                    """, (product_id,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        except Exception as exc:
+            logger.warning("get_product_by_id query failed: %s", exc)
+            return None
 
     def get_product_by_slug(self, slug: str) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT p.*, u.username AS seller_username, u.role AS seller_role
-                    FROM firmware_products p
-                    JOIN users u ON u.id = p.seller_id
-                    WHERE p.slug = %s;
-                """, (slug,))
-                row = cur.fetchone()
-                return dict(row) if row else None
+        if not self.is_db_ready():
+            return None
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT p.*, u.username AS seller_username, u.role AS seller_role
+                        FROM firmware_products p
+                        JOIN users u ON u.id = p.seller_id
+                        WHERE p.slug = %s;
+                    """, (slug,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        except Exception as exc:
+            logger.warning("get_product_by_slug query failed: %s", exc)
+            return None
 
     def get_product_images(self, product_id: str) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
@@ -119,6 +160,8 @@ class MarketplaceRepository:
                 return dict(row) if row else None
 
     def get_seller_products(self, seller_id: int, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        if not self.is_db_ready():
+            return []
         query = """
             SELECT p.*, 
                    img.storage_key AS primary_image_key,
@@ -138,12 +181,18 @@ class MarketplaceRepository:
             params.append(status)
         query += " ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC;"
 
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, params)
-                return [dict(r) for r in cur.fetchall()]
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(query, params)
+                    return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("get_seller_products failed: %s", exc)
+            return []
 
     def get_all_products_admin(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        if not self.is_db_ready():
+            return []
         query = """
             SELECT p.*, 
                    u.username AS seller_username,
@@ -159,10 +208,14 @@ class MarketplaceRepository:
             params.append(status)
         query += " ORDER BY p.created_at DESC;"
 
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, params)
-                return [dict(r) for r in cur.fetchall()]
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(query, params)
+                    return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("get_all_products_admin failed: %s", exc)
+            return []
 
     def create_product(
         self,
@@ -744,69 +797,94 @@ class MarketplaceRepository:
 
     # ── PURCHASES & DOWNLOADS ────────────────────────────────────────────────
     def get_buyer_purchases(self, buyer_id: int) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT 
-                        e.id AS purchase_id, e.status AS entitlement_status, e.entitled_at,
-                        o.order_number, o.paid_at, o.subtotal_amount, o.currency,
-                        o.product_title_snapshot, o.seller_name_snapshot, o.version_label_snapshot, o.firmware_sha256_snapshot,
-                        p.id AS product_id, p.slug,
-                        img.storage_key AS primary_image_key,
-                        a.original_filename, a.file_size, a.storage_key
-                    FROM purchase_entitlements e
-                    JOIN orders o ON o.id = e.order_id
-                    JOIN firmware_products p ON p.id = e.product_id
-                    JOIN firmware_product_versions v ON v.id = e.product_version_id
-                    JOIN firmware_assets a ON a.product_version_id = v.id
-                    LEFT JOIN firmware_product_images img ON img.product_id = p.id AND img.is_primary = TRUE
-                    WHERE e.buyer_id = %s AND e.status = 'ACTIVE' AND o.status = 'PAID'
-                    ORDER BY e.entitled_at DESC;
-                """, (buyer_id,))
-                return [dict(r) for r in cur.fetchall()]
+        if not self.is_db_ready():
+            return []
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            e.id AS purchase_id, e.status AS entitlement_status, e.entitled_at,
+                            o.order_number, o.paid_at, o.subtotal_amount, o.currency,
+                            o.product_title_snapshot, o.seller_name_snapshot, o.version_label_snapshot, o.firmware_sha256_snapshot,
+                            p.id AS product_id, p.slug,
+                            img.storage_key AS primary_image_key,
+                            a.original_filename, a.file_size, a.storage_key
+                        FROM purchase_entitlements e
+                        JOIN orders o ON o.id = e.order_id
+                        JOIN firmware_products p ON p.id = e.product_id
+                        JOIN firmware_product_versions v ON v.id = e.product_version_id
+                        JOIN firmware_assets a ON a.product_version_id = v.id
+                        LEFT JOIN firmware_product_images img ON img.product_id = p.id AND img.is_primary = TRUE
+                        WHERE e.buyer_id = %s AND e.status = 'ACTIVE' AND o.status = 'PAID'
+                        ORDER BY e.entitled_at DESC;
+                    """, (buyer_id,))
+                    return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("get_buyer_purchases failed: %s", exc)
+            return []
 
     def get_entitlement_for_download(self, purchase_id: str, buyer_id: int) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT 
-                        e.id AS purchase_id, e.buyer_id, e.status AS entitlement_status,
-                        o.status AS order_status,
-                        a.storage_bucket, a.storage_key, a.original_filename, a.sha256, a.file_size
-                    FROM purchase_entitlements e
-                    JOIN orders o ON o.id = e.order_id
-                    JOIN firmware_assets a ON a.product_version_id = e.product_version_id
-                    WHERE e.id = %s AND e.buyer_id = %s AND e.status = 'ACTIVE' AND o.status = 'PAID';
-                """, (purchase_id, buyer_id))
-                row = cur.fetchone()
-                return dict(row) if row else None
+        if not self.is_db_ready():
+            return None
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            e.id AS purchase_id, e.buyer_id, e.status AS entitlement_status,
+                            o.status AS order_status,
+                            a.storage_bucket, a.storage_key, a.original_filename, a.sha256, a.file_size
+                        FROM purchase_entitlements e
+                        JOIN orders o ON o.id = e.order_id
+                        JOIN firmware_assets a ON a.product_version_id = e.product_version_id
+                        WHERE e.id = %s AND e.buyer_id = %s AND e.status = 'ACTIVE' AND o.status = 'PAID';
+                    """, (purchase_id, buyer_id))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        except Exception as exc:
+            logger.warning("get_entitlement_for_download failed: %s", exc)
+            return None
 
     # ── WALLET & WITHDRAWALS ─────────────────────────────────────────────────
     def get_wallet(self, user_id: int) -> Dict[str, Any]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO wallet_accounts (user_id, currency, available_balance, pending_balance)
-                    VALUES (%s, 'IDR', 0, 0)
-                    ON CONFLICT (user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
-                    RETURNING *;
-                """, (user_id,))
-                wallet = dict(cur.fetchone())
-                conn.commit()
-                return wallet
+        default_wallet = {"id": "0", "user_id": user_id, "available_balance": 0, "pending_balance": 0, "currency": "IDR"}
+        if not self.is_db_ready():
+            return default_wallet
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO wallet_accounts (user_id, currency, available_balance, pending_balance)
+                        VALUES (%s, 'IDR', 0, 0)
+                        ON CONFLICT (user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+                        RETURNING *;
+                    """, (user_id,))
+                    wallet = dict(cur.fetchone())
+                    conn.commit()
+                    return wallet
+        except Exception as exc:
+            logger.warning("get_wallet failed: %s", exc)
+            return default_wallet
 
     def get_wallet_ledger(self, user_id: int, limit: int = 50) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT l.* 
-                    FROM wallet_ledger l
-                    JOIN wallet_accounts w ON w.id = l.wallet_account_id
-                    WHERE w.user_id = %s
-                    ORDER BY l.created_at DESC
-                    LIMIT %s;
-                """, (user_id, limit))
-                return [dict(r) for r in cur.fetchall()]
+        if not self.is_db_ready():
+            return []
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT l.* 
+                        FROM wallet_ledger l
+                        JOIN wallet_accounts w ON w.id = l.wallet_account_id
+                        WHERE w.user_id = %s
+                        ORDER BY l.created_at DESC
+                        LIMIT %s;
+                    """, (user_id, limit))
+                    return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("get_wallet_ledger failed: %s", exc)
+            return []
 
     def request_withdrawal(
         self,
@@ -872,86 +950,112 @@ class MarketplaceRepository:
                 return withdrawal
 
     def get_seller_withdrawals(self, user_id: int) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT * FROM withdrawals
-                    WHERE user_id = %s
-                    ORDER BY created_at DESC;
-                """, (user_id,))
-                return [dict(r) for r in cur.fetchall()]
+        if not self.is_db_ready():
+            return []
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT * FROM withdrawals
+                        WHERE user_id = %s
+                        ORDER BY created_at DESC;
+                    """, (user_id,))
+                    return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("get_seller_withdrawals failed: %s", exc)
+            return []
 
     def get_seller_sales_summary(self, seller_id: int) -> Dict[str, Any]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT 
-                        COALESCE(COUNT(*), 0) AS total_orders,
-                        COALESCE(SUM(subtotal_amount), 0) AS gross_sales,
-                        COALESCE(SUM(platform_fee_amount), 0) AS total_fees,
-                        COALESCE(SUM(seller_net_amount), 0) AS net_sales
-                    FROM orders
-                    WHERE seller_id = %s AND status = 'PAID';
-                """, (seller_id,))
-                return dict(cur.fetchone())
+        default_summary = {"total_orders": 0, "gross_sales": 0, "total_fees": 0, "net_sales": 0}
+        if not self.is_db_ready():
+            return default_summary
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            COALESCE(COUNT(*), 0) AS total_orders,
+                            COALESCE(SUM(subtotal_amount), 0) AS gross_sales,
+                            COALESCE(SUM(platform_fee_amount), 0) AS total_fees,
+                            COALESCE(SUM(seller_net_amount), 0) AS net_sales
+                        FROM orders
+                        WHERE seller_id = %s AND status = 'PAID';
+                    """, (seller_id,))
+                    return dict(cur.fetchone())
+        except Exception as exc:
+            logger.warning("get_seller_sales_summary failed: %s", exc)
+            return default_summary
 
     def get_seller_orders_list(self, seller_id: int, limit: int = 50) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT 
-                        o.*, u.username AS buyer_username
-                    FROM orders o
-                    JOIN users u ON u.id = o.buyer_id
-                    WHERE o.seller_id = %s AND o.status = 'PAID'
-                    ORDER BY o.paid_at DESC
-                    LIMIT %s;
-                """, (seller_id, limit))
-                return [dict(r) for r in cur.fetchall()]
+        if not self.is_db_ready():
+            return []
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            o.*, u.username AS buyer_username
+                        FROM orders o
+                        JOIN users u ON u.id = o.buyer_id
+                        WHERE o.seller_id = %s AND o.status = 'PAID'
+                        ORDER BY o.paid_at DESC
+                        LIMIT %s;
+                    """, (seller_id, limit))
+                    return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("get_seller_orders_list failed: %s", exc)
+            return []
 
     # ── ADMIN PLATFORM FINANCE ───────────────────────────────────────────────
     def get_admin_platform_finance(self) -> Dict[str, Any]:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                # Overall marketplace stats
-                cur.execute("""
-                    SELECT 
-                        COALESCE(COUNT(*), 0) AS total_paid_orders,
-                        COALESCE(SUM(subtotal_amount), 0) AS gross_volume,
-                        COALESCE(SUM(platform_fee_amount), 0) AS total_admin_fees,
-                        COALESCE(SUM(seller_net_amount), 0) AS total_seller_disbursed
-                    FROM orders
-                    WHERE status = 'PAID';
-                """)
-                summary = dict(cur.fetchone())
+        default_finance = {"total_paid_orders": 0, "gross_volume": 0, "total_admin_fees": 0, "total_seller_disbursed": 0, "admin_available_balance": 0}
+        if not self.is_db_ready():
+            return default_finance
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    # Overall marketplace stats
+                    cur.execute("""
+                        SELECT 
+                            COALESCE(COUNT(*), 0) AS total_paid_orders,
+                            COALESCE(SUM(subtotal_amount), 0) AS gross_volume,
+                            COALESCE(SUM(platform_fee_amount), 0) AS total_admin_fees,
+                            COALESCE(SUM(seller_net_amount), 0) AS total_seller_disbursed
+                        FROM orders
+                        WHERE status = 'PAID';
+                    """)
+                    summary = dict(cur.fetchone())
 
-                # Admin wallet balance
-                cur.execute("""
-                    SELECT w.available_balance 
-                    FROM wallet_accounts w
-                    JOIN users u ON u.id = w.user_id
-                    WHERE u.role = 'admin'
-                    ORDER BY u.id ASC LIMIT 1;
-                """)
-                w_row = cur.fetchone()
-                summary["admin_available_balance"] = w_row["available_balance"] if w_row else 0
+                    # Admin wallet balance
+                    cur.execute("""
+                        SELECT w.available_balance 
+                        FROM wallet_accounts w
+                        JOIN users u ON u.id = w.user_id
+                        WHERE u.role = 'admin'
+                        ORDER BY u.id ASC LIMIT 1;
+                    """)
+                    w_row = cur.fetchone()
+                    summary["admin_available_balance"] = w_row["available_balance"] if w_row else 0
 
-                # Recent platform transactions
-                cur.execute("""
-                    SELECT 
-                        o.id, o.order_number, o.product_title_snapshot, o.subtotal_amount,
-                        o.platform_fee_amount, o.seller_net_amount, o.paid_at,
-                        sb.username AS buyer_username,
-                        ss.username AS seller_username
-                    FROM orders o
-                    JOIN users sb ON sb.id = o.buyer_id
-                    JOIN users ss ON ss.id = o.seller_id
-                    WHERE o.status = 'PAID'
-                    ORDER BY o.paid_at DESC
-                    LIMIT 50;
-                """)
-                summary["transactions"] = [dict(r) for r in cur.fetchall()]
-                return summary
+                    # Recent platform transactions
+                    cur.execute("""
+                        SELECT 
+                            o.id, o.order_number, o.product_title_snapshot, o.subtotal_amount,
+                            o.platform_fee_amount, o.seller_net_amount, o.paid_at,
+                            sb.username AS buyer_username,
+                            ss.username AS seller_username
+                        FROM orders o
+                        JOIN users sb ON sb.id = o.buyer_id
+                        JOIN users ss ON ss.id = o.seller_id
+                        WHERE o.status = 'PAID'
+                        ORDER BY o.paid_at DESC
+                        LIMIT 50;
+                    """)
+                    summary["transactions"] = [dict(r) for r in cur.fetchall()]
+                    return summary
+        except Exception as exc:
+            logger.warning("get_admin_platform_finance failed: %s", exc)
+            return default_finance
 
     # ── CHAT ─────────────────────────────────────────────────────────────────
     def get_or_create_conversation(self, product_id: str, seller_id: int, buyer_id: int) -> Dict[str, Any]:
