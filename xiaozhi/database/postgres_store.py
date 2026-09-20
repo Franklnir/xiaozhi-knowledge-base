@@ -49,6 +49,14 @@ from xiaozhi.core.utils import (
 logger = logging.getLogger("xiaozhi.postgres")
 
 
+def _format_ts(val: Any) -> Optional[str]:
+    if val is None:
+        return None
+    if hasattr(val, "strftime"):
+        return val.strftime("%Y-%m-%d %H:%M:%S")
+    return str(val)
+
+
 class PostgresStore:
     """Production-grade PostgreSQL store for Xiaozhi Indonesia."""
 
@@ -433,7 +441,7 @@ class PostgresStore:
                     "google_id": row.get("google_id"),
                     "google_email": row.get("google_email"),
                     "registered_with_google": bool(row.get("registered_with_google")),
-                    "created_at": row.get("created_at"),
+                    "created_at": _format_ts(row.get("created_at")),
                 }
 
     get_user_by_id = get_user
@@ -919,6 +927,10 @@ class PostgresStore:
         d = dict(row)
         api_cipher = d.pop("api_url_ciphertext", None)
         d["api_url"] = decrypt_secret(api_cipher) if api_cipher else ""
+        if "created_at" in d:
+            d["created_at"] = _format_ts(d["created_at"])
+        if "updated_at" in d:
+            d["updated_at"] = _format_ts(d["updated_at"])
         return d
 
     # ── XiaoZhi Tokens ─────────────────────────────────────────────────────
@@ -987,15 +999,18 @@ class PostgresStore:
     def list_xiaozhi_tokens(self) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT t.user_id, t.token_hash, t.created_at, u.username
-                    FROM xiaozhi_tokens t
-                    JOIN users u ON t.user_id = u.id
-                    ORDER BY t.created_at DESC
-                    """
-                )
-                return cur.fetchall()
+                cur.execute("SELECT user_id, token_ciphertext, token_hash FROM xiaozhi_tokens")
+                rows = cur.fetchall()
+        result = []
+        for row in rows:
+            token = decrypt_secret(row["token_ciphertext"])
+            if token:
+                result.append({
+                    "user_id": row["user_id"],
+                    "token": token,
+                    "token_hash": row["token_hash"],
+                })
+        return result
 
     def find_user_by_mcp_token(self, token: str) -> Optional[Dict[str, Any]]:
         if not token:
@@ -1690,7 +1705,7 @@ class PostgresStore:
                         "id": user_id,
                         "username": row["username"],
                         "role": row["role"],
-                        "created_at": row["created_at"],
+                        "created_at": _format_ts(row.get("created_at")) or "",
                         "limits": limits,
                         "usage": usage,
                         "features": self.get_user_features(user_id),
