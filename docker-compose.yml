@@ -27,7 +27,7 @@ services:
       - ENVIRONMENT=production
       - ALLOWED_HOSTS=163.61.58.235,localhost,xiaozhiscig.biz.id,www.xiaozhiscig.biz.id
     volumes:
-      - .:/app
+      - ./data:/app/data
     mem_limit: 512m
     memswap_limit: 1g
     cpus: 1.0
