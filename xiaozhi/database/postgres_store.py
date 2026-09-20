@@ -264,7 +264,7 @@ class PostgresStore:
                             video_id VARCHAR(50),
                             status VARCHAR(20) NOT NULL DEFAULT 'pending',
                             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            CONSTRAINT chk_audio_queue_status CHECK (status IN ('pending', 'playing', 'done', 'error', 'played'))
+                            CONSTRAINT chk_audio_queue_status CHECK (status IN ('pending', 'playing', 'done', 'error', 'played', 'stopped', 'cancelled'))
                         );
                         CREATE INDEX IF NOT EXISTS idx_audio_owner ON audio_queue(owner_id, status);
                         CREATE INDEX IF NOT EXISTS idx_audio_queue_active ON audio_queue (owner_id, id ASC) WHERE status = 'pending';
