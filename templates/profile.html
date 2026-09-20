@@ -3350,7 +3350,14 @@
 
         try {
             const resp = await fetch('/api/v1/marketplace/chats/conversations', { credentials: 'same-origin' });
-            if (!resp.ok) throw new Error("Gagal memuat percakapan.");
+            if (!resp.ok) {
+                let msg = "Gagal memuat percakapan.";
+                try {
+                    const errData = await resp.json();
+                    if (errData.detail) msg = errData.detail;
+                } catch(e) {}
+                throw new Error(msg);
+            }
             const data = await resp.json();
             allChatConversations = data.conversations || [];
             renderConversationsList(allChatConversations);

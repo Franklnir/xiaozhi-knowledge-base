@@ -1402,7 +1402,13 @@ class MarketplaceRepository:
                            p.price_amount AS product_price,
                            p.status AS product_status,
                            seller.username AS seller_username,
-                           buyer.username AS buyer_username
+                           buyer.username AS buyer_username,
+                           (
+                               SELECT img.storage_key 
+                               FROM firmware_product_images img 
+                               WHERE img.product_id = p.id 
+                               ORDER BY img.is_primary DESC, img.sort_order ASC LIMIT 1
+                           ) AS product_image_key
                     FROM chat_conversations c
                     JOIN firmware_products p ON p.id = c.product_id
                     JOIN users seller ON seller.id = c.seller_id
@@ -1410,7 +1416,15 @@ class MarketplaceRepository:
                     WHERE c.id = %s;
                 """, (conversation_id,))
                 row = cur.fetchone()
-                return dict(row) if row else None
+                if not row:
+                    return None
+                res = dict(row)
+                if res.get("product_image_key"):
+                    from xiaozhi.marketplace.storage import storage_service
+                    res["product_image_url"] = storage_service.get_image_url(res["product_image_key"])
+                else:
+                    res["product_image_url"] = None
+                return res
 
     def get_user_conversations(self, user_id: int) -> List[Dict[str, Any]]:
         from xiaozhi.marketplace.storage import storage_service
@@ -1453,7 +1467,7 @@ class MarketplaceRepository:
                             SELECT img.storage_key 
                             FROM firmware_product_images img 
                             WHERE img.product_id = p.id 
-                            ORDER BY img.display_order ASC LIMIT 1
+                            ORDER BY img.is_primary DESC, img.sort_order ASC LIMIT 1
                         ) AS product_image_key
                     FROM chat_conversations c
                     JOIN firmware_products p ON p.id = c.product_id
