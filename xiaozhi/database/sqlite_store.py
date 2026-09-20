@@ -1298,7 +1298,7 @@ class SQLiteStore:
             """
             SELECT owner_id, title, status FROM audio_queue 
             WHERE video_id = ? 
-              AND status IN ('pending', 'playing') 
+              AND status IN ('pending', 'playing', 'played') 
               AND datetime(created_at) >= datetime('now', ? || ' minutes') 
             ORDER BY id DESC LIMIT 1
             """,
@@ -1314,7 +1314,7 @@ class SQLiteStore:
         row = conn.execute(
             """
             SELECT owner_id, title, status, video_id FROM audio_queue 
-            WHERE status IN ('pending', 'playing') 
+            WHERE status IN ('pending', 'playing', 'played') 
               AND (stream_url LIKE ? OR stream_url LIKE ?)
               AND datetime(created_at) >= datetime('now', ? || ' minutes') 
             ORDER BY id DESC LIMIT 1
@@ -1322,6 +1322,38 @@ class SQLiteStore:
             (f"%{mac_address}%", f"%{clean}%", f"-{abs(minutes)}"),
         ).fetchone()
         return dict(row) if row else None
+
+    def find_recent_pending_audio_command(self, minutes: int = 2) -> Optional[Dict[str, Any]]:
+        conn = self._get_conn()
+        row = conn.execute(
+            """
+            SELECT owner_id, title, status, video_id FROM audio_queue 
+            WHERE status = 'pending' 
+              AND datetime(created_at) >= datetime('now', ? || ' minutes') 
+            ORDER BY id DESC LIMIT 1
+            """,
+            (f"-{abs(minutes)}",),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def expire_audio_commands(self, minutes: int = 30) -> int:
+        conn = self._get_conn()
+        cursor = conn.execute(
+            """
+            UPDATE audio_queue 
+            SET status = 'played' 
+            WHERE status = 'pending' 
+              AND datetime(created_at) < datetime('now', ? || ' minutes')
+            """,
+            (f"-{abs(minutes)}",),
+        )
+        conn.commit()
+        return cursor.rowcount
+
+    def ping(self) -> bool:
+        conn = self._get_conn()
+        conn.execute("SELECT 1")
+        return True
 
     def is_device_owned_by(self, device_id: str, owner_id: int) -> bool:
         dev = self.find_device_by_id(device_id)

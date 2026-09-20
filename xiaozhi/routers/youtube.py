@@ -721,13 +721,12 @@ async def device_audio_commands(
         request.headers.get("X-Chip", "")
     ).strip().lower()
 
-    conn = getattr(store, "_get_conn", lambda: None)()
-    if conn is not None:
+    if hasattr(store, "expire_audio_commands"):
         try:
-            conn.execute("UPDATE audio_queue SET status='expired' WHERE status='pending' AND datetime(created_at) < datetime('now', '-30 minutes')")
-            conn.commit()
+            store.expire_audio_commands(minutes=30)
         except Exception:
             pass
+
     owner_id = None
     if token:
         owner = store.find_user_by_mcp_token(token)
@@ -743,12 +742,10 @@ async def device_audio_commands(
 
     # If owner_id is still None, check if there's a recent pending command in audio_queue created in last 2 mins
     if not owner_id and (mac or request.headers.get("Device-Id", "")):
-        if conn is not None:
+        if hasattr(store, "find_recent_pending_audio_command"):
             try:
-                recent = conn.execute(
-                    "SELECT owner_id FROM audio_queue WHERE status = 'pending' AND datetime(created_at) >= datetime('now', '-2 minutes') ORDER BY id DESC LIMIT 1"
-                ).fetchone()
-                if recent and recent["owner_id"]:
+                recent = store.find_recent_pending_audio_command(minutes=2)
+                if recent and recent.get("owner_id"):
                     owner_id = int(recent["owner_id"])
             except Exception:
                 pass
@@ -901,18 +898,13 @@ async def device_audio_status(request: Request):
             owner_id = owner["user_id"]
 
     # 1. Check audio_queue for this video_id in the last 30 minutes
-    if not owner_id and video_id:
-        conn = getattr(store, "_get_conn", lambda: None)()
-        if conn is not None:
-            try:
-                row = conn.execute(
-                    "SELECT owner_id FROM audio_queue WHERE video_id = ? AND datetime(created_at) >= datetime('now', '-30 minutes') ORDER BY id DESC LIMIT 1",
-                    (video_id,)
-                ).fetchone()
-                if row and row["owner_id"]:
-                    owner_id = int(row["owner_id"])
-            except Exception:
-                pass
+    if not owner_id and video_id and hasattr(store, "find_recent_audio_command_by_video_id"):
+        try:
+            recent = store.find_recent_audio_command_by_video_id(video_id, minutes=30)
+            if recent and recent.get("owner_id"):
+                owner_id = int(recent["owner_id"])
+        except Exception:
+            pass
 
     # 2. Fallback: find active session by video_id or device_mac in playback_tracker
     if not owner_id:

@@ -52,7 +52,7 @@ try:
 except Exception:
     pass
 
-# Store - auto-detect backend (HF for Spaces, SQLite for VPS)
+# Store - auto-detect backend (PostgreSQL for VPS, HF for Spaces, SQLite for fallback)
 store = create_store()
 
 # Initialize dependencies
@@ -319,9 +319,10 @@ async def health_check_db():
     start = time.perf_counter()
     backend = os.getenv("DB_BACKEND", "auto")
     try:
-        if hasattr(store, "_get_conn"):
+        if hasattr(store, "ping"):
+            store.ping()
+        elif hasattr(store, "_get_conn"):
             with store._get_conn() as conn:
-                # Works for both psycopg Connection and sqlite3 Connection
                 if hasattr(conn, "cursor"):
                     with conn.cursor() as cur:
                         cur.execute("SELECT 1")

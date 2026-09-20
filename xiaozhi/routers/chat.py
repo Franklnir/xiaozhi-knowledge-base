@@ -93,7 +93,7 @@ async def api_community_chat_send(request: Request):
     except (ValueError, TypeError):
         reply_to_id = None
 
-    # Save to SQLite
+    # Save to database store
     message_data = store.add_community_chat(
         user_id=user["id"],
         username=user["username"],

@@ -1553,7 +1553,7 @@ class PostgresStore:
                     """
                     SELECT owner_id, title, status FROM audio_queue 
                     WHERE video_id = %s 
-                      AND status IN ('pending', 'playing') 
+                      AND status IN ('pending', 'playing', 'played') 
                       AND created_at >= NOW() - (%s || ' minutes')::INTERVAL 
                     ORDER BY id DESC LIMIT 1
                     """,
@@ -1571,7 +1571,7 @@ class PostgresStore:
                 cur.execute(
                     """
                     SELECT owner_id, title, status, video_id FROM audio_queue 
-                    WHERE status IN ('pending', 'playing') 
+                    WHERE status IN ('pending', 'playing', 'played') 
                       AND (stream_url ILIKE %s OR stream_url ILIKE %s)
                       AND created_at >= NOW() - (%s || ' minutes')::INTERVAL 
                     ORDER BY id DESC LIMIT 1
@@ -1580,6 +1580,42 @@ class PostgresStore:
                 )
                 row = cur.fetchone()
                 return dict(row) if row else None
+
+    def find_recent_pending_audio_command(self, minutes: int = 2) -> Optional[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT owner_id, title, status, video_id FROM audio_queue 
+                    WHERE status = 'pending' 
+                      AND created_at >= NOW() - (%s || ' minutes')::INTERVAL 
+                    ORDER BY id DESC LIMIT 1
+                    """,
+                    (str(int(minutes)),),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+
+    def expire_audio_commands(self, minutes: int = 30) -> int:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE audio_queue 
+                    SET status = 'played' 
+                    WHERE status = 'pending' 
+                      AND created_at < NOW() - (%s || ' minutes')::INTERVAL
+                    """,
+                    (str(int(minutes)),),
+                )
+                conn.commit()
+                return cur.rowcount
+
+    def ping(self) -> bool:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                return True
 
     def is_device_owned_by(self, device_id: str, owner_id: int) -> bool:
         dev = self.find_device_by_id(device_id)

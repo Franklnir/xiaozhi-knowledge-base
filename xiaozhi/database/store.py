@@ -2117,6 +2117,29 @@ class HFJsonStore:
                     return cmd
         return None
 
+    def find_recent_pending_audio_command(self, minutes: int = 2) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            for cmd in reversed(data.get("audio_queue", [])):
+                if cmd.get("status") == "pending" and cmd.get("owner_id"):
+                    return cmd
+        return None
+
+    def expire_audio_commands(self, minutes: int = 30) -> int:
+        count = 0
+        with self._lock:
+            data = self._load()
+            for cmd in data.get("audio_queue", []):
+                if cmd.get("status") == "pending":
+                    cmd["status"] = "played"
+                    count += 1
+            if count > 0:
+                self._commit(data, "Expire pending audio commands")
+        return count
+
+    def ping(self) -> bool:
+        return True
+
     def get_now_playing(self, owner_id: int) -> Optional[Dict[str, Any]]:
         with self._lock:
             data = self._load()
