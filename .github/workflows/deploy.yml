@@ -55,11 +55,12 @@ jobs:
           script: |
             cd ${{ env.APP_DIR }}
 
-            # Fix ownership and permissions for git pull
-            sudo chown -R irsyad:irsyad ${{ env.APP_DIR }} || true
+            # Fix permissions using Docker (runs as root without needing sudo)
+            docker run --rm -v ${{ env.APP_DIR }}:${{ env.APP_DIR }} alpine chown -R $(id -u):$(id -g) ${{ env.APP_DIR }}
 
-            # Pull latest code
-            git pull origin main || sudo git pull origin main || true
+            # Pull latest code and reset cleanly
+            git fetch origin main
+            git reset --hard origin/main
 
             # Authenticate Docker to pull private GHCR image
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
