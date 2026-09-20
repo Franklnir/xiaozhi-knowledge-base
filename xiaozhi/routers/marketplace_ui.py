@@ -96,6 +96,20 @@ async def create_seller_product_action(
     if doc_url and doc_url.strip():
         links.append({"label": (doc_label or "Dokumentasi").strip(), "url": doc_url.strip()})
 
+    # Validasi kelengkapan data
+    if not title or not title.strip():
+        return redirect_with_message("/profil?mode=marketplace&sub=products", "Gagal: Judul produk firmware wajib diisi.")
+    if not short_description or not short_description.strip():
+        return redirect_with_message("/profil?mode=marketplace&sub=products", "Gagal: Deskripsi singkat firmware wajib diisi.")
+    if not full_description or not full_description.strip():
+        return redirect_with_message("/profil?mode=marketplace&sub=products", "Gagal: Deskripsi lengkap & panduan pinout wajib diisi.")
+    if price_amount is None or price_amount < 0:
+        return redirect_with_message("/profil?mode=marketplace&sub=products", "Gagal: Harga jual tidak valid.")
+    if not images_data:
+        return redirect_with_message("/profil?mode=marketplace&sub=products", "Gagal: Minimal 1 foto produk wajib diunggah.")
+    if not firmware_bytes or len(firmware_bytes) == 0:
+        return redirect_with_message("/profil?mode=marketplace&sub=products", "Gagal: File binary firmware (.bin) wajib diunggah.")
+
     try:
         product = service.create_product(
             seller=user,

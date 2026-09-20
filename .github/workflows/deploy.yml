@@ -58,6 +58,25 @@ jobs:
             # Fix permissions using Docker (runs as root without needing sudo)
             docker run --rm -v ${{ env.APP_DIR }}:${{ env.APP_DIR }} alpine chown -R $(id -u):$(id -g) ${{ env.APP_DIR }}
 
+            # Configure host Nginx client_max_body_size to 64M (resolves 413 Entitas Terlalu Besar)
+            docker run --rm -v /etc/nginx:/host_nginx alpine sh -c '
+              if [ -d /host_nginx ]; then
+                mkdir -p /host_nginx/conf.d
+                echo "client_max_body_size 64M;" > /host_nginx/conf.d/upload_size.conf
+                if [ -f /host_nginx/nginx.conf ]; then
+                  sed -i "s/client_max_body_size [0-9]*[MmKkGg]*;/client_max_body_size 64M;/g" /host_nginx/nginx.conf
+                fi
+                for f in /host_nginx/sites-available/* /host_nginx/sites-enabled/*; do
+                  if [ -f "$f" ]; then
+                    sed -i "s/client_max_body_size [0-9]*[MmKkGg]*;/client_max_body_size 64M;/g" "$f"
+                  fi
+                done
+              fi
+            ' || true
+
+            # Reload host nginx gracefully
+            docker run --rm --pid=host alpine sh -c 'pkill -HUP -f nginx || true'
+
             # Pull latest code and reset cleanly
             git fetch origin main
             git reset --hard origin/main

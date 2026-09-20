@@ -1044,11 +1044,6 @@
                 </div>
                 <span id="navChatBadge" style="display:none;background:#ef4444;color:#ffffff;font-size:10.5px;font-weight:900;padding:2px 7px;border-radius:999px;box-shadow:0 0 8px rgba(239,68,68,0.6);border:1.5px solid #000;">0</span>
             </a>
-            <div class="app-sidebar-section">Marketplace</div>
-            <a href="/firmware/marketplace" class="app-sidebar-link {% if page == 'marketplace' %}is-active{% endif %}">
-                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
-                Katalog Firmware
-            </a>
             <a href="/simulasi-smarthome-virtual" class="app-sidebar-link {% if page == 'smarthome' %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Simulasi Smarthome')" {% endif %}>
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
                 Simulasi Smarthome
@@ -1071,6 +1066,12 @@
             <a href="/profil" class="app-sidebar-link {% if page == 'profile' or active_page == 'profile' %}is-active{% endif %}">
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                 Profil Saya
+            </a>
+
+            <div class="app-sidebar-section">Marketplace</div>
+            <a href="/firmware/marketplace" class="app-sidebar-link {% if page == 'marketplace' %}is-active{% endif %}">
+                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
+                Katalog Firmware
             </a>
 
             {% if user.role == 'admin' %}
