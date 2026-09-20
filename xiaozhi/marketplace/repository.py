@@ -1057,6 +1057,262 @@ class MarketplaceRepository:
             logger.warning("get_admin_platform_finance failed: %s", exc)
             return default_finance
 
+    def get_admin_orders(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        if not self.is_db_ready():
+            return [], 0
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    where_clauses = []
+                    params = []
+
+                    if status and status.upper() not in ("ALL", ""):
+                        where_clauses.append("o.status = %s")
+                        params.append(status.upper())
+
+                    if search and search.strip():
+                        s = f"%{search.strip().lower()}%"
+                        where_clauses.append("""(
+                            LOWER(o.order_number) LIKE %s
+                            OR LOWER(o.product_title_snapshot) LIKE %s
+                            OR LOWER(sb.username) LIKE %s
+                            OR LOWER(ss.username) LIKE %s
+                        )""")
+                        params.extend([s, s, s, s])
+
+                    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+                    # Count total matching
+                    cur.execute(f"""
+                        SELECT COUNT(*)
+                        FROM orders o
+                        JOIN users sb ON sb.id = o.buyer_id
+                        JOIN users ss ON ss.id = o.seller_id
+                        {where_sql};
+                    """, tuple(params))
+                    total_count = cur.fetchone()["count"]
+
+                    # Fetch rows
+                    cur.execute(f"""
+                        SELECT 
+                            o.*,
+                            sb.username AS buyer_username,
+                            COALESCE(sb.google_email, '') AS buyer_email,
+                            ss.username AS seller_username,
+                            COALESCE(ss.google_email, '') AS seller_email,
+                            pt.provider AS payment_provider,
+                            pt.status AS payment_status,
+                            pt.provider_transaction_id
+                        FROM orders o
+                        JOIN users sb ON sb.id = o.buyer_id
+                        JOIN users ss ON ss.id = o.seller_id
+                        LEFT JOIN payment_transactions pt ON pt.order_id = o.id
+                        {where_sql}
+                        ORDER BY o.created_at DESC
+                        LIMIT %s OFFSET %s;
+                    """, tuple(params + [limit, offset]))
+
+                    orders = [dict(r) for r in cur.fetchall()]
+                    return orders, total_count
+        except Exception as exc:
+            logger.warning("get_admin_orders failed: %s", exc)
+            return [], 0
+
+    def get_admin_order_detail(self, order_id_or_number: str) -> Optional[Dict[str, Any]]:
+        if not self.is_db_ready():
+            return None
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            o.*,
+                            sb.username AS buyer_username,
+                            sb.role AS buyer_role,
+                            COALESCE(sb.google_email, '') AS buyer_email,
+                            ss.username AS seller_username,
+                            ss.role AS seller_role,
+                            COALESCE(ss.google_email, '') AS seller_email,
+                            p.slug AS product_slug,
+                            v.version_label,
+                            a.original_filename,
+                            a.file_size,
+                            a.sha256 AS binary_sha256,
+                            pt.provider AS payment_provider,
+                            pt.provider_transaction_id,
+                            pt.status AS payment_status,
+                            pt.checkout_url
+                        FROM orders o
+                        JOIN users sb ON sb.id = o.buyer_id
+                        JOIN users ss ON ss.id = o.seller_id
+                        LEFT JOIN firmware_products p ON p.id = o.product_id
+                        LEFT JOIN firmware_product_versions v ON v.id = o.product_version_id
+                        LEFT JOIN firmware_assets a ON a.product_version_id = o.product_version_id
+                        LEFT JOIN payment_transactions pt ON pt.order_id = o.id
+                        WHERE o.id::text = %s OR o.order_number = %s
+                        LIMIT 1;
+                    """, (str(order_id_or_number), str(order_id_or_number)))
+                    row = cur.fetchone()
+                    if not row:
+                        return None
+                    order = dict(row)
+
+                    # Also fetch webhook and ledger events for audit
+                    cur.execute("""
+                        SELECT l.entry_type, l.direction, l.amount, l.description, l.created_at, u.username
+                        FROM wallet_ledger l
+                        JOIN wallet_accounts w ON w.id = l.wallet_account_id
+                        JOIN users u ON u.id = w.user_id
+                        WHERE l.reference_id = %s
+                        ORDER BY l.created_at ASC;
+                    """, (order["id"],))
+                    order["ledger_entries"] = [dict(r) for r in cur.fetchall()]
+
+                    return order
+        except Exception as exc:
+            logger.warning("get_admin_order_detail failed: %s", exc)
+            return None
+
+    def get_admin_withdrawals(self, status: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+        if not self.is_db_ready():
+            return []
+        try:
+            from xiaozhi.marketplace.security import decrypt_sensitive_data
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    where_clause = ""
+                    params = []
+                    if status and status.upper() not in ("ALL", ""):
+                        where_clause = "WHERE w.status = %s"
+                        params.append(status.upper())
+
+                    cur.execute(f"""
+                        SELECT 
+                            w.*,
+                            u.username AS seller_username,
+                            COALESCE(u.google_email, '') AS seller_email,
+                            wa.available_balance AS seller_available_balance
+                        FROM withdrawals w
+                        JOIN users u ON u.id = w.user_id
+                        JOIN wallet_accounts wa ON wa.id = w.wallet_account_id
+                        {where_clause}
+                        ORDER BY 
+                            CASE WHEN w.status = 'REQUESTED' THEN 0
+                                 WHEN w.status = 'PROCESSING' THEN 1
+                                 ELSE 2 END,
+                            w.created_at DESC
+                        LIMIT %s;
+                    """, tuple(params + [limit]))
+
+                    withdrawals = []
+                    for r in cur.fetchall():
+                        item = dict(r)
+                        # Decrypt account number safely for admin
+                        enc_num = item.get("destination_account_encrypted") or ""
+                        item["destination_account_number"] = decrypt_sensitive_data(enc_num) if enc_num else ""
+                        withdrawals.append(item)
+                    return withdrawals
+        except Exception as exc:
+            logger.warning("get_admin_withdrawals failed: %s", exc)
+            return []
+
+    def admin_process_withdrawal(
+        self,
+        withdrawal_id: str,
+        action: str,
+        admin_user_id: int,
+        admin_notes: Optional[str] = None,
+    ) -> bool:
+        """
+        Processes a seller withdrawal request:
+        - approve: marks status = 'PAID', logs processed_at and admin reference.
+        - reject: marks status = 'REJECTED', performs financial ledger reversal (credits amount back to seller).
+        """
+        if not self.is_db_ready():
+            return False
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                # Lock row
+                cur.execute("""
+                    SELECT * FROM withdrawals WHERE id = %s FOR UPDATE;
+                """, (withdrawal_id,))
+                wd = cur.fetchone()
+                if not wd:
+                    raise ValueError("Permintaan penarikan tidak ditemukan.")
+                if wd["status"] not in ("REQUESTED", "PROCESSING"):
+                    raise ValueError(f"Permintaan penarikan ini sudah diproses sebelumnya dengan status: {wd['status']}.")
+
+                notes = (admin_notes or "").strip()
+
+                if action == "approve":
+                    cur.execute("""
+                        UPDATE withdrawals
+                        SET status = 'PAID', processed_at = CURRENT_TIMESTAMP, admin_notes = %s
+                        WHERE id = %s;
+                    """, (notes or "Disetujui oleh admin", withdrawal_id))
+
+                    # Audit Log
+                    cur.execute("""
+                        INSERT INTO audit_logs (
+                            actor_user_id, actor_role, action, entity_type, entity_id, reason
+                        ) VALUES (%s, 'admin', 'WITHDRAWAL_PAID', 'withdrawal', %s, %s);
+                    """, (admin_user_id, withdrawal_id, notes or "Transfer penarikan selesai"))
+
+                    conn.commit()
+                    return True
+
+                elif action == "reject":
+                    if not notes:
+                        raise ValueError("Alasan penolakan penarikan dana wajib dicantumkan.")
+
+                    cur.execute("""
+                        UPDATE withdrawals
+                        SET status = 'REJECTED', processed_at = CURRENT_TIMESTAMP, admin_notes = %s
+                        WHERE id = %s;
+                    """, (notes, withdrawal_id))
+
+                    # FINANCIAL INTEGRITY: Refund balance back to seller available_balance
+                    amount = wd["amount"]
+                    wallet_id = wd["wallet_account_id"]
+
+                    cur.execute("""
+                        UPDATE wallet_accounts
+                        SET available_balance = available_balance + %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s;
+                    """, (amount, wallet_id))
+
+                    # Double-entry ledger: WITHDRAWAL_REVERSAL
+                    cur.execute("""
+                        INSERT INTO wallet_ledger (
+                            wallet_account_id, entry_type, direction, amount, currency,
+                            reference_type, reference_id, idempotency_key, description
+                        ) VALUES (
+                            %s, 'WITHDRAWAL_REVERSAL', 'CREDIT', %s, 'IDR',
+                            'WITHDRAWAL', %s, %s, %s
+                        );
+                    """, (
+                        wallet_id, amount, withdrawal_id,
+                        f"wd_rev_{withdrawal_id}", f"Pengembalian saldo penarikan ditolak: {notes}"
+                    ))
+
+                    # Audit Log
+                    cur.execute("""
+                        INSERT INTO audit_logs (
+                            actor_user_id, actor_role, action, entity_type, entity_id, reason
+                        ) VALUES (%s, 'admin', 'WITHDRAWAL_REJECTED', 'withdrawal', %s, %s);
+                    """, (admin_user_id, withdrawal_id, notes))
+
+                    conn.commit()
+                    return True
+                else:
+                    raise ValueError(f"Aksi tidak valid: {action}")
+
     # ── CHAT ─────────────────────────────────────────────────────────────────
     def get_or_create_conversation(self, product_id: str, seller_id: int, buyer_id: int) -> Dict[str, Any]:
         with self._get_conn() as conn:
