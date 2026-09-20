@@ -1841,26 +1841,124 @@
         if (m) m.style.display = 'none';
     }
 
-    function previewSelectedImages(input) {
+    // ── Smart Client-Side Image Compression (WebP / Canvas) ──
+    async function compressImageToBlob(file, maxDim = 1400, quality = 0.82) {
+        return new Promise((resolve) => {
+            if (!file.type || !file.type.startsWith('image/')) {
+                resolve(file);
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        if (w > h) {
+                            h = Math.round((h * maxDim) / w);
+                            w = maxDim;
+                        } else {
+                            w = Math.round((w * maxDim) / h);
+                            h = maxDim;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+
+                    canvas.toBlob(
+                        (blob) => {
+                            if (!blob) {
+                                resolve(file);
+                                return;
+                            }
+                            const newName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+                            const compressedFile = new File([blob], newName, {
+                                type: 'image/webp',
+                                lastModified: Date.now(),
+                            });
+                            resolve(compressedFile);
+                        },
+                        'image/webp',
+                        quality
+                    );
+                };
+                img.onerror = () => resolve(file);
+                img.src = e.target.result;
+            };
+            reader.onerror = () => resolve(file);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function previewSelectedImages(input) {
         const row = document.getElementById('imagePreviewRow');
         if (!row) return;
-        row.innerHTML = '';
-        if (input.files) {
-            const files = Array.from(input.files).slice(0, 3);
-            files.forEach(f => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.style.width = '70px';
-                    img.style.height = '70px';
-                    img.style.objectFit = 'cover';
-                    img.style.borderRadius = '4px';
-                    img.style.border = '2px solid var(--app-border)';
-                    row.appendChild(img);
-                };
-                reader.readAsDataURL(f);
+        
+        if (input.files && input.files.length > 0) {
+            row.innerHTML = '<div style="font-size:12px; color:var(--app-brand); font-weight:700; padding:6px 0;">⚡ Mengompresi & mengoptimalkan foto secara otomatis...</div>';
+            const rawFiles = Array.from(input.files).slice(0, 3);
+            const dt = new DataTransfer();
+
+            const processedFiles = [];
+            for (let i = 0; i < rawFiles.length; i++) {
+                const f = rawFiles[i];
+                let finalFile = f;
+                if (f.type && f.type.startsWith('image/')) {
+                    finalFile = await compressImageToBlob(f, 1400, 0.82);
+                }
+                dt.items.add(finalFile);
+                processedFiles.push({ original: f, final: finalFile });
+            }
+
+            // Replace input files with compressed files
+            try {
+                input.files = dt.files;
+            } catch(e) {}
+
+            row.innerHTML = '';
+            processedFiles.forEach(({ original, final }) => {
+                const originalKb = (original.size / 1024).toFixed(0);
+                const compressedKb = (final.size / 1024).toFixed(0);
+
+                const thumbWrap = document.createElement('div');
+                thumbWrap.style.display = 'inline-flex';
+                thumbWrap.style.flexDirection = 'column';
+                thumbWrap.style.alignItems = 'center';
+                thumbWrap.style.gap = '4px';
+
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(final);
+                img.style.width = '75px';
+                img.style.height = '75px';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '6px';
+                img.style.border = '2px solid var(--app-border-strong)';
+                thumbWrap.appendChild(img);
+
+                const badge = document.createElement('span');
+                badge.style.fontSize = '10px';
+                badge.style.fontWeight = '800';
+                badge.style.padding = '2px 6px';
+                badge.style.borderRadius = '999px';
+                badge.style.background = '#dcfce7';
+                badge.style.color = '#15803d';
+                badge.style.border = '1px solid #bbf7d0';
+                let txt = `${compressedKb} KB`;
+                if (original.size > final.size) {
+                    const pct = Math.round((1 - final.size / original.size) * 100);
+                    txt += ` (-${pct}%)`;
+                    badge.title = `Sebelum dikompresi: ${originalKb} KB`;
+                }
+                badge.innerText = txt;
+                thumbWrap.appendChild(badge);
+                row.appendChild(thumbWrap);
             });
+        } else {
+            row.innerHTML = '';
         }
     }
 
