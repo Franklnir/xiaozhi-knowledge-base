@@ -575,6 +575,148 @@
         transform: translateY(0);
         opacity: 1;
     }
+
+    /* ── Product 1-on-1 Chat Styles ── */
+    .fw-chat-layout {
+        display: grid;
+        grid-template-columns: 330px 1fr;
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        background: var(--app-surface);
+        box-shadow: var(--app-shadow);
+        overflow: hidden;
+        height: 640px;
+    }
+    @media (max-width: 820px) {
+        .fw-chat-layout {
+            grid-template-columns: 1fr;
+            height: 560px;
+        }
+        .fw-chat-sidebar.is-hidden-mobile {
+            display: none !important;
+        }
+        .fw-chat-main.is-hidden-mobile {
+            display: none !important;
+        }
+        .fw-chat-back-btn {
+            display: inline-flex !important;
+        }
+    }
+    .fw-chat-sidebar {
+        border-right: 2px solid var(--app-border-strong);
+        display: flex;
+        flex-direction: column;
+        background: var(--app-surface-muted);
+        overflow: hidden;
+    }
+    .fw-chat-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+    .fw-conv-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--app-border);
+        cursor: pointer;
+        transition: background 0.15s ease;
+        text-decoration: none;
+        color: inherit;
+        position: relative;
+    }
+    .fw-conv-item:hover {
+        background: var(--app-soft);
+    }
+    .fw-conv-item.is-active {
+        background: var(--app-surface);
+        border-left: 4px solid var(--app-brand);
+    }
+    .fw-chat-main {
+        display: flex;
+        flex-direction: column;
+        background: var(--app-surface);
+        overflow: hidden;
+        position: relative;
+    }
+    .fw-chat-header {
+        padding: 12px 16px;
+        border-bottom: 2px solid var(--app-border-strong);
+        background: var(--app-surface);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 5;
+    }
+    .fw-chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: var(--app-soft);
+    }
+    .fw-msg-bubble {
+        max-width: 78%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-size: 13.5px;
+        line-height: 1.45;
+        position: relative;
+        word-break: break-word;
+    }
+    .fw-msg-outgoing {
+        align-self: flex-end;
+        background: var(--app-brand);
+        color: #ffffff;
+        border-bottom-right-radius: 2px;
+    }
+    :root[data-theme="neo"] .fw-msg-outgoing {
+        background: var(--app-brand);
+        color: #000000;
+        border: 2px solid #000000;
+        box-shadow: 2px 2px 0 #000000;
+    }
+    .fw-msg-incoming {
+        align-self: flex-start;
+        background: var(--app-surface);
+        color: var(--app-text);
+        border: 1.5px solid var(--app-border-strong);
+        border-bottom-left-radius: 2px;
+    }
+    :root[data-theme="neo"] .fw-msg-incoming {
+        border: 2px solid #000000;
+        box-shadow: 2px 2px 0 #000000;
+    }
+    .fw-msg-meta {
+        font-size: 10.5px;
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        opacity: 0.85;
+    }
+    .fw-product-card-bubble {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        overflow: hidden;
+        width: 270px;
+        color: var(--app-text);
+        box-shadow: var(--app-shadow);
+        text-align: left;
+        margin-top: 4px;
+    }
+    .fw-chat-input-bar {
+        padding: 10px 14px;
+        border-top: 2px solid var(--app-border-strong);
+        background: var(--app-surface);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 </style>
 
 <div class="app-page">
@@ -1080,6 +1222,14 @@
                 <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 1px 6px;">Rp {{ "{:,}".format(financial_data.wallet.available_balance) }}</span>
                 {% endif %}
             </button>
+            <button type="button" 
+                    class="mkt-sub-btn {% if active_sub == 'chats' %}is-active{% endif %}" 
+                    id="subBtnChats" 
+                    onclick="switchMarketplaceSubTab('chats')">
+                <span>💬</span>
+                <span>Pesan Produk</span>
+                <span id="chatUnreadBadgeSubTab" class="app-chip app-chip-small" style="display:{% if chat_unread_total and chat_unread_total > 0 %}inline-block{% else %}none{% endif %}; font-size: 11px; padding: 1px 6px; background:#ef4444; color:#fff; font-weight:800; border-radius:10px;">{{ chat_unread_total or 0 }}</span>
+            </button>
         </div>
 
         <!-- 📦 SUB-PANEL 1: PRODUK SAYA (JUAL) -->
@@ -1422,6 +1572,135 @@
             </div>
         </div>
 
+        <!-- 💬 SUB-PANEL 4: PESAN PRODUK (1-ON-1 CHAT) -->
+        <div id="mktSubPanelChats" class="mkt-sub-panel" style="{% if active_sub != 'chats' %}display:none;{% endif %}">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:18px;">
+                <div>
+                    <h2 style="font-size:20px; font-weight:900; margin:0 0 4px; color:var(--app-text);">
+                        💬 Obrolan & Pesan Produk Firmware
+                    </h2>
+                    <p style="font-size:13px; color:var(--app-muted); margin:0;">
+                        Percakapan privat antara Anda dan lawan bicara (pembeli/penjual) khusus untuk masing-masing produk.
+                    </p>
+                </div>
+                <button type="button" onclick="loadChatConversations(activeConversationId)" class="app-button" style="font-size:12.5px; padding:7px 14px; font-weight:700;">
+                    🔄 Segarkan Obrolan
+                </button>
+            </div>
+
+            <div class="fw-chat-layout" id="fwChatLayout">
+                <!-- Left Column: Conversations List -->
+                <div class="fw-chat-sidebar" id="fwChatSidebar">
+                    <div style="padding:12px; border-bottom:1px solid var(--app-border);">
+                        <input type="text" id="chatSearchInput" oninput="filterConversationsList(this.value)" placeholder="🔍 Cari judul atau user..." class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                    </div>
+                    <div class="fw-chat-list" id="conversationsListContainer">
+                        <div style="padding:28px 16px; text-align:center; color:var(--app-muted); font-size:13px;">
+                            Memuat daftar percakapan...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Active Conversation Messages -->
+                <div class="fw-chat-main" id="fwChatMain">
+                    <!-- Default Placeholder when no conversation is selected -->
+                    <div id="chatNoActiveConv" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:440px; text-align:center; padding:30px; color:var(--app-muted);">
+                        <div style="font-size:52px; margin-bottom:12px; line-height:1;">💬</div>
+                        <h3 style="font-size:17px; font-weight:800; color:var(--app-text); margin:0 0 6px;">Pilih Percakapan Produk</h3>
+                        <p style="font-size:13px; max-width:340px; margin:0 0 16px; line-height:1.5;">
+                            Pilih salah satu percakapan di sebelah kiri untuk melihat pesan atau mengirim pertanyaan ke penjual.
+                        </p>
+                        <a href="/firmware/marketplace" class="app-button" style="text-decoration:none; font-size:12.5px; font-weight:700;">
+                            🛍️ Jelajahi Katalog Produk
+                        </a>
+                    </div>
+
+                    <!-- Active Conversation View (Hidden by default) -->
+                    <div id="chatActiveConvWrap" style="display:none; flex-direction:column; height:100%;">
+                        <!-- Header Banner -->
+                        <div class="fw-chat-header" id="chatActiveHeader">
+                            <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
+                                <button type="button" class="fw-chat-back-btn" onclick="backToChatList()" style="display:none; background:none; border:none; font-size:18px; cursor:pointer; color:var(--app-text); padding:0 6px;" title="Kembali">
+                                    ←
+                                </button>
+                                <img id="activeConvProductImg" src="" alt="Product" style="width:44px; height:44px; border-radius:6px; object-fit:cover; border:1px solid var(--app-border); background:var(--app-soft); flex-shrink:0;">
+                                <div style="min-width:0; flex:1;">
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <h4 id="activeConvProductTitle" style="margin:0; font-size:14px; font-weight:800; color:var(--app-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></h4>
+                                        <span id="activeConvRoleBadge" class="app-chip app-chip-small" style="font-size:10px; padding:1px 6px;"></span>
+                                    </div>
+                                    <div style="font-size:12px; color:var(--app-muted); display:flex; align-items:center; gap:8px; margin-top:2px;">
+                                        <span id="activeConvOtherUser" style="font-weight:700; color:var(--app-brand);"></span>
+                                        <span>•</span>
+                                        <span id="activeConvPrice" style="font-weight:800; color:var(--app-text);"></span>
+                                        <span>•</span>
+                                        <a id="activeConvProductLink" href="" target="_blank" style="color:var(--app-brand); text-decoration:none; font-weight:700;">Lihat Produk ↗</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Messages Body -->
+                        <div class="fw-chat-messages" id="chatMessagesBox">
+                            <!-- Injected dynamically -->
+                        </div>
+
+                        <!-- Input Bar -->
+                        <div class="fw-chat-input-bar">
+                            <!-- Share Product Button (Visible if user is seller) -->
+                            <button type="button" id="btnOpenShareProduct" onclick="openShareProductModal()" class="app-button" style="display:none; padding:8px 12px; font-size:12px; font-weight:800; white-space:nowrap; background:var(--app-surface-muted);" title="Kirim rekomendasi produk Anda ke chat ini">
+                                📦 Kirim Produk Saya
+                            </button>
+
+                            <form id="chatSendForm" onsubmit="handleSendChatMessage(event)" style="display:flex; gap:8px; flex:1; align-items:center; margin:0;">
+                                <input type="text" id="chatInputMessage" placeholder="Tulis pesan Anda..." maxlength="3000" autocomplete="off" class="app-input" style="flex:1; font-size:13.5px; padding:9px 14px;">
+                                <button type="submit" id="btnSubmitChatMessage" class="app-button app-button-primary" style="font-weight:800; padding:9px 18px;">
+                                    Kirim 🚀
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Share Seller Product Modal (Strictly Seller's Published Products) -->
+        <div id="shareSellerProductModal" class="mcp-blocking-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="shareProductModalTitle">
+            <div class="mcp-blocking-box" style="max-width:540px; text-align:left; max-height:85vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div>
+                        <h3 id="shareProductModalTitle" style="font-size:18px; font-weight:900; margin:0 0 2px; color:var(--app-text);">
+                            📦 Bagikan Produk Saya ke Chat
+                        </h3>
+                        <p style="font-size:12px; color:var(--app-muted); margin:0;">
+                            Hanya produk milik Anda yang berstatus terbit yang dapat dikirim ke obrolan pribadi ini.
+                        </p>
+                    </div>
+                    <button type="button" onclick="closeShareProductModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
+                </div>
+
+                <div id="shareProductError" class="app-alert app-alert-danger" style="display:none; margin-bottom:12px; font-size:12.5px;"></div>
+
+                <div id="shareableProductsList" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto; margin-bottom:14px;">
+                    <div style="text-align:center; padding:20px; color:var(--app-muted); font-size:13px;">Memuat produk Anda...</div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                        Pesan Singkat Rekomendasi (Opsional)
+                    </label>
+                    <input type="text" id="shareProductNote" placeholder="Contoh: Ini produk yang sesuai dengan kebutuhan Anda" maxlength="250" class="app-input" style="width:100%; font-size:12.5px;">
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button type="button" onclick="closeShareProductModal()" class="app-button">Batal</button>
+                    <button type="button" id="btnConfirmShareProduct" onclick="confirmShareSelectedProduct()" disabled class="app-button app-button-primary" style="font-weight:800;">
+                        Kirim Kartu Produk 🚀
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Add Product Modal -->
         <div id="addProductModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
             <div class="mcp-blocking-box" style="max-width:620px; text-align:left; max-height:90vh; overflow-y:auto;">
@@ -1527,12 +1806,25 @@
                         <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
                             🖨️ Model 3D Casing / Enclosure (.stl) <span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(Opsional jika file BIN diisi)</span>
                         </label>
-                        <input type="file" name="stl_file" id="stlFileInput" accept=".stl" class="app-input" onchange="calculateClientFileSha256(this, 'stlSha256Box', 'stlSha256Value')" style="width:100%;">
+                        <input type="file" name="stl_file" id="stlFileInput" accept=".stl" class="app-input" onchange="handleStlFileInputChange(this)" style="width:100%;">
                         
                         <!-- Realtime Client SHA-256 feedback -->
                         <div id="stlSha256Box" style="display:none; margin-top:10px; font-size:12px; color:var(--app-text);">
                             <div style="font-weight:800; color:#059669;">✓ SHA-256 Model 3D Terhitung:</div>
                             <code id="stlSha256Value" style="word-break:break-all; font-family:monospace; background:var(--app-surface); padding:4px 8px; border-radius:4px; display:block; margin-top:3px; border:1px solid var(--app-border);">Menghitung...</code>
+                        </div>
+
+                        <!-- Realtime Interactive 3D STL Preview -->
+                        <div id="stlViewerContainer" style="display:none; margin-top:12px; border-radius:var(--app-radius); overflow:hidden; border:2px solid var(--app-border-strong); background:#0f172a; position:relative;">
+                            <div style="position:absolute; top:8px; left:10px; z-index:10; font-size:11px; font-weight:800; color:#38bdf8; background:rgba(15,23,42,0.85); padding:3px 8px; border-radius:4px; border:1px solid #0284c7;">
+                                🖨️ 3D Preview (Klik & Putar 360° • Scroll Zoom)
+                            </div>
+                            <div style="position:absolute; top:8px; right:10px; z-index:10;">
+                                <button type="button" onclick="resetStlViewerCamera()" style="font-size:11px; padding:3px 8px; background:rgba(30,41,59,0.9); color:#fff; border:1px solid #475569; border-radius:4px; cursor:pointer;">
+                                    ↺ Reset Posisi
+                                </button>
+                            </div>
+                            <div id="stlCanvasWrap" style="width:100%; height:250px;"></div>
                         </div>
                     </div>
 
@@ -1925,7 +2217,7 @@
 
     function switchMarketplaceSubTab(subName) {
         currentMarketplaceSub = subName;
-        ['products', 'purchases', 'sales'].forEach(s => {
+        ['products', 'purchases', 'sales', 'chats'].forEach(s => {
             const btn = document.getElementById('subBtn' + s.charAt(0).toUpperCase() + s.slice(1));
             const panel = document.getElementById('mktSubPanel' + s.charAt(0).toUpperCase() + s.slice(1));
             if (btn) {
@@ -1939,6 +2231,13 @@
         });
         if (currentProfileMode === 'marketplace') {
             window.history.replaceState(null, '', '/profil?mode=marketplace&sub=' + subName);
+        }
+        if (subName === 'chats') {
+            const params = new URLSearchParams(window.location.search);
+            const targetConvId = params.get('conv_id') || activeConversationId;
+            loadChatConversations(targetConvId);
+        } else {
+            if (chatPollTimer) clearInterval(chatPollTimer);
         }
     }
 
@@ -2414,6 +2713,8 @@
         if (e.target === mAdd) closeAddProductModal();
         const mWith = document.getElementById('withdrawModal');
         if (e.target === mWith) closeWithdrawModal();
+        const mShare = document.getElementById('shareSellerProductModal');
+        if (e.target === mShare) closeShareProductModal();
     });
 
     // ── Validasi Form Tambah Produk Firmware ──
@@ -2534,6 +2835,578 @@
         return true;
     }
 
+    // ── 3D STL INTERACTIVE VIEWER LOGIC ──
+    let stlRenderer = null;
+    let stlScene = null;
+    let stlCamera = null;
+    let stlControls = null;
+    let stlAnimId = null;
+
+    function handleStlFileInputChange(input) {
+        calculateClientFileSha256(input, 'stlSha256Box', 'stlSha256Value');
+        const file = input.files[0];
+        const container = document.getElementById('stlViewerContainer');
+        if (!file || !file.name.toLowerCase().endsWith('.stl')) {
+            if (container) container.style.display = 'none';
+            return;
+        }
+
+        if (container) container.style.display = 'block';
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            initStlViewer(e.target.result);
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function initStlViewer(buffer) {
+        const wrap = document.getElementById('stlCanvasWrap');
+        if (!wrap || typeof THREE === 'undefined' || !THREE.STLLoader) return;
+
+        if (stlAnimId) cancelAnimationFrame(stlAnimId);
+        wrap.innerHTML = '';
+
+        const width = wrap.clientWidth || 540;
+        const height = 250;
+
+        stlScene = new THREE.Scene();
+        stlScene.background = new THREE.Color(0x0f172a);
+
+        stlCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+
+        stlRenderer = new THREE.WebGLRenderer({ antialias: true });
+        stlRenderer.setSize(width, height);
+        stlRenderer.setPixelRatio(window.devicePixelRatio || 1);
+        wrap.appendChild(stlRenderer.domElement);
+
+        if (THREE.OrbitControls) {
+            stlControls = new THREE.OrbitControls(stlCamera, stlRenderer.domElement);
+            stlControls.enableDamping = true;
+            stlControls.dampingFactor = 0.08;
+        }
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        stlScene.add(ambientLight);
+
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.85);
+        dirLight1.position.set(1, 1, 1).normalize();
+        stlScene.add(dirLight1);
+
+        const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.6);
+        dirLight2.position.set(-1, -1, -1).normalize();
+        stlScene.add(dirLight2);
+
+        // Parse geometry
+        try {
+            const loader = new THREE.STLLoader();
+            const geometry = loader.parse(buffer);
+            geometry.computeVertexNormals();
+            geometry.center();
+
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8,
+                roughness: 0.35,
+                metalness: 0.25,
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            stlScene.add(mesh);
+
+            geometry.computeBoundingSphere();
+            const radius = geometry.boundingSphere ? geometry.boundingSphere.radius : 50;
+            stlCamera.position.set(radius * 1.8, radius * 1.5, radius * 2.2);
+            stlCamera.lookAt(0, 0, 0);
+            if (stlControls) {
+                stlControls.target.set(0, 0, 0);
+                stlControls.update();
+            }
+
+            function animate() {
+                stlAnimId = requestAnimationFrame(animate);
+                if (stlControls) stlControls.update();
+                mesh.rotation.y += 0.003;
+                stlRenderer.render(stlScene, stlCamera);
+            }
+            animate();
+        } catch (err) {
+            console.warn("Gagal parsing 3D STL:", err);
+            wrap.innerHTML = '<div style="color:#ef4444; padding:20px; text-align:center; font-size:12px;">Format file STL tidak valid atau rusak.</div>';
+        }
+    }
+
+    function resetStlViewerCamera() {
+        if (stlControls) stlControls.reset();
+    }
+
+
+    // ── PRODUCT 1-ON-1 CHAT CLIENT LOGIC ──
+    const CURRENT_USER_ID = {{ user.id }};
+    let allChatConversations = [];
+    let activeConversationId = null;
+    let activeConversation = null;
+    let chatPollTimer = null;
+    let shareableProductsCache = [];
+    let selectedShareProductId = null;
+
+    async function loadChatConversations(targetConvId) {
+        const listContainer = document.getElementById('conversationsListContainer');
+        if (!listContainer) return;
+
+        try {
+            const resp = await fetch('/api/v1/marketplace/chats/conversations', { credentials: 'same-origin' });
+            if (!resp.ok) throw new Error("Gagal memuat percakapan.");
+            const data = await resp.json();
+            allChatConversations = data.conversations || [];
+            renderConversationsList(allChatConversations);
+
+            // Update badge in sub-tab
+            let totalUnread = 0;
+            allChatConversations.forEach(c => { totalUnread += (c.unread_count || 0); });
+            const badge = document.getElementById('chatUnreadBadgeSubTab');
+            if (badge) {
+                if (totalUnread > 0) {
+                    badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+            const globalBadge = document.getElementById('globalMktChatBadge');
+            if (globalBadge) {
+                if (totalUnread > 0) {
+                    globalBadge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+                    globalBadge.style.display = 'inline-block';
+                } else {
+                    globalBadge.style.display = 'none';
+                }
+            }
+
+            // Determine which conversation to activate
+            if (targetConvId) {
+                selectChatConversation(targetConvId);
+            } else if (allChatConversations.length > 0 && !activeConversationId && window.innerWidth > 820) {
+                selectChatConversation(allChatConversations[0].id);
+            }
+        } catch (err) {
+            listContainer.innerHTML = `<div style="padding:20px; text-align:center; color:var(--app-danger); font-size:12.5px;">Gagal memuat chat: ${err.message}</div>`;
+        }
+    }
+
+    function renderConversationsList(convs) {
+        const listContainer = document.getElementById('conversationsListContainer');
+        if (!listContainer) return;
+
+        if (!convs || convs.length === 0) {
+            listContainer.innerHTML = `
+                <div style="padding:32px 16px; text-align:center; color:var(--app-muted); font-size:13px;">
+                    <div style="font-size:32px; margin-bottom:8px;">📭</div>
+                    <div>Belum ada obrolan produk.</div>
+                    <div style="font-size:11.5px; margin-top:4px;">Obrolan otomatis dibuat saat Anda atau pembeli menekan "Chat Penjual" di halaman produk.</div>
+                </div>
+            `;
+            return;
+        }
+
+        listContainer.innerHTML = convs.map(c => {
+            const isActive = c.id === activeConversationId;
+            const imgHtml = c.product_image_url
+                ? `<img src="${c.product_image_url}" alt="${c.product_title}" style="width:42px; height:42px; border-radius:6px; object-fit:cover; border:1px solid var(--app-border);">`
+                : `<div style="width:42px; height:42px; border-radius:6px; background:var(--app-soft); display:flex; align-items:center; justify-content:center; font-size:20px; border:1px solid var(--app-border);">📦</div>`;
+            
+            const unreadBadgeHtml = c.unread_count > 0
+                ? `<span style="background:#ef4444; color:#ffffff; font-size:11px; font-weight:900; padding:2px 7px; border-radius:99px; flex-shrink:0;">${c.unread_count}</span>`
+                : '';
+
+            const preview = c.last_message_preview || 'Belum ada pesan.';
+            const timeStr = c.last_message_time ? formatChatTime(c.last_message_time) : '';
+
+            return `
+                <div class="fw-conv-item ${isActive ? 'is-active' : ''}" onclick="selectChatConversation('${c.id}')" data-id="${c.id}" data-title="${(c.product_title || '').toLowerCase()}" data-user="${(c.other_username || '').toLowerCase()}">
+                    ${imgHtml}
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                            <div style="font-weight:800; font-size:13px; color:var(--app-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                ${escapeHtml(c.product_title || 'Produk Firmware')}
+                            </div>
+                            <span style="font-size:10.5px; color:var(--app-muted); flex-shrink:0;">${timeStr}</span>
+                        </div>
+                        <div style="font-size:11.5px; color:var(--app-brand); font-weight:700; margin-top:1px;">
+                            @${escapeHtml(c.other_username)} <span style="font-size:10px; color:var(--app-muted); font-weight:normal;">(${c.other_role})</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:2px;">
+                            <div style="font-size:12px; color:var(--app-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                ${escapeHtml(preview)}
+                            </div>
+                            ${unreadBadgeHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function filterConversationsList(query) {
+        const q = (query || '').toLowerCase().trim();
+        const items = document.querySelectorAll('.fw-conv-item');
+        items.forEach(el => {
+            const title = el.getAttribute('data-title') || '';
+            const user = el.getAttribute('data-user') || '';
+            if (!q || title.includes(q) || user.includes(q)) {
+                el.style.display = 'flex';
+            } else {
+                el.style.display = 'none';
+            }
+        });
+    }
+
+    async function selectChatConversation(convId) {
+        activeConversationId = convId;
+        activeConversation = allChatConversations.find(c => c.id === convId);
+
+        // Update active highlight in list
+        document.querySelectorAll('.fw-conv-item').forEach(el => {
+            el.classList.toggle('is-active', el.getAttribute('data-id') === convId);
+        });
+
+        // Toggle mobile view
+        if (window.innerWidth <= 820) {
+            const sidebar = document.getElementById('fwChatSidebar');
+            const main = document.getElementById('fwChatMain');
+            if (sidebar) sidebar.classList.add('is-hidden-mobile');
+            if (main) main.classList.remove('is-hidden-mobile');
+        }
+
+        // Show active view, hide placeholder
+        const noActive = document.getElementById('chatNoActiveConv');
+        const activeWrap = document.getElementById('chatActiveConvWrap');
+        if (noActive) noActive.style.display = 'none';
+        if (activeWrap) activeWrap.style.display = 'flex';
+
+        // Populate Header info
+        if (activeConversation) {
+            const pTitle = document.getElementById('activeConvProductTitle');
+            const pPrice = document.getElementById('activeConvPrice');
+            const pUser = document.getElementById('activeConvOtherUser');
+            const pLink = document.getElementById('activeConvProductLink');
+            const pImg = document.getElementById('activeConvProductImg');
+            const pRole = document.getElementById('activeConvRoleBadge');
+            const btnShare = document.getElementById('btnOpenShareProduct');
+
+            if (pTitle) pTitle.textContent = activeConversation.product_title || 'Produk Firmware';
+            if (pPrice) pPrice.textContent = 'Rp ' + Number(activeConversation.product_price || 0).toLocaleString();
+            if (pUser) pUser.textContent = '@' + activeConversation.other_username;
+            if (pLink) pLink.href = '/firmware/marketplace/' + (activeConversation.product_slug || activeConversation.product_id);
+            if (pImg) {
+                if (activeConversation.product_image_url) {
+                    pImg.src = activeConversation.product_image_url;
+                    pImg.style.display = 'block';
+                } else {
+                    pImg.style.display = 'none';
+                }
+            }
+            if (pRole) {
+                pRole.textContent = activeConversation.other_role;
+                pRole.className = 'app-chip app-chip-small ' + (activeConversation.is_seller ? 'app-chip-info' : 'app-chip-success');
+            }
+
+            // Show "Kirim Produk Saya" ONLY IF user is the seller
+            if (btnShare) {
+                btnShare.style.display = activeConversation.is_seller ? 'inline-flex' : 'none';
+            }
+        }
+
+        // Fetch messages immediately
+        await fetchAndRenderActiveMessages();
+
+        // Start polling for this conversation every 3s
+        if (chatPollTimer) clearInterval(chatPollTimer);
+        chatPollTimer = setInterval(fetchAndRenderActiveMessages, 3000);
+    }
+
+    function backToChatList() {
+        const sidebar = document.getElementById('fwChatSidebar');
+        const main = document.getElementById('fwChatMain');
+        if (sidebar) sidebar.classList.remove('is-hidden-mobile');
+        if (main) main.classList.add('is-hidden-mobile');
+    }
+
+    async function fetchAndRenderActiveMessages() {
+        if (!activeConversationId) return;
+        const box = document.getElementById('chatMessagesBox');
+        if (!box) return;
+
+        try {
+            const resp = await fetch(`/api/v1/marketplace/chats/conversations/${activeConversationId}/messages`, { credentials: 'same-origin' });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const messages = data.messages || [];
+            
+            // Check if user is scrolled near bottom before update
+            const isNearBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+
+            renderChatMessages(messages, activeConversation);
+
+            if (isNearBottom) {
+                box.scrollTop = box.scrollHeight;
+            }
+
+            // Zero out unread count for this conv in allChatConversations
+            const target = allChatConversations.find(c => c.id === activeConversationId);
+            if (target && target.unread_count > 0) {
+                target.unread_count = 0;
+                renderConversationsList(allChatConversations);
+            }
+        } catch (err) {}
+    }
+
+    function renderChatMessages(messages, conv) {
+        const box = document.getElementById('chatMessagesBox');
+        if (!box) return;
+
+        if (!messages || messages.length === 0) {
+            box.innerHTML = `
+                <div style="margin:auto; text-align:center; color:var(--app-muted); font-size:13px; padding:30px;">
+                    <div style="font-size:36px; margin-bottom:6px;">👋</div>
+                    <div style="font-weight:700; color:var(--app-text);">Belum ada pesan di percakapan ini.</div>
+                    <div style="font-size:12px; margin-top:2px;">Silakan sapa dan tanyakan spesifikasi firmware!</div>
+                </div>
+            `;
+            return;
+        }
+
+        box.innerHTML = messages.map(m => {
+            const isMe = Number(m.sender_id) === Number(CURRENT_USER_ID);
+            const checkmarks = isMe ? (m.read_at ? '<span style="color:#60a5fa;" title="Dibaca">✓✓</span>' : '<span style="opacity:0.7;" title="Terkirim">✓</span>') : '';
+            const timeStr = m.created_at ? formatChatTime(m.created_at) : '';
+
+            let contentHtml = '';
+            if (m.is_product_card && m.card_data) {
+                const card = m.card_data;
+                const cardImg = card.image_url 
+                    ? `<img src="${card.image_url}" alt="${card.title}" style="width:100%; height:130px; object-fit:cover; background:var(--app-soft);">`
+                    : `<div style="width:100%; height:100px; display:flex; align-items:center; justify-content:center; font-size:36px; background:var(--app-soft);">📦</div>`;
+
+                contentHtml = `
+                    <div class="fw-product-card-bubble">
+                        ${cardImg}
+                        <div style="padding:10px 12px;">
+                            <div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:4px;">
+                                ${card.has_firmware ? '<span class="app-chip app-chip-small app-chip-info" style="font-size:9.5px; padding:1px 5px;">⚡ .BIN</span>' : ''}
+                                ${card.has_stl ? '<span class="app-chip app-chip-small app-chip-success" style="font-size:9.5px; padding:1px 5px;">🖨️ .STL</span>' : ''}
+                            </div>
+                            <div style="font-size:13px; font-weight:800; color:var(--app-text); line-height:1.3; margin-bottom:4px;">
+                                ${escapeHtml(card.title || 'Produk')}
+                            </div>
+                            <div style="font-size:14px; font-weight:900; color:var(--app-brand); margin-bottom:8px;">
+                                Rp ${Number(card.price || 0).toLocaleString()}
+                            </div>
+                            ${card.note ? `<div style="font-size:11.5px; color:var(--app-muted); font-style:italic; margin-bottom:8px; border-left:2px solid var(--app-brand); padding-left:6px;">"${escapeHtml(card.note)}"</div>` : ''}
+                            <a href="/firmware/marketplace/${card.slug || card.product_id}" target="_blank" class="app-button app-button-primary" style="width:100%; justify-content:center; padding:6px; font-size:11.5px; font-weight:800; text-decoration:none;">
+                                🔍 Lihat Detail Produk
+                            </a>
+                        </div>
+                    </div>
+                `;
+            } else {
+                contentHtml = `<div style="white-space:pre-wrap;">${escapeHtml(m.body)}</div>`;
+            }
+
+            return `
+                <div class="fw-msg-bubble ${isMe ? 'fw-msg-outgoing' : 'fw-msg-incoming'}">
+                    ${contentHtml}
+                    <div class="fw-msg-meta">
+                        <span>${timeStr}</span>
+                        ${checkmarks}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function handleSendChatMessage(e) {
+        e.preventDefault();
+        if (!activeConversationId) return;
+
+        const input = document.getElementById('chatInputMessage');
+        const submitBtn = document.getElementById('btnSubmitChatMessage');
+        if (!input || !input.value.trim()) return;
+
+        const msgText = input.value.trim();
+        input.value = '';
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            const resp = await fetch(`/api/v1/marketplace/chats/conversations/${activeConversationId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msgText })
+            });
+            if (!resp.ok) {
+                const errData = await resp.json().catch(() => ({}));
+                const errDetail = errData.detail ? (errData.detail.error ? errData.detail.error.message : errData.detail) : 'Gagal mengirim pesan.';
+                alert(errDetail);
+            } else {
+                await fetchAndRenderActiveMessages();
+                const box = document.getElementById('chatMessagesBox');
+                if (box) box.scrollTop = box.scrollHeight;
+            }
+        } catch (err) {
+            alert("Terjadi gangguan koneksi: " + err.message);
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+            if (input) input.focus();
+        }
+    }
+
+
+    // ── SHARE SELLER PRODUCT MODAL LOGIC ──
+    async function openShareProductModal() {
+        const modal = document.getElementById('shareSellerProductModal');
+        const listDiv = document.getElementById('shareableProductsList');
+        const errDiv = document.getElementById('shareProductError');
+        const noteInput = document.getElementById('shareProductNote');
+        const confirmBtn = document.getElementById('btnConfirmShareProduct');
+
+        if (errDiv) errDiv.style.display = 'none';
+        if (noteInput) noteInput.value = '';
+        if (confirmBtn) confirmBtn.disabled = true;
+        selectedShareProductId = null;
+
+        if (modal) modal.style.display = 'flex';
+
+        try {
+            const resp = await fetch('/api/v1/marketplace/chats/my-shareable-products', { credentials: 'same-origin' });
+            if (!resp.ok) throw new Error("Gagal mengambil produk Anda.");
+            const data = await resp.json();
+            shareableProductsCache = data.products || [];
+
+            if (shareableProductsCache.length === 0) {
+                listDiv.innerHTML = `
+                    <div style="text-align:center; padding:24px; color:var(--app-muted); font-size:13px;">
+                        Anda belum memiliki produk lain yang berstatus terbit (PUBLISHED).
+                    </div>
+                `;
+                return;
+            }
+
+            listDiv.innerHTML = shareableProductsCache.map(p => {
+                const imgHtml = p.image_url 
+                    ? `<img src="${p.image_url}" alt="${p.title}" style="width:48px; height:48px; border-radius:6px; object-fit:cover; border:1px solid var(--app-border);">`
+                    : `<div style="width:48px; height:48px; border-radius:6px; background:var(--app-soft); display:flex; align-items:center; justify-content:center; font-size:22px; border:1px solid var(--app-border);">📦</div>`;
+
+                return `
+                    <div class="shareable-prod-item" onclick="selectProductToShare('${p.id}', this)" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:2px solid var(--app-border); border-radius:var(--app-radius); cursor:pointer; background:var(--app-surface); transition:all 0.15s ease;">
+                        ${imgHtml}
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:800; font-size:13.5px; color:var(--app-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                ${escapeHtml(p.title)}
+                            </div>
+                            <div style="font-size:12.5px; font-weight:800; color:var(--app-brand); margin-top:2px;">
+                                Rp ${Number(p.price_amount || 0).toLocaleString()}
+                            </div>
+                        </div>
+                        <input type="radio" name="selectedShareRadio" value="${p.id}" style="accent-color:var(--app-brand);">
+                    </div>
+                `;
+            }).join('');
+        } catch (err) {
+            listDiv.innerHTML = `<div style="color:var(--app-danger); padding:20px; text-align:center; font-size:12.5px;">${err.message}</div>`;
+        }
+    }
+
+    function closeShareProductModal() {
+        const modal = document.getElementById('shareSellerProductModal');
+        if (modal) modal.style.display = 'none';
+        selectedShareProductId = null;
+    }
+
+    function selectProductToShare(prodId, el) {
+        selectedShareProductId = prodId;
+        document.querySelectorAll('.shareable-prod-item').forEach(item => {
+            item.style.borderColor = 'var(--app-border)';
+            item.style.background = 'var(--app-surface)';
+            const r = item.querySelector('input[type="radio"]');
+            if (r) r.checked = false;
+        });
+
+        if (el) {
+            el.style.borderColor = 'var(--app-brand)';
+            el.style.background = 'rgba(37,99,235,0.05)';
+            const r = el.querySelector('input[type="radio"]');
+            if (r) r.checked = true;
+        }
+
+        const confirmBtn = document.getElementById('btnConfirmShareProduct');
+        if (confirmBtn) confirmBtn.disabled = false;
+    }
+
+    async function confirmShareSelectedProduct() {
+        if (!activeConversationId || !selectedShareProductId) return;
+
+        const confirmBtn = document.getElementById('btnConfirmShareProduct');
+        const errDiv = document.getElementById('shareProductError');
+        const noteInput = document.getElementById('shareProductNote');
+        const note = noteInput ? noteInput.value.trim() : '';
+
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Mengirim...';
+        }
+        if (errDiv) errDiv.style.display = 'none';
+
+        try {
+            const resp = await fetch(`/api/v1/marketplace/chats/conversations/${activeConversationId}/share-product`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: selectedShareProductId, note: note })
+            });
+            const res = await resp.json();
+            if (!resp.ok) {
+                const msg = (res.detail && res.detail.error) ? res.detail.error.message : (res.detail || 'Gagal membagikan produk.');
+                throw new Error(msg);
+            }
+
+            closeShareProductModal();
+            await fetchAndRenderActiveMessages();
+            const box = document.getElementById('chatMessagesBox');
+            if (box) box.scrollTop = box.scrollHeight;
+        } catch (err) {
+            if (errDiv) {
+                errDiv.textContent = err.message;
+                errDiv.style.display = 'block';
+            } else {
+                alert(err.message);
+            }
+        } finally {
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Kirim Kartu Produk 🚀';
+            }
+        }
+    }
+
+    function formatChatTime(dateStr) {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     // Auto-activate mode/sub on load if specified in URL query
     document.addEventListener('DOMContentLoaded', function() {
         const params = new URLSearchParams(window.location.search);
@@ -2544,4 +3417,9 @@
         }
     });
 </script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 {% endblock %}
+
