@@ -62,15 +62,7 @@ async def marketplace_product_detail(request: Request, product_id_or_slug: str):
 # ── SELLER PRODUCTS ──────────────────────────────────────────────────────────
 @router.get("/seller/products", response_class=HTMLResponse)
 async def seller_products_page(request: Request, status: Optional[str] = None):
-    user = require_user(request)
-    repo = get_marketplace_repo()
-    products = repo.get_seller_products(int(user["id"]), status=status)
-    return render(request, "marketplace/seller_products.html", {
-        "user": user,
-        "page": "seller_products",
-        "products": products,
-        "current_filter": status or "all",
-    })
+    return RedirectResponse(url="/profil?mode=marketplace&sub=products")
 
 
 @router.post("/seller/products")
@@ -117,10 +109,10 @@ async def create_seller_product_action(
             links=links,
         )
         msg = "Produk firmware berhasil diterbitkan!" if user.get("role") == "admin" else "Draft produk firmware berhasil disimpan. Silakan ajukan untuk ditinjau."
-        return redirect_with_message("/firmware/seller/products", msg)
+        return redirect_with_message("/profil?mode=marketplace&sub=products", msg)
     except Exception as exc:
         logger.error("Gagal membuat produk seller: %s", exc)
-        return redirect_with_message("/firmware/seller/products", f"Gagal: {str(exc)}")
+        return redirect_with_message("/profil?mode=marketplace&sub=products", f"Gagal: {str(exc)}")
 
 
 @router.post("/seller/products/{product_id}/submit")
@@ -129,9 +121,9 @@ async def submit_seller_product_action(request: Request, product_id: str):
     service = get_product_service()
     try:
         service.submit_for_review(product_id, int(user["id"]))
-        return redirect_with_message("/firmware/seller/products", "Produk berhasil diajukan untuk review admin.")
+        return redirect_with_message("/profil?mode=marketplace&sub=products", "Produk berhasil diajukan untuk review admin.")
     except Exception as exc:
-        return redirect_with_message("/firmware/seller/products", f"Gagal mengajukan: {str(exc)}")
+        return redirect_with_message("/profil?mode=marketplace&sub=products", f"Gagal mengajukan: {str(exc)}")
 
 
 @router.get("/seller/products/{product_id}/edit", response_class=HTMLResponse)
@@ -141,8 +133,10 @@ async def edit_product_page(request: Request, product_id: str):
     product = service.get_product_detail(product_id, current_user_id=int(user["id"]))
     if not product:
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan.")
-    if user.get("role") != "admin" and product["seller_id"] != int(user["id"]):
-        raise HTTPException(status_code=403, detail="Anda tidak memiliki hak akses mengedit produk ini.")
+
+    if product["seller_id"] != int(user["id"]) and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Akses ditolak.")
+
     return render(request, "marketplace/seller_product_edit.html", {
         "user": user,
         "page": "seller_products",
@@ -166,6 +160,7 @@ async def update_seller_product_action(
     user = require_user(request)
     service = get_product_service()
 
+    # Read images bytes if uploaded
     images_data = []
     if images:
         for img in images[:3]:
@@ -174,6 +169,7 @@ async def update_seller_product_action(
                 if len(b) > 0:
                     images_data.append(b)
 
+    # Read firmware bytes if new file uploaded
     firmware_bytes = None
     firmware_filename = None
     if firmware_file and firmware_file.filename:
@@ -199,7 +195,7 @@ async def update_seller_product_action(
             firmware_filename=firmware_filename,
             links=links if (doc_url and doc_url.strip()) else None,
         )
-        return redirect_with_message("/firmware/seller/products", "Produk berhasil diperbarui.")
+        return redirect_with_message("/profil?mode=marketplace&sub=products", "Produk berhasil diperbarui.")
     except Exception as exc:
         return redirect_with_message(f"/firmware/seller/products/{product_id}/edit", f"Gagal memperbarui: {str(exc)}")
 
@@ -211,23 +207,16 @@ async def delete_seller_product_action(request: Request, product_id: str):
     try:
         res = service.delete_product(product_id, user)
         action_text = "diarsipkan (karena memiliki histori transaksi)" if res.get("action") == "archived" else "berhasil dihapus"
-        return redirect_with_message("/firmware/seller/products", f"Produk {action_text}.")
+        return redirect_with_message("/profil?mode=marketplace&sub=products", f"Produk {action_text}.")
     except Exception as exc:
-        return redirect_with_message("/firmware/seller/products", f"Gagal menghapus produk: {str(exc)}")
+        return redirect_with_message("/profil?mode=marketplace&sub=products", f"Gagal menghapus produk: {str(exc)}")
 
 
 
 # ── BUYER PURCHASES & DOWNLOADS ──────────────────────────────────────────────
 @router.get("/purchases", response_class=HTMLResponse)
 async def buyer_purchases_page(request: Request):
-    user = require_user(request)
-    service = get_entitlement_service()
-    purchases = service.get_user_purchases(int(user["id"]))
-    return render(request, "marketplace/purchases.html", {
-        "user": user,
-        "page": "purchases",
-        "purchases": purchases,
-    })
+    return RedirectResponse(url="/profil?mode=marketplace&sub=purchases")
 
 
 @router.get("/purchases/{purchase_id}/download")
@@ -238,20 +227,13 @@ async def buyer_download_redirect(request: Request, purchase_id: str):
         meta = service.authorize_download(purchase_id, int(user["id"]))
         return RedirectResponse(url=meta["download_url"], status_code=303)
     except Exception as exc:
-        return redirect_with_message("/firmware/purchases", f"Gagal mengunduh: {str(exc)}")
+        return redirect_with_message("/profil?mode=marketplace&sub=purchases", f"Gagal mengunduh: {str(exc)}")
 
 
 # ── SELLER SALES & WITHDRAWALS ───────────────────────────────────────────────
 @router.get("/seller/sales", response_class=HTMLResponse)
 async def seller_sales_page(request: Request):
-    user = require_user(request)
-    service = get_wallet_service()
-    data = service.get_seller_financial_data(int(user["id"]))
-    return render(request, "marketplace/seller_sales.html", {
-        "user": user,
-        "page": "seller_sales",
-        "data": data,
-    })
+    return RedirectResponse(url="/profil?mode=marketplace&sub=sales")
 
 
 @router.post("/seller/withdrawals")
@@ -272,9 +254,9 @@ async def request_withdrawal_action(
             destination_account_name=destination_account_name,
             destination_account_number=destination_account_number,
         )
-        return redirect_with_message("/firmware/seller/sales", f"Permintaan penarikan dana Rp {amount:,} berhasil diajukan.")
+        return redirect_with_message("/profil?mode=marketplace&sub=sales", f"Permintaan penarikan dana Rp {amount:,} berhasil diajukan.")
     except Exception as exc:
-        return redirect_with_message("/firmware/seller/sales", f"Penarikan gagal: {str(exc)}")
+        return redirect_with_message("/profil?mode=marketplace&sub=sales", f"Penarikan gagal: {str(exc)}")
 
 
 # ── SIMULATED CHECKOUT FLOW (ZERO-COST SANDBOX) ──────────────────────────────
@@ -312,4 +294,4 @@ async def confirm_simulated_checkout_action(request: Request, order_number: str 
         payload={"order_number": order_number, "status": "PAID", "simulated": True},
     )
 
-    return redirect_with_message("/firmware/purchases", f"Pembayaran pesanan #{order_number} berhasil dikonfirmasi!")
+    return redirect_with_message("/profil?mode=marketplace&sub=purchases", f"Pembayaran pesanan #{order_number} berhasil dikonfirmasi!")
