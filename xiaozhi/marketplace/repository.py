@@ -149,9 +149,12 @@ class MarketplaceRepository:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT v.*, a.id AS asset_id, a.original_filename, a.file_size, a.sha256, a.upload_status, a.storage_key
+                    SELECT v.*, 
+                           a.id AS asset_id, a.original_filename, a.file_size, a.sha256, a.upload_status, a.storage_key,
+                           s.id AS stl_asset_id, s.original_filename AS stl_original_filename, s.file_size AS stl_file_size, s.sha256 AS stl_sha256, s.upload_status AS stl_upload_status, s.storage_key AS stl_storage_key
                     FROM firmware_product_versions v
                     LEFT JOIN firmware_assets a ON a.product_version_id = v.id
+                    LEFT JOIN product_stl_assets s ON s.product_version_id = v.id
                     WHERE v.product_id = %s
                     ORDER BY v.created_at DESC
                     LIMIT 1;
@@ -398,6 +401,34 @@ class MarketplaceRepository:
                 conn.commit()
                 return dict(row)
 
+    def set_stl_asset(
+        self,
+        product_version_id: str,
+        original_filename: str,
+        storage_bucket: str,
+        storage_key: str,
+        file_size: int,
+        sha256: str,
+    ) -> Dict[str, Any]:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO product_stl_assets (
+                        product_version_id, original_filename, storage_bucket, storage_key, file_size, sha256, upload_status
+                    ) VALUES (%s, %s, %s, %s, %s, %s, 'READY')
+                    ON CONFLICT (product_version_id) DO UPDATE SET
+                        original_filename = EXCLUDED.original_filename,
+                        storage_bucket = EXCLUDED.storage_bucket,
+                        storage_key = EXCLUDED.storage_key,
+                        file_size = EXCLUDED.file_size,
+                        sha256 = EXCLUDED.sha256,
+                        upload_status = 'READY'
+                    RETURNING *;
+                """, (product_version_id, original_filename, storage_bucket, storage_key, file_size, sha256))
+                row = cur.fetchone()
+                conn.commit()
+                return dict(row)
+
     def submit_product_for_approval(self, product_id: str, seller_id: int) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
@@ -417,17 +448,22 @@ class MarketplaceRepository:
                 if cur.fetchone()["c"] < 1:
                     raise ValueError("Produk wajib memiliki minimal 1 foto produk.")
 
-                # Check latest version & asset
+                # Check latest version & assets (must have either .bin or .stl ready)
                 cur.execute("""
-                    SELECT v.id AS version_id, a.sha256, a.upload_status
+                    SELECT v.id AS version_id, 
+                           a.sha256 AS bin_sha256, a.upload_status AS bin_status,
+                           s.sha256 AS stl_sha256, s.upload_status AS stl_status
                     FROM firmware_product_versions v
-                    JOIN firmware_assets a ON a.product_version_id = v.id
+                    LEFT JOIN firmware_assets a ON a.product_version_id = v.id
+                    LEFT JOIN product_stl_assets s ON s.product_version_id = v.id
                     WHERE v.product_id = %s
                     ORDER BY v.created_at DESC LIMIT 1;
                 """, (product_id,))
                 ver_asset = cur.fetchone()
-                if not ver_asset or ver_asset["upload_status"] != "READY":
-                    raise ValueError("Produk wajib memiliki file firmware .bin yang sudah ter-upload.")
+                has_valid_bin = ver_asset and ver_asset["bin_status"] == "READY" and ver_asset["bin_sha256"]
+                has_valid_stl = ver_asset and ver_asset["stl_status"] == "READY" and ver_asset["stl_sha256"]
+                if not (has_valid_bin or has_valid_stl):
+                    raise ValueError("Produk wajib memiliki minimal salah satu file (Binary Firmware .bin atau Model 3D .stl) yang sudah ter-upload.")
 
                 # 3. Create approval record
                 cur.execute("""
@@ -566,7 +602,9 @@ class MarketplaceRepository:
         product_title_snapshot: str,
         seller_name_snapshot: str,
         version_label_snapshot: str,
-        firmware_sha256_snapshot: str,
+        firmware_sha256_snapshot: Optional[str] = None,
+        stl_sha256_snapshot: Optional[str] = None,
+        stl_filename_snapshot: Optional[str] = None,
     ) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
@@ -575,18 +613,18 @@ class MarketplaceRepository:
                         buyer_id, seller_id, product_id, product_version_id, order_number,
                         currency, subtotal_amount, platform_fee_amount, buyer_total_amount, seller_net_amount,
                         product_title_snapshot, seller_name_snapshot, version_label_snapshot,
-                        price_snapshot, firmware_sha256_snapshot, status
+                        price_snapshot, firmware_sha256_snapshot, stl_sha256_snapshot, stl_filename_snapshot, status
                     ) VALUES (
                         %s, %s, %s, %s, %s,
                         'IDR', %s, %s, %s, %s,
                         %s, %s, %s,
-                        %s, %s, 'PENDING_PAYMENT'
+                        %s, %s, %s, %s, 'PENDING_PAYMENT'
                     ) RETURNING *;
                 """, (
                     buyer_id, seller_id, product_id, version_id, order_number,
                     subtotal_amount, platform_fee_amount, buyer_total_amount, seller_net_amount,
                     product_title_snapshot, seller_name_snapshot, version_label_snapshot,
-                    subtotal_amount, firmware_sha256_snapshot
+                    subtotal_amount, firmware_sha256_snapshot or "", stl_sha256_snapshot, stl_filename_snapshot
                 ))
                 order = dict(cur.fetchone())
                 conn.commit()
@@ -807,14 +845,17 @@ class MarketplaceRepository:
                             e.id AS purchase_id, e.status AS entitlement_status, e.entitled_at,
                             o.order_number, o.paid_at, o.subtotal_amount, o.currency,
                             o.product_title_snapshot, o.seller_name_snapshot, o.version_label_snapshot, o.firmware_sha256_snapshot,
+                            o.stl_sha256_snapshot, o.stl_filename_snapshot,
                             p.id AS product_id, p.slug,
                             img.storage_key AS primary_image_key,
-                            a.original_filename, a.file_size, a.storage_key
+                            a.original_filename, a.file_size, a.storage_key,
+                            s.original_filename AS stl_original_filename, s.file_size AS stl_file_size, s.storage_key AS stl_storage_key, s.sha256 AS stl_sha256
                         FROM purchase_entitlements e
                         JOIN orders o ON o.id = e.order_id
                         JOIN firmware_products p ON p.id = e.product_id
                         JOIN firmware_product_versions v ON v.id = e.product_version_id
-                        JOIN firmware_assets a ON a.product_version_id = v.id
+                        LEFT JOIN firmware_assets a ON a.product_version_id = v.id
+                        LEFT JOIN product_stl_assets s ON s.product_version_id = v.id
                         LEFT JOIN firmware_product_images img ON img.product_id = p.id AND img.is_primary = TRUE
                         WHERE e.buyer_id = %s AND e.status = 'ACTIVE' AND o.status = 'PAID'
                         ORDER BY e.entitled_at DESC;
@@ -824,22 +865,36 @@ class MarketplaceRepository:
             logger.warning("get_buyer_purchases failed: %s", exc)
             return []
 
-    def get_entitlement_for_download(self, purchase_id: str, buyer_id: int) -> Optional[Dict[str, Any]]:
+    def get_entitlement_for_download(self, purchase_id: str, buyer_id: int, asset_type: str = "bin") -> Optional[Dict[str, Any]]:
         if not self.is_db_ready():
             return None
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT 
-                            e.id AS purchase_id, e.buyer_id, e.status AS entitlement_status,
-                            o.status AS order_status,
-                            a.storage_bucket, a.storage_key, a.original_filename, a.sha256, a.file_size
-                        FROM purchase_entitlements e
-                        JOIN orders o ON o.id = e.order_id
-                        JOIN firmware_assets a ON a.product_version_id = e.product_version_id
-                        WHERE e.id = %s AND e.buyer_id = %s AND e.status = 'ACTIVE' AND o.status = 'PAID';
-                    """, (purchase_id, buyer_id))
+                    if str(asset_type).lower() == "stl":
+                        cur.execute("""
+                            SELECT 
+                                e.id AS purchase_id, e.buyer_id, e.status AS entitlement_status,
+                                o.status AS order_status,
+                                s.storage_bucket, s.storage_key, s.original_filename, s.sha256, s.file_size,
+                                'stl' AS asset_type
+                            FROM purchase_entitlements e
+                            JOIN orders o ON o.id = e.order_id
+                            JOIN product_stl_assets s ON s.product_version_id = e.product_version_id
+                            WHERE e.id = %s AND e.buyer_id = %s AND e.status = 'ACTIVE' AND o.status = 'PAID';
+                        """, (purchase_id, buyer_id))
+                    else:
+                        cur.execute("""
+                            SELECT 
+                                e.id AS purchase_id, e.buyer_id, e.status AS entitlement_status,
+                                o.status AS order_status,
+                                a.storage_bucket, a.storage_key, a.original_filename, a.sha256, a.file_size,
+                                'bin' AS asset_type
+                            FROM purchase_entitlements e
+                            JOIN orders o ON o.id = e.order_id
+                            JOIN firmware_assets a ON a.product_version_id = e.product_version_id
+                            WHERE e.id = %s AND e.buyer_id = %s AND e.status = 'ACTIVE' AND o.status = 'PAID';
+                        """, (purchase_id, buyer_id))
                     row = cur.fetchone()
                     return dict(row) if row else None
         except Exception as exc:
@@ -1144,6 +1199,9 @@ class MarketplaceRepository:
                             a.original_filename,
                             a.file_size,
                             a.sha256 AS binary_sha256,
+                            sa.original_filename AS stl_original_filename,
+                            sa.file_size AS stl_file_size,
+                            sa.sha256 AS stl_sha256,
                             pt.provider AS payment_provider,
                             pt.provider_transaction_id,
                             pt.status AS payment_status,
@@ -1154,6 +1212,7 @@ class MarketplaceRepository:
                         LEFT JOIN firmware_products p ON p.id = o.product_id
                         LEFT JOIN firmware_product_versions v ON v.id = o.product_version_id
                         LEFT JOIN firmware_assets a ON a.product_version_id = o.product_version_id
+                        LEFT JOIN product_stl_assets sa ON sa.product_version_id = o.product_version_id
                         LEFT JOIN payment_transactions pt ON pt.order_id = o.id
                         WHERE o.id::text = %s OR o.order_number = %s
                         LIMIT 1;

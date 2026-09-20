@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import Optional, List
-from fastapi import APIRouter, Request, Form, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Request, Form, UploadFile, File, HTTPException, status, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from xiaozhi.dependencies import render, get_current_user, require_user, redirect_with_message
@@ -86,7 +86,8 @@ async def create_seller_product_action(
     doc_label: Optional[str] = Form(None),
     doc_url: Optional[str] = Form(None),
     images: List[UploadFile] = File(...),
-    firmware_file: UploadFile = File(...),
+    firmware_file: Optional[UploadFile] = File(None),
+    stl_file: Optional[UploadFile] = File(None),
 ):
     user = require_user(request)
     service = get_product_service()
@@ -99,9 +100,23 @@ async def create_seller_product_action(
             if len(b) > 0:
                 images_data.append(b)
 
-    # Read firmware bytes
-    firmware_bytes = await firmware_file.read()
-    firmware_filename = firmware_file.filename or "firmware.bin"
+    # Read firmware bytes if provided
+    firmware_bytes = None
+    firmware_filename = None
+    if firmware_file and firmware_file.filename:
+        b = await firmware_file.read()
+        if len(b) > 0:
+            firmware_bytes = b
+            firmware_filename = firmware_file.filename
+
+    # Read stl bytes if provided
+    stl_bytes = None
+    stl_filename = None
+    if stl_file and stl_file.filename:
+        b = await stl_file.read()
+        if len(b) > 0:
+            stl_bytes = b
+            stl_filename = stl_file.filename
 
     links = []
     if doc_url and doc_url.strip():
@@ -118,8 +133,11 @@ async def create_seller_product_action(
         return redirect_with_message("/profil?mode=marketplace&sub=products", "Gagal: Harga jual tidak valid.")
     if not images_data:
         return redirect_with_message("/profil?mode=marketplace&sub=products", "Gagal: Minimal 1 foto produk wajib diunggah.")
-    if not firmware_bytes or len(firmware_bytes) == 0:
-        return redirect_with_message("/profil?mode=marketplace&sub=products", "Gagal: File binary firmware (.bin) wajib diunggah.")
+    if not firmware_bytes and not stl_bytes:
+        return redirect_with_message(
+            "/profil?mode=marketplace&sub=products",
+            "Gagal: Wajib mengunggah minimal salah satu file: Binary Firmware (.bin) atau Model 3D (.stl)."
+        )
 
     try:
         product = service.create_product(
@@ -131,6 +149,8 @@ async def create_seller_product_action(
             images_data=images_data,
             firmware_bytes=firmware_bytes,
             firmware_filename=firmware_filename,
+            stl_bytes=stl_bytes,
+            stl_filename=stl_filename,
             links=links,
         )
         msg = "Produk firmware berhasil diterbitkan!" if user.get("role") == "admin" else "Draft produk firmware berhasil disimpan. Silakan ajukan untuk ditinjau."
@@ -181,6 +201,7 @@ async def update_seller_product_action(
     doc_url: Optional[str] = Form(None),
     images: Optional[List[UploadFile]] = File(None),
     firmware_file: Optional[UploadFile] = File(None),
+    stl_file: Optional[UploadFile] = File(None),
 ):
     user = require_user(request)
     service = get_product_service()
@@ -203,6 +224,15 @@ async def update_seller_product_action(
             firmware_bytes = b
             firmware_filename = firmware_file.filename
 
+    # Read stl bytes if new file uploaded
+    stl_bytes = None
+    stl_filename = None
+    if stl_file and stl_file.filename:
+        b = await stl_file.read()
+        if len(b) > 0:
+            stl_bytes = b
+            stl_filename = stl_file.filename
+
     links = []
     if doc_url and doc_url.strip():
         links.append({"label": (doc_label or "Dokumentasi").strip(), "url": doc_url.strip()})
@@ -218,6 +248,8 @@ async def update_seller_product_action(
             images_data=images_data if images_data else None,
             firmware_bytes=firmware_bytes,
             firmware_filename=firmware_filename,
+            stl_bytes=stl_bytes,
+            stl_filename=stl_filename,
             links=links if (doc_url and doc_url.strip()) else None,
         )
         return redirect_with_message("/profil?mode=marketplace&sub=products", "Produk berhasil diperbarui.")
@@ -245,11 +277,11 @@ async def buyer_purchases_page(request: Request):
 
 
 @router.get("/purchases/{purchase_id}/download")
-async def buyer_download_redirect(request: Request, purchase_id: str):
+async def buyer_download_redirect(request: Request, purchase_id: str, asset: str = Query("bin")):
     user = require_user(request)
     service = get_entitlement_service()
     try:
-        meta = service.authorize_download(purchase_id, int(user["id"]))
+        meta = service.authorize_download(purchase_id, int(user["id"]), asset_type=asset)
         return RedirectResponse(url=meta["download_url"], status_code=303)
     except Exception as exc:
         return redirect_with_message("/profil?mode=marketplace&sub=purchases", f"Gagal mengunduh: {str(exc)}")

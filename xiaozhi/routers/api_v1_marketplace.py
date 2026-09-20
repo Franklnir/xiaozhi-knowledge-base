@@ -122,11 +122,11 @@ async def list_purchases(request: Request):
 
 
 @router.get("/purchases/{purchase_id}/download")
-async def download_firmware(request: Request, purchase_id: str):
+async def download_firmware(request: Request, purchase_id: str, asset: str = "bin"):
     user = require_user(request)
     service = get_entitlement_service()
     try:
-        dl_meta = service.authorize_download(purchase_id, int(user["id"]))
+        dl_meta = service.authorize_download(purchase_id, int(user["id"]), asset_type=asset)
         return {"success": True, "download": dl_meta}
     except PermissionError as exc:
         raise HTTPException(
@@ -153,7 +153,7 @@ async def serve_local_image(storage_key: str):
 @router.get("/storage/download/{token}")
 async def serve_local_firmware_download(token: str, filename: Optional[str] = None):
     """
-    Validates short-lived HMAC token and streams private firmware binary to authorized buyer.
+    Validates short-lived HMAC token and streams private firmware binary or 3D STL file to authorized buyer.
     Direct path access is impossible because filenames use non-guessable UUIDs.
     """
     payload = verify_download_token(token)
@@ -166,12 +166,14 @@ async def serve_local_firmware_download(token: str, filename: Optional[str] = No
     storage_key = payload.get("k", "")
     target_path = storage_service.get_local_firmware_path(storage_key)
     if not target_path or not target_path.exists():
-        raise HTTPException(status_code=404, detail="File binary firmware tidak ditemukan di storage.")
+        raise HTTPException(status_code=404, detail="File aset tidak ditemukan di storage.")
 
-    safe_filename = filename or "firmware.bin"
+    is_stl = target_path.suffix.lower() == ".stl"
+    safe_filename = filename or ("model.stl" if is_stl else "firmware.bin")
+    media_type = "model/stl" if is_stl else "application/octet-stream"
     return FileResponse(
         path=target_path,
-        media_type="application/octet-stream",
+        media_type=media_type,
         filename=safe_filename,
         headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
     )
