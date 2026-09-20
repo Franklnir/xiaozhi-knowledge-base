@@ -153,7 +153,12 @@
                 </span>
                 {% endif %}
                 <span class="app-chip app-chip-neutral">Versi {{ product.latest_version.version_label if product.latest_version else '1.0.0' }}</span>
-                <span class="app-chip app-chip-info">Binary .BIN</span>
+                {% if product.latest_version and product.latest_version.sha256 %}
+                <span class="app-chip app-chip-info">⚡ Firmware .BIN</span>
+                {% endif %}
+                {% if product.latest_version and product.latest_version.stl_sha256 %}
+                <span class="app-chip" style="background:#d1fae5; color:#065f46; border:1px solid #10b981; font-weight:700;">🖨️ Model 3D .STL</span>
+                {% endif %}
             </div>
 
             <h1 style="font-size:26px; font-weight:900; margin:0 0 12px; color:var(--app-text); line-height:1.3;">
@@ -188,7 +193,7 @@
             </ul>
             {% endif %}
 
-            <!-- Firmware Binary Status Box -->
+            <!-- Asset Package Lock Box -->
             <div class="fw-firmware-lock-box">
                 <div class="fw-firmware-lock-icon">
                     {% if product.is_owned %}🔓{% else %}🔒{% endif %}
@@ -196,16 +201,20 @@
                 <div style="flex:1;">
                     <div style="font-weight:800; font-size:14px; color:var(--app-text);">
                         {% if product.is_owned %}
-                        Firmware Binary Terbuka (Sudah Anda Beli)
+                        Paket Berkas Terbuka (Sudah Anda Beli)
                         {% else %}
-                        Firmware Binary Dilindungi
+                        Paket Berkas Privat Terlindungi
                         {% endif %}
                     </div>
-                    <div style="font-size:12px; color:var(--app-muted); margin-top:2px;">
+                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; display:flex; flex-direction:column; gap:4px;">
                         {% if product.latest_version and product.latest_version.sha256 %}
-                        File: <code>{{ product.latest_version.original_filename or 'firmware.bin' }}</code> ({{ (product.latest_version.file_size / (1024*1024))|round(2) }} MB) • SHA-256: <code>{{ product.latest_version.sha256[:12] }}...</code>
-                        {% else %}
-                        File firmware .bin siap diunduh segera setelah pembayaran tervalidasi.
+                        <div>⚡ <strong>Binary ESP32:</strong> <code>{{ product.latest_version.original_filename or 'firmware.bin' }}</code> ({{ (product.latest_version.file_size / (1024*1024))|round(2) }} MB) • SHA-256: <code>{{ product.latest_version.sha256[:12] }}...</code></div>
+                        {% endif %}
+                        {% if product.latest_version and product.latest_version.stl_sha256 %}
+                        <div>🖨️ <strong>Model 3D STL:</strong> <code>{{ product.latest_version.stl_original_filename or 'model.stl' }}</code> ({{ (product.latest_version.stl_file_size / (1024*1024))|round(2) }} MB) • SHA-256: <code>{{ product.latest_version.stl_sha256[:12] }}...</code></div>
+                        {% endif %}
+                        {% if not product.latest_version or (not product.latest_version.sha256 and not product.latest_version.stl_sha256) %}
+                        <div>File aset siap diunduh segera setelah pembayaran terkonfirmasi.</div>
                         {% endif %}
                     </div>
                 </div>

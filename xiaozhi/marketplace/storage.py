@@ -31,6 +31,7 @@ Image.MAX_IMAGE_PIXELS = 10_000_000
 LOCAL_STORAGE_DIR = BASE_DIR / "data" / "marketplace_storage"
 LOCAL_PUBLIC_IMAGES_DIR = LOCAL_STORAGE_DIR / "public" / "images"
 LOCAL_PRIVATE_FIRMWARE_DIR = LOCAL_STORAGE_DIR / "private" / "firmwares"
+LOCAL_PRIVATE_STL_DIR = LOCAL_STORAGE_DIR / "private" / "stl_files"
 
 
 class StorageService:
@@ -45,6 +46,7 @@ class StorageService:
         # Ensure local directories exist
         LOCAL_PUBLIC_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
         LOCAL_PRIVATE_FIRMWARE_DIR.mkdir(parents=True, exist_ok=True)
+        LOCAL_PRIVATE_STL_DIR.mkdir(parents=True, exist_ok=True)
 
     def _get_s3(self):
         if not self.has_s3:
@@ -146,6 +148,26 @@ class StorageService:
             "sha256": sha256_hash,
         }
 
+    def validate_stl(self, filename: str, file_obj) -> Dict[str, Any]:
+        """
+        Validates .stl extension, computes SHA-256 using memory-efficient chunked streaming.
+        """
+        clean_name = Path(filename).name.strip()
+        if not clean_name.lower().endswith(".stl"):
+            raise ValueError("Hanya file model 3D berekstensi .stl yang diperbolehkan.")
+        
+        sha256_hash, total_bytes = calculate_sha256_stream(file_obj)
+        if total_bytes == 0:
+            raise ValueError("File model 3D .stl tidak boleh kosong (0 bytes).")
+        if total_bytes > MAX_FIRMWARE_SIZE_BYTES:
+            raise ValueError(f"Ukuran model 3D ({total_bytes / (1024*1024):.1f} MB) melebihi batas sistem ({MAX_FIRMWARE_SIZE_BYTES / (1024*1024):.0f} MB).")
+
+        return {
+            "original_filename": clean_name,
+            "file_size": total_bytes,
+            "sha256": sha256_hash,
+        }
+
     def save_product_image(self, product_id: str, image_bytes: bytes) -> str:
         """Saves image and returns storage_key."""
         img_id = uuid.uuid4().hex
@@ -202,6 +224,39 @@ class StorageService:
 
         return bucket_name, storage_key
 
+    def save_stl(self, seller_id: int, product_id: str, version_id: str, file_obj) -> Tuple[str, str]:
+        """
+        Saves 3D model STL to private storage using chunked stream.
+        Returns (storage_bucket, storage_key).
+        """
+        random_id = uuid.uuid4().hex
+        storage_key = f"stl_models/{seller_id}/{product_id}/{version_id}/{random_id}.stl"
+        bucket_name = S3_BUCKET_PRIVATE if self.has_s3 else "local-private"
+
+        s3 = self._get_s3()
+        if s3:
+            if hasattr(file_obj, "seek"):
+                file_obj.seek(0)
+            s3.upload_fileobj(
+                file_obj,
+                Bucket=bucket_name,
+                Key=storage_key,
+                ExtraArgs={"ContentType": "model/stl"},
+            )
+        else:
+            # Local private storage
+            target_file = LOCAL_PRIVATE_STL_DIR / f"{random_id}.stl"
+            if hasattr(file_obj, "seek"):
+                file_obj.seek(0)
+            with open(target_file, "wb") as dest:
+                while True:
+                    chunk = file_obj.read(65536)
+                    if not chunk:
+                        break
+                    dest.write(chunk)
+
+        return bucket_name, storage_key
+
     def get_image_url(self, storage_key: str) -> str:
         """Returns public or local-served URL for a product image."""
         if not storage_key:
@@ -243,11 +298,43 @@ class StorageService:
         token = generate_download_token(purchase_id, storage_key, expires_in_seconds)
         return f"/api/v1/marketplace/storage/download/{token}?filename={filename}"
 
+    def get_stl_download_url(self, purchase_id: str, storage_key: str, filename: str, expires_in_seconds: int = 600) -> str:
+        """
+        Generates a short-lived signed download URL (10 minutes) for 3D model STL.
+        """
+        s3 = self._get_s3()
+        if s3:
+            return s3.generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": S3_BUCKET_PRIVATE,
+                    "Key": storage_key,
+                    "ResponseContentDisposition": f'attachment; filename="{filename}"',
+                },
+                ExpiresIn=expires_in_seconds,
+            )
+        
+        # Local secured download token
+        token = generate_download_token(purchase_id, storage_key, expires_in_seconds)
+        return f"/api/v1/marketplace/storage/download/{token}?filename={filename}"
+
     def get_local_firmware_path(self, storage_key: str) -> Optional[Path]:
-        """Returns Path to local private firmware file after security sanitization."""
-        # Key format: firmwares/.../{random_id}.bin
+        """Returns Path to local private file (.bin or .stl) after security sanitization."""
         filename = Path(storage_key).name
+        # Check firmware dir
         target = LOCAL_PRIVATE_FIRMWARE_DIR / filename
+        if target.exists() and target.is_file():
+            return target
+        # Check STL dir
+        target_stl = LOCAL_PRIVATE_STL_DIR / filename
+        if target_stl.exists() and target_stl.is_file():
+            return target_stl
+        return None
+
+    def get_local_stl_path(self, storage_key: str) -> Optional[Path]:
+        """Returns Path to local private STL file after security sanitization."""
+        filename = Path(storage_key).name
+        target = LOCAL_PRIVATE_STL_DIR / filename
         if target.exists() and target.is_file():
             return target
         return None

@@ -27,8 +27,10 @@ class ProductService:
         full_description: str,
         price_amount: int,
         images_data: List[bytes],
-        firmware_bytes: bytes,
-        firmware_filename: str,
+        firmware_bytes: Optional[bytes] = None,
+        firmware_filename: Optional[str] = None,
+        stl_bytes: Optional[bytes] = None,
+        stl_filename: Optional[str] = None,
         links: Optional[List[Dict[str, str]]] = None,
         version_label: str = "1.0.0",
     ) -> Dict[str, Any]:
@@ -47,22 +49,38 @@ class ProductService:
         if len(images_data) > 3:
             raise ValueError("Maksimal 3 foto produk diperbolehkan.")
 
-        # 1. Validate firmware
-        import io
-        firmware_io = io.BytesIO(firmware_bytes)
-        fw_meta = storage_service.validate_firmware(firmware_filename, firmware_io)
+        has_fw = bool(firmware_bytes and len(firmware_bytes) > 0 and firmware_filename)
+        has_stl = bool(stl_bytes and len(stl_bytes) > 0 and stl_filename)
+        if not has_fw and not has_stl:
+            raise ValueError("Wajib mengunggah minimal salah satu file: Binary Firmware (.bin) atau File 3D Model (.stl).")
 
-        # 2. Process and validate images
+        import io
+
+        # 1. Validate firmware if present
+        fw_meta = None
+        firmware_io = None
+        if has_fw:
+            firmware_io = io.BytesIO(firmware_bytes)
+            fw_meta = storage_service.validate_firmware(firmware_filename, firmware_io)
+
+        # 2. Validate STL if present
+        stl_meta = None
+        stl_io = None
+        if has_stl:
+            stl_io = io.BytesIO(stl_bytes)
+            stl_meta = storage_service.validate_stl(stl_filename, stl_io)
+
+        # 3. Process and validate images
         processed_images = []
         for idx, img_b in enumerate(images_data[:3]):
             p_img = storage_service.process_and_validate_image(img_b, f"img_{idx}.webp")
             processed_images.append(p_img)
 
-        # 3. Create slug
+        # 4. Create slug
         base_slug = slugify(title)
         slug = f"{base_slug}-{uuid.uuid4().hex[:6]}"
 
-        # 4. Insert product & initial version
+        # 5. Insert product & initial version
         product = self.repo.create_product(
             seller_id=seller_id,
             title=title,
@@ -76,7 +94,7 @@ class ProductService:
         product_id = str(product["id"])
         version_id = str(product["version_id"])
 
-        # 5. Save images to storage and save to DB
+        # 6. Save images to storage and save to DB
         db_images = []
         for p_img in processed_images:
             storage_key = storage_service.save_product_image(product_id, p_img["bytes"])
@@ -90,19 +108,33 @@ class ProductService:
             })
         self.repo.set_product_images(product_id, db_images)
 
-        # 6. Save firmware to private storage and save to DB
-        firmware_io.seek(0)
-        bucket, fw_key = storage_service.save_firmware(seller_id, product_id, version_id, firmware_io)
-        self.repo.set_firmware_asset(
-            product_version_id=version_id,
-            original_filename=fw_meta["original_filename"],
-            storage_bucket=bucket,
-            storage_key=fw_key,
-            file_size=fw_meta["file_size"],
-            sha256=fw_meta["sha256"],
-        )
+        # 7. Save firmware to private storage and save to DB
+        if has_fw and firmware_io and fw_meta:
+            firmware_io.seek(0)
+            bucket, fw_key = storage_service.save_firmware(seller_id, product_id, version_id, firmware_io)
+            self.repo.set_firmware_asset(
+                product_version_id=version_id,
+                original_filename=fw_meta["original_filename"],
+                storage_bucket=bucket,
+                storage_key=fw_key,
+                file_size=fw_meta["file_size"],
+                sha256=fw_meta["sha256"],
+            )
 
-        # 7. Set links if any
+        # 8. Save STL to private storage and save to DB
+        if has_stl and stl_io and stl_meta:
+            stl_io.seek(0)
+            stl_bucket, stl_key = storage_service.save_stl(seller_id, product_id, version_id, stl_io)
+            self.repo.set_stl_asset(
+                product_version_id=version_id,
+                original_filename=stl_meta["original_filename"],
+                storage_bucket=stl_bucket,
+                storage_key=stl_key,
+                file_size=stl_meta["file_size"],
+                sha256=stl_meta["sha256"],
+            )
+
+        # 9. Set links if any
         if links:
             self.repo.set_product_links(product_id, links)
 
@@ -180,6 +212,8 @@ class ProductService:
         images_data: Optional[List[bytes]] = None,
         firmware_bytes: Optional[bytes] = None,
         firmware_filename: Optional[str] = None,
+        stl_bytes: Optional[bytes] = None,
+        stl_filename: Optional[str] = None,
         links: Optional[List[Dict[str, str]]] = None,
         version_label: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -229,11 +263,24 @@ class ProductService:
                 })
             self.repo.set_product_images(product_id, db_images)
 
-        # If new firmware binary uploaded -> create new version
-        if firmware_bytes and len(firmware_bytes) > 0 and firmware_filename:
+        has_new_fw = bool(firmware_bytes and len(firmware_bytes) > 0 and firmware_filename)
+        has_new_stl = bool(stl_bytes and len(stl_bytes) > 0 and stl_filename)
+
+        # If new binary or STL uploaded -> create new version
+        if has_new_fw or has_new_stl:
             import io
-            fw_io = io.BytesIO(firmware_bytes)
-            fw_meta = storage_service.validate_firmware(firmware_filename, fw_io)
+            fw_meta = None
+            fw_io = None
+            if has_new_fw:
+                fw_io = io.BytesIO(firmware_bytes)
+                fw_meta = storage_service.validate_firmware(firmware_filename, fw_io)
+
+            stl_meta = None
+            stl_io = None
+            if has_new_stl:
+                stl_io = io.BytesIO(stl_bytes)
+                stl_meta = storage_service.validate_stl(stl_filename, stl_io)
+
             v_label = version_label or f"v{prod['version'] + 1}.0"
             v_status = "PUBLISHED" if is_admin else "DRAFT"
 
@@ -253,16 +300,29 @@ class ProductService:
 
                     conn.commit()
 
-            fw_io.seek(0)
-            bucket, fw_key = storage_service.save_firmware(prod["seller_id"], product_id, new_ver_id, fw_io)
-            self.repo.set_firmware_asset(
-                product_version_id=new_ver_id,
-                original_filename=fw_meta["original_filename"],
-                storage_bucket=bucket,
-                storage_key=fw_key,
-                file_size=fw_meta["file_size"],
-                sha256=fw_meta["sha256"],
-            )
+            if has_new_fw and fw_io and fw_meta:
+                fw_io.seek(0)
+                bucket, fw_key = storage_service.save_firmware(prod["seller_id"], product_id, new_ver_id, fw_io)
+                self.repo.set_firmware_asset(
+                    product_version_id=new_ver_id,
+                    original_filename=fw_meta["original_filename"],
+                    storage_bucket=bucket,
+                    storage_key=fw_key,
+                    file_size=fw_meta["file_size"],
+                    sha256=fw_meta["sha256"],
+                )
+
+            if has_new_stl and stl_io and stl_meta:
+                stl_io.seek(0)
+                stl_bucket, stl_key = storage_service.save_stl(prod["seller_id"], product_id, new_ver_id, stl_io)
+                self.repo.set_stl_asset(
+                    product_version_id=new_ver_id,
+                    original_filename=stl_meta["original_filename"],
+                    storage_bucket=stl_bucket,
+                    storage_key=stl_key,
+                    file_size=stl_meta["file_size"],
+                    sha256=stl_meta["sha256"],
+                )
 
         # Update links if provided
         if links is not None:

@@ -1225,21 +1225,45 @@
                         </h3>
 
                         <div style="font-size:13px; color:var(--app-muted); margin-bottom:8px;">
-                            Penjual: <strong>{{ p.seller_name_snapshot }}</strong> • Versi: <strong>{{ p.version_label_snapshot }}</strong> • Ukuran: <strong>{{ (p.file_size / (1024*1024))|round(2) }} MB</strong>
+                            Penjual: <strong>{{ p.seller_name_snapshot }}</strong> • Versi: <strong>{{ p.version_label_snapshot }}</strong>
+                            {% if p.file_size and p.file_size > 0 %}
+                            • FW: <strong>{{ (p.file_size / (1024*1024))|round(2) }} MB</strong>
+                            {% endif %}
+                            {% if p.stl_file_size and p.stl_file_size > 0 %}
+                            • STL: <strong>{{ (p.stl_file_size / (1024*1024))|round(2) }} MB</strong>
+                            {% endif %}
                         </div>
 
-                        <!-- SHA-256 Checksum -->
-                        <div style="display:flex; align-items:center; gap:8px; font-size:11.5px; background:var(--app-surface-muted); padding:6px 10px; border-radius:4px; border:1px solid var(--app-border); width:fit-content;">
-                            <span style="font-weight:700; color:var(--app-muted);">SHA-256:</span>
-                            <code id="hash-{{ loop.index }}" style="font-family:monospace; color:var(--app-text);">{{ p.firmware_sha256_snapshot }}</code>
-                            <button type="button" onclick="navigator.clipboard.writeText('{{ p.firmware_sha256_snapshot }}'); alert('SHA-256 disalin!');" title="Salin SHA-256" style="background:none; border:none; cursor:pointer; font-size:14px; padding:0 4px;">📋</button>
+                        <!-- SHA-256 Checksum(s) -->
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            {% if p.firmware_sha256_snapshot %}
+                            <div style="display:flex; align-items:center; gap:8px; font-size:11.5px; background:var(--app-surface-muted); padding:5px 9px; border-radius:4px; border:1px solid var(--app-border); width:fit-content;">
+                                <span style="font-weight:700; color:var(--app-muted);">⚡ SHA-256 (.BIN):</span>
+                                <code style="font-family:monospace; color:var(--app-text);">{{ p.firmware_sha256_snapshot }}</code>
+                                <button type="button" onclick="navigator.clipboard.writeText('{{ p.firmware_sha256_snapshot }}'); alert('SHA-256 BIN disalin!');" title="Salin SHA-256" style="background:none; border:none; cursor:pointer; font-size:13px; padding:0 3px;">📋</button>
+                            </div>
+                            {% endif %}
+                            {% if p.stl_sha256_snapshot %}
+                            <div style="display:flex; align-items:center; gap:8px; font-size:11.5px; background:var(--app-surface-muted); padding:5px 9px; border-radius:4px; border:1px solid var(--app-border); width:fit-content;">
+                                <span style="font-weight:700; color:var(--app-muted);">🖨️ SHA-256 (.STL):</span>
+                                <code style="font-family:monospace; color:var(--app-text);">{{ p.stl_sha256_snapshot }}</code>
+                                <button type="button" onclick="navigator.clipboard.writeText('{{ p.stl_sha256_snapshot }}'); alert('SHA-256 STL disalin!');" title="Salin SHA-256" style="background:none; border:none; cursor:pointer; font-size:13px; padding:0 3px;">📋</button>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
 
                     <div style="display:flex; flex-direction:column; gap:8px; min-width:170px;">
-                        <a href="/firmware/purchases/{{ p.purchase_id }}/download" class="app-button app-button-primary" style="justify-content:center; font-weight:800; padding:10px 16px;">
-                            🔓 Unduh Firmware .BIN
+                        {% if p.firmware_sha256_snapshot %}
+                        <a href="/firmware/purchases/{{ p.purchase_id }}/download?asset=bin" class="app-button app-button-primary" style="justify-content:center; font-weight:800; padding:9px 14px;">
+                            🔓 Unduh Firmware (.BIN)
                         </a>
+                        {% endif %}
+                        {% if p.stl_sha256_snapshot %}
+                        <a href="/firmware/purchases/{{ p.purchase_id }}/download?asset=stl" class="app-button" style="justify-content:center; font-weight:800; padding:9px 14px; background:#059669; color:#ffffff; border:none;">
+                            🖨️ Unduh 3D Model (.STL)
+                        </a>
+                        {% endif %}
                         <a href="/firmware/marketplace/{{ p.slug or p.product_id }}" target="_blank" class="app-button" style="justify-content:center; font-size:12px;">
                             Lihat Halaman Produk ↗
                         </a>
@@ -1479,17 +1503,36 @@
                         </div>
                     </div>
 
+                    <!-- File Assets (BIN & STL) Notice -->
+                    <div style="margin-bottom:8px; font-size:12px; color:var(--app-brand); font-weight:700; background:rgba(37,99,235,0.06); padding:8px 12px; border-radius:var(--app-radius); border:1px solid rgba(37,99,235,0.18);">
+                        ℹ️ <strong>Ketentuan File:</strong> Wajib mengunggah minimal salah satu file (Firmware <code>.bin</code> atau Model 3D <code>.stl</code>), atau bisa keduanya sekaligus.
+                    </div>
+
                     <!-- Firmware Binary Upload & Realtime Checksum -->
-                    <div style="background:var(--app-surface-muted); padding:14px; border:1.5px dashed var(--app-border-strong); border-radius:var(--app-radius); margin-bottom:18px;">
+                    <div style="background:var(--app-surface-muted); padding:14px; border:1.5px dashed var(--app-border-strong); border-radius:var(--app-radius); margin-bottom:12px;">
                         <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
-                            Binary Firmware (.bin only) <span style="color:#dc2626;">*</span>
+                            ⚡ Binary Firmware (.bin) <span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(Opsional jika file STL diisi)</span>
                         </label>
-                        <input type="file" name="firmware_file" id="firmwareFileInput" accept=".bin" required class="app-input" onchange="calculateClientSha256(this)" style="width:100%;">
+                        <input type="file" name="firmware_file" id="firmwareFileInput" accept=".bin" class="app-input" onchange="calculateClientFileSha256(this, 'sha256Box', 'sha256Value')" style="width:100%;">
                         
                         <!-- Realtime Client SHA-256 feedback -->
                         <div id="sha256Box" style="display:none; margin-top:10px; font-size:12px; color:var(--app-text);">
-                            <div style="font-weight:800; color:var(--app-brand);">✓ SHA-256 Terhitung:</div>
+                            <div style="font-weight:800; color:var(--app-brand);">✓ SHA-256 Firmware Terhitung:</div>
                             <code id="sha256Value" style="word-break:break-all; font-family:monospace; background:var(--app-surface); padding:4px 8px; border-radius:4px; display:block; margin-top:3px; border:1px solid var(--app-border);">Menghitung...</code>
+                        </div>
+                    </div>
+
+                    <!-- 3D Model STL Upload & Realtime Checksum -->
+                    <div style="background:var(--app-surface-muted); padding:14px; border:1.5px dashed var(--app-border-strong); border-radius:var(--app-radius); margin-bottom:18px;">
+                        <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
+                            🖨️ Model 3D Casing / Enclosure (.stl) <span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(Opsional jika file BIN diisi)</span>
+                        </label>
+                        <input type="file" name="stl_file" id="stlFileInput" accept=".stl" class="app-input" onchange="calculateClientFileSha256(this, 'stlSha256Box', 'stlSha256Value')" style="width:100%;">
+                        
+                        <!-- Realtime Client SHA-256 feedback -->
+                        <div id="stlSha256Box" style="display:none; margin-top:10px; font-size:12px; color:var(--app-text);">
+                            <div style="font-weight:800; color:#059669;">✓ SHA-256 Model 3D Terhitung:</div>
+                            <code id="stlSha256Value" style="word-break:break-all; font-family:monospace; background:var(--app-surface); padding:4px 8px; border-radius:4px; display:block; margin-top:3px; border:1px solid var(--app-border);">Menghitung...</code>
                         </div>
                     </div>
 
@@ -1968,10 +2011,10 @@
         }
     }
 
-    async function calculateClientSha256(input) {
+    async function calculateClientFileSha256(input, boxId, valId) {
         const file = input.files[0];
-        const box = document.getElementById('sha256Box');
-        const val = document.getElementById('sha256Value');
+        const box = document.getElementById(boxId || 'sha256Box');
+        const val = document.getElementById(valId || 'sha256Value');
         if (!file) {
             if (box) box.style.display = 'none';
             return;
@@ -1989,6 +2032,10 @@
         } catch (e) {
             if (val) val.innerText = 'Kalkulasi otomatis selesai di server.';
         }
+    }
+
+    function calculateClientSha256(input) {
+        return calculateClientFileSha256(input, 'sha256Box', 'sha256Value');
     }
 
     window.addEventListener('click', function(e) {
@@ -2065,18 +2112,37 @@
             return showError('Harga jual wajib diisi nominal valid (isi 0 jika gratis).', priceInput);
         }
 
-        // 6. Validasi Binary Firmware (.bin only)
+        // 6. Validasi File Aset: Firmware (.bin) dan/atau 3D Model (.stl)
+        // Aturan: Wajib minimal salah satu terisi. Bisa salah satu atau keduanya.
         const fwInput = form.querySelector('input[name="firmware_file"]');
-        if (!fwInput || !fwInput.files || fwInput.files.length === 0) {
-            return showError('File binary firmware (.bin) wajib dipilih.', fwInput);
+        const stlInput = form.querySelector('input[name="stl_file"]');
+        const hasFw = fwInput && fwInput.files && fwInput.files.length > 0;
+        const hasStl = stlInput && stlInput.files && stlInput.files.length > 0;
+
+        if (!hasFw && !hasStl) {
+            return showError('Wajib memilih minimal salah satu file: Binary Firmware (.bin) atau 3D Model (.stl).', fwInput);
         }
-        const fwFile = fwInput.files[0];
-        if (!fwFile.name.toLowerCase().endsWith('.bin')) {
-            return showError('File firmware harus berformat .bin (binary flash ESP32).', fwInput);
+
+        if (hasFw) {
+            const fwFile = fwInput.files[0];
+            if (!fwFile.name.toLowerCase().endsWith('.bin')) {
+                return showError('File firmware harus berformat .bin (binary flash ESP32).', fwInput);
+            }
+            if (fwFile.size > 32 * 1024 * 1024) {
+                const mb = (fwFile.size / (1024 * 1024)).toFixed(1);
+                return showError(`Ukuran binary firmware (${mb} MB) melebihi batas sistem 32 MB.`, fwInput);
+            }
         }
-        if (fwFile.size > 32 * 1024 * 1024) {
-            const mb = (fwFile.size / (1024 * 1024)).toFixed(1);
-            return showError(`Ukuran binary firmware (${mb} MB) melebihi batas sistem 32 MB.`, fwInput);
+
+        if (hasStl) {
+            const stlFile = stlInput.files[0];
+            if (!stlFile.name.toLowerCase().endsWith('.stl')) {
+                return showError('File model 3D harus berformat .stl.', stlInput);
+            }
+            if (stlFile.size > 32 * 1024 * 1024) {
+                const mb = (stlFile.size / (1024 * 1024)).toFixed(1);
+                return showError(`Ukuran file 3D Model STL (${mb} MB) melebihi batas sistem 32 MB.`, stlInput);
+            }
         }
 
         // 7. Validasi Opsional: doc_url jika diisi

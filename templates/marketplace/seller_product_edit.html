@@ -153,26 +153,45 @@
             </p>
         </div>
 
-        <!-- Firmware Binary Section -->
+        <!-- Firmware Binary & 3D Model Section -->
         <div style="margin-bottom:24px; border-top:1px dashed var(--app-border); padding-top:16px;">
             <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:8px;">
-                Firmware Binary Saat Ini
+                Aset Terpasang Saat Ini
             </label>
             {% if product.latest_version %}
-            <div class="fw-spec-box">
+            <div class="fw-spec-box" style="margin-bottom:14px;">
                 <div>🏷️ <strong>Versi:</strong> {{ product.latest_version.version_label }}</div>
-                <div>📁 <strong>File:</strong> {{ product.latest_version.original_filename or 'firmware.bin' }} ({{ "{:,}".format(product.latest_version.file_size or 0) }} bytes)</div>
-                <div style="word-break:break-all;">🔒 <strong>SHA-256:</strong> {{ product.latest_version.sha256 }}</div>
+                {% if product.latest_version.sha256 %}
+                <div>⚡ <strong>Firmware (.bin):</strong> {{ product.latest_version.original_filename or 'firmware.bin' }} ({{ "{:,}".format(product.latest_version.file_size or 0) }} bytes)</div>
+                <div style="word-break:break-all; font-size:11.5px; color:var(--app-muted);">🔒 <strong>SHA-256 BIN:</strong> {{ product.latest_version.sha256 }}</div>
+                {% endif %}
+                {% if product.latest_version.stl_sha256 %}
+                <div style="margin-top:6px;">🖨️ <strong>Model 3D (.stl):</strong> {{ product.latest_version.stl_original_filename or 'model.stl' }} ({{ "{:,}".format(product.latest_version.stl_file_size or 0) }} bytes)</div>
+                <div style="word-break:break-all; font-size:11.5px; color:var(--app-muted);">🔒 <strong>SHA-256 STL:</strong> {{ product.latest_version.stl_sha256 }}</div>
+                {% endif %}
             </div>
             {% endif %}
 
-            <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:6px; color:var(--app-muted);">
-                Unggah File Firmware Baru (.bin) (Opsional)
-            </label>
-            <input type="file" name="firmware_file" accept=".bin,application/octet-stream" class="app-input" style="width:100%;">
-            <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0;">
-                Kosongkan jika tetap memakai file binary versi sekarang.
-            </p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div>
+                    <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:6px; color:var(--app-muted);">
+                        ⚡ Unggah File Firmware Baru (.bin) (Opsional)
+                    </label>
+                    <input type="file" name="firmware_file" accept=".bin,application/octet-stream" class="app-input" style="width:100%;">
+                    <p style="font-size:11.5px; color:var(--app-muted); margin:4px 0 0;">
+                        Kosongkan jika tetap memakai file binary versi sekarang.
+                    </p>
+                </div>
+                <div>
+                    <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:6px; color:var(--app-muted);">
+                        🖨️ Unggah File Model 3D Baru (.stl) (Opsional)
+                    </label>
+                    <input type="file" name="stl_file" accept=".stl" class="app-input" style="width:100%;">
+                    <p style="font-size:11.5px; color:var(--app-muted); margin:4px 0 0;">
+                        Kosongkan jika tetap memakai file 3D model versi sekarang.
+                    </p>
+                </div>
+            </div>
         </div>
 
         <div style="display:flex; justify-content:flex-end; gap:12px;">
@@ -277,6 +296,19 @@
             if (fwFile.size > 32 * 1024 * 1024) {
                 const mb = (fwFile.size / (1024 * 1024)).toFixed(1);
                 return showError(`Ukuran binary firmware (${mb} MB) melebihi batas sistem 32 MB.`, fwInput);
+            }
+        }
+
+        // Validasi STL Baru (Jika ada yang dipilih)
+        const stlInput = form.querySelector('input[name="stl_file"]');
+        if (stlInput && stlInput.files && stlInput.files.length > 0) {
+            const stlFile = stlInput.files[0];
+            if (!stlFile.name.toLowerCase().endsWith('.stl')) {
+                return showError('File model 3D harus berformat .stl.', stlInput);
+            }
+            if (stlFile.size > 32 * 1024 * 1024) {
+                const mb = (stlFile.size / (1024 * 1024)).toFixed(1);
+                return showError(`Ukuran file model 3D (${mb} MB) melebihi batas sistem 32 MB.`, stlInput);
             }
         }
 
