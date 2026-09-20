@@ -116,7 +116,7 @@
                             <span class="app-table-subtext">{{ conn.message[:60] }}</span>
                         </td>
                         <td>
-                            <span class="app-table-subtext">{{ conn.updated_at[:19] if conn.updated_at else '-' }}</span>
+                            <span class="app-table-subtext">{{ (conn.updated_at|string)[:19] if conn.updated_at else '-' }}</span>
                         </td>
                         <td>
                             <div style="display:flex;gap:6px">

@@ -459,7 +459,7 @@
             <div class="profile-name">{{ user.username }}</div>
             <div class="profile-role">{{ user.role|capitalize }}</div>
             {% if user.created_at %}
-            <div class="profile-joined">Bergabung: {{ user.created_at[:10] }}</div>
+            <div class="profile-joined">Bergabung: {{ (user.created_at|string)[:10] }}</div>
             {% endif %}
             <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 {% if device_mac %}

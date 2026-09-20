@@ -351,7 +351,7 @@
                         <td>
                             <span class="app-table-title">{{ item.username }}</span>
                             {% if item.created_at %}
-                            <br><span class="app-table-subtext">{{ item.created_at[:10] }}</span>
+                            <br><span class="app-table-subtext">{{ (item.created_at|string)[:10] }}</span>
                             {% endif %}
                             <div id="user-playback-badge-{{ item.id }}" class="user-playback-badge" style="margin-top: 4px; {% if not item.youtube_stream %}display:none;{% endif %}">
                                 <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 2px 6px;">
