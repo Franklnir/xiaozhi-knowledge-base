@@ -25,11 +25,13 @@ async def marketplace_catalog(request: Request, q: Optional[str] = None):
     user = get_current_user(request)
     service = get_product_service()
     products = service.get_marketplace_list(limit=30, search=q)
+    repo = get_marketplace_repo()
     return render(request, "marketplace/index.html", {
         "user": user,
         "page": "marketplace",
         "products": products,
         "search_query": q or "",
+        "db_ready": repo.is_db_ready(),
     })
 
 

@@ -196,6 +196,15 @@
     </div>
 </div>
 
+{% if not db_ready %}
+<div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: var(--app-radius); padding: 14px 18px; margin-bottom: 20px; color: #92400e; font-size: 13.5px; line-height: 1.5; box-shadow: var(--app-shadow);">
+    <div style="font-weight: 800; font-size: 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+        <span>ℹ️</span> Konfigurasi PostgreSQL Diperlukan
+    </div>
+    Marketplace Firmware menggunakan PostgreSQL dan Row-Level Security (RLS) untuk keamanan data. Di lingkungan hosting seperti Hugging Face Space atau VPS, pastikan variable <code>DATABASE_URL</code> telah dikonfigurasi pada Settings & Secrets.
+</div>
+{% endif %}
+
 {% if not products %}
 <div class="app-muted-panel" style="text-align:center; padding:50px 20px;">
     <div style="font-size:40px; margin-bottom:12px;">🔍</div>
