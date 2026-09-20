@@ -42,11 +42,22 @@ def get_admin_dashboard_snapshot() -> Dict[str, Any]:
 
     # Active YouTube Music streams
     active_streams = playback_tracker.get_active_sessions()
-    active_user_map = {int(s["user_id"]): s for s in active_streams}
+    active_user_map = {int(s["user_id"]): s for s in active_streams if s.get("user_id")}
+    active_mac_map = {
+        str(s["device_mac"]).replace(":", "").replace("-", "").strip().lower(): s
+        for s in active_streams if s.get("device_mac") and not str(s.get("device_mac", "")).lower().startswith("esp32 board")
+    }
 
     # Attach YouTube active stream info to each user
     for u in managed_users:
-        u["youtube_stream"] = active_user_map.get(int(u["id"]))
+        stream = active_user_map.get(int(u["id"]))
+        if not stream and u.get("device_mac"):
+            clean_mac = str(u["device_mac"]).replace(":", "").replace("-", "").strip().lower()
+            stream = active_mac_map.get(clean_mac)
+        u["youtube_stream"] = stream
+        if stream:
+            u["is_playing"] = True
+            u["current_track"] = stream.get("title", "")
 
     totals = {
         "users": len(managed_users),

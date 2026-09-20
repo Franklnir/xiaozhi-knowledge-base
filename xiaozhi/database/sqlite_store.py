@@ -1270,6 +1270,59 @@ class SQLiteStore:
         ).fetchone()
         return dict(row) if row else None
 
+    def find_device_by_mac(self, mac_address: str) -> Optional[Dict[str, Any]]:
+        if not mac_address:
+            return None
+        raw = mac_address.strip().lower()
+        clean = raw.replace(":", "").replace("-", "")
+        parts = [clean[i:i+2] for i in range(0, len(clean), 2)] if len(clean) == 12 else []
+        with_colons = ":".join(parts) if parts else raw
+        conn = self._get_conn()
+        row = conn.execute(
+            """
+            SELECT * FROM registered_devices 
+            WHERE LOWER(device_id) = ? 
+               OR LOWER(device_id) = ? 
+               OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ?
+            ORDER BY id DESC LIMIT 1
+            """,
+            (raw, with_colons, clean),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def find_recent_audio_command_by_video_id(self, video_id: str, minutes: int = 20) -> Optional[Dict[str, Any]]:
+        if not video_id:
+            return None
+        conn = self._get_conn()
+        row = conn.execute(
+            """
+            SELECT owner_id, title, status FROM audio_queue 
+            WHERE video_id = ? 
+              AND status IN ('pending', 'playing') 
+              AND datetime(created_at) >= datetime('now', ? || ' minutes') 
+            ORDER BY id DESC LIMIT 1
+            """,
+            (video_id, f"-{abs(minutes)}"),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def find_recent_audio_command_by_mac(self, mac_address: str, minutes: int = 20) -> Optional[Dict[str, Any]]:
+        if not mac_address:
+            return None
+        clean = mac_address.replace(":", "").replace("-", "").strip().lower()
+        conn = self._get_conn()
+        row = conn.execute(
+            """
+            SELECT owner_id, title, status, video_id FROM audio_queue 
+            WHERE status IN ('pending', 'playing') 
+              AND (stream_url LIKE ? OR stream_url LIKE ?)
+              AND datetime(created_at) >= datetime('now', ? || ' minutes') 
+            ORDER BY id DESC LIMIT 1
+            """,
+            (f"%{mac_address}%", f"%{clean}%", f"-{abs(minutes)}"),
+        ).fetchone()
+        return dict(row) if row else None
+
     def is_device_owned_by(self, device_id: str, owner_id: int) -> bool:
         dev = self.find_device_by_id(device_id)
         if not dev:
@@ -1420,6 +1473,8 @@ class SQLiteStore:
             try:
                 from xiaozhi.services.playback_tracker import playback_tracker
                 active_session = playback_tracker.get_session_by_user(user_id)
+                if not active_session and device_mac:
+                    active_session = playback_tracker.get_session_by_mac(device_mac)
             except Exception:
                 pass
 

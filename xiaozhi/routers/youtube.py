@@ -51,38 +51,36 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
     mac_with_colons = _normalize_mac(raw_mac)
     raw_mac_clean = raw_mac.replace(":", "").replace("-", "").lower()
 
-    conn = getattr(store, "_get_conn", lambda: None)()
-    if conn is not None:
-        # 1. PRIMARY AUTHORITY: Check registered_devices by exact device_id / MAC
-        try:
-            row = conn.execute(
-                "SELECT owner_id FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(device_id) = ? OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ? ORDER BY id DESC LIMIT 1",
-                (device_id.lower(), mac_with_colons.lower(), raw_mac_clean)
-            ).fetchone()
-            if row and row["owner_id"]:
-                return int(row["owner_id"])
-        except Exception:
-            pass
-
-    if hasattr(store, "find_device_by_mac"):
-        try:
-            dev = store.find_device_by_mac(mac_with_colons) or store.find_device_by_mac(raw_mac)
+    # 1. PRIMARY AUTHORITY: Check registered_devices by exact device_id / MAC via store
+    try:
+        if hasattr(store, "find_device_by_mac"):
+            dev = (
+                store.find_device_by_mac(device_id) or
+                store.find_device_by_mac(mac_with_colons) or
+                store.find_device_by_mac(raw_mac) or
+                store.find_device_by_mac(raw_mac_clean)
+            )
             if dev and dev.get("owner_id"):
                 return int(dev["owner_id"])
-        except Exception:
-            pass
+        if hasattr(store, "find_device_by_id"):
+            dev = (
+                store.find_device_by_id(device_id) or
+                store.find_device_by_id(mac_with_colons) or
+                store.find_device_by_id(raw_mac)
+            )
+            if dev and dev.get("owner_id"):
+                return int(dev["owner_id"])
+    except Exception as e:
+        logger.debug("Device lookup by MAC failed: %s", e)
 
     # 2. MATCH AUDIO QUEUE ONLY IF THE URL/COMMAND EXPLICITLY CONTAINS THIS MAC
-    if conn is not None:
-        try:
-            matching_row = conn.execute(
-                "SELECT owner_id FROM audio_queue WHERE status IN ('pending', 'playing') AND (stream_url LIKE ? OR stream_url LIKE ?) ORDER BY id DESC LIMIT 1",
-                (f"%{mac_with_colons}%", f"%{raw_mac_clean}%")
-            ).fetchone()
-            if matching_row and matching_row["owner_id"]:
-                return int(matching_row["owner_id"])
-        except Exception:
-            pass
+    try:
+        if hasattr(store, "find_recent_audio_command_by_mac"):
+            cmd = store.find_recent_audio_command_by_mac(mac_with_colons) or store.find_recent_audio_command_by_mac(raw_mac)
+            if cmd and cmd.get("owner_id"):
+                return int(cmd["owner_id"])
+    except Exception as e:
+        logger.debug("Audio queue lookup by MAC failed: %s", e)
 
     return None
 
@@ -153,40 +151,15 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
 
     # 2. Check recent audio_queue for this video_id (created in last 20 minutes)
     # This directly identifies the user who just asked XiaoZhi to play this song!
-    if not user:
-        conn = getattr(store, "_get_conn", lambda: None)()
-        if conn is not None:
-            try:
-                row = conn.execute(
-                    "SELECT owner_id, title FROM audio_queue WHERE video_id = ? AND status IN ('pending', 'playing') AND datetime(created_at) >= datetime('now', '-20 minutes') ORDER BY id DESC LIMIT 1",
-                    (video_id,)
-                ).fetchone()
-                if row and row["owner_id"]:
-                    user = _fetch_user(store, row["owner_id"])
-                    if row["title"] and not title:
-                        title = row["title"]
-                    try:
-                        conn.execute(
-                            "UPDATE audio_queue SET status = 'playing' WHERE video_id = ? AND status = 'pending'",
-                            (video_id,)
-                        )
-                        conn.commit()
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-        elif hasattr(store, "_load"):
-            try:
-                with store._lock:
-                    data = store._load()
-                    for cmd in reversed(data.get("audio_queue", [])):
-                        if cmd.get("video_id") == video_id and cmd.get("owner_id"):
-                            user = _fetch_user(store, cmd["owner_id"])
-                            if cmd.get("title") and not title:
-                                title = cmd["title"]
-                            break
-            except Exception:
-                pass
+    if not user and hasattr(store, "find_recent_audio_command_by_video_id"):
+        try:
+            cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=20)
+            if cmd and cmd.get("owner_id"):
+                user = _fetch_user(store, cmd["owner_id"])
+                if cmd.get("title") and not title:
+                    title = cmd["title"]
+        except Exception as e:
+            logger.debug("Error resolving user from audio_queue: %s", e)
 
     # 3. If still not resolved, check MCP token
     if not user and token:
@@ -215,21 +188,16 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
         except Exception:
             pass
 
-    # 6. Fallback: recent audio_queue record within 30 minutes (never from days ago!)
-    if not user:
-        conn = getattr(store, "_get_conn", lambda: None)()
-        if conn is not None:
-            try:
-                row = conn.execute(
-                    "SELECT owner_id, title FROM audio_queue WHERE video_id = ? AND datetime(created_at) >= datetime('now', '-30 minutes') ORDER BY id DESC LIMIT 1",
-                    (video_id,)
-                ).fetchone()
-                if row and row["owner_id"]:
-                    user = _fetch_user(store, row["owner_id"])
-                    if row["title"] and not title:
-                        title = row["title"]
-            except Exception:
-                pass
+    # 6. Fallback: recent audio_queue record within 45 minutes
+    if not user and hasattr(store, "find_recent_audio_command_by_video_id"):
+        try:
+            cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=45)
+            if cmd and cmd.get("owner_id"):
+                user = _fetch_user(store, cmd["owner_id"])
+                if cmd.get("title") and not title:
+                    title = cmd["title"]
+        except Exception:
+            pass
 
     # If user known but device_mac not provided in request, check if user already has registered MAC
     if user and not device_mac and hasattr(store, "get_user_mac_address"):

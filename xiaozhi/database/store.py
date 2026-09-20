@@ -2095,6 +2095,28 @@ class HFJsonStore:
                 self._commit(data, "Delete registered device")
             return changed
 
+    def find_recent_audio_command_by_video_id(self, video_id: str, minutes: int = 20) -> Optional[Dict[str, Any]]:
+        if not video_id:
+            return None
+        with self._lock:
+            data = self._load()
+            for cmd in reversed(data.get("audio_queue", [])):
+                if cmd.get("video_id") == video_id and cmd.get("owner_id"):
+                    return cmd
+        return None
+
+    def find_recent_audio_command_by_mac(self, mac_address: str, minutes: int = 20) -> Optional[Dict[str, Any]]:
+        if not mac_address:
+            return None
+        clean = mac_address.replace(":", "").replace("-", "").strip().lower()
+        with self._lock:
+            data = self._load()
+            for cmd in reversed(data.get("audio_queue", [])):
+                url = str(cmd.get("stream_url", "")).lower()
+                if mac_address.lower() in url or clean in url:
+                    return cmd
+        return None
+
     def get_now_playing(self, owner_id: int) -> Optional[Dict[str, Any]]:
         with self._lock:
             data = self._load()
