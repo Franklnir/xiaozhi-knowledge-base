@@ -14,6 +14,7 @@ from xiaozhi.marketplace.deps import (
     get_chat_service,
 )
 from xiaozhi.config import MARKETPLACE_ADMIN_FEE_FLAT, MARKETPLACE_ADMIN_FEE_PERCENT
+from xiaozhi.marketplace.services.bank_service import verify_account
 
 logger = logging.getLogger("xiaozhi.marketplace.ui")
 router = APIRouter(prefix="/firmware", tags=["Marketplace Web UI"])
@@ -304,14 +305,16 @@ async def request_withdrawal_action(
     user = require_user(request)
     service = get_wallet_service()
     try:
+        inquiry = verify_account(destination_bank, destination_account_number, user)
+        acc_name = destination_account_name.strip() or inquiry["account_name"]
         service.request_withdrawal(
             user_id=int(user["id"]),
             amount=amount,
-            destination_bank=destination_bank,
-            destination_account_name=destination_account_name,
-            destination_account_number=destination_account_number,
+            destination_bank=inquiry["short_name"],
+            destination_account_name=acc_name,
+            destination_account_number=inquiry["account_number"],
         )
-        return redirect_with_message("/profil?mode=marketplace&sub=sales", f"Permintaan penarikan dana Rp {amount:,} berhasil diajukan.")
+        return redirect_with_message("/profil?mode=marketplace&sub=sales", f"Permintaan penarikan dana Rp {amount:,} berhasil diajukan ke {inquiry['short_name']} ({acc_name}).")
     except Exception as exc:
         return redirect_with_message("/profil?mode=marketplace&sub=sales", f"Penarikan gagal: {str(exc)}")
 
