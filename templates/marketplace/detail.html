@@ -160,10 +160,12 @@
                 {{ product.title }}
             </h1>
 
-            <div style="display:flex; align-items:center; gap:16px; font-size:13px; color:var(--app-muted); margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--app-border);">
+            <div style="display:flex; align-items:center; gap:16px; font-size:13px; color:var(--app-muted); margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--app-border); flex-wrap:wrap;">
                 <div>Penjual: <strong style="color:var(--app-text)">{{ product.seller_username }}</strong></div>
+                {% if product.sales_count and product.sales_count > 0 %}
                 <div>•</div>
                 <div>Terjual: <strong>{{ product.sales_count }}x</strong></div>
+                {% endif %}
                 <div>•</div>
                 <div>Status: <span style="color:var(--app-accent); font-weight:800;">Tersedia</span></div>
             </div>
@@ -242,15 +244,32 @@
                         <td style="color:var(--app-muted);">Biaya Layanan Platform:</td>
                         <td style="text-align:right; font-weight:700; color:#b45309;">- Rp {{ "{:,}".format(platform_fee) }}</td>
                     </tr>
+                    <tr>
+                        <td style="color:var(--app-muted);">PPN (11%):</td>
+                        <td style="text-align:right; font-weight:700; color:#64748b;">Rp {{ "{:,}".format(ppn_amount) }}</td>
+                    </tr>
                     <tr style="font-size:12px;">
                         <td style="color:var(--app-text); font-weight:800;">Net Diterima Penjual:</td>
                         <td style="text-align:right; font-weight:800; color:var(--app-brand);">Rp {{ "{:,}".format(seller_net) }}</td>
                     </tr>
                 </table>
                 <div style="font-size:11px; color:var(--app-muted); line-height:1.4;">
-                    *Biaya platform sudah termasuk di dalam total harga. Pembeli hanya membayar nominal Rp {{ "{:,}".format(product.price_amount) }}.
+                    *Biaya platform & PPN 11% sudah diperhitungkan secara transparan. Pembeli hanya membayar nominal Rp {{ "{:,}".format(product.price_amount) }}.
                 </div>
             </div>
+
+            <!-- MCP Connection Requirement Warning -->
+            {% if user and not mcp_connected %}
+            <div style="background:rgba(234, 179, 8, 0.12); border:1.5px solid rgba(234, 179, 8, 0.4); border-radius:var(--app-radius); padding:10px 12px; margin-bottom:12px; font-size:12px; color:#854d0e; line-height:1.5;">
+                <div style="font-weight:800; display:flex; align-items:center; gap:6px;">
+                    <span>⚠️</span> Syarat Pembelian:
+                </div>
+                Board ESP32 atau akun Anda <strong>wajib terhubung ke MCP Bridge</strong> sebelum dapat membeli firmware.
+                <div style="margin-top:6px;">
+                    <a href="/profil" style="font-weight:800; color:#b45309; text-decoration:underline;">Hubungkan MCP Sekarang &rarr;</a>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Purchase Actions -->
             {% if not user %}
@@ -258,7 +277,7 @@
                 Masuk untuk Membeli
             </a>
             {% elif product.is_seller %}
-            <div class="app-alert app-alert-info" style="font-size:13px; text-align:center;">
+            <div class="app-alert app-alert-info" style="font-size:13px; text-align:center; margin-bottom:10px;">
                 Ini adalah produk firmware Anda sendiri.
             </div>
             {% elif product.is_owned %}
@@ -266,10 +285,22 @@
                 🔓 Buka di Pembelian Saya
             </a>
             {% else %}
-            <button type="button" onclick="openDevNoticeModal()" id="btnCheckout" class="app-button app-button-primary" style="width:100%; justify-content:center; padding:13px; font-size:15px; font-weight:900;">
-                ⚡ Beli Firmware Sekarang
+            <!-- Fitur Buy Dinonaktifkan (Tahap Pengembangan) -->
+            <button type="button" onclick="openDevNoticeModal()" id="btnCheckout" class="app-button" style="width:100%; justify-content:center; padding:13px; font-size:14px; font-weight:900; background:var(--app-surface-muted); color:var(--app-muted); border:2px dashed var(--app-border-strong); cursor:pointer;">
+                🔒 Beli Sekarang (Tahap Pengembangan)
             </button>
-            <div id="checkoutError" style="display:none; color:#dc2626; font-size:12px; font-weight:700; margin-top:8px; text-align:center;"></div>
+            <div style="font-size:11px; color:var(--app-muted); text-align:center; margin-top:5px;">
+                *Fitur transaksi sedang dalam tahap pengembangan & integrasi gateway pembayaran.
+            </div>
+            {% endif %}
+
+            <!-- Fitur Chat Penjual -->
+            {% if not product.is_seller %}
+            <a href="/chat?mention=@{{ product.seller_username }}&msg=Halo%20@{{ product.seller_username }},%20saya%20tertarik%20dengan%20produk%20firmware%20{{ product.title|urlencode }}" 
+               class="app-button" 
+               style="width:100%; justify-content:center; padding:11px; font-size:13.5px; font-weight:800; margin-top:10px; border:2px solid var(--app-brand); color:var(--app-brand); background:var(--app-surface); text-decoration:none;">
+                💬 Chat Penjual (@{{ product.seller_username }})
+            </a>
             {% endif %}
 
             <div style="display:flex; justify-content:center; gap:8px; margin-top:14px; font-size:12px; color:var(--app-muted);">

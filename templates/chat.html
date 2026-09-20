@@ -895,6 +895,18 @@
         connectWebSocket();
         chatInput.focus();
 
+        // Auto fill message or mention from URL params (e.g. from marketplace product detail)
+        const urlParams = new URLSearchParams(window.location.search);
+        const prefillMsg = urlParams.get('msg');
+        const prefillMention = urlParams.get('mention');
+        if (prefillMsg || prefillMention) {
+            let text = '';
+            if (prefillMention) text += prefillMention + ' ';
+            if (prefillMsg) text += prefillMsg;
+            chatInput.value = text.trim() + ' ';
+            chatInput.focus();
+        }
+
         // Clear unread badge immediately since we are in chat room
         fetch('/api/community/chat/read', { method: 'POST', credentials: 'same-origin' });
         const badge = document.getElementById('navChatBadge');

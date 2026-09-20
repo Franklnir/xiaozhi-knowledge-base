@@ -48,14 +48,25 @@ async def marketplace_product_detail(request: Request, product_id_or_slug: str):
     subtotal = int(product["price_amount"])
     platform_fee = int(MARKETPLACE_ADMIN_FEE_FLAT + int(subtotal * MARKETPLACE_ADMIN_FEE_PERCENT))
     platform_fee = min(platform_fee, subtotal)
+    ppn_amount = int(round(platform_fee * 0.11))
     seller_net = subtotal - platform_fee
+
+    # MCP connection check for buyer
+    mcp_connected = False
+    if user:
+        from xiaozhi.services.mcp_service import mcp_status_payload
+        token_saved = bool(user.get("mcp_token"))
+        status_data = mcp_status_payload(int(user["id"]), token_saved=token_saved)
+        mcp_connected = bool(status_data.get("connected"))
 
     return render(request, "marketplace/detail.html", {
         "user": user,
         "page": "marketplace",
         "product": product,
         "platform_fee": platform_fee,
+        "ppn_amount": ppn_amount,
         "seller_net": seller_net,
+        "mcp_connected": mcp_connected,
     })
 
 

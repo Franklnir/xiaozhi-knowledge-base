@@ -72,6 +72,24 @@ async def get_product(request: Request, product_id: str):
 @router.post("/orders")
 async def create_order(request: Request, payload: OrderCreateRequest):
     user = require_user(request)
+
+    # 1. Syarat Pembelian: Wajib terhubung ke MCP
+    from xiaozhi.services.mcp_service import mcp_status_payload
+    token_saved = bool(user.get("mcp_token"))
+    status_data = mcp_status_payload(int(user["id"]), token_saved=token_saved)
+    if not status_data.get("connected") and user.get("role") != "admin":
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "MCP_REQUIRED", "message": "Syarat Pembelian: Akun atau board ESP32 Anda harus terhubung ke MCP terlebih dahulu sebelum dapat membeli produk firmware."}}
+        )
+
+    # 2. Fitur Beli Dinonaktifkan Sementara (Tahap Pengembangan)
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "FEATURE_UNDER_DEVELOPMENT", "message": "Fitur transaksi dan pembelian firmware saat ini sedang dalam tahap pengembangan & integrasi sistem pembayaran."}}
+        )
+
     service = get_order_service()
     try:
         order, checkout_url = await service.create_checkout_order(user, payload.product_id)
