@@ -43,6 +43,53 @@
         color: var(--app-muted);
         margin-top: 8px;
     }
+    .photo-slot-box {
+        border: 2px dashed var(--app-border-strong);
+        border-radius: var(--app-radius);
+        background: var(--app-surface-muted);
+        min-height: 140px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+        user-select: none;
+    }
+    .photo-slot-box:hover {
+        border-color: var(--app-brand);
+        background: var(--app-surface);
+    }
+    .photo-slot-box.has-file {
+        border-style: solid;
+        background: var(--app-surface);
+        cursor: default;
+    }
+    .slot-btn {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid var(--app-border-strong);
+        background: var(--app-surface);
+        color: var(--app-text);
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .slot-btn:hover {
+        background: var(--app-surface-muted);
+    }
+    .slot-btn-danger {
+        color: #dc2626;
+        border-color: #fca5a5;
+        background: #fef2f2;
+    }
+    .slot-btn-danger:hover {
+        background: #fee2e2;
+    }
     /* Dual-Mode Profile Switcher */
     .profile-mode-nav {
         display: flex;
@@ -1725,10 +1772,40 @@
                     <!-- Photos (1-3) -->
                     <div style="margin-bottom:14px;">
                         <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:4px;">
-                            Foto Produk (Maksimal 3 foto • Maks 500 KB per foto) <span style="color:#dc2626;">*</span>
+                            Foto Produk (Maksimal 3 Foto • Klik Tiap Kotak untuk Pilih / Ganti • Kompresi Otomatis Aktif) <span style="color:#dc2626;">*</span>
                         </label>
-                        <input type="file" name="images" id="productImagesInput" accept="image/png, image/jpeg, image/webp" multiple required class="app-input" onchange="previewSelectedImages(this)" style="width:100%;">
-                        <div id="imagePreviewRow" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
+                        <div class="photo-slots-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-top:8px;">
+                            <!-- Slot 0 -->
+                            <div id="slotBox_0" class="photo-slot-box" onclick="triggerSlot(0)">
+                                <div style="font-size:24px; margin-bottom:4px;">📷</div>
+                                <div style="font-weight:800; font-size:12px;">+ Foto 1 (Utama) *</div>
+                                <div style="font-size:11px; color:var(--app-muted);">Klik untuk pilih</div>
+                            </div>
+                            <!-- Slot 1 -->
+                            <div id="slotBox_1" class="photo-slot-box" onclick="triggerSlot(1)">
+                                <div style="font-size:24px; margin-bottom:4px;">📷</div>
+                                <div style="font-weight:800; font-size:12px;">+ Foto 2 (Opsional)</div>
+                                <div style="font-size:11px; color:var(--app-muted);">Klik untuk pilih</div>
+                            </div>
+                            <!-- Slot 2 -->
+                            <div id="slotBox_2" class="photo-slot-box" onclick="triggerSlot(2)">
+                                <div style="font-size:24px; margin-bottom:4px;">📷</div>
+                                <div style="font-weight:800; font-size:12px;">+ Foto 3 (Opsional)</div>
+                                <div style="font-size:11px; color:var(--app-muted);">Klik untuk pilih</div>
+                            </div>
+                        </div>
+
+                        <!-- Hidden Inputs for Each Slot -->
+                        <input type="file" id="slotInput_0" accept="image/png, image/jpeg, image/webp" multiple style="display:none;" onchange="handleSlotChange(0, this)">
+                        <input type="file" id="slotInput_1" accept="image/png, image/jpeg, image/webp" style="display:none;" onchange="handleSlotChange(1, this)">
+                        <input type="file" id="slotInput_2" accept="image/png, image/jpeg, image/webp" style="display:none;" onchange="handleSlotChange(2, this)">
+                        
+                        <!-- Real Form Input Submitted to Server -->
+                        <input type="file" name="images" id="productImagesInput" multiple style="display:none;">
+
+                        <p style="font-size:12px; color:var(--app-muted); margin:8px 0 0;">
+                            💡 <strong>Tips:</strong> Anda bisa memilih foto satu per satu di setiap kotak atau langsung memilih hingga 3 foto sekaligus di kotak pertama. Minimal 1 foto (Foto Utama).
+                        </p>
                     </div>
 
                     <!-- Title -->
@@ -2630,71 +2707,111 @@
         });
     }
 
-    async function previewSelectedImages(input) {
-        const row = document.getElementById('imagePreviewRow');
-        if (!row) return;
-        
-        if (input.files && input.files.length > 0) {
-            row.innerHTML = '<div style="font-size:12px; color:var(--app-brand); font-weight:700; padding:6px 0;">⚡ Mengompresi & mengoptimalkan foto secara otomatis...</div>';
-            const rawFiles = Array.from(input.files).slice(0, 3);
-            const dt = new DataTransfer();
+    // ── 3-Slot Photo Manager State ──
+    const slotFiles = [null, null, null];
 
-            const processedFiles = [];
-            for (let i = 0; i < rawFiles.length; i++) {
-                const f = rawFiles[i];
-                let finalFile = f;
-                if (f.type && f.type.startsWith('image/')) {
-                    finalFile = await compressImageToBlob(f, 1400, 0.82);
-                }
-                dt.items.add(finalFile);
-                processedFiles.push({ original: f, final: finalFile });
+    function triggerSlot(idx) {
+        const inp = document.getElementById(`slotInput_${idx}`);
+        if (inp) inp.click();
+    }
+
+    async function handleSlotChange(idx, input) {
+        if (!input.files || input.files.length === 0) return;
+
+        // If user selected multiple files in slot 0, distribute them across available slots
+        if (input.files.length > 1) {
+            const files = Array.from(input.files).slice(0, 3);
+            for (let i = 0; i < files.length; i++) {
+                await setSlotFile(i, files[i]);
             }
+            syncRealImagesInput();
+            input.value = '';
+            return;
+        }
 
-            // Replace input files with compressed files
+        // Single file chosen for this slot
+        await setSlotFile(idx, input.files[0]);
+        syncRealImagesInput();
+        input.value = '';
+    }
+
+    async function setSlotFile(idx, file) {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+            alert('File harus berupa gambar (PNG, JPG, atau WebP).');
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            alert(`Foto "${file.name}" terlalu besar (> 10 MB).`);
+            return;
+        }
+
+        const box = document.getElementById(`slotBox_${idx}`);
+        if (box) {
+            box.classList.add('has-file');
+            box.innerHTML = '<div style="font-size:12px; font-weight:800; color:var(--app-brand); padding:30px 0;">⚡ Mengompresi...</div>';
+        }
+
+        const finalFile = await compressImageToBlob(file, 1280, 0.80);
+        slotFiles[idx] = finalFile;
+        renderSlot(idx, file, finalFile);
+    }
+
+    function renderSlot(idx, originalFile, compressedFile) {
+        const box = document.getElementById(`slotBox_${idx}`);
+        if (!box) return;
+
+        box.classList.add('has-file');
+        const originalKb = (originalFile.size / 1024).toFixed(0);
+        const compressedKb = (compressedFile.size / 1024).toFixed(0);
+        const labelText = idx === 0 ? '⭐ Foto 1 (Utama)' : `Foto ${idx + 1}`;
+        const pct = (originalFile.size > compressedFile.size)
+            ? ` (-${Math.round((1 - compressedFile.size / originalFile.size) * 100)}%)`
+            : '';
+
+        box.innerHTML = `
+            <div style="position:relative; width:100%; display:flex; flex-direction:column; align-items:center; gap:6px;">
+                <div style="position:relative; width:100%; height:110px; border-radius:6px; overflow:hidden; border:1px solid var(--app-border);">
+                    <img src="${URL.createObjectURL(compressedFile)}" style="width:100%; height:100%; object-fit:cover;">
+                    <span style="position:absolute; top:4px; left:4px; font-size:10px; font-weight:800; background:rgba(0,0,0,0.75); color:#fff; padding:2px 6px; border-radius:4px;">
+                        ${labelText}
+                    </span>
+                </div>
+                <div style="font-size:10.5px; font-weight:800; color:#15803d; background:#dcfce7; border:1px solid #bbf7d0; border-radius:999px; padding:1px 7px;">
+                    ${compressedKb} KB${pct}
+                </div>
+                <div style="display:flex; gap:6px; margin-top:2px;">
+                    <button type="button" class="slot-btn" onclick="event.stopPropagation(); triggerSlot(${idx});">🔄 Ganti</button>
+                    <button type="button" class="slot-btn slot-btn-danger" onclick="event.stopPropagation(); removeSlotFile(${idx});">🗑️ Hapus</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function removeSlotFile(idx) {
+        slotFiles[idx] = null;
+        const box = document.getElementById(`slotBox_${idx}`);
+        if (box) {
+            box.classList.remove('has-file');
+            const defaultLabel = idx === 0 ? '+ Foto 1 (Utama) *' : `+ Foto ${idx + 1} (Opsional)`;
+            box.innerHTML = `
+                <div style="font-size:24px; margin-bottom:4px;">📷</div>
+                <div style="font-weight:800; font-size:12px;">${defaultLabel}</div>
+                <div style="font-size:11px; color:var(--app-muted);">Klik untuk pilih</div>
+            `;
+        }
+        syncRealImagesInput();
+    }
+
+    function syncRealImagesInput() {
+        const dt = new DataTransfer();
+        slotFiles.forEach(f => {
+            if (f) dt.items.add(f);
+        });
+        const real = document.getElementById('productImagesInput');
+        if (real) {
             try {
-                input.files = dt.files;
+                real.files = dt.files;
             } catch(e) {}
-
-            row.innerHTML = '';
-            processedFiles.forEach(({ original, final }) => {
-                const originalKb = (original.size / 1024).toFixed(0);
-                const compressedKb = (final.size / 1024).toFixed(0);
-
-                const thumbWrap = document.createElement('div');
-                thumbWrap.style.display = 'inline-flex';
-                thumbWrap.style.flexDirection = 'column';
-                thumbWrap.style.alignItems = 'center';
-                thumbWrap.style.gap = '4px';
-
-                const img = document.createElement('img');
-                img.src = URL.createObjectURL(final);
-                img.style.width = '75px';
-                img.style.height = '75px';
-                img.style.objectFit = 'cover';
-                img.style.borderRadius = '6px';
-                img.style.border = '2px solid var(--app-border-strong)';
-                thumbWrap.appendChild(img);
-
-                const badge = document.createElement('span');
-                badge.style.fontSize = '10px';
-                badge.style.fontWeight = '800';
-                badge.style.padding = '2px 6px';
-                badge.style.borderRadius = '999px';
-                badge.style.background = '#dcfce7';
-                badge.style.color = '#15803d';
-                badge.style.border = '1px solid #bbf7d0';
-                let txt = `${compressedKb} KB`;
-                if (original.size > final.size) {
-                    const pct = Math.round((1 - final.size / original.size) * 100);
-                    txt += ` (-${pct}%)`;
-                    badge.title = `Sebelum dikompresi: ${originalKb} KB`;
-                }
-                badge.innerText = txt;
-                thumbWrap.appendChild(badge);
-                row.appendChild(thumbWrap);
-            });
-        } else {
-            row.innerHTML = '';
         }
     }
 
@@ -2757,13 +2874,15 @@
 
         if (errBox) errBox.style.display = 'none';
 
-        // 1. Validasi Foto Produk (Wajib, 1-3 foto, max 500 KB per foto)
-        const imgInput = form.querySelector('input[name="images"]');
-        if (!imgInput || !imgInput.files || imgInput.files.length === 0) {
-            return showError('Silakan pilih minimal 1 foto produk (format JPG/PNG/WebP).', imgInput);
+        // 1. Validasi Foto Produk (Wajib, 1-3 foto)
+        syncRealImagesInput();
+        const imgInput = document.getElementById('productImagesInput');
+        const activeFiles = slotFiles.filter(Boolean);
+        if (activeFiles.length === 0 || !imgInput || !imgInput.files || imgInput.files.length === 0) {
+            return showError('Silakan pilih minimal 1 foto produk (Foto Utama).', document.getElementById('slotBox_0'));
         }
         if (imgInput.files.length > 3) {
-            return showError('Maksimal 3 foto produk yang dapat diunggah.', imgInput);
+            return showError('Maksimal 3 foto produk yang dapat diunggah.', document.getElementById('slotBox_0'));
         }
         for (let i = 0; i < imgInput.files.length; i++) {
             const file = imgInput.files[i];

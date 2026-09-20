@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional, List
+from typing import Optional, List, Union
 from fastapi import APIRouter, Request, Form, UploadFile, File, HTTPException, status, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -86,7 +86,7 @@ async def create_seller_product_action(
     price_amount: int = Form(...),
     doc_label: Optional[str] = Form(None),
     doc_url: Optional[str] = Form(None),
-    images: List[UploadFile] = File(...),
+    images: List[Union[UploadFile, str]] = File(...),
     firmware_file: Optional[UploadFile] = File(None),
     stl_file: Optional[UploadFile] = File(None),
 ):
@@ -96,7 +96,7 @@ async def create_seller_product_action(
     # Read images bytes
     images_data = []
     for img in images[:3]:
-        if img.filename:
+        if isinstance(img, UploadFile) and img.filename:
             b = await img.read()
             if len(b) > 0:
                 images_data.append(b)
@@ -200,7 +200,7 @@ async def update_seller_product_action(
     price_amount: int = Form(...),
     doc_label: Optional[str] = Form(None),
     doc_url: Optional[str] = Form(None),
-    images: Optional[List[UploadFile]] = File(None),
+    images: Optional[List[Union[UploadFile, str]]] = File(None),
     firmware_file: Optional[UploadFile] = File(None),
     stl_file: Optional[UploadFile] = File(None),
 ):
@@ -211,7 +211,7 @@ async def update_seller_product_action(
     images_data = []
     if images:
         for img in images[:3]:
-            if img.filename:
+            if isinstance(img, UploadFile) and img.filename:
                 b = await img.read()
                 if len(b) > 0:
                     images_data.append(b)
