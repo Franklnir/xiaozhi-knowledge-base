@@ -211,6 +211,8 @@ from xiaozhi.routers import (
     search,
     smarthome,
     youtube,
+    marketplace_ui,
+    admin_firmware_ui,
 )
 from xiaozhi.routers import (
     api_v1_auth,
@@ -218,6 +220,8 @@ from xiaozhi.routers import (
     api_v1_materials,
     api_v1_mcp,
     api_v1_smarthome,
+    api_v1_marketplace,
+    api_v1_webhooks,
 )
 
 app.include_router(auth.router)
@@ -231,13 +235,17 @@ app.include_router(mcp_endpoints.router)
 app.include_router(search.router)
 app.include_router(youtube.router)
 app.include_router(devices.router)
+app.include_router(marketplace_ui.router)
+app.include_router(admin_firmware_ui.router)
 
-# API v1 routers (for mobile/API clients)
+# API v1 routers (for mobile/API clients & webhooks)
 app.include_router(api_v1_auth.router)
 app.include_router(api_v1_materials.router)
 app.include_router(api_v1_smarthome.router)
 app.include_router(api_v1_mcp.router)
 app.include_router(api_v1_chat.router)
+app.include_router(api_v1_marketplace.router)
+app.include_router(api_v1_webhooks.router)
 
 
 # Mount MCP SSE endpoint - will be mounted during startup

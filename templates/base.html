@@ -1044,6 +1044,10 @@
                 </div>
                 <span id="navChatBadge" style="display:none;background:#ef4444;color:#ffffff;font-size:10.5px;font-weight:900;padding:2px 7px;border-radius:999px;box-shadow:0 0 8px rgba(239,68,68,0.6);border:1.5px solid #000;">0</span>
             </a>
+            <a href="/firmware/marketplace" class="app-sidebar-link {% if page in ('marketplace', 'seller_products', 'purchases', 'seller_sales') %}is-active{% endif %}">
+                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
+                Firmware Marketplace
+            </a>
             <a href="/simulasi-smarthome-virtual" class="app-sidebar-link {% if page == 'smarthome' %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Simulasi Smarthome')" {% endif %}>
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
                 Simulasi Smarthome
@@ -1073,6 +1077,18 @@
             <a href="/admin" class="app-sidebar-link {% if page == 'admin' %}is-active{% endif %}">
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
                 Manajemen User
+            </a>
+            <a href="/admin/firmware/products" class="app-sidebar-link {% if page == 'admin_firmware_products' %}is-active{% endif %}">
+                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
+                Master Produk FW
+            </a>
+            <a href="/admin/firmware/approvals" class="app-sidebar-link {% if page == 'admin_firmware_approvals' %}is-active{% endif %}">
+                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 13"/></svg></span>
+                Approval Firmware
+            </a>
+            <a href="/admin/firmware/finance" class="app-sidebar-link {% if page == 'admin_firmware_finance' %}is-active{% endif %}">
+                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                Saldo Platform
             </a>
             {% endif %}
         </nav>
@@ -1104,10 +1120,12 @@
             </div>
         </a>
         <div style="display:flex; gap:10px; align-items:center;">
+            <a href="/firmware/marketplace" class="app-button" style="text-decoration:none;">Marketplace</a>
             <a href="/dokumentasi" class="app-button" style="text-decoration:none;">Dokumentasi</a>
             <a href="/login" class="app-button app-button-primary" style="text-decoration:none;">Masuk</a>
         </div>
     </header>
+
     {% endif %}
 
     <!-- Main Content (defined once) -->

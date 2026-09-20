@@ -651,3 +651,27 @@ for _ch, _meta in SMART_HOME_RELAYS.items():
     _aliases = set(_meta["aliases"])
     _aliases.update({_ch, f"ch {_ch}", f"ch{_ch}", f"channel {_ch}", f"kanal {_ch}"})
     SMART_HOME_CHANNEL_ALIASES[_ch] = _aliases
+
+# ── Firmware Marketplace ───────────────────────────────────────────────────
+MARKETPLACE_ADMIN_FEE_FLAT = int(os.getenv("MARKETPLACE_ADMIN_FEE_FLAT", "1500"))
+MARKETPLACE_ADMIN_FEE_PERCENT = float(os.getenv("MARKETPLACE_ADMIN_FEE_PERCENT", "0.0"))
+MARKETPLACE_PAYMENT_PROVIDER = os.getenv("MARKETPLACE_PAYMENT_PROVIDER", "simulator").strip().lower()
+MINIMUM_WITHDRAWAL = int(os.getenv("MINIMUM_WITHDRAWAL", "10000"))
+WITHDRAWAL_FEE = int(os.getenv("WITHDRAWAL_FEE", "0"))
+
+# S3 / Object Storage (NepalCloud / AWS / Cloudflare R2 / MinIO)
+S3_ENDPOINT = os.getenv("S3_ENDPOINT", "").strip()
+S3_REGION = os.getenv("S3_REGION", "us-east-1").strip()
+S3_BUCKET_PUBLIC = os.getenv("S3_BUCKET_PUBLIC", "xiaozhi-public").strip()
+S3_BUCKET_PRIVATE = os.getenv("S3_BUCKET_PRIVATE", "xiaozhi-private").strip()
+S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "").strip()
+S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "").strip()
+S3_USE_SSL = os.getenv("S3_USE_SSL", "true").strip().lower() == "true"
+
+# Payment Secrets
+XENDIT_SECRET_KEY = os.getenv("XENDIT_SECRET_KEY", "").strip()
+XENDIT_WEBHOOK_TOKEN = os.getenv("XENDIT_WEBHOOK_TOKEN", "").strip()
+MIDTRANS_SERVER_KEY = os.getenv("MIDTRANS_SERVER_KEY", "").strip()
+MIDTRANS_CLIENT_KEY = os.getenv("MIDTRANS_CLIENT_KEY", "").strip()
+MIDTRANS_IS_PRODUCTION = os.getenv("MIDTRANS_IS_PRODUCTION", "false").strip().lower() == "true"
+

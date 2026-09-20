@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .fw-finance-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .fw-metric-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 20px;
+        box-shadow: var(--app-shadow);
+    }
+    .fw-metric-label {
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--app-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+    }
+    .fw-metric-val {
+        font-size: 24px;
+        font-weight: 900;
+        color: var(--app-text);
+    }
+</style>
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px;">
+    <div>
+        <h1 style="font-size:24px; font-weight:900; margin:0 0 6px; color:var(--app-text);">
+            Penjualan & Saldo
+        </h1>
+        <p style="font-size:13.5px; color:var(--app-muted); margin:0;">
+            Pantau pendapatan dari penjualan firmware dan lakukan penarikan saldo secara transparan.
+        </p>
+    </div>
+    <button type="button" onclick="openWithdrawModal()" class="app-button app-button-primary" style="font-weight:800; padding:10px 20px;">
+        💳 Tarik Saldo Penjualan
+    </button>
+</div>
+
+<!-- Metrics Cards -->
+<div class="fw-finance-grid">
+    <div class="fw-metric-card">
+        <div class="fw-metric-label">Saldo Tersedia</div>
+        <div class="fw-metric-val" style="color:var(--app-brand);">
+            Rp {{ "{:,}".format(data.wallet.available_balance) }}
+        </div>
+        <div style="font-size:11.5px; color:var(--app-muted); margin-top:4px;">Siap ditarik ke rekening Anda</div>
+    </div>
+    <div class="fw-metric-card">
+        <div class="fw-metric-label">Total Omset Kotor</div>
+        <div class="fw-metric-val">
+            Rp {{ "{:,}".format(data.summary.gross_sales) }}
+        </div>
+        <div style="font-size:11.5px; color:var(--app-muted); margin-top:4px;">Dari {{ data.summary.total_orders }} transaksi sukses</div>
+    </div>
+    <div class="fw-metric-card">
+        <div class="fw-metric-label">Total Fee Platform</div>
+        <div class="fw-metric-val" style="color:#b45309;">
+            Rp {{ "{:,}".format(data.summary.total_fees) }}
+        </div>
+        <div style="font-size:11.5px; color:var(--app-muted); margin-top:4px;">Biaya admin Rp 1.500 per pesanan</div>
+    </div>
+    <div class="fw-metric-card">
+        <div class="fw-metric-label">Total Bersih Diterima</div>
+        <div class="fw-metric-val" style="color:var(--app-accent);">
+            Rp {{ "{:,}".format(data.summary.net_sales) }}
+        </div>
+        <div style="font-size:11.5px; color:var(--app-muted); margin-top:4px;">Akumulasi pendapatan bersih</div>
+    </div>
+</div>
+
+<!-- Transparent Transactions Table -->
+<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:24px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="font-size:18px; font-weight:800; margin:0; color:var(--app-text);">
+            Riwayat Transaksi Penjualan (Transparan)
+        </h2>
+        <span style="font-size:12px; color:var(--app-muted);">Semua potongan biaya tercatat jelas</span>
+    </div>
+
+    {% if not data.orders %}
+    <div style="text-align:center; padding:30px 10px; color:var(--app-muted); font-size:13.5px;">
+        Belum ada riwayat transaksi penjualan.
+    </div>
+    {% else %}
+    <div class="app-table-wrap">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Tanggal</th>
+                    <th>Produk Firmware</th>
+                    <th>Pembeli</th>
+                    <th>Harga Jual</th>
+                    <th>Fee Admin</th>
+                    <th>Bersih Diterima</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in data.orders %}
+                <tr>
+                    <td style="font-weight:700; font-family:monospace;">#{{ o.order_number }}</td>
+                    <td style="color:var(--app-muted); font-size:12px;">{{ o.paid_at.strftime('%d %b %Y, %H:%M') if o.paid_at else '-' }}</td>
+                    <td style="font-weight:800;">{{ o.product_title_snapshot }}</td>
+                    <td>{{ o.buyer_username }}</td>
+                    <td style="font-weight:700;">Rp {{ "{:,}".format(o.subtotal_amount) }}</td>
+                    <td style="color:#b45309; font-weight:700;">- Rp {{ "{:,}".format(o.platform_fee_amount) }}</td>
+                    <td style="color:var(--app-brand); font-weight:800;">Rp {{ "{:,}".format(o.seller_net_amount) }}</td>
+                    <td><span class="app-chip app-chip-success" style="font-size:11px; padding:2px 6px;">PAID</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Ledger & Withdrawal History -->
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+    <!-- Ledger -->
+    <div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow);">
+        <h3 style="font-size:16px; font-weight:800; margin:0 0 12px; color:var(--app-text);">
+            Buku Kas Dompet (Append-Only Ledger)
+        </h3>
+        {% if not data.ledger %}
+        <div style="text-align:center; padding:20px; color:var(--app-muted); font-size:13px;">Belum ada entri ledger.</div>
+        {% else %}
+        <div style="max-height:300px; overflow-y:auto;">
+            {% for l in data.ledger %}
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed var(--app-border); font-size:12.5px;">
+                <div>
+                    <div style="font-weight:700;">{{ l.description }}</div>
+                    <div style="font-size:11px; color:var(--app-muted);">{{ l.created_at.strftime('%d %b %Y, %H:%M') if l.created_at else '-' }}</div>
+                </div>
+                <div style="font-weight:800; {% if l.direction == 'CREDIT' %}color:var(--app-brand);{% else %}color:#dc2626;{% endif %}">
+                    {% if l.direction == 'CREDIT' %}+{% else %}-{% endif %} Rp {{ "{:,}".format(l.amount) }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Withdrawals -->
+    <div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow);">
+        <h3 style="font-size:16px; font-weight:800; margin:0 0 12px; color:var(--app-text);">
+            Riwayat Penarikan Dana
+        </h3>
+        {% if not data.withdrawals %}
+        <div style="text-align:center; padding:20px; color:var(--app-muted); font-size:13px;">Belum ada permintaan penarikan dana.</div>
+        {% else %}
+        <div style="max-height:300px; overflow-y:auto;">
+            {% for w in data.withdrawals %}
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed var(--app-border); font-size:12.5px;">
+                <div>
+                    <div style="font-weight:700;">{{ w.destination_bank }} - {{ w.destination_account_name }}</div>
+                    <div style="font-size:11px; color:var(--app-muted);">{{ w.created_at.strftime('%d %b %Y, %H:%M') if w.created_at else '-' }}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-weight:800; color:var(--app-text);">Rp {{ "{:,}".format(w.amount) }}</div>
+                    <span class="app-chip app-chip-info" style="font-size:10px; padding:1px 5px;">{{ w.status }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Withdrawal Modal -->
+<div id="withdrawModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
+    <div class="mcp-blocking-box" style="max-width:480px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h2 style="font-size:19px; font-weight:900; margin:0; color:var(--app-text);">
+                Tarik Saldo Penjualan
+            </h2>
+            <button type="button" onclick="closeWithdrawModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
+        </div>
+
+        <div style="background:var(--app-surface-muted); padding:12px; border-radius:var(--app-radius); margin-bottom:16px; font-size:13px;">
+            <div>Saldo Tersedia: <strong style="color:var(--app-brand); font-size:15px;">Rp {{ "{:,}".format(data.wallet.available_balance) }}</strong></div>
+            <div style="color:var(--app-muted); font-size:11.5px; margin-top:2px;">Minimal penarikan: Rp {{ "{:,}".format(data.minimum_withdrawal) }}</div>
+        </div>
+
+        <form method="POST" action="/firmware/seller/withdrawals">
+            <div style="margin-bottom:12px;">
+                <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Jumlah Penarikan (IDR)</label>
+                <input type="number" name="amount" required min="{{ data.minimum_withdrawal }}" max="{{ data.wallet.available_balance }}" step="1000" placeholder="Minimal {{ data.minimum_withdrawal }}" class="app-input" style="width:100%;">
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Nama Bank / E-Wallet</label>
+                <input type="text" name="destination_bank" required placeholder="BCA / Mandiri / BRI / GoPay / DANA" class="app-input" style="width:100%;">
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Nama Pemilik Rekening</label>
+                <input type="text" name="destination_account_name" required placeholder="Nama lengkap sesuai buku tabungan" class="app-input" style="width:100%;">
+            </div>
+
+            <div style="margin-bottom:18px;">
+                <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">Nomor Rekening</label>
+                <input type="text" name="destination_account_number" required placeholder="Contoh: 1234567890" class="app-input" style="width:100%;">
+                <div style="font-size:11px; color:var(--app-muted); margin-top:3px;">
+                    *Nomor rekening dienkripsi secara aman (AES-256) pada database.
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" onclick="closeWithdrawModal()" class="app-button">Batal</button>
+                <button type="submit" class="app-button app-button-primary" style="font-weight:800;">
+                    Kirim Permintaan Penarikan
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openWithdrawModal() {
+        document.getElementById('withdrawModal').style.display = 'flex';
+    }
+    function closeWithdrawModal() {
+        document.getElementById('withdrawModal').style.display = 'none';
+    }
+</script>
+{% endblock %}

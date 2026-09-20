@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .fw-detail-layout {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 28px;
+        align-items: start;
+    }
+    @media (max-width: 900px) {
+        .fw-detail-layout { grid-template-columns: 1fr; }
+    }
+    .fw-main-col {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+    .fw-gallery-wrap {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        overflow: hidden;
+        box-shadow: var(--app-shadow);
+    }
+    .fw-gallery-main {
+        width: 100%;
+        max-height: 440px;
+        background: var(--app-soft);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .fw-gallery-main img {
+        width: 100%;
+        height: auto;
+        max-height: 440px;
+        object-fit: contain;
+    }
+    .fw-gallery-thumbs {
+        display: flex;
+        gap: 10px;
+        padding: 12px;
+        background: var(--app-surface-muted);
+        border-top: 1px solid var(--app-border);
+    }
+    .fw-thumb {
+        width: 70px;
+        height: 70px;
+        border: 2px solid var(--app-border);
+        border-radius: var(--app-radius);
+        cursor: pointer;
+        overflow: hidden;
+        background: var(--app-surface);
+        transition: border-color .15s ease, transform .15s ease;
+    }
+    .fw-thumb.is-active, .fw-thumb:hover {
+        border-color: var(--app-brand);
+        transform: scale(1.05);
+    }
+    .fw-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .fw-detail-box {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 24px;
+        box-shadow: var(--app-shadow);
+    }
+    .fw-firmware-lock-box {
+        background: var(--app-surface-muted);
+        border: 2px dashed var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 18px 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 16px;
+    }
+    .fw-firmware-lock-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--app-radius);
+        background: var(--app-surface);
+        border: 2px solid var(--app-border);
+        display: grid;
+        place-items: center;
+        font-size: 24px;
+        flex-shrink: 0;
+    }
+    .fw-checkout-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 24px;
+        box-shadow: var(--app-shadow);
+        position: sticky;
+        top: 80px;
+    }
+    .fw-fee-table {
+        width: 100%;
+        font-size: 13px;
+        margin: 14px 0;
+        border-collapse: collapse;
+    }
+    .fw-fee-table td {
+        padding: 6px 0;
+    }
+    .fw-fee-table tr:not(:last-child) {
+        border-bottom: 1px dashed var(--app-border);
+    }
+</style>
+
+<div style="margin-bottom:16px;">
+    <a href="/firmware/marketplace" style="color:var(--app-muted); text-decoration:none; font-weight:700; font-size:13px;">
+        ← Kembali ke Katalog Marketplace
+    </a>
+</div>
+
+<div class="fw-detail-layout">
+    <!-- Main Left Column -->
+    <div class="fw-main-col">
+        <!-- Gallery -->
+        <div class="fw-gallery-wrap">
+            <div class="fw-gallery-main" id="galleryMain">
+                {% if product.images %}
+                <img src="{{ product.images[0].url }}" id="activeImage" alt="{{ product.title }}">
+                {% else %}
+                <div style="font-size:64px; padding:60px 0;">💾</div>
+                {% endif %}
+            </div>
+            {% if product.images and product.images|length > 1 %}
+            <div class="fw-gallery-thumbs">
+                {% for img in product.images %}
+                <div class="fw-thumb {% if loop.first %}is-active{% endif %}" onclick="changeGalleryImage('{{ img.url }}', this)">
+                    <img src="{{ img.url }}" alt="Thumbnail {{ loop.index }}">
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Description Box -->
+        <div class="fw-detail-box">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+                {% if product.is_admin_product %}
+                <span class="app-chip" style="background:#fef08a; color:#854d0e; border:2px solid #ca8a04; font-weight:900;">
+                    🛡️ OFFICIAL ADMIN
+                </span>
+                {% endif %}
+                <span class="app-chip app-chip-neutral">Versi {{ product.latest_version.version_label if product.latest_version else '1.0.0' }}</span>
+                <span class="app-chip app-chip-info">Binary .BIN</span>
+            </div>
+
+            <h1 style="font-size:26px; font-weight:900; margin:0 0 12px; color:var(--app-text); line-height:1.3;">
+                {{ product.title }}
+            </h1>
+
+            <div style="display:flex; align-items:center; gap:16px; font-size:13px; color:var(--app-muted); margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--app-border);">
+                <div>Penjual: <strong style="color:var(--app-text)">{{ product.seller_username }}</strong></div>
+                <div>•</div>
+                <div>Terjual: <strong>{{ product.sales_count }}x</strong></div>
+                <div>•</div>
+                <div>Status: <span style="color:var(--app-accent); font-weight:800;">Tersedia</span></div>
+            </div>
+
+            <h3 style="font-size:15px; font-weight:800; margin:0 0 8px;">Deskripsi Lengkap</h3>
+            <div style="font-size:14px; line-height:1.7; color:var(--app-text); white-space:pre-line; margin-bottom:20px;">
+                {{ product.full_description }}
+            </div>
+
+            {% if product.links %}
+            <h3 style="font-size:15px; font-weight:800; margin:0 0 8px;">Tautan Dokumentasi & Panduan</h3>
+            <ul style="padding-left:20px; margin:0 0 20px; font-size:13.5px;">
+                {% for link in product.links %}
+                <li style="margin-bottom:6px;">
+                    <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" style="color:var(--app-brand); font-weight:700;">
+                        {{ link.label }} ↗
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+            <!-- Firmware Binary Status Box -->
+            <div class="fw-firmware-lock-box">
+                <div class="fw-firmware-lock-icon">
+                    {% if product.is_owned %}🔓{% else %}🔒{% endif %}
+                </div>
+                <div style="flex:1;">
+                    <div style="font-weight:800; font-size:14px; color:var(--app-text);">
+                        {% if product.is_owned %}
+                        Firmware Binary Terbuka (Sudah Anda Beli)
+                        {% else %}
+                        Firmware Binary Dilindungi
+                        {% endif %}
+                    </div>
+                    <div style="font-size:12px; color:var(--app-muted); margin-top:2px;">
+                        {% if product.latest_version and product.latest_version.sha256 %}
+                        File: <code>{{ product.latest_version.original_filename or 'firmware.bin' }}</code> ({{ (product.latest_version.file_size / (1024*1024))|round(2) }} MB) • SHA-256: <code>{{ product.latest_version.sha256[:12] }}...</code>
+                        {% else %}
+                        File firmware .bin siap diunduh segera setelah pembayaran tervalidasi.
+                        {% endif %}
+                    </div>
+                </div>
+                {% if product.is_owned %}
+                <a href="/firmware/purchases" class="app-button app-button-small app-button-primary">Unduh Sekarang ↗</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sticky Checkout Sidebar -->
+    <div>
+        <div class="fw-checkout-card">
+            <div style="font-size:12px; font-weight:800; color:var(--app-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">
+                Harga Firmware
+            </div>
+            <div style="font-size:28px; font-weight:900; color:var(--app-accent); margin-bottom:14px;">
+                {% if product.price_amount == 0 %}
+                Gratis
+                {% else %}
+                Rp {{ "{:,}".format(product.price_amount) }}
+                {% endif %}
+            </div>
+
+            <!-- Transparency Breakdown Table -->
+            <div style="background:var(--app-surface-muted); padding:12px; border-radius:var(--app-radius); border:1px solid var(--app-border); margin-bottom:18px;">
+                <div style="font-size:11.5px; font-weight:800; text-transform:uppercase; color:var(--app-muted); margin-bottom:6px;">
+                    Transparansi Transaksi
+                </div>
+                <table class="fw-fee-table">
+                    <tr>
+                        <td style="color:var(--app-muted);">Harga Firmware:</td>
+                        <td style="text-align:right; font-weight:700;">Rp {{ "{:,}".format(product.price_amount) }}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:var(--app-muted);">Biaya Layanan Platform:</td>
+                        <td style="text-align:right; font-weight:700; color:#b45309;">- Rp {{ "{:,}".format(platform_fee) }}</td>
+                    </tr>
+                    <tr style="font-size:12px;">
+                        <td style="color:var(--app-text); font-weight:800;">Net Diterima Penjual:</td>
+                        <td style="text-align:right; font-weight:800; color:var(--app-brand);">Rp {{ "{:,}".format(seller_net) }}</td>
+                    </tr>
+                </table>
+                <div style="font-size:11px; color:var(--app-muted); line-height:1.4;">
+                    *Biaya platform sudah termasuk di dalam total harga. Pembeli hanya membayar nominal Rp {{ "{:,}".format(product.price_amount) }}.
+                </div>
+            </div>
+
+            <!-- Purchase Actions -->
+            {% if not user %}
+            <a href="/login?redirect=/firmware/marketplace/{{ product.slug or product.id }}" class="app-button app-button-primary" style="width:100%; justify-content:center; padding:12px; font-size:14px; font-weight:800;">
+                Masuk untuk Membeli
+            </a>
+            {% elif product.is_seller %}
+            <div class="app-alert app-alert-info" style="font-size:13px; text-align:center;">
+                Ini adalah produk firmware Anda sendiri.
+            </div>
+            {% elif product.is_owned %}
+            <a href="/firmware/purchases" class="app-button app-button-primary" style="width:100%; justify-content:center; padding:12px; font-size:14px; font-weight:800;">
+                🔓 Buka di Pembelian Saya
+            </a>
+            {% else %}
+            <button type="button" onclick="openDevNoticeModal()" id="btnCheckout" class="app-button app-button-primary" style="width:100%; justify-content:center; padding:13px; font-size:15px; font-weight:900;">
+                ⚡ Beli Firmware Sekarang
+            </button>
+            <div id="checkoutError" style="display:none; color:#dc2626; font-size:12px; font-weight:700; margin-top:8px; text-align:center;"></div>
+            {% endif %}
+
+            <div style="display:flex; justify-content:center; gap:8px; margin-top:14px; font-size:12px; color:var(--app-muted);">
+                <span>🔒 Pembayaran Aman</span>
+                <span>•</span>
+                <span>⚡ Akses Unduhan Instan</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Notifikasi Tahap Pengembangan -->
+<div class="mcp-blocking-overlay" id="devNoticeModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="devNoticeTitle">
+    <div class="mcp-blocking-box" style="text-align:center; max-width:480px; padding:28px 24px;">
+        <div style="font-size:48px; margin-bottom:12px; line-height:1;">🚧</div>
+        <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 14px; background:#fef3c7; color:#92400e; border:2px solid #d97706; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:14px;">
+            <span>⚠️</span> FITUR DALAM PENGEMBANGAN
+        </div>
+        <h2 id="devNoticeTitle" style="font-size:22px; font-weight:900; margin:0 0 10px; color:var(--app-text); line-height:1.3;">
+            Fitur Pembayaran Belum Dibuka
+        </h2>
+        <p style="font-size:13.5px; color:var(--app-muted); line-height:1.6; margin:0 0 20px;">
+            Mohon maaf, sistem transaksi dan gateway pembayaran firmware saat ini masih dalam <strong>tahap pengembangan & integrasi akhir</strong>. Pembelian resmi akan segera diaktifkan dalam waktu dekat!
+        </p>
+
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <button type="button" onclick="closeDevNoticeModal()" class="app-button app-button-primary" style="font-weight:800; padding:10px 22px;">
+                Saya Mengerti 👍
+            </button>
+            <a href="/firmware/marketplace" class="app-button" style="text-decoration:none; padding:10px 18px;">
+                Jelajahi Produk Lain
+            </a>
+        </div>
+
+        {% if user and user.role == 'admin' %}
+        <div style="margin-top:20px; padding-top:14px; border-top:1px dashed var(--app-border);">
+            <p style="font-size:11.5px; color:var(--app-muted); margin:0 0 8px;">
+                🛡️ <strong>Khusus Admin:</strong> Anda dapat menguji alur pembayaran sandbox.
+            </p>
+            <button type="button" onclick="initiateCheckout('{{ product.id }}')" class="app-button" style="font-size:12px; padding:6px 14px; background:var(--app-surface-muted);">
+                ⚡ Uji Coba Checkout (Sandbox Simulator)
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function openDevNoticeModal() {
+        const m = document.getElementById('devNoticeModal');
+        if (m) m.style.display = 'flex';
+    }
+
+    function closeDevNoticeModal() {
+        const m = document.getElementById('devNoticeModal');
+        if (m) m.style.display = 'none';
+    }
+
+    // Tutup modal jika user menekan tombol Escape atau klik di luar kotak modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeDevNoticeModal();
+    });
+
+    const devModalOverlay = document.getElementById('devNoticeModal');
+    if (devModalOverlay) {
+        devModalOverlay.addEventListener('click', function(e) {
+            if (e.target === this) closeDevNoticeModal();
+        });
+    }
+
+    function changeGalleryImage(url, el) {
+        document.getElementById('activeImage').src = url;
+        document.querySelectorAll('.fw-thumb').forEach(t => t.classList.remove('is-active'));
+        if (el) el.classList.add('is-active');
+    }
+
+    async function initiateCheckout(productId) {
+        closeDevNoticeModal();
+        const btn = document.getElementById('btnCheckout');
+        const errDiv = document.getElementById('checkoutError');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Memproses Pesanan...';
+        }
+        if (errDiv) errDiv.style.display = 'none';
+
+        try {
+            const resp = await fetch('/api/v1/marketplace/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: productId })
+            });
+            const res = await resp.json();
+            if (!resp.ok) {
+                const msg = (res.detail && res.detail.error) ? res.detail.error.message : (res.detail || 'Terjadi kesalahan.');
+                throw new Error(msg);
+            }
+            if (res.data && res.data.checkout_url) {
+                window.location.href = res.data.checkout_url;
+            } else {
+                window.location.href = '/firmware/purchases';
+            }
+        } catch (e) {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = '⚡ Beli Firmware Sekarang';
+            }
+            if (errDiv) {
+                errDiv.innerText = e.message;
+                errDiv.style.display = 'block';
+            }
+        }
+    }
+</script>
+{% endblock %}

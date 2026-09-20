@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="margin-bottom:24px;">
+    <h1 style="font-size:24px; font-weight:900; margin:0 0 6px; color:var(--app-text);">
+        Approval Produk Firmware
+    </h1>
+    <p style="font-size:13.5px; color:var(--app-muted); margin:0;">
+        Tinjau pengajuan produk firmware dari pengguna sebelum dipublikasikan ke marketplace.
+    </p>
+</div>
+
+{% if not approvals %}
+<div class="app-muted-panel" style="text-align:center; padding:50px 20px;">
+    <div style="font-size:40px; margin-bottom:10px;">✅</div>
+    <h3 style="font-size:18px; font-weight:800; margin:0 0 6px;">Antrean Review Kosong</h3>
+    <p style="color:var(--app-muted); font-size:13.5px; margin:0;">
+        Tidak ada produk firmware yang sedang menunggu persetujuan saat ini.
+    </p>
+</div>
+{% else %}
+<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow);">
+    <div class="app-table-wrap">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th>Waktu Pengajuan</th>
+                    <th>Seller</th>
+                    <th>Judul & Harga</th>
+                    <th>Metadata Binary Firmware</th>
+                    <th>Aksi Admin</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in approvals %}
+                <tr>
+                    <td style="color:var(--app-muted); font-size:12px;">
+                        {{ a.submitted_at.strftime('%d %b %Y, %H:%M') if a.submitted_at else '-' }}
+                    </td>
+                    <td>
+                        <strong>{{ a.seller_username }}</strong>
+                    </td>
+                    <td>
+                        <div style="font-weight:800; font-size:14px; margin-bottom:2px;">{{ a.title }}</div>
+                        <div style="color:var(--app-accent); font-weight:700; font-size:13px;">
+                            Rp {{ "{:,}".format(a.price_amount) }}
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); margin-top:4px; max-width:300px;">
+                            {{ a.short_description }}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size:12.5px; font-weight:700;">
+                            📁 {{ a.original_filename or 'firmware.bin' }}
+                        </div>
+                        <div style="font-size:11.5px; color:var(--app-muted); margin-top:2px;">
+                            Versi: <strong>{{ a.version_label }}</strong> • Ukuran: <strong>{{ (a.file_size / (1024*1024))|round(2) }} MB</strong>
+                        </div>
+                        <div style="margin-top:4px; font-size:11px;">
+                            <code style="background:var(--app-surface-muted); padding:2px 6px; border-radius:3px; border:1px solid var(--app-border); word-break:break-all;">
+                                SHA-256: {{ a.sha256[:16] }}...
+                            </code>
+                        </div>
+                    </td>
+                    <td style="vertical-align:middle;">
+                        <div style="display:flex; gap:8px;">
+                            <form method="POST" action="/admin/firmware/approvals/{{ a.approval_id }}/approve">
+                                <button type="submit" class="app-button app-button-primary app-button-small" style="font-weight:800;" onclick="return confirm('Setujui dan publikasikan produk ini?')">
+                                    ✓ Setujui
+                                </button>
+                            </form>
+                            <button type="button" onclick="openRejectModal('{{ a.approval_id }}', '{{ a.title }}')" class="app-button app-button-danger app-button-small" style="font-weight:800;">
+                                ✕ Tolak
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Reject Modal -->
+<div id="rejectModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
+    <div class="mcp-blocking-box" style="max-width:460px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h2 style="font-size:18px; font-weight:900; margin:0; color:#dc2626;">
+                Tolak Produk Firmware
+            </h2>
+            <button type="button" onclick="closeRejectModal()" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--app-muted);">&times;</button>
+        </div>
+
+        <p id="rejectModalTitle" style="font-size:13px; color:var(--app-muted); margin:0 0 14px;"></p>
+
+        <form method="POST" id="rejectForm" action="">
+            <div style="margin-bottom:16px;">
+                <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">
+                    Alasan Penolakan Wajib Diisi (Minimal 10 karakter) <span style="color:#dc2626;">*</span>
+                </label>
+                <textarea name="reason" id="rejectReason" required minlength="10" rows="4" placeholder="Contoh: Firmware tidak sesuai dengan deskripsi ESP32-C3 atau file rusak..." class="app-input" style="width:100%;"></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" onclick="closeRejectModal()" class="app-button">Batal</button>
+                <button type="submit" class="app-button app-button-danger" style="font-weight:800;">
+                    Konfirmasi Penolakan
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openRejectModal(approvalId, title) {
+        document.getElementById('rejectForm').action = '/admin/firmware/approvals/' + approvalId + '/reject';
+        document.getElementById('rejectModalTitle').innerText = 'Produk: ' + title;
+        document.getElementById('rejectReason').value = '';
+        document.getElementById('rejectModal').style.display = 'flex';
+    }
+    function closeRejectModal() {
+        document.getElementById('rejectModal').style.display = 'none';
+    }
+</script>
+{% endblock %}

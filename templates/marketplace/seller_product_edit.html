@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .edit-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    .edit-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: var(--app-shadow);
+    }
+    .img-thumb-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+    .img-thumb {
+        width: 100px;
+        height: 75px;
+        border-radius: var(--app-radius);
+        border: 1px solid var(--app-border);
+        object-fit: cover;
+    }
+    .fw-spec-box {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+        padding: 14px;
+        font-family: monospace;
+        font-size: 13px;
+        margin-bottom: 14px;
+    }
+    .danger-zone {
+        border-color: #f87171;
+        background: rgba(239, 68, 68, 0.03);
+    }
+</style>
+
+<div class="edit-container">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div>
+            <a href="/firmware/seller/products" style="font-size:13px; color:var(--app-brand); text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:4px; margin-bottom:6px;">
+                &larr; Kembali ke Daftar Produk Saya
+            </a>
+            <h1 style="font-size:24px; font-weight:900; margin:0; color:var(--app-text);">
+                Edit Produk: {{ product.title }}
+            </h1>
+        </div>
+        <div>
+            {% if product.status == 'PUBLISHED' %}
+            <span class="app-chip app-chip-success" style="font-size:12px; padding:4px 10px;">✅ PUBLISHED</span>
+            {% elif product.status == 'PENDING_REVIEW' %}
+            <span class="app-chip app-chip-info" style="font-size:12px; padding:4px 10px;">⏳ MENUNGGU REVIEW</span>
+            {% elif product.status == 'REJECTED' %}
+            <span class="app-chip" style="font-size:12px; padding:4px 10px; background:#fef2f2; color:#b91c1c; border:1px solid #f87171;">❌ DITOLAK</span>
+            {% else %}
+            <span class="app-chip app-chip-neutral" style="font-size:12px; padding:4px 10px;">📝 DRAFT</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if product.is_admin_product %}
+    <div class="app-alert app-alert-warning" style="margin-bottom:20px; font-size:13px;">
+        🛡️ <strong>Produk Official Admin:</strong> Perubahan detail pada produk ini akan langsung aktif dan live di Marketplace.
+    </div>
+    {% elif product.status == 'PUBLISHED' %}
+    <div class="app-alert app-alert-info" style="margin-bottom:20px; font-size:13px;">
+        💡 <strong>Catatan:</strong> Jika Anda mengunggah file binary (.bin) baru, versi firmware akan diperbarui dan status produk akan dialihkan ke antrean review verifikasi admin.
+    </div>
+    {% endif %}
+
+    <!-- FORM EDIT PRODUK -->
+    <form method="POST" action="/firmware/seller/products/{{ product.id }}/edit" enctype="multipart/form-data" class="edit-card">
+        <div style="margin-bottom:16px;">
+            <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:6px;">
+                Judul Produk Firmware <span style="color:#dc2626;">*</span>
+            </label>
+            <input type="text" name="title" value="{{ product.title }}" required maxlength="160" class="app-input" style="width:100%;">
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:6px;">
+                Harga (IDR) <span style="color:#dc2626;">*</span>
+            </label>
+            <input type="number" name="price_amount" value="{{ product.price_amount }}" min="0" step="1000" required class="app-input" style="width:100%;">
+            <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0;">
+                Isi 0 jika firmware gratis (free open-source).
+            </p>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:6px;">
+                Ringkasan Singkat (Short Description) <span style="color:#dc2626;">*</span>
+            </label>
+            <input type="text" name="short_description" value="{{ product.short_description }}" required maxlength="500" class="app-input" style="width:100%;">
+            <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0;">
+                Muncul pada kartu katalog marketplace (maks. 500 karakter).
+            </p>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:6px;">
+                Deskripsi Lengkap & Panduan Flashing <span style="color:#dc2626;">*</span>
+            </label>
+            <textarea name="full_description" rows="6" required class="app-input" style="width:100%; resize:vertical;">{{ product.full_description }}</textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 2fr; gap:12px; margin-bottom:18px;">
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:6px;">
+                    Label Dokumentasi
+                </label>
+                <input type="text" name="doc_label" value="{{ product.links[0].label if product.links and product.links|length > 0 else 'Dokumentasi & GitHub' }}" class="app-input" style="width:100%;">
+            </div>
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:6px;">
+                    URL Tautan Eksternal
+                </label>
+                <input type="url" name="doc_url" value="{{ product.links[0].url if product.links and product.links|length > 0 else '' }}" placeholder="https://github.com/... atau https://docs..." class="app-input" style="width:100%;">
+            </div>
+        </div>
+
+        <!-- Foto Produk Section -->
+        <div style="margin-bottom:20px; border-top:1px dashed var(--app-border); padding-top:16px;">
+            <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:8px;">
+                Foto Produk Saat Ini
+            </label>
+            {% if product.images and product.images|length > 0 %}
+            <div class="img-thumb-row">
+                {% for img in product.images %}
+                <img src="{{ img.url }}" alt="Thumbnail" class="img-thumb">
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="font-size:12.5px; color:var(--app-muted); margin:0 0 10px;">Belum ada foto yang diunggah.</p>
+            {% endif %}
+
+            <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:6px; color:var(--app-muted);">
+                Ganti Foto Produk (Opsional - maksimal 3 foto baru)
+            </label>
+            <input type="file" name="images" accept="image/png, image/jpeg, image/webp" multiple class="app-input" style="width:100%;">
+            <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0;">
+                Kosongkan jika tidak ingin mengganti foto saat ini.
+            </p>
+        </div>
+
+        <!-- Firmware Binary Section -->
+        <div style="margin-bottom:24px; border-top:1px dashed var(--app-border); padding-top:16px;">
+            <label class="app-label" style="display:block; font-weight:800; font-size:13px; margin-bottom:8px;">
+                Firmware Binary Saat Ini
+            </label>
+            {% if product.latest_version %}
+            <div class="fw-spec-box">
+                <div>🏷️ <strong>Versi:</strong> {{ product.latest_version.version_label }}</div>
+                <div>📁 <strong>File:</strong> {{ product.latest_version.original_filename or 'firmware.bin' }} ({{ "{:,}".format(product.latest_version.file_size or 0) }} bytes)</div>
+                <div style="word-break:break-all;">🔒 <strong>SHA-256:</strong> {{ product.latest_version.sha256 }}</div>
+            </div>
+            {% endif %}
+
+            <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:6px; color:var(--app-muted);">
+                Unggah File Firmware Baru (.bin) (Opsional)
+            </label>
+            <input type="file" name="firmware_file" accept=".bin,application/octet-stream" class="app-input" style="width:100%;">
+            <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0;">
+                Kosongkan jika tetap memakai file binary versi sekarang.
+            </p>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px;">
+            <a href="/firmware/seller/products" class="app-button" style="text-decoration:none;">
+                Batal
+            </a>
+            <button type="submit" class="app-button app-button-primary" style="font-weight:800; padding:10px 24px;">
+                💾 Simpan Perubahan
+            </button>
+        </div>
+    </form>
+
+    <!-- DANGER ZONE: DELETE / ARCHIVE -->
+    <div class="edit-card danger-zone">
+        <h3 style="font-size:16px; font-weight:900; margin:0 0 8px; color:#b91c1c;">
+            Zona Bahaya: Hapus / Arsipkan Produk
+        </h3>
+        <p style="font-size:13px; color:var(--app-muted); margin:0 0 16px;">
+            Produk yang belum pernah terjual akan dihapus permanen. Produk yang sudah pernah dibeli pengguna lain akan otomatis diarsipkan (soft-delete) agar pembeli tetap dapat mengunduh firmware yang telah mereka bayar.
+        </p>
+        <form method="POST" action="/firmware/seller/products/{{ product.id }}/delete" onsubmit="return confirm('Apakah Anda yakin ingin menghapus atau mengarsipkan produk firmware ini? Tindakan ini tidak dapat dibatalkan.');">
+            <button type="submit" class="app-button" style="background:#dc2626; color:white; border-color:#b91c1c; font-weight:800;">
+                🗑️ Hapus / Arsipkan Produk Ini
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
