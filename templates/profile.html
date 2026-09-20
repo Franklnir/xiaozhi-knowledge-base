@@ -1767,6 +1767,16 @@
                 <!-- Validation Error Alert Box -->
                 <div id="addProductErrorAlert" class="app-alert app-alert-danger" style="display:none; margin-bottom:16px; font-size:13px; line-height:1.5;"></div>
 
+                <!-- Draft Restored Alert Box -->
+                <div id="addProductDraftBanner" class="app-alert app-alert-info" style="display:none; margin-bottom:16px; font-size:12.5px; align-items:center; justify-content:space-between;">
+                    <div>
+                        <strong>📋 Draf Tersimpan:</strong> Isian form dipulihkan otomatis dari penyimpanan lokal Anda (<span id="addProductDraftTime"></span>).
+                    </div>
+                    <button type="button" onclick="clearProductDraft(true)" style="background:none; border:none; color:#dc2626; font-weight:800; cursor:pointer; text-decoration:underline; font-size:12px; white-space:nowrap; margin-left:10px;">
+                        🗑️ Hapus Draf
+                    </button>
+                </div>
+
                 <form method="POST" action="/firmware/seller/products" enctype="multipart/form-data" id="addProductForm" onsubmit="return handleAddProductSubmit(event)">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <!-- Photos (1-3) -->
@@ -2321,6 +2331,7 @@
     function openAddProductModal() {
         const m = document.getElementById('addProductModal');
         if (m) m.style.display = 'flex';
+        restoreProductDraft();
     }
     function closeAddProductModal() {
         const m = document.getElementById('addProductModal');
@@ -2707,9 +2718,12 @@
         });
     }
 
-    // ── 3-Slot Photo Manager State ──
+    // ── 3-Slot Photo Manager State & Local Draft Persistence ──
+    const DRAFT_KEY = 'xiaozhi_seller_product_draft';
     const slotFiles = [null, null, null];
+    const draftImages = [null, null, null];
     let compressingCount = 0;
+    let draftSaveTimeout = null;
 
     function triggerSlot(idx) {
         const inp = document.getElementById(`slotInput_${idx}`);
@@ -2755,9 +2769,23 @@
             const finalFile = await compressImageToBlob(file, 1280, 0.80);
             slotFiles[idx] = finalFile;
             renderSlot(idx, file, finalFile);
+            
+            // Save to draft base64
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                draftImages[idx] = e.target.result;
+                saveProductDraft();
+            };
+            reader.readAsDataURL(finalFile);
         } catch (e) {
             slotFiles[idx] = file;
             renderSlot(idx, file, file);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                draftImages[idx] = e.target.result;
+                saveProductDraft();
+            };
+            reader.readAsDataURL(file);
         } finally {
             compressingCount--;
         }
@@ -2796,6 +2824,7 @@
 
     function removeSlotFile(idx) {
         slotFiles[idx] = null;
+        draftImages[idx] = null;
         const box = document.getElementById(`slotBox_${idx}`);
         if (box) {
             box.classList.remove('has-file');
@@ -2807,6 +2836,155 @@
             `;
         }
         syncRealImagesInput();
+        saveProductDraft();
+    }
+
+    function saveProductDraft() {
+        if (draftSaveTimeout) clearTimeout(draftSaveTimeout);
+        draftSaveTimeout = setTimeout(() => {
+            const form = document.getElementById('addProductForm');
+            if (!form) return;
+
+            const title = form.querySelector('input[name="title"]')?.value || '';
+            const short_desc = form.querySelector('input[name="short_description"]')?.value || '';
+            const full_desc = form.querySelector('textarea[name="full_description"]')?.value || '';
+            const price = form.querySelector('input[name="price_amount"]')?.value || '';
+            const doc_label = form.querySelector('input[name="doc_label"]')?.value || '';
+            const doc_url = form.querySelector('input[name="doc_url"]')?.value || '';
+
+            const hasAnyText = title.trim() || short_desc.trim() || full_desc.trim() || price.trim() || doc_label.trim() || doc_url.trim();
+            const hasAnyImg = draftImages.some(Boolean);
+
+            if (!hasAnyText && !hasAnyImg) {
+                return;
+            }
+
+            const draftData = {
+                title,
+                short_description: short_desc,
+                full_description: full_desc,
+                price_amount: price,
+                doc_label,
+                doc_url,
+                images: draftImages,
+                savedAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+            };
+
+            try {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+            } catch (e) {
+                try {
+                    draftData.images = [null, null, null];
+                    localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+                } catch (err) {}
+            }
+        }, 300);
+    }
+
+    function restoreProductDraft() {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return;
+
+        try {
+            const data = JSON.parse(raw);
+            const form = document.getElementById('addProductForm');
+            if (!form) return;
+
+            let restoredAny = false;
+
+            const titleEl = form.querySelector('input[name="title"]');
+            if (data.title && titleEl && !titleEl.value) { titleEl.value = data.title; restoredAny = true; }
+
+            const shortEl = form.querySelector('input[name="short_description"]');
+            if (data.short_description && shortEl && !shortEl.value) { shortEl.value = data.short_description; restoredAny = true; }
+
+            const fullEl = form.querySelector('textarea[name="full_description"]');
+            if (data.full_description && fullEl && !fullEl.value) { fullEl.value = data.full_description; restoredAny = true; }
+
+            const priceEl = form.querySelector('input[name="price_amount"]');
+            if (data.price_amount !== undefined && data.price_amount !== '' && priceEl && !priceEl.value) { priceEl.value = data.price_amount; restoredAny = true; }
+
+            const docLabelEl = form.querySelector('input[name="doc_label"]');
+            if (data.doc_label && docLabelEl && !docLabelEl.value) { docLabelEl.value = data.doc_label; restoredAny = true; }
+
+            const docUrlEl = form.querySelector('input[name="doc_url"]');
+            if (data.doc_url && docUrlEl && !docUrlEl.value) { docUrlEl.value = data.doc_url; restoredAny = true; }
+
+            if (Array.isArray(data.images)) {
+                data.images.forEach((dataUrl, idx) => {
+                    if (dataUrl && !slotFiles[idx]) {
+                        try {
+                            const file = dataURLtoFile(dataUrl, `draft_foto_${idx+1}.webp`);
+                            slotFiles[idx] = file;
+                            draftImages[idx] = dataUrl;
+                            renderSlot(idx, file, file);
+                            restoredAny = true;
+                        } catch(e) {}
+                    }
+                });
+                syncRealImagesInput();
+            }
+
+            if (restoredAny) {
+                const banner = document.getElementById('addProductDraftBanner');
+                const timeEl = document.getElementById('addProductDraftTime');
+                if (banner) banner.style.display = 'flex';
+                if (timeEl && data.savedAt) timeEl.innerText = data.savedAt;
+            }
+        } catch(e) {}
+    }
+
+    function dataURLtoFile(dataurl, filename) {
+        const arr = dataurl.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new File([u8arr], filename, { type: mime });
+    }
+
+    function clearProductDraft(confirmPrompt = false) {
+        if (confirmPrompt) {
+            if (!confirm('Apakah Anda yakin ingin menghapus draf isian form dan mulai dari awal?')) {
+                return;
+            }
+        }
+        try {
+            localStorage.removeItem(DRAFT_KEY);
+        } catch(e) {}
+
+        const form = document.getElementById('addProductForm');
+        if (form) {
+            const titleInput = form.querySelector('input[name="title"]');
+            if (titleInput) titleInput.value = '';
+            const shortDesc = form.querySelector('input[name="short_description"]');
+            if (shortDesc) shortDesc.value = '';
+            const fullDesc = form.querySelector('textarea[name="full_description"]');
+            if (fullDesc) fullDesc.value = '';
+            const priceInput = form.querySelector('input[name="price_amount"]');
+            if (priceInput) priceInput.value = '';
+            const docLabel = form.querySelector('input[name="doc_label"]');
+            if (docLabel) docLabel.value = '';
+            const docUrl = form.querySelector('input[name="doc_url"]');
+            if (docUrl) docUrl.value = '';
+            const fwInput = form.querySelector('input[name="firmware_file"]');
+            if (fwInput) fwInput.value = '';
+            const stlInput = form.querySelector('input[name="stl_file"]');
+            if (stlInput) stlInput.value = '';
+        }
+
+        for (let i = 0; i < 3; i++) {
+            draftImages[i] = null;
+            removeSlotFile(i);
+        }
+
+        const banner = document.getElementById('addProductDraftBanner');
+        if (banner) banner.style.display = 'none';
+        const errBox = document.getElementById('addProductErrorAlert');
+        if (errBox) errBox.style.display = 'none';
     }
 
     function syncRealImagesInput() {
@@ -3008,6 +3186,7 @@
             });
 
             if (res.redirected) {
+                clearProductDraft(false);
                 window.location.href = res.url;
                 return false;
             }
@@ -3031,6 +3210,7 @@
                 throw new Error(errorText);
             }
 
+            clearProductDraft(false);
             window.location.href = '/profil?mode=marketplace&sub=products&message=' + encodeURIComponent('Produk firmware berhasil disimpan!');
         } catch(err) {
             if (submitBtn) {
@@ -3620,13 +3800,20 @@
             .replace(/'/g, '&#39;');
     }
 
-    // Auto-activate mode/sub on load if specified in URL query
+    // Auto-activate mode/sub on load if specified in URL query & setup draft auto-save
     document.addEventListener('DOMContentLoaded', function() {
         const params = new URLSearchParams(window.location.search);
         const mode = params.get('mode') || currentProfileMode;
         const sub = params.get('sub') || currentMarketplaceSub;
         if (mode === 'marketplace') {
             switchProfileTab('marketplace', sub);
+        }
+
+        const addProductForm = document.getElementById('addProductForm');
+        if (addProductForm) {
+            addProductForm.addEventListener('input', saveProductDraft);
+            addProductForm.addEventListener('change', saveProductDraft);
+            restoreProductDraft();
         }
     });
 </script>
