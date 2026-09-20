@@ -360,3 +360,60 @@ async def health_check_db():
             "store_class": store.__class__.__name__,
         }
 
+
+@app.get("/health/storage", tags=["Health"])
+async def health_check_storage():
+    """Check S3 Object Storage connectivity, bucket status, and latency."""
+    from xiaozhi.marketplace.storage import storage_service
+    from xiaozhi.config import S3_ENDPOINT, S3_REGION, S3_BUCKET_PUBLIC, S3_BUCKET_PRIVATE
+    
+    start = time.perf_counter()
+    if not storage_service.has_s3:
+        return {
+            "status": "warning",
+            "has_s3": False,
+            "mode": "local_fallback",
+            "message": "S3 credentials not configured in environment; running on local fallback storage.",
+        }
+    
+    try:
+        s3 = storage_service._get_s3()
+        if not s3:
+            raise RuntimeError("Failed to initialize boto3 S3 client.")
+        
+        # Test listing buckets
+        resp = s3.list_buckets()
+        detected_buckets = [b["Name"] for b in resp.get("Buckets", [])]
+        latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        
+        public_exists = S3_BUCKET_PUBLIC in detected_buckets
+        private_exists = S3_BUCKET_PRIVATE in detected_buckets
+        
+        return {
+            "status": "healthy" if (public_exists and private_exists) else "degraded",
+            "has_s3": True,
+            "mode": "s3_object_storage",
+            "endpoint": S3_ENDPOINT,
+            "region": S3_REGION,
+            "latency_ms": latency_ms,
+            "bucket_public": {
+                "name": S3_BUCKET_PUBLIC,
+                "exists": public_exists,
+            },
+            "bucket_private": {
+                "name": S3_BUCKET_PRIVATE,
+                "exists": private_exists,
+            },
+            "all_detected_buckets": detected_buckets,
+        }
+    except Exception as exc:
+        logger.error("Storage health check failed: %s", exc)
+        return {
+            "status": "unhealthy",
+            "has_s3": True,
+            "mode": "s3_object_storage",
+            "endpoint": S3_ENDPOINT,
+            "error": str(exc),
+        }
+
+
