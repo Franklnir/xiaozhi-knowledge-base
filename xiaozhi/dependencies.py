@@ -25,6 +25,12 @@ def init_dependencies(templates_instance: Jinja2Templates, store) -> None:
     global templates, _store
     templates = templates_instance
     _store = store
+    if templates and hasattr(templates, "env"):
+        def _default_ser(o):
+            if hasattr(o, "isoformat"):
+                return o.isoformat()
+            return str(o)
+        templates.env.policies["json.dumps_kwargs"] = {"default": _default_ser}
 
 
 def get_current_user(request: Request) -> Optional[Dict[str, Any]]:

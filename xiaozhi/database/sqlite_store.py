@@ -898,6 +898,8 @@ class SQLiteStore:
         token_hash: str = "",
         semantic: bool = False,
         date: str = "",
+        offset: int = 0,
+        tool_name: str = "",
     ) -> List[Dict[str, Any]]:
         conn = self._get_conn()
         sql = "SELECT * FROM chat_history WHERE owner_id = ?"
@@ -910,6 +912,10 @@ class SQLiteStore:
         if token_hash:
             sql += " AND (token_hash = ? OR token_hash = '')"
             params.append(token_hash)
+
+        if tool_name:
+            sql += " AND tool_name = ?"
+            params.append(tool_name)
 
         # If semantic search is requested and query is provided, fetch a broader window and rank semantically
         if semantic and query.strip():
@@ -926,8 +932,8 @@ class SQLiteStore:
         if query:
             sql += " AND (user_message LIKE ? OR xiaozhi_answer LIKE ?)"
             params.extend([f"%{query}%", f"%{query}%"])
-        sql += " ORDER BY id DESC LIMIT ?"
-        params.append(limit)
+        sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
         rows = conn.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
