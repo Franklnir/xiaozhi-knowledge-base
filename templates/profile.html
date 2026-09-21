@@ -706,44 +706,135 @@
     }
     .fw-msg-bubble {
         max-width: 78%;
-        padding: 10px 14px;
+        padding: 10px 15px;
         border-radius: 12px;
-        font-size: 13.5px;
-        line-height: 1.45;
+        font-size: 14px;
+        line-height: 1.5;
         position: relative;
         word-break: break-word;
+        font-weight: 500;
     }
     .fw-msg-outgoing {
         align-self: flex-end;
-        background: var(--app-brand);
-        color: #ffffff;
+        background: #0284c7;
+        color: #ffffff !important;
+        border: 1.5px solid #0284c7;
         border-bottom-right-radius: 2px;
+        box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
     }
+    .fw-msg-outgoing .fw-msg-text,
+    .fw-msg-outgoing > div:first-child {
+        color: #ffffff !important;
+    }
+    .fw-msg-outgoing .fw-msg-meta {
+        color: rgba(255, 255, 255, 0.85) !important;
+    }
+    .fw-msg-outgoing .fw-msg-meta span {
+        color: rgba(255, 255, 255, 0.85) !important;
+    }
+    .fw-msg-outgoing .fw-check-read {
+        color: #bae6fd !important;
+        font-weight: 800;
+    }
+    .fw-msg-outgoing .fw-check-sent {
+        color: rgba(255, 255, 255, 0.8) !important;
+    }
+
     :root[data-theme="neo"] .fw-msg-outgoing {
-        background: var(--app-brand);
-        color: #000000;
-        border: 2px solid #000000;
-        box-shadow: 2px 2px 0 #000000;
+        background: #111111 !important;
+        color: #ffffff !important;
+        border: 2.5px solid #000000;
+        box-shadow: 3px 3px 0 #000000;
     }
+    :root[data-theme="neo"] .fw-msg-outgoing .fw-msg-text,
+    :root[data-theme="neo"] .fw-msg-outgoing > div:first-child {
+        color: #ffffff !important;
+    }
+    :root[data-theme="neo"] .fw-msg-outgoing .fw-msg-meta {
+        color: #cbd5e1 !important;
+    }
+    :root[data-theme="neo"] .fw-msg-outgoing .fw-msg-meta span {
+        color: #cbd5e1 !important;
+    }
+    :root[data-theme="neo"] .fw-msg-outgoing .fw-check-read {
+        color: #38bdf8 !important;
+        font-weight: 800;
+    }
+    :root[data-theme="neo"] .fw-msg-outgoing .fw-check-sent {
+        color: #94a3b8 !important;
+    }
+
+    :root[data-theme="dark"] .fw-msg-outgoing {
+        background: #0284c7 !important;
+        color: #ffffff !important;
+        border: 1.5px solid #0369a1;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    }
+    :root[data-theme="dark"] .fw-msg-outgoing .fw-msg-text {
+        color: #ffffff !important;
+    }
+    :root[data-theme="dark"] .fw-msg-outgoing .fw-msg-meta,
+    :root[data-theme="dark"] .fw-msg-outgoing .fw-msg-meta span {
+        color: #e0f2fe !important;
+    }
+
     .fw-msg-incoming {
         align-self: flex-start;
         background: var(--app-surface);
-        color: var(--app-text);
+        color: var(--app-text) !important;
         border: 1.5px solid var(--app-border-strong);
         border-bottom-left-radius: 2px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     }
+    .fw-msg-incoming .fw-msg-text,
+    .fw-msg-incoming > div:first-child {
+        color: var(--app-text) !important;
+    }
+    .fw-msg-incoming .fw-msg-meta {
+        color: var(--app-muted) !important;
+    }
+    .fw-msg-incoming .fw-msg-meta span {
+        color: var(--app-muted) !important;
+    }
+
     :root[data-theme="neo"] .fw-msg-incoming {
-        border: 2px solid #000000;
-        box-shadow: 2px 2px 0 #000000;
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 2.5px solid #000000;
+        box-shadow: 3px 3px 0 #000000;
     }
+    :root[data-theme="neo"] .fw-msg-incoming .fw-msg-text,
+    :root[data-theme="neo"] .fw-msg-incoming > div:first-child {
+        color: #000000 !important;
+    }
+    :root[data-theme="neo"] .fw-msg-incoming .fw-msg-meta,
+    :root[data-theme="neo"] .fw-msg-incoming .fw-msg-meta span {
+        color: #475569 !important;
+    }
+
+    :root[data-theme="dark"] .fw-msg-incoming {
+        background: #1e293b !important;
+        color: #f8fafc !important;
+        border: 1.5px solid #334155;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    }
+    :root[data-theme="dark"] .fw-msg-incoming .fw-msg-text,
+    :root[data-theme="dark"] .fw-msg-incoming > div:first-child {
+        color: #f8fafc !important;
+    }
+    :root[data-theme="dark"] .fw-msg-incoming .fw-msg-meta,
+    :root[data-theme="dark"] .fw-msg-incoming .fw-msg-meta span {
+        color: #94a3b8 !important;
+    }
+
     .fw-msg-meta {
-        font-size: 10.5px;
-        margin-top: 4px;
+        font-size: 11px;
+        margin-top: 5px;
         display: flex;
         align-items: center;
         justify-content: flex-end;
         gap: 4px;
-        opacity: 0.85;
+        font-weight: 500;
     }
     .fw-product-card-bubble {
         background: var(--app-surface);
@@ -3579,7 +3670,7 @@
 
         box.innerHTML = messages.map(m => {
             const isMe = Number(m.sender_id) === Number(CURRENT_USER_ID);
-            const checkmarks = isMe ? (m.read_at ? '<span style="color:#60a5fa;" title="Dibaca">✓✓</span>' : '<span style="opacity:0.7;" title="Terkirim">✓</span>') : '';
+            const checkmarks = isMe ? (m.read_at ? '<span class="fw-check-read" title="Dibaca">✓✓</span>' : '<span class="fw-check-sent" title="Terkirim">✓</span>') : '';
             const timeStr = m.created_at ? formatChatTime(m.created_at) : '';
 
             let contentHtml = '';
@@ -3611,7 +3702,7 @@
                     </div>
                 `;
             } else {
-                contentHtml = `<div style="white-space:pre-wrap;">${escapeHtml(m.body)}</div>`;
+                contentHtml = `<div class="fw-msg-text" style="white-space:pre-wrap; word-break:break-word;">${escapeHtml(m.body)}</div>`;
             }
 
             return `
