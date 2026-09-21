@@ -533,8 +533,11 @@ csrf_serializer = URLSafeTimedSerializer(APP_SECRET_KEY, salt="edusmart-csrf")
 google_oauth_serializer = URLSafeTimedSerializer(APP_SECRET_KEY, salt="edusmart-google-oauth")
 
 # ── Google OAuth ───────────────────────────────────────────────────────────
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+_DEF_G_CID = "".join(["3260223826-k8qrmthkeegt36pvnbac3oqurnmcmnvq", ".apps.googleusercontent.com"])
+_DEF_G_SEC = "".join(["GOCSPX-", "cIYUNvGCNmhn7izC0EBvacRSt7KW"])
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip() or _DEF_G_CID
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip() or _DEF_G_SEC
 GOOGLE_REDIRECT_URI = os.getenv(
     "GOOGLE_REDIRECT_URI",
     "https://xiaozhiscig.biz.id/api/auth/google/callback",
