@@ -1,10 +1,13 @@
 import os
+import logging
 import mimetypes
 from pathlib import Path
 from typing import Optional, List
 from fastapi import APIRouter, Request, HTTPException, Depends, Query, Path as FPath, status
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("xiaozhi.marketplace.api")
 
 from xiaozhi.dependencies import get_current_user, require_user
 from xiaozhi.marketplace.deps import (
@@ -200,6 +203,60 @@ async def serve_local_image(storage_key: str):
     if not path or not path.exists():
         raise HTTPException(status_code=404, detail="Gambar tidak ditemukan.")
     return FileResponse(path, media_type="image/webp")
+
+
+@router.get("/products/{product_id_or_slug}/stl-preview")
+async def serve_stl_preview(request: Request, product_id_or_slug: str):
+    """
+    Serves the 3D STL file for client-side WebGL / Three.js interactive preview on the product detail page.
+    Publicly viewable for published products; restricted to seller/admin for draft products.
+    """
+    product_service = get_product_service()
+    product = product_service.get_product_detail(product_id_or_slug)
+    if not product:
+        raise HTTPException(status_code=404, detail="Produk tidak ditemukan.")
+
+    # Access control: If not PUBLISHED, only seller or admin can view preview
+    if product.get("status") != "PUBLISHED":
+        user = get_current_user(request)
+        is_admin = bool(user and str(user.get("role", "")).lower() == "admin")
+        is_seller = bool(user and int(user.get("id", -1)) == int(product.get("seller_id", -2)))
+        if not (is_admin or is_seller):
+            raise HTTPException(status_code=403, detail="Akses preview model 3D dibatasi.")
+
+    latest_ver = product.get("latest_version")
+    if not latest_ver or not latest_ver.get("stl_storage_key"):
+        raise HTTPException(status_code=404, detail="Produk ini tidak memiliki berkas 3D model STL.")
+
+    stl_key = latest_ver["stl_storage_key"]
+    filename = latest_ver.get("stl_original_filename") or "model.stl"
+
+    if storage_service.has_s3:
+        s3 = storage_service._get_s3()
+        if s3:
+            try:
+                presigned_url = s3.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": storage_service.S3_BUCKET_PRIVATE, "Key": stl_key},
+                    ExpiresIn=3600,
+                )
+                return RedirectResponse(presigned_url, status_code=307)
+            except Exception as e:
+                logger.error("Gagal generate presigned url untuk STL preview: %s", e)
+
+    target_path = storage_service.get_local_firmware_path(stl_key)
+    if not target_path or not target_path.exists():
+        raise HTTPException(status_code=404, detail="File STL tidak ditemukan di storage server.")
+
+    return FileResponse(
+        path=target_path,
+        media_type="model/stl",
+        filename=filename,
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
 
 
 @router.get("/storage/download/{token}")
