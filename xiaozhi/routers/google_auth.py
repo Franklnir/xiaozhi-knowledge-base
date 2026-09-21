@@ -84,8 +84,16 @@ def generate_unique_username(email: str, name: str, store) -> str:
 
 
 @router.get("/login")
-async def google_login(request: Request, intent: str = Query("login"), source: str = Query("web")):
-    """Initiate Google OAuth flow for Login or Register."""
+async def google_login(
+    request: Request,
+    intent: str = Query("login"),
+    source: str = Query("web"),
+    token: Optional[str] = Query(None),
+):
+    """Initiate Google OAuth flow for Login, Register, or Link."""
+    if intent == "link":
+        return await google_link(request=request, token=token, source=source)
+
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         logger.error("Google OAuth credentials not configured.")
         if source == "mobile":
@@ -116,18 +124,40 @@ async def google_login(request: Request, intent: str = Query("login"), source: s
 
 
 @router.get("/link")
-async def google_link(request: Request):
+async def google_link(
+    request: Request,
+    token: Optional[str] = Query(None),
+    source: str = Query("web"),
+):
     """Initiate Google OAuth flow to link Google account to current logged-in user."""
     user = get_current_user(request)
+    if not user and token:
+        from xiaozhi.core.security import validate_access_token
+        user_info, err = validate_access_token(token.strip())
+        if user_info and not err:
+            store = get_store()
+            user = store.get_user(int(user_info["user_id"]))
+
     if not user:
+        if source == "mobile":
+            return RedirectResponse(
+                url=f"espbridge://oauth/callback?error={urlencode({'msg': 'Sesi login tidak valid atau telah berakhir.'})}",
+                status_code=303
+            )
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu untuk menautkan Google.")
 
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        if source == "mobile":
+            return RedirectResponse(
+                url=f"espbridge://oauth/callback?error={urlencode({'msg': 'Integrasi Google belum dikonfigurasi di server.'})}",
+                status_code=303
+            )
         return redirect_with_message("/profil", "Integrasi Google belum dikonfigurasi di server.")
 
     state = google_oauth_serializer.dumps({
         "action": "link",
         "user_id": int(user["id"]),
+        "source": source,
         "nonce": secrets.token_urlsafe(16),
     })
 
@@ -242,16 +272,35 @@ async def google_callback(
 
     # ── Action: LINK ACCOUNT ────────────────────────────────────────────────
     if action == "link":
-        current_user = get_current_user(request)
         state_uid = state_data.get("user_id")
-        if not current_user or int(current_user["id"]) != int(state_uid):
+        if not state_uid:
+            return respond_error("Data sesi tautan Google tidak valid.", "/login")
+
+        current_user = get_current_user(request)
+        if current_user and int(current_user["id"]) != int(state_uid):
             return respond_error("Sesi login tidak cocok saat menautkan akun.", "/login")
 
+        user_to_link = current_user or store.get_user(int(state_uid))
+        if not user_to_link:
+            return respond_error("Pengguna tidak ditemukan untuk menautkan akun.", "/login")
+
         try:
-            store.link_google_account(int(current_user["id"]), google_id, google_email)
-            return redirect_with_message("/profil", f"Akun Google ({google_email}) berhasil ditautkan!")
+            store.link_google_account(int(user_to_link["id"]), google_id, google_email)
         except ValueError as exc:
             return respond_error(str(exc), "/profil")
+
+        if is_mobile:
+            cb_params = {
+                "action": "link",
+                "status": "success",
+                "email": google_email,
+                "msg": f"Akun Google ({google_email}) berhasil ditautkan!",
+            }
+            return RedirectResponse(url=f"espbridge://oauth/callback?{urlencode(cb_params)}", status_code=303)
+
+        redirect = redirect_with_message("/profil", f"Akun Google ({google_email}) berhasil ditautkan!")
+        set_session_cookie(redirect, request, user_to_link)
+        return redirect
 
     # ── Action: REGISTER DENGAN GOOGLE ─────────────────────────────────────
     if action == "register":
