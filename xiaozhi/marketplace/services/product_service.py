@@ -187,6 +187,18 @@ class ProductService:
         latest_ver = self.repo.get_latest_version(str(product["id"]))
         product["latest_version"] = latest_ver
 
+        # Check STL 3D asset
+        if latest_ver and latest_ver.get("stl_storage_key"):
+            product["has_stl"] = True
+            product["stl_preview_url"] = f"/api/v1/marketplace/products/{product['id']}/stl-preview"
+            product["stl_filename"] = latest_ver.get("stl_original_filename") or "model.stl"
+            product["stl_file_size"] = latest_ver.get("stl_file_size") or 0
+        else:
+            product["has_stl"] = False
+            product["stl_preview_url"] = None
+            product["stl_filename"] = None
+            product["stl_file_size"] = 0
+
         # Check if current user already purchased / owns this
         product["is_owned"] = False
         product["is_seller"] = False

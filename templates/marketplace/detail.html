@@ -172,6 +172,221 @@
     .fw-fee-table tr:not(:last-child) {
         border-bottom: 1px dashed var(--app-border);
     }
+
+    /* Media Tabs (Photos vs 3D Model) */
+    .fw-media-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+        align-items: center;
+    }
+    .fw-media-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 800;
+        border-radius: var(--app-radius);
+        border: 2px solid var(--app-border);
+        background: var(--app-surface);
+        color: var(--app-muted);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+    .fw-media-tab:hover {
+        color: var(--app-text);
+        border-color: var(--app-brand);
+        transform: translateY(-1px);
+    }
+    .fw-media-tab.is-active {
+        background: var(--app-surface);
+        color: var(--app-brand);
+        border-color: var(--app-brand);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .fw-media-tab-3d.is-active {
+        background: linear-gradient(135deg, #0284c7 0%, #4f46e5 100%);
+        color: #ffffff;
+        border-color: transparent;
+        box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+    }
+    .fw-badge-3d {
+        font-size: 9.5px;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        background: rgba(255, 255, 255, 0.25);
+        color: #ffffff;
+        padding: 2px 6px;
+        border-radius: 99px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+    }
+    .fw-pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: pulse-dot 1.8s infinite;
+    }
+    @keyframes pulse-dot {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* 3D STL Container */
+    .fw-stl-viewer-container {
+        position: relative;
+        width: 100%;
+        height: 440px;
+        background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0b0f19 100%);
+        overflow: hidden;
+        user-select: none;
+        border-radius: var(--app-radius);
+    }
+    .fw-stl-canvas-wrap {
+        width: 100%;
+        height: 100%;
+        cursor: grab;
+    }
+    .fw-stl-canvas-wrap:active {
+        cursor: grabbing;
+    }
+    .fw-stl-topbar {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        right: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        pointer-events: none;
+        z-index: 10;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .fw-stl-topbar > * {
+        pointer-events: auto;
+    }
+    .fw-stl-file-info {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #f8fafc;
+        padding: 5px 12px;
+        border-radius: 99px;
+        font-size: 11.5px;
+        font-weight: 700;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    }
+    .fw-stl-toolbar {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 4px 8px;
+        border-radius: 99px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    }
+    .fw-stl-tool-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        color: #cbd5e1;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.15s ease;
+    }
+    .fw-stl-tool-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+        transform: scale(1.1);
+    }
+    .fw-stl-tool-btn.is-active {
+        background: #0ea5e9;
+        color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+    .fw-stl-color-dots {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 0 6px;
+        border-left: 1px solid rgba(255, 255, 255, 0.15);
+        border-right: 1px solid rgba(255, 255, 255, 0.15);
+        margin: 0 2px;
+    }
+    .fw-stl-color-dot {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid rgba(255, 255, 255, 0.25);
+        transition: all 0.15s ease;
+    }
+    .fw-stl-color-dot:hover, .fw-stl-color-dot.is-selected {
+        transform: scale(1.25);
+        border-color: #ffffff;
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+    }
+    .fw-stl-hint {
+        position: absolute;
+        bottom: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #94a3b8;
+        font-size: 11px;
+        padding: 5px 14px;
+        border-radius: 99px;
+        pointer-events: none;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    @media (max-width: 600px) {
+        .fw-stl-hint { display: none; }
+    }
+    .fw-stl-loading-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(6px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+    }
+    @keyframes spin-3d {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .fw-stl-spinner {
+        width: 38px;
+        height: 38px;
+        border: 3px solid rgba(14, 165, 233, 0.25);
+        border-top-color: #0ea5e9;
+        border-radius: 50%;
+        animation: spin-3d 0.8s linear infinite;
+        margin-bottom: 12px;
+    }
 </style>
 
 <div style="margin-bottom:16px;">
@@ -183,31 +398,122 @@
 <div class="fw-detail-layout">
     <!-- Main Left Column -->
     <div class="fw-main-col">
-        <!-- Gallery Slider (Hingga 3 Foto) -->
+        <!-- Media Showcase (Foto & 3D STL) -->
+        {% set has_images = product.images and product.images|length > 0 %}
+        {% set default_tab = 'photos' if has_images else ('stl' if product.has_stl else 'photos') %}
+
+        {% if product.has_stl %}
+        <div class="fw-media-tabs" id="mediaTabsWrap">
+            <button type="button" class="fw-media-tab {% if default_tab == 'photos' %}is-active{% endif %}" id="tabBtnPhotos" onclick="switchMediaTab('photos')">
+                <span style="font-size:15px;">📷</span>
+                <span>Foto Produk</span>
+                <span class="app-chip app-chip-neutral" style="font-size:11px; padding:1px 6px;">{{ product.images|length if product.images else 0 }}</span>
+            </button>
+            <button type="button" class="fw-media-tab fw-media-tab-3d {% if default_tab == 'stl' %}is-active{% endif %}" id="tabBtnStl" onclick="switchMediaTab('stl')">
+                <span class="fw-pulse-dot"></span>
+                <span style="font-size:15px;">🖨️</span>
+                <span>Model 3D Interaktif</span>
+                <span class="fw-badge-3d">3D VIEW</span>
+            </button>
+        </div>
+        {% endif %}
+
         <div class="fw-gallery-wrap" id="productGalleryWrap">
-            <div class="fw-gallery-main" id="galleryMain">
-                {% if product.images and product.images|length > 0 %}
-                <img src="{{ product.images[0].url }}" id="activeImage" alt="{{ product.title }}">
-                {% if product.images|length > 1 %}
-                <button type="button" class="fw-slider-btn fw-slider-btn-prev" onclick="slideGallery(-1)" aria-label="Foto Sebelumnya">&#10094;</button>
-                <button type="button" class="fw-slider-btn fw-slider-btn-next" onclick="slideGallery(1)" aria-label="Foto Berikutnya">&#10095;</button>
-                <div class="fw-slider-dots" id="sliderDots">
+            <!-- Photo Gallery View -->
+            <div id="photosMediaView" style="{% if default_tab != 'photos' %}display:none;{% endif %}">
+                <div class="fw-gallery-main" id="galleryMain">
+                    {% if product.images and product.images|length > 0 %}
+                    <img src="{{ product.images[0].url }}" id="activeImage" alt="{{ product.title }}">
+                    {% if product.images|length > 1 %}
+                    <button type="button" class="fw-slider-btn fw-slider-btn-prev" onclick="slideGallery(-1)" aria-label="Foto Sebelumnya">&#10094;</button>
+                    <button type="button" class="fw-slider-btn fw-slider-btn-next" onclick="slideGallery(1)" aria-label="Foto Berikutnya">&#10095;</button>
+                    <div class="fw-slider-dots" id="sliderDots">
+                        {% for img in product.images %}
+                        <span class="fw-slider-dot {% if loop.first %}is-active{% endif %}" onclick="goToGallerySlide({{ loop.index0 }})" title="Foto {{ loop.index }}"></span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div style="font-size:64px; padding:60px 0;">💾</div>
+                    {% endif %}
+                </div>
+                {% if product.images and product.images|length > 1 %}
+                <div class="fw-gallery-thumbs">
                     {% for img in product.images %}
-                    <span class="fw-slider-dot {% if loop.first %}is-active{% endif %}" onclick="goToGallerySlide({{ loop.index0 }})" title="Foto {{ loop.index }}"></span>
+                    <div class="fw-thumb {% if loop.first %}is-active{% endif %}" data-index="{{ loop.index0 }}" onclick="goToGallerySlide({{ loop.index0 }})">
+                        <img src="{{ img.url }}" alt="Thumbnail {{ loop.index }}">
+                    </div>
                     {% endfor %}
                 </div>
                 {% endif %}
-                {% else %}
-                <div style="font-size:64px; padding:60px 0;">💾</div>
-                {% endif %}
             </div>
-            {% if product.images and product.images|length > 1 %}
-            <div class="fw-gallery-thumbs">
-                {% for img in product.images %}
-                <div class="fw-thumb {% if loop.first %}is-active{% endif %}" data-index="{{ loop.index0 }}" onclick="goToGallerySlide({{ loop.index0 }})">
-                    <img src="{{ img.url }}" alt="Thumbnail {{ loop.index }}">
+
+            <!-- 3D STL Interactive Viewer View -->
+            {% if product.has_stl %}
+            <div id="stlMediaView" style="{% if default_tab != 'stl' %}display:none;{% endif %}">
+                <div class="fw-stl-viewer-container" id="stlViewerContainer">
+                    <!-- Top Floating Bar -->
+                    <div class="fw-stl-topbar">
+                        <div class="fw-stl-file-info">
+                            <span>🖨️</span>
+                            <span>{{ product.stl_filename or 'model.stl' }}</span>
+                            {% if product.stl_file_size %}
+                            <span style="opacity:0.75; font-size:11px;">({{ (product.stl_file_size / (1024*1024))|round(2) }} MB)</span>
+                            {% endif %}
+                        </div>
+                        <div class="fw-stl-toolbar">
+                            <!-- Reset View -->
+                            <button type="button" class="fw-stl-tool-btn" onclick="resetStlCamera()" title="Reset Posisi Kamera">
+                                ↺
+                            </button>
+                            <!-- Auto Rotate -->
+                            <button type="button" class="fw-stl-tool-btn is-active" id="btnStlRotate" onclick="toggleStlRotate()" title="Putar Otomatis">
+                                🔄
+                            </button>
+                            <!-- Wireframe -->
+                            <button type="button" class="fw-stl-tool-btn" id="btnStlWireframe" onclick="toggleStlWireframe()" title="Mode Wireframe">
+                                🕸️
+                            </button>
+                            <!-- Filament Colors -->
+                            <div class="fw-stl-color-dots" title="Pilih Warna Preview">
+                                <span class="fw-stl-color-dot is-selected" style="background:#0ea5e9;" onclick="setStlColor(0x0ea5e9, this)" title="Tech Cyan"></span>
+                                <span class="fw-stl-color-dot" style="background:#f97316;" onclick="setStlColor(0xf97316, this)" title="Prusa Orange"></span>
+                                <span class="fw-stl-color-dot" style="background:#10b981;" onclick="setStlColor(0x10b981, this)" title="Emerald Green"></span>
+                                <span class="fw-stl-color-dot" style="background:#a855f7;" onclick="setStlColor(0xa855f7, this)" title="Neon Violet"></span>
+                                <span class="fw-stl-color-dot" style="background:#cbd5e1;" onclick="setStlColor(0xcbd5e1, this)" title="Silver White"></span>
+                                <span class="fw-stl-color-dot" style="background:#334155;" onclick="setStlColor(0x334155, this)" title="Matte Slate"></span>
+                            </div>
+                            <!-- Fullscreen -->
+                            <button type="button" class="fw-stl-tool-btn" onclick="toggleStlFullscreen()" title="Layar Penuh">
+                                ⛶
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Wrapper -->
+                    <div class="fw-stl-canvas-wrap" id="stlCanvasWrap"></div>
+
+                    <!-- Loading / Progress Overlay -->
+                    <div class="fw-stl-loading-overlay" id="stlLoadingOverlay">
+                        <div class="fw-stl-spinner"></div>
+                        <div style="color:#ffffff; font-weight:800; font-size:14px; margin-bottom:4px;" id="stlLoadingText">
+                            Memuat Model 3D...
+                        </div>
+                        <div style="color:#94a3b8; font-size:12px;" id="stlLoadingSubtext">
+                            Mengunduh berkas STL ({{ (product.stl_file_size / (1024*1024))|round(2) if product.stl_file_size else '...' }} MB)
+                        </div>
+                    </div>
+
+                    <!-- Interaction Hint -->
+                    <div class="fw-stl-hint">
+                        <span>💡</span>
+                        <span>Geser mouse untuk memutar</span>
+                        <span style="opacity:0.4;">•</span>
+                        <span>Scroll zoom</span>
+                        <span style="opacity:0.4;">•</span>
+                        <span>Klik kanan untuk menggeser</span>
+                    </div>
                 </div>
-                {% endfor %}
             </div>
             {% endif %}
         </div>
@@ -224,7 +530,11 @@
                 {% if product.latest_version and product.latest_version.sha256 %}
                 <span class="app-chip app-chip-info">⚡ Firmware .BIN</span>
                 {% endif %}
-                {% if product.latest_version and product.latest_version.stl_sha256 %}
+                {% if product.has_stl %}
+                <button type="button" onclick="switchMediaTab('stl'); document.getElementById('mediaTabsWrap')?.scrollIntoView({behavior:'smooth'});" class="app-chip" style="background:#d1fae5; color:#065f46; border:1.5px solid #10b981; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" title="Klik untuk lihat model 3D">
+                    🖨️ Model 3D .STL <span style="font-size:9.5px; background:#10b981; color:#ffffff; padding:1px 6px; border-radius:99px; font-weight:900;">3D VIEW ↗</span>
+                </button>
+                {% elif product.latest_version and product.latest_version.stl_sha256 %}
                 <span class="app-chip" style="background:#d1fae5; color:#065f46; border:1px solid #10b981; font-weight:700;">🖨️ Model 3D .STL</span>
                 {% endif %}
             </div>
@@ -279,7 +589,14 @@
                         <div>⚡ <strong>Binary ESP32:</strong> <code>{{ product.latest_version.original_filename or 'firmware.bin' }}</code> ({{ (product.latest_version.file_size / (1024*1024))|round(2) }} MB) • SHA-256: <code>{{ product.latest_version.sha256[:12] }}...</code></div>
                         {% endif %}
                         {% if product.latest_version and product.latest_version.stl_sha256 %}
-                        <div>🖨️ <strong>Model 3D STL:</strong> <code>{{ product.latest_version.stl_original_filename or 'model.stl' }}</code> ({{ (product.latest_version.stl_file_size / (1024*1024))|round(2) }} MB) • SHA-256: <code>{{ product.latest_version.stl_sha256[:12] }}...</code></div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                            <div>🖨️ <strong>Model 3D STL:</strong> <code>{{ product.latest_version.stl_original_filename or product.stl_filename or 'model.stl' }}</code> ({{ ((product.latest_version.stl_file_size or product.stl_file_size or 0) / (1024*1024))|round(2) }} MB) • SHA-256: <code>{{ product.latest_version.stl_sha256[:12] }}...</code></div>
+                            {% if product.has_stl %}
+                            <button type="button" onclick="switchMediaTab('stl'); document.getElementById('mediaTabsWrap')?.scrollIntoView({behavior:'smooth'});" class="app-button app-button-small" style="font-size:11px; padding:3px 10px; background:var(--app-surface); border:1.5px solid #10b981; color:#065f46; font-weight:800; cursor:pointer; white-space:nowrap;">
+                                🔍 Preview 3D
+                            </button>
+                            {% endif %}
+                        </div>
                         {% endif %}
                         {% if not product.latest_version or (not product.latest_version.sha256 and not product.latest_version.stl_sha256) %}
                         <div>File aset siap diunduh segera setelah pembayaran terkonfirmasi.</div>
@@ -533,5 +850,262 @@
             }
         }
     }
+
+    // ── 3D STL INTERACTIVE VIEWER LOGIC ──
+    {% if product.has_stl %}
+    let activeMediaTab = '{{ default_tab }}';
+    let stlLoaded = false;
+    let stlLoading = false;
+    let stlScene = null;
+    let stlCamera = null;
+    let stlRenderer = null;
+    let stlControls = null;
+    let stlMesh = null;
+    let stlAnimId = null;
+    let isStlRotating = true;
+    let isStlWireframe = false;
+    let currentStlColor = 0x0ea5e9;
+    let stlDefaultCamPos = null;
+
+    function switchMediaTab(tab) {
+        activeMediaTab = tab;
+        const photosView = document.getElementById('photosMediaView');
+        const stlView = document.getElementById('stlMediaView');
+        const tabBtnPhotos = document.getElementById('tabBtnPhotos');
+        const tabBtnStl = document.getElementById('tabBtnStl');
+
+        if (tab === 'stl') {
+            if (photosView) photosView.style.display = 'none';
+            if (stlView) stlView.style.display = 'block';
+            if (tabBtnPhotos) tabBtnPhotos.classList.remove('is-active');
+            if (tabBtnStl) tabBtnStl.classList.add('is-active');
+
+            if (!stlLoaded && !stlLoading) {
+                loadStlModel('{{ product.stl_preview_url or "" }}');
+            } else {
+                setTimeout(handleStlResize, 50);
+            }
+        } else {
+            if (stlView) stlView.style.display = 'none';
+            if (photosView) photosView.style.display = 'block';
+            if (tabBtnStl) tabBtnStl.classList.remove('is-active');
+            if (tabBtnPhotos) tabBtnPhotos.classList.add('is-active');
+        }
+    }
+
+    async function loadStlModel(url) {
+        if (!url) return;
+        const loadingEl = document.getElementById('stlLoadingOverlay');
+        const textEl = document.getElementById('stlLoadingText');
+        const subtextEl = document.getElementById('stlLoadingSubtext');
+
+        stlLoading = true;
+        if (loadingEl) loadingEl.style.display = 'flex';
+        if (textEl) textEl.innerText = 'Mengunduh Model 3D...';
+
+        try {
+            if (typeof THREE === 'undefined' || !THREE.STLLoader) {
+                throw new Error('Pustaka Three.js 3D belum siap dimuat.');
+            }
+
+            const resp = await fetch(url, { credentials: 'same-origin' });
+            if (!resp.ok) {
+                throw new Error(`Gagal mengunduh berkas STL (HTTP ${resp.status})`);
+            }
+            if (textEl) textEl.innerText = 'Merender Model 3D...';
+            const buffer = await resp.arrayBuffer();
+            initStlViewer(buffer);
+            stlLoaded = true;
+            stlLoading = false;
+            if (loadingEl) loadingEl.style.display = 'none';
+        } catch (err) {
+            console.error('Gagal memuat STL:', err);
+            stlLoading = false;
+            if (loadingEl) {
+                loadingEl.innerHTML = `
+                    <div style="text-align:center; color:#f87171; padding:24px; max-width:340px;">
+                        <div style="font-size:36px; margin-bottom:8px;">⚠️</div>
+                        <div style="font-weight:800; font-size:14px; margin-bottom:6px; color:#ffffff;">Gagal Memuat Model 3D</div>
+                        <div style="font-size:12px; color:#94a3b8; margin-bottom:14px; line-height:1.4;">${err.message || 'Format tidak valid atau terjadi kendala jaringan.'}</div>
+                        <button type="button" class="app-button app-button-primary app-button-small" onclick="loadStlModel('${url}')" style="font-size:12px; padding:6px 16px;">
+                            Coba Lagi ↺
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    function initStlViewer(buffer) {
+        const wrap = document.getElementById('stlCanvasWrap');
+        if (!wrap || typeof THREE === 'undefined' || !THREE.STLLoader) return;
+
+        if (stlAnimId) cancelAnimationFrame(stlAnimId);
+        wrap.innerHTML = '';
+
+        const width = wrap.clientWidth || 540;
+        const height = wrap.clientHeight || 440;
+
+        stlScene = new THREE.Scene();
+        stlScene.background = new THREE.Color(0x0b1120);
+
+        stlCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 3000);
+
+        stlRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        stlRenderer.setSize(width, height);
+        stlRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        wrap.appendChild(stlRenderer.domElement);
+
+        if (THREE.OrbitControls) {
+            stlControls = new THREE.OrbitControls(stlCamera, stlRenderer.domElement);
+            stlControls.enableDamping = true;
+            stlControls.dampingFactor = 0.06;
+        }
+
+        // Parse STL geometry
+        const loader = new THREE.STLLoader();
+        const geometry = loader.parse(buffer);
+        geometry.computeVertexNormals();
+        geometry.center();
+
+        const material = new THREE.MeshStandardMaterial({
+            color: currentStlColor,
+            roughness: 0.32,
+            metalness: 0.22,
+            wireframe: isStlWireframe,
+        });
+        stlMesh = new THREE.Mesh(geometry, material);
+        stlScene.add(stlMesh);
+
+        // Ground Grid Floor
+        geometry.computeBoundingBox();
+        geometry.computeBoundingSphere();
+        const radius = geometry.boundingSphere ? geometry.boundingSphere.radius : 50;
+        const bbox = geometry.boundingBox;
+        const bottomY = bbox ? bbox.min.y : -radius;
+
+        const gridHelper = new THREE.GridHelper(radius * 3.5, 20, 0x0284c7, 0x1e293b);
+        gridHelper.position.y = bottomY - 0.5;
+        stlScene.add(gridHelper);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        stlScene.add(ambientLight);
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+        keyLight.position.set(radius * 2, radius * 3, radius * 2);
+        stlScene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.5);
+        fillLight.position.set(-radius * 2, -radius, -radius * 2);
+        stlScene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xa855f7, 0.45);
+        rimLight.position.set(0, radius * 2, -radius * 3);
+        stlScene.add(rimLight);
+
+        // Camera setup
+        const camDist = radius * 2.3;
+        stlDefaultCamPos = new THREE.Vector3(camDist, camDist * 0.7, camDist * 1.2);
+        stlCamera.position.copy(stlDefaultCamPos);
+        stlCamera.lookAt(0, 0, 0);
+
+        if (stlControls) {
+            stlControls.minDistance = radius * 0.4;
+            stlControls.maxDistance = radius * 10;
+            stlControls.target.set(0, 0, 0);
+            stlControls.update();
+        }
+
+        function animate() {
+            stlAnimId = requestAnimationFrame(animate);
+            if (isStlRotating && stlMesh) {
+                stlMesh.rotation.y += 0.005;
+            }
+            if (stlControls) stlControls.update();
+            stlRenderer.render(stlScene, stlCamera);
+        }
+        animate();
+    }
+
+    function handleStlResize() {
+        const wrap = document.getElementById('stlCanvasWrap');
+        if (!wrap || !stlRenderer || !stlCamera) return;
+        const w = wrap.clientWidth;
+        const h = wrap.clientHeight || 440;
+        if (w === 0) return;
+        stlCamera.aspect = w / h;
+        stlCamera.updateProjectionMatrix();
+        stlRenderer.setSize(w, h);
+    }
+
+    window.addEventListener('resize', () => {
+        if (activeMediaTab === 'stl') handleStlResize();
+    });
+
+    function resetStlCamera() {
+        if (stlControls && stlCamera && stlDefaultCamPos) {
+            stlControls.reset();
+            stlCamera.position.copy(stlDefaultCamPos);
+            stlCamera.lookAt(0, 0, 0);
+            stlControls.target.set(0, 0, 0);
+            stlControls.update();
+        }
+    }
+
+    function toggleStlRotate() {
+        isStlRotating = !isStlRotating;
+        const btn = document.getElementById('btnStlRotate');
+        if (btn) btn.classList.toggle('is-active', isStlRotating);
+    }
+
+    function toggleStlWireframe() {
+        isStlWireframe = !isStlWireframe;
+        if (stlMesh) stlMesh.material.wireframe = isStlWireframe;
+        const btn = document.getElementById('btnStlWireframe');
+        if (btn) btn.classList.toggle('is-active', isStlWireframe);
+    }
+
+    function setStlColor(hexColor, el) {
+        currentStlColor = hexColor;
+        if (stlMesh) stlMesh.material.color.setHex(hexColor);
+        const dots = document.querySelectorAll('.fw-stl-color-dot');
+        dots.forEach(d => d.classList.remove('is-selected'));
+        if (el) el.classList.add('is-selected');
+    }
+
+    function toggleStlFullscreen() {
+        const container = document.getElementById('stlViewerContainer');
+        if (!container) return;
+        if (!document.fullscreenElement) {
+            if (container.requestFullscreen) {
+                container.requestFullscreen();
+            } else if (container.webkitRequestFullscreen) {
+                container.webkitRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+        setTimeout(handleStlResize, 100);
+    });
+
+    // Auto initialize if default tab is stl
+    document.addEventListener('DOMContentLoaded', () => {
+        if (activeMediaTab === 'stl') {
+            switchMediaTab('stl');
+        }
+    });
+    {% endif %}
 </script>
+
+{% if product.has_stl %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+{% endif %}
 {% endblock %}
