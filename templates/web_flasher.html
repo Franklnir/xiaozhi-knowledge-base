@@ -18,7 +18,7 @@
     .flasher-dropzone {
         border: 2px dashed var(--app-border-strong);
         border-radius: var(--app-radius);
-        padding: 28px 18px;
+        padding: 24px 18px;
         text-align: center;
         background: var(--app-surface-muted);
         cursor: pointer;
@@ -179,19 +179,34 @@
                         <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
                             <span>📦</span> 2. Pilih File Firmware (.bin)
                         </h2>
-                        <p class="app-section-subtitle">Pilih atau seret file binary firmware hasil build.</p>
+                        <p class="app-section-subtitle">Pilih file binary firmware hasil build dari komputer atau muat preset siap pakai.</p>
                     </div>
                     <span class="app-chip app-chip-neutral" style="font-size:11px;">Opsi B: Custom .bin</span>
                 </div>
 
+                <!-- Quick Preset Bar -->
+                <div style="margin-bottom:12px; padding:10px 12px; background:var(--app-surface-muted); border:1.5px solid var(--app-border); border-radius:var(--app-radius); display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px;">
+                    <div style="font-size:12px; font-weight:700; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                        <span>🎯</span> Preset: <code>esp32 s3 n16r8/cam</code>
+                    </div>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <button type="button" class="app-button app-button-small app-button-primary" style="font-size:11.5px; padding:4px 10px;" onclick="loadPresetFirmware('/static/firmware/esp32_s3_n16r8_cam.bin', 'esp32_s3_n16r8_cam.bin', '0x20000')">
+                            ⚡ Muat Preset Ini
+                        </button>
+                        <a href="/static/firmware/esp32_s3_n16r8_cam.bin" download="esp32_s3_n16r8_cam.bin" class="app-button app-button-ghost app-button-small" style="font-size:11.5px; padding:4px 8px; text-decoration:none;">
+                            📥 Unduh .bin
+                        </a>
+                    </div>
+                </div>
+
                 <div class="flasher-dropzone" id="dropzone" onclick="document.getElementById('firmwareFileInput').click()">
                     <input type="file" id="firmwareFileInput" accept=".bin" style="display:none;">
-                    <div style="font-size:32px; margin-bottom:8px;">📁</div>
+                    <div style="font-size:32px; margin-bottom:6px;">📁</div>
                     <div style="font-size:14px; font-weight:750; color:var(--app-text);" id="filePromptText">
-                        Klik untuk memilih file firmware (.bin) atau seret ke sini
+                        Klik untuk memilih file firmware (.bin) dari komputer atau seret ke sini
                     </div>
                     <p style="font-size:12px; color:var(--app-muted); margin-top:4px;" id="fileSubText">
-                        Mendukung binary firmware untuk ESP32, ESP32-S3, ESP32-C3, dll.
+                        Mendukung binary firmware untuk ESP32-S3 N16R8 CAM, ESP32 standar, ESP32-C3, dll.
                     </p>
                 </div>
 
@@ -462,6 +477,40 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         };
         reader.readAsBinaryString(file);
     }
+
+    // Quick Preset Loader
+    window.loadPresetFirmware = async (url, filename, defaultOffset = '0x20000') => {
+        try {
+            terminal.writeLine(`Mengunduh preset ${filename}...`);
+            progressStatusText.textContent = `Memuat preset firmware ${filename}...`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const buffer = await res.arrayBuffer();
+
+            const bytes = new Uint8Array(buffer);
+            let binaryStr = '';
+            const chunkSize = 8192;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                binaryStr += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+            }
+            selectedFileBuffer = binaryStr;
+
+            selectedFileName.textContent = `${filename} (ESP32-S3 N16R8 / CAM)`;
+            selectedFileSize.textContent = `${(bytes.length / 1024).toFixed(1)} KB (${(bytes.length / 1024 / 1024).toFixed(2)} MB)`;
+            dropzone.style.display = 'none';
+            selectedFileInfo.style.display = 'block';
+
+            document.getElementById('offsetPreset').value = defaultOffset;
+            handleOffsetChange(defaultOffset);
+
+            terminal.writeLine(`✅ Berhasil memuat preset ${filename} (${(bytes.length / 1024).toFixed(1)} KB) ke flasher.`);
+            progressStatusText.textContent = `Firmware ${filename} siap diflash ke offset ${defaultOffset}.`;
+            checkCanFlash();
+        } catch (e) {
+            terminal.writeLine(`❌ Gagal memuat preset: ${e}`);
+            alert(`Gagal memuat preset firmware: ${e}`);
+        }
+    };
 
     window.clearSelectedFile = () => {
         selectedFileBuffer = null;
