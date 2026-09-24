@@ -15,6 +15,29 @@
             grid-template-columns: 1fr;
         }
     }
+    @media (max-width: 768px) {
+        .flasher-grid {
+            gap: 16px;
+        }
+        .flasher-console {
+            height: 260px;
+            font-size: 11px;
+            padding: 10px;
+        }
+        .flasher-chip-info-grid {
+            grid-template-columns: 1fr;
+        }
+        .flasher-dropzone {
+            padding: 16px 12px;
+        }
+        .source-tab-btn {
+            padding: 8px 10px;
+            font-size: 11.5px;
+        }
+        .app-button {
+            min-height: 42px;
+        }
+    }
     .flasher-dropzone {
         border: 2px dashed var(--app-border-strong);
         border-radius: var(--app-radius);
@@ -172,6 +195,14 @@
             <p class="app-eyebrow">Hardware Flashing Tool</p>
             <h1 class="app-title">⚡ Web Serial Flasher ESP32</h1>
             <p class="app-subtitle">Flash firmware binary langsung ke peranti ESP32 via peramban Web Serial API tanpa perlu instalasi driver atau tools Python.</p>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                <span class="app-chip app-chip-success" style="font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                    <span>📱</span> Android OTG &amp; <span>💻</span> Desktop Ready
+                </span>
+                <span id="wakeLockBadge" class="app-chip app-chip-info" style="font-size:11px; font-weight:800; display:none; align-items:center; gap:4px;">
+                    <span>🛡️</span> Screen Keep-Awake Aktif
+                </span>
+            </div>
         </div>
         <div>
             <div id="connStatusBadge" class="app-status-pill is-offline">
@@ -192,7 +223,7 @@
                         <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
                             <span>🔌</span> 1. Koneksi Port Serial (COM)
                         </h2>
-                        <p class="app-section-subtitle">Hubungkan kabel data USB ESP32 ke komputer Anda.</p>
+                        <p class="app-section-subtitle">Sambungkan kabel USB ESP32 ke Komputer PC/Laptop atau HP Android (via kabel OTG).</p>
                     </div>
                     <span class="app-chip app-chip-info" style="font-size:11px;">Web Serial API</span>
                 </div>
@@ -216,7 +247,12 @@
 
                 <!-- Disconnected Notice -->
                 <div id="connNotice" style="margin-top:14px; padding:12px 14px; background:var(--app-surface-muted); border:1px dashed var(--app-border-strong); border-radius:var(--app-radius); font-size:12px; color:var(--app-muted); line-height:1.5;">
-                    💡 <strong>Tips Sambungan:</strong> Gunakan kabel data USB. Pilih port perangkat (misal: <em>USB Serial JTAG, CH343, atau CH340</em>). Jika gagal connect, tahan tombol <strong>BOOT (GPIO 0)</strong>, tekan <strong>RST</strong> 1x, lalu lepas BOOT.
+                    💡 <strong>Tips Sambungan (Desktop &amp; Mobile):</strong>
+                    <ul style="margin:4px 0 0; padding-left:18px; display:grid; gap:3px;">
+                        <li><strong>💻 PC / Laptop:</strong> Gunakan browser Chromium (Chrome, Edge, Opera, Brave).</li>
+                        <li><strong>📱 HP Android:</strong> Sambungkan ESP32 via kabel / adapter <strong>USB OTG</strong>. Saat muncul pop-up izin USB browser, pilih <em>Izinkan / OK</em>.</li>
+                        <li><strong>🔧 Mode Bootloader:</strong> Jika port tidak terdeteksi, tahan tombol <strong>BOOT (GPIO 0)</strong>, tekan <strong>RST</strong> 1x, lalu lepas tombol BOOT.</li>
+                    </ul>
                 </div>
 
                 <!-- Connected Hardware Details -->
@@ -411,7 +447,8 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 </div>
                 <ul style="padding-left:18px; margin:0; display:grid; gap:4px;">
                     <li>Gunakan <strong>Preset Resmi (ESP32-S3)</strong> dengan offset <strong>0x0</strong> untuk peranti yang masih baru.</li>
-                    <li>Gunakan peramban Chromium (Google Chrome, Microsoft Edge, Opera, Brave).</li>
+                    <li><strong>💻 Desktop:</strong> Gunakan peramban Chromium (Google Chrome, Microsoft Edge, Opera, Brave).</li>
+                    <li><strong>📱 Mobile:</strong> Flashing langsung via HP Android dengan kabel USB OTG (Screen Keep-Awake otomatis aktif).</li>
                     <li>Pastikan kabel USB mendukung transfer data (bukan sekadar kabel charging biasa).</li>
                     <li>Panduan lengkap pinout layar/audio dapat dibuka lewat tombol panduan di dalam panel Preset.</li>
                 </ul>
@@ -631,6 +668,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 <script type="module">
     import { ESPLoader, Transport } from '/static/js/esptool-bundle.js';
+    import { serial as polyfillSerial } from '/static/js/serial-polyfill.js';
 
     // Check if running inside Hugging Face Spaces iframe
     if (window.self !== window.top) {
@@ -653,6 +691,46 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         status: "{{ preset_status.status if preset_status else 'NONE' }}",
         message: "{{ preset_status.message if preset_status else '' }}"
     };
+
+    // Multi-platform Serial Resolver (Desktop & Android OTG WebUSB)
+    function getSerialApi() {
+        if (typeof navigator !== 'undefined') {
+            if ('serial' in navigator && navigator.serial) {
+                return { api: navigator.serial, mode: 'Native (Desktop/Android)' };
+            }
+            if (polyfillSerial) {
+                return { api: polyfillSerial, mode: 'WebUSB Polyfill (Mobile OTG)' };
+            }
+        }
+        return null;
+    }
+
+    // Screen Wake Lock API for Mobile (mencegah layar HP mati/sleep di tengah flashing)
+    let wakeLock = null;
+    async function requestScreenWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                const b = document.getElementById('wakeLockBadge');
+                if (b) b.style.display = 'inline-flex';
+                logToConsole('[INFO] Screen Wake Lock aktif: Layar HP/laptop dijaga tetap menyala selama proses transfer.');
+            } catch (e) {
+                console.warn('Wake Lock request:', e);
+            }
+        }
+    }
+
+    function releaseScreenWakeLock() {
+        if (wakeLock) {
+            try {
+                wakeLock.release();
+            } catch (e) {}
+            wakeLock = null;
+            const b = document.getElementById('wakeLockBadge');
+            if (b) b.style.display = 'none';
+            logToConsole('[INFO] Screen Wake Lock dinonaktifkan.');
+        }
+    }
 
     let port = null;
     let transport = null;
@@ -1156,16 +1234,21 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         });
     }
 
-    // Connect Web Serial Port
+    // Connect Web Serial Port (Desktop & Mobile)
     btnConnect.addEventListener('click', async () => {
-        if (!('serial' in navigator)) {
-            alert('Web Serial API tidak didukung di browser ini. Harap gunakan Google Chrome, MS Edge, atau Opera versi terbaru di PC/Laptop.');
+        const serialObj = getSerialApi();
+        if (!serialObj || !serialObj.api) {
+            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                alert('Perangkat iOS (iPhone / iPad) tidak mengizinkan akses hardware USB Serial di peramban web karena kebijakan sistem Apple.\n\nSilakan gunakan HP Android (Google Chrome dengan kabel USB OTG) atau Laptop/PC (Chrome/Edge).');
+            } else {
+                alert('Browser ini tidak mendukung Web Serial atau WebUSB.\n\nHarap gunakan:\n- HP Android: Google Chrome (dengan kabel USB OTG)\n- PC / Laptop: Google Chrome, MS Edge, Opera, atau Brave.');
+            }
             return;
         }
 
         try {
-            logToConsole('[INFO] Membuka dialog pemilih port serial...');
-            port = await navigator.serial.requestPort({});
+            logToConsole(`[INFO] Membuka dialog pemilih port serial (${serialObj.mode})...`);
+            port = await serialObj.api.requestPort({});
             logToConsole('[INFO] Port dipilih oleh pengguna. Menginisialisasi transport...');
 
             const terminal = {
@@ -1273,6 +1356,12 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         progressPercent.textContent = '0%';
         progressStatusText.textContent = 'Memulai proses flashing...';
 
+        // Aktifkan WakeLock agar HP tidak sleep
+        await requestScreenWakeLock();
+        if (window.innerWidth <= 768) {
+            progressBar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
         logToConsole('============================================================');
         logToConsole(`[FLASH] Memulai Flashing Firmware...`);
         logToConsole(`[FLASH] Alamat Offset : 0x${offset.toString(16).toUpperCase()}`);
@@ -1370,6 +1459,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             }
             alert(`Terjadi kesalahan saat flashing:\n\n${userMsg}`);
         } finally {
+            releaseScreenWakeLock();
             isFlashing = false;
             btnConnect.disabled = false;
             btnDisconnect.disabled = false;
