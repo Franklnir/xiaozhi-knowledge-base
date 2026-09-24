@@ -1293,12 +1293,6 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         await new Promise(resolve => setTimeout(resolve, 80));
 
         try {
-            try {
-                if (esploader && typeof esploader.flushInput === 'function') {
-                    await esploader.flushInput();
-                }
-            } catch (e) {}
-
             if (eraseAll) {
                 progressStatusText.textContent = 'Menghapus seluruh chip flash (Erase All)... Harap tunggu...';
                 logToConsole('[FLASH] Menghapus flash chip...');
@@ -1314,6 +1308,8 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             const flashOptions = {
                 fileArray: fileArray,
                 flashSize: 'keep',
+                flashMode: 'keep',
+                flashFreq: 'keep',
                 eraseAll: false,
                 compress: true,
                 reportProgress: (fileIndex, written, total) => {
@@ -1322,11 +1318,11 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                     progressPercent.textContent = `${percent}%`;
                     const writtenKB = (written / 1024).toFixed(0);
                     const totalKB = (total / 1024).toFixed(0);
-                    progressStatusText.textContent = `Menulis flash ke ESP32: ${percent}% (${writtenKB} KB / ${totalKB} KB)`;
+                    progressStatusText.textContent = `Menulis flash: ${percent}% (${writtenKB} KB / ${totalKB} KB)`;
                 }
-                // Hapus calculateMD5Hash dengan CryptoJS pada string 9.6MB agar browser tidak freeze/hang 20 detik
             };
 
+            logToConsole('[INFO] Mengirim data binary ke bootloader ESP32...');
             await esploader.writeFlash(flashOptions);
 
             progressBar.style.width = '100%';
