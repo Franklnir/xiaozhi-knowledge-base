@@ -1,0 +1,540 @@
+{% extends "base.html" %}
+
+{% block title %}Web Flasher ESP32 - Xiaozhi Indonesia{% endblock %}
+
+{% block content %}
+<style>
+    .flasher-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        gap: 22px;
+        align-items: start;
+    }
+    @media (max-width: 992px) {
+        .flasher-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .flasher-dropzone {
+        border: 2px dashed var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 28px 18px;
+        text-align: center;
+        background: var(--app-surface-muted);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .flasher-dropzone:hover, .flasher-dropzone.dragover {
+        border-color: var(--app-accent, #059669);
+        background: rgba(5, 150, 105, 0.06);
+    }
+    .flasher-console {
+        background: #090d16;
+        color: #38bdf8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        padding: 14px;
+        border-radius: var(--app-radius);
+        border: 1.5px solid var(--app-border-strong);
+        height: 380px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+    :root[data-theme="neo"] .flasher-console {
+        border: 2px solid #111;
+        box-shadow: 4px 4px 0 #111;
+    }
+    .flasher-progress-wrap {
+        background: var(--app-surface-muted);
+        border: 1.5px solid var(--app-border-strong);
+        border-radius: 999px;
+        height: 20px;
+        overflow: hidden;
+        margin: 12px 0 6px 0;
+        position: relative;
+    }
+    :root[data-theme="neo"] .flasher-progress-wrap {
+        border: 2px solid #111;
+    }
+    .flasher-progress-bar {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #059669, #10b981);
+        border-radius: 999px;
+        transition: width 0.2s ease;
+    }
+    .flasher-chip-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        background: var(--app-surface-muted);
+        border: 1.5px solid var(--app-border);
+        border-radius: var(--app-radius);
+        padding: 12px;
+        margin-top: 14px;
+        font-size: 12px;
+    }
+    :root[data-theme="neo"] .flasher-chip-info-grid {
+        border: 1.5px solid #111;
+    }
+    .chip-info-item span:first-child {
+        color: var(--app-muted);
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .chip-info-item span:last-child {
+        font-weight: 800;
+        color: var(--app-text);
+    }
+</style>
+
+<div class="app-page">
+    <header class="app-page-header">
+        <div>
+            <p class="app-eyebrow">Hardware Flashing Tool</p>
+            <h1 class="app-title">⚡ Web Serial Flasher ESP32</h1>
+            <p class="app-subtitle">Flash file binary firmware custom (<code>.bin</code>) langsung ke berbagai board ESP32 via Web Serial API tanpa perlu instalasi Python atau driver eksternal.</p>
+        </div>
+        <div id="connStatusBadge" class="app-status-pill is-offline">
+            <span class="app-status-dot"></span>
+            <span id="connStatusText">Port Belum Terhubung</span>
+        </div>
+    </header>
+
+    <div class="flasher-grid">
+        <!-- LEFT COLUMN: CONTROLS & SETTINGS -->
+        <div style="display: grid; gap: 20px;">
+            <!-- Step 1: Connect Serial Port -->
+            <div class="app-card">
+                <div class="app-card-header">
+                    <div>
+                        <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                            <span>🔌</span> 1. Koneksi Port Serial (COM)
+                        </h2>
+                        <p class="app-section-subtitle">Hubungkan kabel USB board ESP32 ke komputer Anda.</p>
+                    </div>
+                    <span class="app-chip app-chip-info" style="font-size:11px;">Web Serial API</span>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                    <button type="button" id="btnConnect" class="app-button app-button-primary" style="flex:1; justify-content:center;">
+                        <span>🔌</span> Pilih &amp; Hubungkan Port COM
+                    </button>
+                    <button type="button" id="btnDisconnect" class="app-button app-button-danger" style="display:none; justify-content:center;">
+                        <span>❌</span> Putuskan
+                    </button>
+                    <div style="min-width:140px;">
+                        <select id="baudrateSelect" class="app-input" style="padding:7px 10px; font-size:12px; font-weight:700;">
+                            <option value="460800" selected>460,800 bps (Cepat)</option>
+                            <option value="921600">921,600 bps (Ultra Cepat)</option>
+                            <option value="115200">115,200 bps (Standar/Aman)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Disconnected Notice -->
+                <div id="connNotice" style="margin-top:14px; padding:12px 14px; background:var(--app-surface-muted); border:1px dashed var(--app-border-strong); border-radius:var(--app-radius); font-size:12px; color:var(--app-muted); line-height:1.5;">
+                    💡 <strong>Petunjuk:</strong> Sambungkan board ESP32 via kabel data USB. Klik tombol di atas lalu pilih port COM peranti Anda (misal: <em>CH343, CH340, CP2102, atau USB Serial JTAG</em>).
+                </div>
+
+                <!-- Connected Hardware Details -->
+                <div id="chipInfoBox" class="flasher-chip-info-grid" style="display:none;">
+                    <div class="chip-info-item">
+                        <span>Model Chip ESP32:</span>
+                        <span id="chipModel" style="color:var(--app-accent, #059669); font-weight:800;">-</span>
+                    </div>
+                    <div class="chip-info-item">
+                        <span>MAC Address:</span>
+                        <span id="chipMac" style="font-family:monospace;">-</span>
+                    </div>
+                    <div class="chip-info-item">
+                        <span>Fitur Hardware:</span>
+                        <span id="chipFeatures">-</span>
+                    </div>
+                    <div class="chip-info-item">
+                        <span>Frekuensi Kristal:</span>
+                        <span id="chipCrystal">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Upload Custom Firmware File (.bin) -->
+            <div class="app-card">
+                <div class="app-card-header">
+                    <div>
+                        <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                            <span>📦</span> 2. Pilih File Firmware (.bin)
+                        </h2>
+                        <p class="app-section-subtitle">Pilih atau seret file binary firmware hasil build.</p>
+                    </div>
+                    <span class="app-chip app-chip-neutral" style="font-size:11px;">Opsi B: Custom .bin</span>
+                </div>
+
+                <div class="flasher-dropzone" id="dropzone" onclick="document.getElementById('firmwareFileInput').click()">
+                    <input type="file" id="firmwareFileInput" accept=".bin" style="display:none;">
+                    <div style="font-size:32px; margin-bottom:8px;">📁</div>
+                    <div style="font-size:14px; font-weight:750; color:var(--app-text);" id="filePromptText">
+                        Klik untuk memilih file firmware (.bin) atau seret ke sini
+                    </div>
+                    <p style="font-size:12px; color:var(--app-muted); margin-top:4px;" id="fileSubText">
+                        Mendukung binary firmware untuk ESP32, ESP32-S3, ESP32-C3, dll.
+                    </p>
+                </div>
+
+                <!-- File Info Card -->
+                <div id="selectedFileInfo" style="display:none; margin-top:12px; padding:12px 14px; background:rgba(5,150,105,0.08); border:1.5px solid var(--app-accent, #059669); border-radius:var(--app-radius);">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong id="selectedFileName" style="font-size:13.5px; color:var(--app-text);">-</strong>
+                            <span id="selectedFileSize" style="display:block; font-size:12px; color:var(--app-muted); margin-top:2px;">-</span>
+                        </div>
+                        <button type="button" class="app-button app-button-small app-button-danger" onclick="clearSelectedFile()">Ganti File</button>
+                    </div>
+                </div>
+
+                <!-- Flash Offset & Options -->
+                <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                    <div>
+                        <label style="display:block; font-size:12px; font-weight:700; color:var(--app-text); margin-bottom:4px;">
+                            Alamat Offset Flash:
+                        </label>
+                        <select id="offsetPreset" class="app-input" onchange="handleOffsetChange(this.value)">
+                            <option value="0x20000" selected>0x20000 (Standar App XiaoZhi / IDF)</option>
+                            <option value="0x0">0x0 (Full Factory Binary Merged)</option>
+                            <option value="0x10000">0x10000 (Standar Arduino App)</option>
+                            <option value="custom">Offset Kustom...</option>
+                        </select>
+                        <input type="text" id="offsetInput" class="app-input" value="0x20000" style="display:none; margin-top:6px;" placeholder="Contoh: 0x20000">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:12px; font-weight:700; color:var(--app-text); margin-bottom:4px;">
+                            Opsi Flashing:
+                        </label>
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer; margin-top:6px;">
+                            <input type="checkbox" id="chkAutoReset" checked style="accent-color:var(--app-accent, #059669);">
+                            <span>Reset chip otomatis setelah selesai</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer; margin-top:6px;">
+                            <input type="checkbox" id="chkEraseAll" style="accent-color:var(--app-accent, #059669);">
+                            <span>Hapus seluruh flash (Erase All)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Flash Action Button -->
+            <div class="app-card" style="padding:16px;">
+                <button type="button" id="btnFlash" class="app-button app-button-success" style="width:100%; padding:14px; font-size:15px; font-weight:850; justify-content:center; letter-spacing:0.3px;" disabled>
+                    <span>🚀</span> Mulai Flash ke ESP32
+                </button>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: PROGRESS & TERMINAL CONSOLE -->
+        <div style="display: grid; gap: 20px;">
+            <!-- Progress Card -->
+            <div class="app-card">
+                <div class="app-card-header">
+                    <div>
+                        <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                            <span>📊</span> Status &amp; Progress
+                        </h2>
+                        <p id="progressStatusText" class="app-section-subtitle">Menunggu koneksi port serial dan pemilihan file...</p>
+                    </div>
+                    <span id="progressPercent" style="font-size:18px; font-weight:900; color:var(--app-accent, #059669);">0%</span>
+                </div>
+                <div class="flasher-progress-wrap">
+                    <div id="progressBar" class="flasher-progress-bar"></div>
+                </div>
+            </div>
+
+            <!-- Console Log -->
+            <div class="app-card">
+                <div class="app-card-header">
+                    <div>
+                        <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                            <span>📟</span> Serial Terminal Log
+                        </h2>
+                        <p class="app-section-subtitle">Log output komunikasi bootloader ESP32 secara realtime.</p>
+                    </div>
+                    <button type="button" class="app-button app-button-ghost app-button-small" onclick="clearConsole()" style="font-size:11px;">
+                        🗑️ Bersihkan
+                    </button>
+                </div>
+                <div class="flasher-console" id="consoleLog">Xiaozhi ESP32 Web Flasher siap.
+Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
+</div>
+            </div>
+
+            <!-- Tips & Troubleshooting -->
+            <div class="app-card" style="font-size:12.5px; color:var(--app-muted); line-height:1.6;">
+                <div style="font-weight:800; color:var(--app-text); margin-bottom:8px; font-size:13px; display:flex; align-items:center; gap:6px;">
+                    <span>💡</span> Tips &amp; Bantuan Flashing:
+                </div>
+                <ul style="padding-left:18px; margin:0; display:grid; gap:4px;">
+                    <li>Gunakan browser Chromium modern (Google Chrome, Microsoft Edge, Opera, atau Brave).</li>
+                    <li>Pastikan kabel USB adalah kabel data (bukan sekadar kabel charging/power only).</li>
+                    <li>Jika koneksi timeout atau port tidak merespons, tahan tombol <strong>BOOT (GPIO 0)</strong>, tekan tombol <strong>RST / EN</strong> 1 kali, lalu lepas tombol BOOT sebelum mengklik Hubungkan.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script type="module">
+    import { ESPLoader, Transport } from '/static/js/esptool-bundle.js';
+
+    let port = null;
+    let transport = null;
+    let esploader = null;
+    let selectedFileBuffer = null;
+    let isFlashing = false;
+
+    const consoleLog = document.getElementById('consoleLog');
+    const btnConnect = document.getElementById('btnConnect');
+    const btnDisconnect = document.getElementById('btnDisconnect');
+    const btnFlash = document.getElementById('btnFlash');
+    const connStatusBadge = document.getElementById('connStatusBadge');
+    const connStatusText = document.getElementById('connStatusText');
+    const chipInfoBox = document.getElementById('chipInfoBox');
+    const connNotice = document.getElementById('connNotice');
+
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressStatusText = document.getElementById('progressStatusText');
+
+    const terminal = {
+        clean() {
+            consoleLog.textContent = '';
+        },
+        writeLine(data) {
+            consoleLog.textContent += data + '
+';
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+        },
+        write(data) {
+            consoleLog.textContent += data;
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+        }
+    };
+
+    window.clearConsole = () => terminal.clean();
+
+    // Connect handler
+    btnConnect.addEventListener('click', async () => {
+        if (!navigator.serial) {
+            alert('Browser Anda tidak mendukung Web Serial API. Silakan gunakan Google Chrome, Microsoft Edge, Opera, atau Brave.');
+            return;
+        }
+        try {
+            port = await navigator.serial.requestPort();
+            terminal.writeLine('Menginisialisasi koneksi serial...');
+            transport = new Transport(port, true);
+            const baudrate = parseInt(document.getElementById('baudrateSelect').value || "460800");
+
+            esploader = new ESPLoader({
+                transport: transport,
+                baudrate: baudrate,
+                terminal: terminal
+            });
+
+            terminal.writeLine('Menghubungkan ke bootloader ESP32...');
+            const chipDesc = await esploader.main();
+            const mac = await esploader.chip.readMac(esploader);
+            const features = await esploader.chip.getChipFeatures(esploader);
+            const crystal = await esploader.chip.getCrystalFreq(esploader);
+
+            // Update UI
+            document.getElementById('chipModel').textContent = chipDesc;
+            document.getElementById('chipMac').textContent = mac;
+            document.getElementById('chipFeatures').textContent = features;
+            document.getElementById('chipCrystal').textContent = crystal + ' MHz';
+
+            chipInfoBox.style.display = 'grid';
+            connNotice.style.display = 'none';
+            btnConnect.style.display = 'none';
+            btnDisconnect.style.display = 'inline-flex';
+
+            connStatusBadge.className = 'app-status-pill is-online';
+            connStatusText.textContent = chipDesc.split(' ')[0] + ' Terhubung';
+
+            progressStatusText.textContent = 'ESP32 terdeteksi siap! Pilih file firmware lalu klik Mulai Flash.';
+            terminal.writeLine('✅ ESP32 berhasil terdeteksi dan siap diflash!');
+
+            checkCanFlash();
+        } catch (err) {
+            terminal.writeLine('❌ Gagal menghubungkan: ' + err);
+            disconnect();
+        }
+    });
+
+    // Disconnect handler
+    async function disconnect() {
+        if (transport) {
+            try { await transport.disconnect(); } catch (e) {}
+            transport = null;
+        }
+        port = null;
+        esploader = null;
+
+        chipInfoBox.style.display = 'none';
+        connNotice.style.display = 'block';
+        btnConnect.style.display = 'inline-flex';
+        btnDisconnect.style.display = 'none';
+
+        connStatusBadge.className = 'app-status-pill is-offline';
+        connStatusText.textContent = 'Port Belum Terhubung';
+        checkCanFlash();
+    }
+    btnDisconnect.addEventListener('click', disconnect);
+
+    // File selection
+    const fileInput = document.getElementById('firmwareFileInput');
+    const dropzone = document.getElementById('dropzone');
+    const selectedFileInfo = document.getElementById('selectedFileInfo');
+    const selectedFileName = document.getElementById('selectedFileName');
+    const selectedFileSize = document.getElementById('selectedFileSize');
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleFile(e.target.files[0]);
+        }
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+    });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    function handleFile(file) {
+        if (!file.name.toLowerCase().endsWith('.bin')) {
+            alert('File harus berformat .bin!');
+            return;
+        }
+        selectedFileName.textContent = file.name;
+        selectedFileSize.textContent = (file.size / 1024).toFixed(1) + ' KB (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            selectedFileBuffer = reader.result;
+            dropzone.style.display = 'none';
+            selectedFileInfo.style.display = 'block';
+            terminal.writeLine('File dimuat: ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)');
+            checkCanFlash();
+        };
+        reader.readAsBinaryString(file);
+    }
+
+    window.clearSelectedFile = () => {
+        selectedFileBuffer = null;
+        fileInput.value = '';
+        dropzone.style.display = 'block';
+        selectedFileInfo.style.display = 'none';
+        checkCanFlash();
+    };
+
+    window.handleOffsetChange = (val) => {
+        const input = document.getElementById('offsetInput');
+        if (val === 'custom') {
+            input.style.display = 'block';
+        } else {
+            input.style.display = 'none';
+            input.value = val;
+        }
+    };
+
+    function checkCanFlash() {
+        btnFlash.disabled = !(esploader && selectedFileBuffer && !isFlashing);
+    }
+
+    // Flashing Action
+    btnFlash.addEventListener('click', async () => {
+        if (!esploader || !selectedFileBuffer || isFlashing) return;
+
+        isFlashing = true;
+        btnFlash.disabled = true;
+        btnConnect.disabled = true;
+        btnDisconnect.disabled = true;
+
+        const offsetStr = document.getElementById('offsetInput').value.trim();
+        const offset = parseInt(offsetStr, 16);
+        if (isNaN(offset)) {
+            alert('Format offset salah! Gunakan format heksadesimal, misal: 0x20000');
+            isFlashing = false;
+            checkCanFlash();
+            return;
+        }
+
+        const eraseAll = document.getElementById('chkEraseAll').checked;
+        const autoReset = document.getElementById('chkAutoReset').checked;
+
+        terminal.writeLine('
+========================================');
+        terminal.writeLine('Memulai proses flashing...');
+        terminal.writeLine('Offset: ' + offsetStr + ' (' + offset + ')');
+        terminal.writeLine('Ukuran file: ' + selectedFileBuffer.length + ' bytes');
+        terminal.writeLine('========================================');
+
+        progressStatusText.textContent = 'Menulis firmware ke flash memory...';
+        progressBar.style.width = '0%';
+        progressPercent.textContent = '0%';
+
+        try {
+            const fileArray = [{
+                data: selectedFileBuffer,
+                address: offset
+            }];
+
+            await esploader.writeFlash({
+                fileArray: fileArray,
+                flashSize: 'keep',
+                eraseAll: eraseAll,
+                compress: true,
+                reportProgress: (fileIndex, written, total) => {
+                    const percent = Math.min(100, Math.round((written / total) * 100));
+                    progressBar.style.width = percent + '%';
+                    progressPercent.textContent = percent + '%';
+                    progressStatusText.textContent = 'Menulis firmware ke flash memory (' + percent + '%)...';
+                },
+                calculateMD5Hash: (image) => CryptoJS.MD5(CryptoJS.enc.Latin1.parse(image)).toString()
+            });
+
+            progressBar.style.width = '100%';
+            progressPercent.textContent = '100%';
+            progressStatusText.textContent = '✅ Flashing Berhasil 100%!';
+            terminal.writeLine('
+🎉 Flashing berhasil diselesaikan!');
+
+            if (autoReset) {
+                terminal.writeLine('Me-reset board ESP32...');
+                try {
+                    await esploader.hardReset();
+                    terminal.writeLine('Board ESP32 telah di-restart.');
+                } catch (re) {
+                    terminal.writeLine('Reset manual: tekan tombol RST pada ESP32.');
+                }
+            }
+        } catch (err) {
+            terminal.writeLine('❌ Terjadi kesalahan saat flashing: ' + err);
+            progressStatusText.textContent = '❌ Flashing gagal: ' + err;
+        } finally {
+            isFlashing = false;
+            btnConnect.disabled = false;
+            btnDisconnect.disabled = false;
+            checkCanFlash();
+        }
+    });
+</script>
+{% endblock %}

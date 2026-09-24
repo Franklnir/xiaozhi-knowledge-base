@@ -311,6 +311,20 @@ async def clear_chat_history(request: Request, csrf_token: str = Form(...)):
     return redirect_with_message("/riwayat-chat", f"{removed} riwayat chat dihapus.")
 
 
+@router.get("/web-flasher", response_class=HTMLResponse)
+async def web_flasher_page(request: Request):
+    user = get_current_user(request)
+    return render(
+        request,
+        "web_flasher.html",
+        {
+            "user": user,
+            "page": "web_flasher",
+            "active_page": "web_flasher",
+        },
+    )
+
+
 @router.get("/dokumentasi", response_class=HTMLResponse)
 async def documentation_page(request: Request):
     user = get_current_user(request)
