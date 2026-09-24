@@ -545,7 +545,7 @@
 
             <div style="display:flex; align-items:center; gap:16px; font-size:13px; color:var(--app-muted); margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--app-border); flex-wrap:wrap;">
                 <div>Penjual: <strong style="color:var(--app-text)">{{ product.seller_username }}</strong></div>
-                {% if product.sales_count and product.sales_count > 0 %}
+                {% if user and user.role == "admin" and product.sales_count and product.sales_count > 0 %}
                 <div>•</div>
                 <div>Terjual: <strong>{{ product.sales_count }}x</strong></div>
                 {% endif %}

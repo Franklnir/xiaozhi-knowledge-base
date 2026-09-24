@@ -1,3 +1,11 @@
+from xiaozhi.services.preset_approval_service import (
+    list_all_requests as list_preset_requests,
+    list_granted_users as list_preset_granted_users,
+    approve_request as approve_preset_request,
+    reject_request as reject_preset_request,
+    grant_access_direct as grant_preset_direct,
+    revoke_access as revoke_preset_access,
+)
 import logging
 from fastapi import APIRouter, Request, Form, Query, HTTPException, status
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -40,11 +48,51 @@ async def admin_approvals_page(request: Request):
     user = require_admin(request)
     service = get_approval_service()
     approvals = service.get_pending_approvals()
+    preset_requests = list_preset_requests()
+    preset_granted = list_preset_granted_users()
     return render(request, "admin/firmware_approvals.html", {
         "user": user,
         "page": "admin_firmware_approvals",
         "approvals": approvals,
+        "preset_requests": preset_requests,
+        "preset_granted": preset_granted,
     })
+
+
+@router.post("/preset-approvals/{request_id}/approve")
+async def admin_approve_preset_action(request: Request, request_id: str):
+    user = require_admin(request)
+    success = approve_preset_request(request_id, user)
+    if success:
+        return redirect_with_message("/admin/firmware/approvals", "Izin preset berhasil disetujui. Akses pengguna aktif.")
+    return redirect_with_message("/admin/firmware/approvals", "Permintaan izin preset tidak ditemukan.")
+
+
+@router.post("/preset-approvals/{request_id}/reject")
+async def admin_reject_preset_action(request: Request, request_id: str, reason: str = Form("Ditolak oleh admin")):
+    user = require_admin(request)
+    success = reject_preset_request(request_id, user, reason)
+    if success:
+        return redirect_with_message("/admin/firmware/approvals", "Permintaan izin preset berhasil ditolak.")
+    return redirect_with_message("/admin/firmware/approvals", "Permintaan izin preset tidak ditemukan.")
+
+
+@router.post("/preset-approvals/grant")
+async def admin_grant_preset_action(request: Request, username: str = Form(...), preset_id: str = Form("esp32s3_cam")):
+    user = require_admin(request)
+    success = grant_preset_direct(username, user, preset_id)
+    if success:
+        return redirect_with_message("/admin/firmware/approvals", f"Akses preset berhasil diberikan langsung ke '{username}'.")
+    return redirect_with_message("/admin/firmware/approvals", "Username tidak valid.")
+
+
+@router.post("/preset-approvals/revoke")
+async def admin_revoke_preset_action(request: Request, username: str = Form(...), preset_id: str = Form("esp32s3_cam")):
+    user = require_admin(request)
+    success = revoke_preset_access(username, user, preset_id)
+    if success:
+        return redirect_with_message("/admin/firmware/approvals", f"Akses preset '{username}' berhasil dicabut.")
+    return redirect_with_message("/admin/firmware/approvals", "Pengguna tidak ditemukan.")
 
 
 @router.post("/approvals/{approval_id}/approve")

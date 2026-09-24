@@ -1,3 +1,11 @@
+from fastapi import Response
+from xiaozhi.services.preset_approval_service import (
+    get_user_status,
+    is_user_authorized,
+    request_access as request_preset_access,
+    get_decrypted_preset_binary,
+    PRESETS,
+)
 import asyncio
 import json
 import logging
@@ -314,6 +322,7 @@ async def clear_chat_history(request: Request, csrf_token: str = Form(...)):
 @router.get("/web-flasher", response_class=HTMLResponse)
 async def web_flasher_page(request: Request):
     user = get_current_user(request)
+    preset_status = get_user_status(user, "esp32s3_cam")
     return render(
         request,
         "web_flasher.html",
@@ -321,8 +330,56 @@ async def web_flasher_page(request: Request):
             "user": user,
             "page": "web_flasher",
             "active_page": "web_flasher",
+            "preset_status": preset_status,
         },
     )
+
+
+@router.get("/api/v1/flasher/preset/{preset_id}/status")
+async def get_preset_status_api(request: Request, preset_id: str):
+    user = get_current_user(request)
+    return get_user_status(user, preset_id)
+
+
+@router.post("/api/v1/flasher/preset/{preset_id}/request")
+async def request_preset_access_api(request: Request, preset_id: str):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Silakan masuk terlebih dahulu.")
+    try:
+        body = await request.json()
+        note = body.get("note", "")
+    except Exception:
+        note = ""
+    res = request_preset_access(user, preset_id, note)
+    return res
+
+
+@router.get("/api/v1/flasher/preset/{preset_id}/stream")
+async def stream_preset_binary_api(request: Request, preset_id: str):
+    user = get_current_user(request)
+    if not is_user_authorized(user, preset_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Akses ditolak. Lisensi preset ini memerlukan persetujuan Admin.",
+        )
+    try:
+        preset_info = PRESETS.get(preset_id)
+        if not preset_info:
+            raise HTTPException(status_code=404, detail="Preset tidak ditemukan.")
+        raw_bytes = get_decrypted_preset_binary(preset_id)
+        return Response(
+            content=raw_bytes,
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'inline; filename="{preset_info["filename"]}"',
+                "Content-Length": str(len(raw_bytes)),
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "X-Firmware-Offset": preset_info.get("offset", "0x0"),
+            },
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal memuat binary preset: {str(exc)}")
 
 
 @router.get("/dokumentasi", response_class=HTMLResponse)

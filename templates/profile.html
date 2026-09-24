@@ -1429,7 +1429,7 @@
                             {{ p.title }}
                         </h3>
                         <div style="font-size:13px; color:var(--app-muted); margin-bottom:8px;">
-                            Harga: <strong style="color:var(--app-text);">Rp {{ "{:,}".format(p.price_amount) }}</strong>{% if p.sales_count and p.sales_count > 0 %} • Terjual: <strong>{{ p.sales_count }}x</strong>{% endif %}
+                            Harga: <strong style="color:var(--app-text);">Rp {{ "{:,}".format(p.price_amount) }}</strong>{% if user and user.role == "admin" and p.sales_count and p.sales_count > 0 %} • Terjual: <strong>{{ p.sales_count }}x</strong>{% endif %}
                         </div>
 
                         {% if p.status == 'REJECTED' and p.reject_reason %}
