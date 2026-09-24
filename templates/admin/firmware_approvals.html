@@ -3,19 +3,154 @@
 {% block content %}
 <div style="margin-bottom:24px;">
     <h1 style="font-size:24px; font-weight:900; margin:0 0 6px; color:var(--app-text);">
-        Approval Produk Firmware
+        Approval & Lisensi Firmware
     </h1>
     <p style="font-size:13.5px; color:var(--app-muted); margin:0;">
-        Tinjau pengajuan produk firmware dari pengguna sebelum dipublikasikan ke marketplace.
+        Kelola persetujuan produk marketplace dan perizinan akses Preset Web Flasher resmi (ESP32-S3 N16R8/CAM).
+    </p>
+</div>
+
+<!-- ======================================================== -->
+<!-- SECTION 1: PERMOHONAN AKSES PRESET FLASHER RESMI        -->
+<!-- ======================================================== -->
+<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:30px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:18px;">
+        <div>
+            <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                <span>🎯</span> Izin Akses Preset Flasher: ESP32-S3 N16R8 / CAM
+            </h2>
+            <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
+                Kelola pengguna yang berhak memuat & flashing binary Full Factory Merged (~9.65 MB, Offset 0x0).
+            </p>
+        </div>
+
+        <!-- Form Beri Akses Langsung -->
+        <form method="POST" action="/admin/firmware/preset-approvals/grant" style="display:flex; gap:8px; align-items:center;">
+            <input type="text" name="username" placeholder="Ketik Username..." required class="app-input" style="padding:6px 12px; font-size:12.5px; min-width:170px;">
+            <button type="submit" class="app-button app-button-primary app-button-small" style="font-weight:800; white-space:nowrap;">
+                ➕ Beri Akses Langsung
+            </button>
+        </form>
+    </div>
+
+    <!-- Tabel Permohonan User -->
+    <h3 style="font-size:14px; font-weight:800; margin:0 0 10px; color:var(--app-text);">
+        Antrean Permohonan Izin dari Pengguna:
+    </h3>
+    {% if not preset_requests %}
+    <div style="padding:20px; background:var(--app-surface-muted); border-radius:var(--app-radius); text-align:center; color:var(--app-muted); font-size:13px; margin-bottom:20px;">
+        Belum ada permohonan izin preset dari pengguna.
+    </div>
+    {% else %}
+    <div class="app-table-wrap" style="margin-bottom:20px;">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th>Waktu</th>
+                    <th>Pengguna</th>
+                    <th>Catatan / Pesan User</th>
+                    <th>Status</th>
+                    <th>Aksi Admin</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in preset_requests %}
+                <tr>
+                    <td style="color:var(--app-muted); font-size:12px; white-space:nowrap;">
+                        {{ req.requested_at[:16].replace('T', ' ') if req.requested_at else '-' }}
+                    </td>
+                    <td>
+                        <strong style="color:var(--app-text); font-size:13.5px;">{{ req.username }}</strong>
+                        <span style="font-size:11px; color:var(--app-muted); display:block;">ID: {{ req.user_id }}</span>
+                    </td>
+                    <td style="font-size:12.5px; color:var(--app-muted); max-width:250px;">
+                        {{ req.note if req.note else '<span style="font-style:italic;">Tidak ada catatan</span>'|safe }}
+                    </td>
+                    <td>
+                        {% if req.status == 'APPROVED' %}
+                        <span class="app-chip app-chip-success" style="font-size:11px; font-weight:800;">APPROVED</span>
+                        {% elif req.status == 'PENDING' %}
+                        <span class="app-chip app-chip-warning" style="font-size:11px; font-weight:800;">PENDING</span>
+                        {% elif req.status == 'REJECTED' %}
+                        <span class="app-chip app-chip-danger" style="font-size:11px; font-weight:800;">DITOLAK</span>
+                        {% else %}
+                        <span class="app-chip app-chip-neutral" style="font-size:11px;">{{ req.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="vertical-align:middle; white-space:nowrap;">
+                        {% if req.status == 'PENDING' %}
+                        <div style="display:flex; gap:6px;">
+                            <form method="POST" action="/admin/firmware/preset-approvals/{{ req.id }}/approve">
+                                <button type="submit" class="app-button app-button-primary app-button-small" style="font-weight:800;" onclick="return confirm('Setujui izin akses preset untuk {{ req.username }}?')">
+                                    ✅ Setujui
+                                </button>
+                            </form>
+                            <form method="POST" action="/admin/firmware/preset-approvals/{{ req.id }}/reject">
+                                <button type="submit" class="app-button app-button-danger app-button-small" style="font-weight:800;" onclick="return confirm('Tolak permohonan {{ req.username }}?')">
+                                    ❌ Tolak
+                                </button>
+                            </form>
+                        </div>
+                        {% elif req.status == 'APPROVED' %}
+                        <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="display:inline;">
+                            <input type="hidden" name="username" value="{{ req.username }}">
+                            <button type="submit" class="app-button app-button-ghost app-button-small" style="color:#dc2626; font-size:11px;" onclick="return confirm('Cabut akses preset untuk {{ req.username }}?')">
+                                Cabut Akses
+                            </button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="/admin/firmware/preset-approvals/grant" style="display:inline;">
+                            <input type="hidden" name="username" value="{{ req.username }}">
+                            <button type="submit" class="app-button app-button-ghost app-button-small" style="font-size:11px;">
+                                Beri Ulang Akses
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Daftar Pengguna Berlisensi Aktif -->
+    {% if preset_granted %}
+    <h3 style="font-size:13.5px; font-weight:800; margin:16px 0 10px; color:var(--app-text);">
+        Pengguna dengan Lisensi Preset Aktif ({{ preset_granted|length }} user):
+    </h3>
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        {% for uname, g in preset_granted.items() %}
+        <div style="display:inline-flex; align-items:center; gap:8px; padding:5px 10px; background:var(--app-surface-muted); border:1px solid var(--app-border-strong); border-radius:var(--app-radius); font-size:12px;">
+            <span style="font-weight:750; color:var(--app-text);">👤 {{ uname }}</span>
+            <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
+                <input type="hidden" name="username" value="{{ uname }}">
+                <button type="submit" title="Cabut Akses" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; padding:0 2px;" onclick="return confirm('Cabut akses {{ uname }}?')">&times;</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- ======================================================== -->
+<!-- SECTION 2: APPROVAL PRODUK MARKETPLACE DARI USER         -->
+<!-- ======================================================== -->
+<div style="margin-bottom:16px;">
+    <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text);">
+        📦 Approval Produk Firmware Marketplace
+    </h2>
+    <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
+        Tinjau pengajuan produk firmware yang diunggah oleh komunitas seller sebelum tayang di katalog.
     </p>
 </div>
 
 {% if not approvals %}
-<div class="app-muted-panel" style="text-align:center; padding:50px 20px;">
-    <div style="font-size:40px; margin-bottom:10px;">✅</div>
-    <h3 style="font-size:18px; font-weight:800; margin:0 0 6px;">Antrean Review Kosong</h3>
-    <p style="color:var(--app-muted); font-size:13.5px; margin:0;">
-        Tidak ada produk firmware yang sedang menunggu persetujuan saat ini.
+<div class="app-muted-panel" style="text-align:center; padding:40px 20px;">
+    <div style="font-size:36px; margin-bottom:8px;">✨</div>
+    <h3 style="font-size:16px; font-weight:800; margin:0 0 4px;">Antrean Review Marketplace Kosong</h3>
+    <p style="color:var(--app-muted); font-size:13px; margin:0;">
+        Tidak ada produk firmware seller yang sedang menunggu persetujuan saat ini.
     </p>
 </div>
 {% else %}
@@ -51,7 +186,7 @@
                     </td>
                     <td>
                         <div style="font-size:12.5px; font-weight:700;">
-                            📁 {{ a.original_filename or 'firmware.bin' }}
+                            💾 {{ a.original_filename or 'firmware.bin' }}
                         </div>
                         <div style="font-size:11.5px; color:var(--app-muted); margin-top:2px;">
                             Versi: <strong>{{ a.version_label }}</strong> • Ukuran: <strong>{{ (a.file_size / (1024*1024))|round(2) }} MB</strong>
@@ -66,11 +201,11 @@
                         <div style="display:flex; gap:8px;">
                             <form method="POST" action="/admin/firmware/approvals/{{ a.approval_id }}/approve">
                                 <button type="submit" class="app-button app-button-primary app-button-small" style="font-weight:800;" onclick="return confirm('Setujui dan publikasikan produk ini?')">
-                                    ✓ Setujui
+                                    ✅ Setujui
                                 </button>
                             </form>
                             <button type="button" onclick="openRejectModal('{{ a.approval_id }}', '{{ a.title }}')" class="app-button app-button-danger app-button-small" style="font-weight:800;">
-                                ✕ Tolak
+                                ❌ Tolak
                             </button>
                         </div>
                     </td>

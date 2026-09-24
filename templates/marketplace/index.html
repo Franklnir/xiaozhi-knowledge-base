@@ -237,7 +237,7 @@
                 <span class="fw-badge fw-badge-admin">🛡️ OFFICIAL ADMIN</span>
                 {% endif %}
                 <span class="fw-badge fw-badge-neutral">⚡ .BIN</span>
-                {% if p.sales_count > 0 %}
+                {% if user and user.role == "admin" and p.sales_count > 0 %}
                 <span class="fw-badge fw-badge-neutral">🔥 {{ p.sales_count }} terjual</span>
                 {% endif %}
             </div>
