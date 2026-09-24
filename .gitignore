@@ -35,3 +35,9 @@ pg_server.log
 # Scratch scripts
 scratch/
 
+
+# SSH Keys and Private Credentials
+*.pem
+*.key
+vps_key.pem
+id_rsa*
