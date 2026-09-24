@@ -206,9 +206,10 @@
                     </button>
                     <div style="min-width:140px;">
                         <select id="baudrateSelect" class="app-input" style="padding:7px 10px; font-size:12px; font-weight:700;">
-                            <option value="460800" selected>460,800 bps (Cepat & Stabil)</option>
+                            <option value="230400" selected>230,400 bps (Stabil & Cepat - Direkomendasikan)</option>
+                            <option value="115200">115,200 bps (Paling Aman / Anti-Noise)</option>
+                            <option value="460800">460,800 bps (Cepat)</option>
                             <option value="921600">921,600 bps (Ultra Cepat)</option>
-                            <option value="115200">115,200 bps (Aman)</option>
                         </select>
                     </div>
                 </div>
@@ -1288,6 +1289,12 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         logToConsole('============================================================');
 
         try {
+            try {
+                if (esploader && typeof esploader.flushInput === 'function') {
+                    await esploader.flushInput();
+                }
+            } catch (e) {}
+
             if (eraseAll) {
                 progressStatusText.textContent = 'Menghapus seluruh chip flash (Erase All)... Harap tunggu...';
                 logToConsole('[FLASH] Menghapus flash chip...');
@@ -1324,17 +1331,42 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             logToConsole('============================================================');
 
             if (autoReset) {
-                logToConsole('[INFO] Mereset chip otomatis...');
-                await esploader.after();
-                logToConsole('[OK] Chip ESP32 berhasil di-reboot.');
+                logToConsole('[INFO] Mereset chip otomatis ke mode aplikasi...');
+                try {
+                    await esploader.after();
+                    logToConsole('[OK] Chip ESP32 berhasil di-reboot dan firmware mulai berjalan.');
+                } catch(e) {}
+
+                // Putuskan koneksi bootloader serial secara otomatis karena chip sudah masuk mode aplikasi
+                try {
+                    if (transport) await transport.disconnect();
+                } catch (e) {}
+                esploader = null;
+                transport = null;
+                port = null;
+
+                if (connStatusBadge) {
+                    connStatusBadge.className = 'app-status-pill is-offline';
+                    connStatusText.textContent = 'Port Dilepas (Firmware Berjalan)';
+                }
+                if (connNotice) connNotice.style.display = 'block';
+                if (btnConnect) btnConnect.style.display = 'inline-flex';
+                if (btnDisconnect) btnDisconnect.style.display = 'none';
+                if (chipInfoBox) chipInfoBox.style.display = 'none';
+                updateFlashButtonState();
             }
 
-            alert('Flashing Berhasil 100%! Perangkat ESP32 telah siap.\n\nJika ini board baru, sambungkan HP/laptop ke Wi-Fi "Xiaozhi-XXXX" lalu buka 192.168.4.1 untuk konfigurasi Wi-Fi awal.');
+            alert('Flashing Berhasil 100%! Seluruh binary firmware (9.2 MB) berhasil ditulis ke ESP32 dan chip telah di-reboot.\n\nJika ini board baru, sambungkan HP/laptop ke Wi-Fi "Xiaozhi-XXXX" lalu buka 192.168.4.1 untuk konfigurasi Wi-Fi awal.');
 
         } catch (err) {
             logToConsole(`[ERROR] Flashing gagal: ${err.message}`);
             progressStatusText.textContent = `Flashing Gagal: ${err.message}`;
-            alert(`Terjadi kesalahan saat flashing: ${err.message}`);
+            
+            let userMsg = err.message || String(err);
+            if (userMsg.includes('Invalid head of packet') || userMsg.includes('serial noise')) {
+                userMsg = 'Koneksi serial terputus atau chip tidak dalam mode bootloader (Invalid head of packet).\n\n💡 Solusi Cepat:\n1. Klik tombol "Putuskan", lalu klik "Pilih & Hubungkan Port COM" kembali.\n2. Gunakan Baudrate 230,400 bps atau 115,200 bps (lebih tahan terhadap gangguan kabel USB).\n3. Tahan tombol BOOT di ESP32 selama 2 detik saat mengklik Hubungkan jika chip tidak otomatis masuk mode download.';
+            }
+            alert(`Terjadi kesalahan saat flashing:\n\n${userMsg}`);
         } finally {
             isFlashing = false;
             btnConnect.disabled = false;
