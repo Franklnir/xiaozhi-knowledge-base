@@ -122,7 +122,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 6px 10px;
+        padding: 7px 12px;
         border-bottom: 1px solid var(--app-border);
         font-size: 12px;
     }
@@ -132,15 +132,25 @@
     .pin-name {
         font-weight: 700;
         color: var(--app-text);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .pin-desc {
+        font-size: 11px;
+        color: var(--app-muted);
+        font-weight: normal;
+        margin-left: 4px;
     }
     .pin-gpio {
         font-family: ui-monospace, monospace;
         font-weight: 850;
-        color: var(--app-accent, #059669);
-        background: rgba(5, 150, 105, 0.08);
-        padding: 2px 8px;
+        color: #10b981;
+        background: #0f172a;
+        padding: 3px 9px;
         border-radius: 4px;
-        border: 1px solid var(--app-border);
+        border: 1px solid #1e293b;
+        letter-spacing: 0.3px;
     }
 </style>
 
@@ -163,8 +173,8 @@
             <p class="app-subtitle">Flash firmware binary langsung ke peranti ESP32 via peramban Web Serial API tanpa perlu instalasi driver atau tools Python.</p>
         </div>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <button type="button" onclick="openGuideModal()" class="app-button app-button-ghost" style="font-size:12px; font-weight:800; border:1.5px solid var(--app-border-strong);">
-                📖 Panduan &amp; Dataset PIN GPIO
+            <button type="button" onclick="openGuideModal()" class="app-button app-button-ghost" style="font-size:12px; font-weight:800; border:1.5px solid var(--app-border-strong); display:flex; align-items:center; gap:6px;">
+                <span>📖</span> Panduan &amp; Dataset PIN GPIO
             </button>
             <div id="connStatusBadge" class="app-status-pill is-offline">
                 <span class="app-status-dot"></span>
@@ -238,96 +248,23 @@
                         <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
                             <span>💾</span> 2. File Firmware (.bin)
                         </h2>
-                        <p class="app-section-subtitle">Pilih sumber firmware: Gunakan Preset Resmi atau Unggah file custom.</p>
+                        <p class="app-section-subtitle">Pilih sumber firmware: Unggah file sendiri atau gunakan Preset Resmi.</p>
                     </div>
-                    <span id="sourceBadge" class="app-chip app-chip-success" style="font-size:11px;">Official Preset</span>
+                    <span id="sourceBadge" class="app-chip app-chip-neutral" style="font-size:11px;">Custom Upload</span>
                 </div>
 
-                <!-- Switcher Tabs (Hemat Ruang) -->
+                <!-- Switcher Tabs (Hemat Ruang & Gated by Admin Approval) -->
                 <div style="display:flex; gap:8px; margin-bottom:14px;">
-                    <button type="button" id="tabBtnPreset" class="source-tab-btn active" onclick="switchSourceMode('preset')">
-                        <span>🎯</span> Preset Resmi (ESP32-S3)
+                    <button type="button" id="tabBtnCustom" class="source-tab-btn active" onclick="switchSourceMode('custom')">
+                        <span>📁</span> Unggah File Firmware (.bin)
                     </button>
-                    <button type="button" id="tabBtnCustom" class="source-tab-btn" onclick="switchSourceMode('custom')">
-                        <span>📁</span> Unggah File Custom (.bin)
+                    <button type="button" id="tabBtnPreset" class="source-tab-btn" onclick="switchSourceMode('preset')">
+                        <span>🎯</span> Preset Firmware (ESP32-S3)
                     </button>
                 </div>
 
-                <!-- TAB 1: OFFICIAL PRESET VIEW -->
-                <div id="panelPreset">
-                    <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:14px;">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
-                            <div>
-                                <strong style="font-size:14px; color:var(--app-text); display:flex; align-items:center; gap:6px;">
-                                    <span>🎯</span> ESP32-S3 N16R8 / CAM Full Factory
-                                </strong>
-                                <span style="font-size:11.5px; color:var(--app-muted); display:block; margin-top:2px;">
-                                    Binary komersial (~9.65 MB) • Lengkap Bootloader, Partisi, OTA, Voice App, Aset UI &amp; Audio.
-                                </span>
-                            </div>
-                            <span class="app-chip app-chip-neutral" style="font-size:10.5px; font-weight:750;">Offset 0x0</span>
-                        </div>
-
-                        <!-- Status & Action Box -->
-                        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--app-border);">
-                            {% if not user %}
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                                <div style="font-size:12px; color:var(--app-muted);">
-                                    🔒 Preset ini membutuhkan izin akun. Silakan masuk terlebih dahulu.
-                                </div>
-                                <a href="/login?next=/web-flasher" class="app-button app-button-primary app-button-small" style="font-weight:800; text-decoration:none;">
-                                    🔐 Masuk ke Akun
-                                </a>
-                            </div>
-                            {% elif preset_status and preset_status.authorized %}
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                                <div>
-                                    <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:850;">
-                                        {% if user.role == 'admin' %}🛡️ AKSES ADMINISTRATOR{% else %}✅ LISENSI RESMI AKTIF{% endif %}
-                                    </span>
-                                    <span style="font-size:11px; color:var(--app-muted); display:block; margin-top:3px;">
-                                        Hanya untuk flashing langsung ke chip ESP32 (dilindungi hak cipta).
-                                    </span>
-                                </div>
-                                <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:7px 16px;">
-                                    ⚡ Muat Preset Ini ke Flasher
-                                </button>
-                            </div>
-                            {% elif preset_status and preset_status.status == 'PENDING' %}
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                                <div>
-                                    <span class="app-chip app-chip-warning" style="font-size:10.5px; font-weight:850;">
-                                        ⏳ MENUNGGU PERSETUJUAN ADMIN
-                                    </span>
-                                    <p style="font-size:11.5px; color:var(--app-muted); margin:3px 0 0;">
-                                        Permohonan lisensi Anda sedang ditinjau Admin. Hubungi Admin setelah menyelesaikan pembelian.
-                                    </p>
-                                </div>
-                                <button type="button" onclick="checkPresetStatus()" class="app-button app-button-ghost app-button-small" style="font-size:11px; font-weight:750;">
-                                    🔄 Cek Status
-                                </button>
-                            </div>
-                            {% else %}
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                                <div>
-                                    <span class="app-chip app-chip-neutral" style="font-size:10.5px; font-weight:750;">
-                                        🔒 BUTUH IZIN ADMIN
-                                    </span>
-                                    <p style="font-size:11.5px; color:var(--app-muted); margin:3px 0 0;">
-                                        Preset ini tidak gratis. Anda harus mendapatkan persetujuan lisensi Admin sebelum dapat mem-flash.
-                                    </p>
-                                </div>
-                                <button type="button" onclick="openRequestModal()" class="app-button app-button-primary app-button-small" style="font-weight:800;">
-                                    🔑 Minta Izin Akses Preset
-                                </button>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB 2: CUSTOM UPLOAD VIEW -->
-                <div id="panelCustom" style="display:none;">
+                <!-- TAB 1: CUSTOM UPLOAD VIEW (DEFAULT) -->
+                <div id="panelCustom">
                     <div class="flasher-dropzone" id="dropzone" onclick="document.getElementById('firmwareFileInput').click()">
                         <input type="file" id="firmwareFileInput" accept=".bin" style="display:none;">
                         <div style="font-size:28px; margin-bottom:6px;">📁</div>
@@ -337,6 +274,40 @@
                         <p style="font-size:11.5px; color:var(--app-muted); margin-top:4px;" id="fileSubText">
                             Mendukung Application Binary (<code>0x20000</code>) atau Full Factory Merged (<code>0x0</code>).
                         </p>
+                    </div>
+                </div>
+
+                <!-- TAB 2: OFFICIAL PRESET VIEW (ADMIN APPROVED ONLY, FLASH ONLY - NO DOWNLOAD) -->
+                <div id="panelPreset" style="display:none;">
+                    <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
+                            <div>
+                                <strong style="font-size:14px; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                                    <span>🎯</span> ESP32-S3 N16R8 / CAM Full Factory Merged
+                                </strong>
+                                <span style="font-size:11.5px; color:var(--app-muted); display:block; margin-top:2px;">
+                                    Binary resmi (~9.65 MB) • Lengkap Bootloader, Partisi, OTA, Voice App, Aset UI &amp; Audio.
+                                </span>
+                            </div>
+                            <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">Offset 0x0</span>
+                        </div>
+
+                        <!-- Status & Action Box -->
+                        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--app-border);">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                                <div>
+                                    <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:850;">
+                                        {% if user and user.role == 'admin' %}🛡️ ADMINISTRATOR RESMI{% else %}✅ LISENSI RESMI AKTIF{% endif %}
+                                    </span>
+                                    <span style="font-size:11px; color:var(--app-muted); display:block; margin-top:3px;">
+                                        ⚡ File langsung di-stream ke memori peramban untuk flashing (Flash Only, tidak dapat diunduh).
+                                    </span>
+                                </div>
+                                <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:7px 16px;">
+                                    ⚡ Muat Preset Ini ke Flasher
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -432,9 +403,9 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 </div>
                 <ul style="padding-left:18px; margin:0; display:grid; gap:4px;">
                     <li>Gunakan <strong>Preset Resmi (ESP32-S3)</strong> dengan offset <strong>0x0</strong> untuk peranti yang masih baru.</li>
-                    <li>Gunakan peramban berbasis Chromium (Google Chrome, Microsoft Edge, Opera, Brave).</li>
-                    <li>Pastikan kabel USB mendukung transfer data (bukan sekadar kabel charging HP).</li>
-                    <li>Untuk panduan wiring hardware dan dataset pin, klik tombol <strong>📖 Panduan &amp; Dataset PIN GPIO</strong> di atas.</li>
+                    <li>Gunakan peramban Chromium (Google Chrome, Microsoft Edge, Opera, Brave).</li>
+                    <li>Pastikan kabel USB mendukung transfer data (bukan sekadar kabel charging biasa).</li>
+                    <li>Untuk skema koneksi kabel modul layar/audio/kamera, klik tombol <strong>📖 Panduan &amp; Dataset PIN GPIO</strong> di atas.</li>
                 </ul>
             </div>
         </div>
@@ -442,7 +413,100 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 </div>
 
 <!-- ======================================================== -->
-<!-- MODAL: BUKU PANDUAN & DATASET PIN GPIO HARDWARE          -->
+<!-- MODAL: PERINGATAN BUTUH PERIZINAN ADMIN (PRESET GATING)  -->
+<!-- ======================================================== -->
+<div id="permissionModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
+    <div class="mcp-blocking-box" style="max-width:480px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:8px;">
+            <h2 style="font-size:16.5px; font-weight:850; margin:0; color:#dc2626; display:flex; align-items:center; gap:8px;">
+                <span>🔒</span> Izin Lisensi Admin Diperlukan
+            </h2>
+            <button type="button" onclick="closePermissionModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
+        </div>
+
+        <div style="font-size:13px; color:var(--app-text); line-height:1.6; margin-bottom:16px;">
+            <p style="margin:0 0 10px;">
+                Preset <strong>ESP32-S3 N16R8 / CAM Full Factory</strong> adalah firmware komersial resmi. Anda <strong>harus meminta perizinan Admin</strong> terlebih dahulu sebelum dapat menggunakan preset ini.
+            </p>
+            <div style="padding:10px 12px; background:rgba(220,38,38,0.06); border:1px solid rgba(220,38,38,0.2); border-radius:var(--app-radius); font-size:12px; color:var(--app-muted);">
+                🛡️ <strong>Catatan:</strong> Firmware ini dilindungi hak cipta dan hanya dapat di-flash langsung ke perangkat ESP32 setelah diapprove (tidak dapat diunduh).
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button type="button" onclick="closePermissionModal()" class="app-button">
+                Batal
+            </button>
+            <button type="button" onclick="openRequestFromPermissionModal()" class="app-button app-button-primary" style="font-weight:850;">
+                🔑 Minta Izin ke Admin Sekarang
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: STATUS PENDING APPROVAL                          -->
+<!-- ======================================================== -->
+<div id="pendingModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
+    <div class="mcp-blocking-box" style="max-width:460px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:8px;">
+            <h2 style="font-size:16.5px; font-weight:850; margin:0; color:#b45309; display:flex; align-items:center; gap:8px;">
+                <span>⏳</span> Permohonan Sedang Ditinjau Admin
+            </h2>
+            <button type="button" onclick="closePendingModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
+        </div>
+
+        <p style="font-size:13px; color:var(--app-text); line-height:1.6; margin:0 0 14px;">
+            Permohonan izin preset Anda telah terkirim dan saat ini berada dalam antrean peninjauan Admin.
+            <br><br>
+            Jika Anda telah menyelesaikan pembelian kit / board ESP32, silakan hubungi Admin atau konfirmasikan pesanan Anda agar lisensi preset dapat segera diaktifkan.
+        </p>
+
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button type="button" onclick="closePendingModal()" class="app-button">Tutup</button>
+            <button type="button" onclick="checkPresetStatus()" class="app-button app-button-primary" style="font-weight:850;">
+                🔄 Cek Ulang Status Izin
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: FORM PERMOHONAN IZIN KE ADMIN                     -->
+<!-- ======================================================== -->
+<div id="requestModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
+    <div class="mcp-blocking-box" style="max-width:480px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:8px;">
+            <h2 style="font-size:16.5px; font-weight:850; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                <span>🔑</span> Form Permohonan Izin Preset
+            </h2>
+            <button type="button" onclick="closeRequestModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
+        </div>
+
+        <p style="font-size:12.5px; color:var(--app-muted); margin:0 0 14px;">
+            Kirimkan pesan atau nomor pesanan Anda agar Admin dapat memverifikasi dan menyetujui akses flashing preset ini.
+        </p>
+
+        <form id="reqAccessForm" onsubmit="submitAccessRequest(event)">
+            <div style="margin-bottom:14px;">
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                    Nomor Pesanan / Catatan untuk Admin (Opsional):
+                </label>
+                <textarea id="reqNote" rows="3" placeholder="Contoh: Pembeli kit ESP32 Tokopedia/Shopee/WA no order #12345..." class="app-input" style="width:100%; font-size:12.5px;"></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" onclick="closeRequestModal()" class="app-button">Batal</button>
+                <button type="submit" id="btnSubmitReq" class="app-button app-button-primary" style="font-weight:850;">
+                    Kirim Permohonan ke Admin
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: BUKU PANDUAN & DATASET PIN GPIO (WIFI-PORTAL STYLE) -->
 <!-- ======================================================== -->
 <div id="guideModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
     <div class="mcp-blocking-box" style="max-width:680px; text-align:left; max-height:88vh; display:flex; flex-direction:column;">
@@ -450,19 +514,19 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:20px;">📖</span>
                 <h2 style="font-size:16.5px; font-weight:850; margin:0; color:var(--app-text);">
-                    Panduan Flashing &amp; Dataset PIN GPIO Hardware
+                    Buku Panduan &amp; Dataset PIN GPIO Hardware
                 </h2>
             </div>
             <button type="button" onclick="closeGuideModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
         </div>
 
-        <!-- Modal Sub-Tabs -->
-        <div style="display:flex; gap:6px; margin-bottom:12px;">
-            <button type="button" id="modalTabBtnFlashing" class="source-tab-btn active" style="padding:6px 12px; font-size:12px;" onclick="switchModalTab('flashing')">
+        <!-- Subtabs: Flashing Guide vs Pin Dataset -->
+        <div style="display:flex; gap:6px; margin-bottom:14px;">
+            <button type="button" id="modalTabBtnFlashing" class="source-tab-btn active" style="padding:7px 12px; font-size:12px;" onclick="switchModalTab('flashing')">
                 📑 Petunjuk Flashing Board Baru
             </button>
-            <button type="button" id="modalTabBtnPin" class="source-tab-btn" style="padding:6px 12px; font-size:12px;" onclick="switchModalTab('pin')">
-                🔌 Dataset PIN GPIO (Hardware Mapping)
+            <button type="button" id="modalTabBtnPin" class="source-tab-btn" style="padding:7px 12px; font-size:12px;" onclick="switchModalTab('pin')">
+                🔌 Dataset PIN GPIO (Dropdown Hardware)
             </button>
         </div>
 
@@ -471,19 +535,19 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             <div id="modalPanelFlashing" style="display:grid; gap:12px;">
                 <div style="padding:10px 14px; background:rgba(5,150,105,0.08); border-radius:var(--app-radius); border-left:4px solid var(--app-accent, #059669);">
                     <strong>Firmware Full Factory Merged (Offset 0x0):</strong><br>
-                    Dirancang untuk board ESP32-S3 baru yang belum memiliki program. Satu file binary ini mencakup bootloader, partition table, data OTA, AI Voice Assistant, serta seluruh aset audio dan antarmuka layar ST7789.
+                    Dirancang untuk board ESP32-S3 baru yang masih kosong. File ini mencakup Bootloader chip, Partition Table, OTA data, Aplikasi AI Voice Assistant, serta seluruh font &amp; aset suara.
                 </div>
 
                 <div style="display:grid; gap:8px;">
                     <h4 style="margin:0; font-size:13.5px; font-weight:800; color:var(--app-accent, #059669);">
-                        Langkah Flashing ke Board:
+                        Langkah-Langkah Flashing:
                     </h4>
                     <ol style="padding-left:20px; margin:0; display:grid; gap:6px;">
-                        <li>Buka halaman ini menggunakan <strong>Google Chrome</strong> atau <strong>Microsoft Edge</strong> di PC/Laptop.</li>
-                        <li>Hubungkan board ESP32-S3 menggunakan kabel data USB yang bagus.</li>
-                        <li>Klik <strong>🔌 Pilih &amp; Hubungkan Port COM</strong>, lalu tentukan port serial ESP32 Anda.</li>
-                        <li>Di Langkah 2, pilih tab <strong>🎯 Preset Resmi</strong> lalu klik <strong>⚡ Muat Preset Ini ke Flasher</strong>.</li>
-                        <li>Offset otomatis terkunci ke <strong>0x0</strong> dan baudrate default <strong>460,800 bps</strong>.</li>
+                        <li>Gunakan laptop/PC dengan browser <strong>Google Chrome</strong> atau <strong>Microsoft Edge</strong>.</li>
+                        <li>Sambungkan board ESP32-S3 ke komputer dengan kabel data USB.</li>
+                        <li>Klik tombol <strong>🔌 Pilih &amp; Hubungkan Port COM</strong>, lalu tentukan port serial ESP32 Anda.</li>
+                        <li>Di Langkah 2, pilih tab <strong>🎯 Preset Firmware</strong> lalu klik <strong>⚡ Muat Preset Ini ke Flasher</strong>.</li>
+                        <li>Offset otomatis diset ke <strong>0x0</strong> dan baudrate default <strong>460,800 bps</strong>.</li>
                         <li>Klik tombol hijau <strong>⚡ Mulai Flash ke ESP32</strong> dan tunggu progress bar hingga 100%.</li>
                     </ol>
                 </div>
@@ -507,28 +571,30 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 </div>
             </div>
 
-            <!-- SUB-TAB 2: DATASET PIN GPIO TERPAKAI -->
+            <!-- SUB-TAB 2: DATASET PIN GPIO TERPAKAI (WIFI-PORTAL DROPDOWN STYLE) -->
             <div id="modalPanelPin" style="display:none;">
                 <div style="margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                    <label style="font-size:12.5px; font-weight:800; color:var(--app-text);">
-                        Pilih Modul Hardware:
+                    <label style="font-size:12.5px; font-weight:800; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                        <span>⚙️</span> Pilih Preset Hardware / Layar:
                     </label>
-                    <select id="pinModuleSelect" class="app-input" onchange="renderPinDataset(this.value)" style="padding:6px 12px; font-size:12.5px; font-weight:750; min-width:220px;">
-                        <option value="display" selected>📺 Layar ST7789 SPI (240x280)</option>
-                        <option value="audio">🎤 Audio I2S (Mic &amp; Speaker)</option>
-                        <option value="camera">📷 Kamera OV2640 / GC2145</option>
-                        <option value="buttons">🔘 Tombol, Daya &amp; LED</option>
-                        <option value="all">📑 Lihat Seluruh Pin Sekaligus</option>
+                    <select id="pinModuleSelect" class="app-input" onchange="renderPinDataset(this.value)" style="padding:7px 12px; font-size:12.5px; font-weight:750; min-width:260px; background:var(--app-surface);">
+                        <option value="st7789_240x280_8p" selected>📺 Layar ST7789 240x280 8-Pin SPI (Bawaan Preset)</option>
+                        <option value="st7789_240x240_7p">📺 Layar ST7789 240x240 7-Pin SPI (Tanpa CS)</option>
+                        <option value="oled_128x64">📺 Layar OLED SSD1306 128x64 (I2C)</option>
+                        <option value="audio">🎤 Audio I2S (Mic INMP441 &amp; Spk MAX98357A)</option>
+                        <option value="camera">📷 Modul Kamera OV2640 / GC2145 (ESP32-S3 CAM)</option>
+                        <option value="buttons">🔘 Tombol Kontrol, Sensor Baterai &amp; LED</option>
+                        <option value="all">📑 Lihat Seluruh Pin Sekaligus (Dataset Lengkap)</option>
                     </select>
                 </div>
 
-                <div id="pinDatasetContainer" style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); overflow:hidden;">
-                    <!-- Dynamically rendered by JS -->
+                <div id="pinDatasetContainer" style="background:#090d16; border:2px solid var(--app-border-strong); border-radius:var(--app-radius); overflow:hidden;">
+                    <!-- Dynamically rendered by renderPinDataset() -->
                 </div>
 
-                <p style="font-size:11.5px; color:var(--app-muted); margin:10px 0 0; line-height:1.4;">
-                    🔒 <strong>Catatan:</strong> Pin GPIO di atas telah dikonfigurasi secara permanen di dalam binary firmware komersial WeAct ESP32-S3 N16R8 untuk performa dan stabilitas audio/kamera terbaik.
-                </p>
+                <div style="margin-top:10px; padding:8px 12px; background:var(--app-surface-muted); border-radius:var(--app-radius); font-size:11.5px; color:var(--app-muted); line-height:1.4;">
+                    🔒 <strong>Permanen:</strong> Skema dataset pin di atas telah diprogram secara tetap di firmware untuk kompatibilitas optimal hardware WeAct ESP32-S3 N16R8.
+                </div>
             </div>
         </div>
 
@@ -537,40 +603,6 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 Tutup Panduan
             </button>
         </div>
-    </div>
-</div>
-
-<!-- ======================================================== -->
-<!-- MODAL: REQUEST AKSES PRESET                             -->
-<!-- ======================================================== -->
-<div id="requestModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
-    <div class="mcp-blocking-box" style="max-width:460px; text-align:left;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h2 style="font-size:16.5px; font-weight:850; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-                <span>🔑</span> Minta Izin Akses Preset Flasher
-            </h2>
-            <button type="button" onclick="closeRequestModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
-        </div>
-
-        <p style="font-size:12.5px; color:var(--app-muted); margin:0 0 14px;">
-            Preset <strong>ESP32-S3 N16R8 / CAM Full Factory</strong> adalah firmware komersial resmi. Masukkan nomor pesanan atau pesan untuk diverifikasi oleh Admin.
-        </p>
-
-        <form id="reqAccessForm" onsubmit="submitAccessRequest(event)">
-            <div style="margin-bottom:14px;">
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    Nomor Pesanan / Pesan untuk Admin (Opsional):
-                </label>
-                <textarea id="reqNote" rows="3" placeholder="Contoh: Pembeli kit ESP32 Tokopedia/Shopee no order #12345..." class="app-input" style="width:100%; font-size:12.5px;"></textarea>
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:8px;">
-                <button type="button" onclick="closeRequestModal()" class="app-button">Batal</button>
-                <button type="submit" id="btnSubmitReq" class="app-button app-button-primary" style="font-weight:800;">
-                    Kirim Permohonan
-                </button>
-            </div>
-        </form>
     </div>
 </div>
 
@@ -590,12 +622,22 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         }
     }
 
+    // USER AUTHORIZATION STATE
+    const userAuthStatus = {
+        isLoggedIn: {{ 'true' if user else 'false' }},
+        role: "{{ user.role if user else '' }}",
+        username: "{{ user.username if user else '' }}",
+        authorized: {{ 'true' if preset_status and preset_status.authorized else 'false' }},
+        status: "{{ preset_status.status if preset_status else 'NONE' }}",
+        message: "{{ preset_status.message if preset_status else '' }}"
+    };
+
     let port = null;
     let transport = null;
     let esploader = null;
     let selectedFileBuffer = null;
     let isFlashing = false;
-    let currentSourceMode = 'preset';
+    let currentSourceMode = 'custom';
 
     const consoleLog = document.getElementById('consoleLog');
     const btnConnect = document.getElementById('btnConnect');
@@ -633,8 +675,27 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         if (consoleLog) consoleLog.textContent = '';
     };
 
-    // Mode Switcher: Preset vs Custom
+    // Mode Switcher: Preset vs Custom GATED by Admin Approval
     window.switchSourceMode = function(mode) {
+        if (mode === 'preset') {
+            if (!userAuthStatus.isLoggedIn) {
+                alert('🔒 Preset Berlisensi: Anda harus masuk ke akun dan meminta izin Admin terlebih dahulu.');
+                window.location.href = '/login?next=/web-flasher';
+                return;
+            }
+            if (!userAuthStatus.authorized) {
+                if (userAuthStatus.status === 'PENDING') {
+                    document.getElementById('pendingModal').style.display = 'flex';
+                } else {
+                    document.getElementById('permissionModal').style.display = 'flex';
+                }
+                return;
+            }
+        }
+        setActiveSourceMode(mode);
+    };
+
+    function setActiveSourceMode(mode) {
         currentSourceMode = mode;
         const btnPreset = document.getElementById('tabBtnPreset');
         const btnCustom = document.getElementById('tabBtnCustom');
@@ -657,117 +718,21 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             badge.textContent = 'Custom Upload';
             badge.className = 'app-chip app-chip-neutral';
         }
+    }
+
+    window.closePermissionModal = function() {
+        document.getElementById('permissionModal').style.display = 'none';
     };
 
-    // Guide Modal & Subtabs
-    window.openGuideModal = function() {
-        document.getElementById('guideModal').style.display = 'flex';
-        renderPinDataset('display');
+    window.openRequestFromPermissionModal = function() {
+        document.getElementById('permissionModal').style.display = 'none';
+        document.getElementById('requestModal').style.display = 'flex';
     };
 
-    window.closeGuideModal = function() {
-        document.getElementById('guideModal').style.display = 'none';
+    window.closePendingModal = function() {
+        document.getElementById('pendingModal').style.display = 'none';
     };
 
-    window.switchModalTab = function(tab) {
-        const btnF = document.getElementById('modalTabBtnFlashing');
-        const btnP = document.getElementById('modalTabBtnPin');
-        const panF = document.getElementById('modalPanelFlashing');
-        const panP = document.getElementById('modalPanelPin');
-
-        if (tab === 'flashing') {
-            btnF.classList.add('active');
-            btnP.classList.remove('active');
-            panF.style.display = 'grid';
-            panP.style.display = 'none';
-        } else {
-            btnP.classList.add('active');
-            btnF.classList.remove('active');
-            panP.style.display = 'block';
-            panF.style.display = 'none';
-            renderPinDataset(document.getElementById('pinModuleSelect').value);
-        }
-    };
-
-    // PIN DATASET DEFINITIONS
-    const PIN_DATASET = {
-        display: {
-            title: '📺 Layar ST7789 SPI (240x280)',
-            pins: [
-                { name: 'SCL / SCK (SPI Clock)', gpio: 'GPIO 19' },
-                { name: 'SDA / MOSI (SPI Data)', gpio: 'GPIO 20' },
-                { name: 'RES / RST (Reset)', gpio: 'GPIO 21' },
-                { name: 'DC (Data / Command)', gpio: 'GPIO 47' },
-                { name: 'CS (Chip Select)', gpio: 'GPIO 45' },
-                { name: 'BLK / BL (Backlight PWM)', gpio: 'GPIO 38' },
-                { name: 'VCC & GND', gpio: '3.3V & GND' }
-            ]
-        },
-        audio: {
-            title: '🎤 Audio I2S (Mic INMP441 & Spk MAX98357A)',
-            pins: [
-                { name: 'MIC WS / LRCK (Word Select)', gpio: 'GPIO 1' },
-                { name: 'MIC SCK / BCLK (Bit Clock)', gpio: 'GPIO 2' },
-                { name: 'MIC DIN (Data In)', gpio: 'GPIO 42' },
-                { name: 'SPK DOUT (Data Out)', gpio: 'GPIO 39' },
-                { name: 'SPK BCLK (Bit Clock)', gpio: 'GPIO 40' },
-                { name: 'SPK LRCK (Word Select)', gpio: 'GPIO 41' }
-            ]
-        },
-        camera: {
-            title: '📷 Kamera Modul OV2640 / GC2145',
-            pins: [
-                { name: 'SIOD / SDA (SCCB Data)', gpio: 'GPIO 4' },
-                { name: 'SIOC / SCL (SCCB Clock)', gpio: 'GPIO 5' },
-                { name: 'VSYNC (Vertical Sync)', gpio: 'GPIO 6' },
-                { name: 'HREF (Horizontal Ref)', gpio: 'GPIO 7' },
-                { name: 'D0 - D7 (Data Bus 8-Bit)', gpio: 'GPIO 11, 9, 8, 10, 12, 18, 17, 16' },
-                { name: 'XCLK (Master Clock 10MHz)', gpio: 'GPIO 15' },
-                { name: 'PCLK (Pixel Clock)', gpio: 'GPIO 13' }
-            ]
-        },
-        buttons: {
-            title: '🔘 Tombol, Daya & LED Indikator',
-            pins: [
-                { name: 'Tombol BOOT (Download Mode)', gpio: 'GPIO 0' },
-                { name: 'Tombol Volume UP', gpio: 'GPIO 14' },
-                { name: 'Tombol Volume DOWN', gpio: 'GPIO 46' },
-                { name: 'Built-in Status LED', gpio: 'GPIO 48' },
-                { name: 'Sensor Tegangan Baterai ADC', gpio: 'GPIO 3 (100K Divider)' }
-            ]
-        }
-    };
-
-    window.renderPinDataset = function(mod) {
-        const c = document.getElementById('pinDatasetContainer');
-        if (!c) return;
-
-        let items = [];
-        if (mod === 'all') {
-            Object.keys(PIN_DATASET).forEach(k => {
-                items.push(PIN_DATASET[k]);
-            });
-        } else if (PIN_DATASET[mod]) {
-            items.push(PIN_DATASET[mod]);
-        }
-
-        let html = '';
-        items.forEach(sec => {
-            html += `<div style="background:var(--app-surface); padding:8px 12px; font-weight:850; font-size:12px; color:var(--app-accent, #059669); border-bottom:1px solid var(--app-border-strong); display:flex; justify-content:space-between; align-items:center;">
-                <span>${sec.title}</span>
-                <span style="font-size:9.5px; padding:2px 6px; border-radius:4px; background:#059669; color:#fff; font-weight:800;">TERKUNCI / RESMI</span>
-            </div>`;
-            sec.pins.forEach(p => {
-                html += `<div class="pin-row">
-                    <span class="pin-name">${p.name}</span>
-                    <span class="pin-gpio">${p.gpio}</span>
-                </div>`;
-            });
-        });
-        c.innerHTML = html;
-    };
-
-    // Request Access Modal
     window.openRequestModal = function() {
         document.getElementById('requestModal').style.display = 'flex';
     };
@@ -795,7 +760,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         } catch (err) {
             alert('Gagal mengirim permohonan: ' + err.message);
             btn.disabled = false;
-            btn.textContent = 'Kirim Permohonan';
+            btn.textContent = 'Kirim Permohonan ke Admin';
         }
     };
 
@@ -807,21 +772,161 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 alert('Selamat! Akses lisensi preset Anda telah disetujui Admin.');
                 window.location.reload();
             } else {
-                alert('Status saat ini: ' + (data.status || 'Pending') + '. ' + (data.message || ''));
+                alert('Status saat ini: ' + (data.status || 'Pending') + '. ' + (data.message || 'Menunggu peninjauan Admin.'));
             }
         } catch (e) {
             alert('Gagal mengecek status: ' + e.message);
         }
     };
 
-    // Load Preset into Memory (No download allowed)
+    // Guide Modal & Subtabs
+    window.openGuideModal = function() {
+        document.getElementById('guideModal').style.display = 'flex';
+        renderPinDataset('st7789_240x280_8p');
+    };
+
+    window.closeGuideModal = function() {
+        document.getElementById('guideModal').style.display = 'none';
+    };
+
+    window.switchModalTab = function(tab) {
+        const btnF = document.getElementById('modalTabBtnFlashing');
+        const btnP = document.getElementById('modalTabBtnPin');
+        const panF = document.getElementById('modalPanelFlashing');
+        const panP = document.getElementById('modalPanelPin');
+
+        if (tab === 'flashing') {
+            btnF.classList.add('active');
+            btnP.classList.remove('active');
+            panF.style.display = 'grid';
+            panP.style.display = 'none';
+        } else {
+            btnP.classList.add('active');
+            btnF.classList.remove('active');
+            panP.style.display = 'block';
+            panF.style.display = 'none';
+            renderPinDataset(document.getElementById('pinModuleSelect').value);
+        }
+    };
+
+    // PIN DATASETS (Matches WeAct ESP32-S3 & Wi-Fi configuration portal exactly)
+    const PIN_DATASETS = {
+        'st7789_240x280_8p': {
+            title: '📺 Layar ST7789 240x280 SPI 8-Pin (Bawaan Preset Resmi)',
+            desc: 'Koneksi bus SPI LCD ST7789 1.69" 240x280 dengan chip select (CS)',
+            pins: [
+                { name: 'SCL / SCK', desc: 'SPI3 Clock', gpio: 'GPIO 19' },
+                { name: 'SDA / MOSI', desc: 'SPI3 Master Out', gpio: 'GPIO 20' },
+                { name: 'RES / RST', desc: 'Display Hardware Reset', gpio: 'GPIO 21' },
+                { name: 'DC', desc: 'Data / Command Register', gpio: 'GPIO 47' },
+                { name: 'CS', desc: 'Chip Select Active-Low', gpio: 'GPIO 45' },
+                { name: 'BLK / BL', desc: 'Backlight Brightness PWM', gpio: 'GPIO 38' },
+                { name: 'VCC & GND', desc: 'Daya Layar (Gunakan 3.3V)', gpio: '3.3V & GND' }
+            ]
+        },
+        'st7789_240x240_7p': {
+            title: '📺 Layar ST7789 240x240 SPI 7-Pin (Tanpa Pin CS)',
+            desc: 'Koneksi layar ST7789 1.3" atau 1.54" tanpa pin Chip Select',
+            pins: [
+                { name: 'SCL / SCK', desc: 'SPI Clock', gpio: 'GPIO 19' },
+                { name: 'SDA / MOSI', desc: 'SPI Data Out', gpio: 'GPIO 20' },
+                { name: 'RES / RST', desc: 'Reset Layar', gpio: 'GPIO 21' },
+                { name: 'DC', desc: 'Data / Command', gpio: 'GPIO 47' },
+                { name: 'BLK / BL', desc: 'Backlight PWM', gpio: 'GPIO 38' },
+                { name: 'CS', desc: 'Tidak Digunakan (Internal Ground)', gpio: 'NC / GND' }
+            ]
+        },
+        'oled_128x64': {
+            title: '📺 Layar OLED SSD1306 128x64 (I2C Bus)',
+            desc: 'Layar monokrom OLED I2C 0.96 inch',
+            pins: [
+                { name: 'SCL', desc: 'I2C Clock Bus', gpio: 'GPIO 19' },
+                { name: 'SDA', desc: 'I2C Data Bus', gpio: 'GPIO 20' },
+                { name: 'VCC & GND', desc: 'Tegangan Operasional', gpio: '3.3V & GND' }
+            ]
+        },
+        'audio': {
+            title: '🎤 Audio I2S (Mic INMP441 & Speaker MAX98357A)',
+            desc: 'Bus I2S Simplex untuk penangkapan suara mic dan output audio speaker',
+            pins: [
+                { name: 'MIC WS / LRCK', desc: 'Word Select Microphone INMP441', gpio: 'GPIO 1' },
+                { name: 'MIC SCK / BCLK', desc: 'Bit Clock Microphone INMP441', gpio: 'GPIO 2' },
+                { name: 'MIC DIN / SD', desc: 'Serial Data In (Suara Pengguna)', gpio: 'GPIO 42' },
+                { name: 'SPK DOUT / DIN', desc: 'Serial Data Out Speaker MAX98357A', gpio: 'GPIO 39' },
+                { name: 'SPK BCLK', desc: 'Bit Clock Amplifier MAX98357A', gpio: 'GPIO 40' },
+                { name: 'SPK LRCK', desc: 'Word Select Amplifier MAX98357A', gpio: 'GPIO 41' }
+            ]
+        },
+        'camera': {
+            title: '📷 Modul Kamera OV2640 / GC2145 (ESP32-S3 CAM)',
+            desc: 'Kamera DVP 8-bit bus untuk fitur vision asisten AI',
+            pins: [
+                { name: 'SIOD / SDA', desc: 'SCCB I2C Data', gpio: 'GPIO 4' },
+                { name: 'SIOC / SCL', desc: 'SCCB I2C Clock', gpio: 'GPIO 5' },
+                { name: 'VSYNC', desc: 'Vertical Sync Pulse', gpio: 'GPIO 6' },
+                { name: 'HREF', desc: 'Horizontal Reference Pulse', gpio: 'GPIO 7' },
+                { name: 'D0 - D7', desc: 'Data Bus 8-Bit Paralel', gpio: 'GPIO 11, 9, 8, 10, 12, 18, 17, 16' },
+                { name: 'XCLK', desc: 'Master Clock (10 MHz)', gpio: 'GPIO 15' },
+                { name: 'PCLK', desc: 'Pixel Sampling Clock', gpio: 'GPIO 13' }
+            ]
+        },
+        'buttons': {
+            title: '🔘 Tombol Kontrol, Sensor Baterai &amp; LED',
+            desc: 'Pin input tactile switch, deteksi tegangan baterai, dan indikator status',
+            pins: [
+                { name: 'Tombol BOOT', desc: 'Tombol Download Bootloader', gpio: 'GPIO 0' },
+                { name: 'Tombol Volume UP', desc: 'Naikkan Volume Suara', gpio: 'GPIO 14' },
+                { name: 'Tombol Volume DOWN', desc: 'Turunkan Volume Suara', gpio: 'GPIO 46' },
+                { name: 'Built-in Status LED', desc: 'Lampu Indikator Sinyal/Status', gpio: 'GPIO 48' },
+                { name: 'Battery ADC Sensor', desc: 'Pembagi Tegangan 100K+100K', gpio: 'GPIO 3 (ADC1_CH2)' }
+            ]
+        }
+    };
+
+    window.renderPinDataset = function(mod) {
+        const c = document.getElementById('pinDatasetContainer');
+        if (!c) return;
+
+        let groups = [];
+        if (mod === 'all') {
+            groups = Object.keys(PIN_DATASETS).map(k => PIN_DATASETS[k]);
+        } else if (PIN_DATASETS[mod]) {
+            groups = [PIN_DATASETS[mod]];
+        }
+
+        let html = '';
+        groups.forEach(g => {
+            html += `<div style="background:#111827; padding:9px 12px; border-bottom:1.5px solid var(--app-border-strong); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                <div>
+                    <span style="font-size:12px; font-weight:850; color:#38bdf8; letter-spacing:0.3px;">${g.title}</span>
+                    <span style="display:block; font-size:11px; color:#94a3b8; margin-top:2px;">${g.desc}</span>
+                </div>
+                <span style="font-size:9.5px; padding:2px 7px; border-radius:4px; background:#059669; color:#fff; font-weight:850; letter-spacing:0.5px;">PERMANENT</span>
+            </div>
+            <div style="background:#090d16;">`;
+            g.pins.forEach(p => {
+                html += `<div class="pin-row" style="border-bottom:1px solid #1e293b;">
+                    <div class="pin-name" style="color:#f1f5f9;">
+                        <span>🔹 ${p.name}</span>
+                        <span class="pin-desc">(${p.desc})</span>
+                    </div>
+                    <span class="pin-gpio">${p.gpio}</span>
+                </div>`;
+            });
+            html += `</div>`;
+        });
+
+        c.innerHTML = html;
+    };
+
+    // Load Preset into Memory (FLASH ONLY, NO DOWNLOAD)
     window.loadOfficialPreset = async function() {
         const btn = document.getElementById('btnLoadPreset');
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '⏳ Menyiapkan firmware ke memori...';
         }
-        logToConsole('[INFO] Mengambil binary preset dari endpoint aman server...');
+        logToConsole('[INFO] Mengambil binary preset dari server aman...');
         try {
             const resp = await fetch('/api/v1/flasher/preset/esp32s3_cam/stream', {
                 credentials: 'same-origin'
@@ -829,8 +934,8 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 
             if (!resp.ok) {
                 if (resp.status === 403 || resp.status === 401) {
-                    alert('⚠️ Akses Terbatas: Anda belum memiliki izin lisensi untuk menggunakan preset ini. Silakan klik tombol "Minta Izin Akses Preset" untuk menghubungi Admin.');
-                    throw new Error('Akses lisensi belum disetujui oleh Admin.');
+                    alert('⚠️ Akses Terbatas: Anda belum memiliki izin lisensi untuk menggunakan preset ini. Silakan minta izin ke Admin terlebih dahulu.');
+                    throw new Error('Akses lisensi belum disetujui Admin.');
                 }
                 throw new Error('Server error code: ' + resp.status);
             }
