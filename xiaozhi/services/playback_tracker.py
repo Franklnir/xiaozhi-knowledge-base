@@ -85,6 +85,7 @@ class PlaybackTracker:
         device_mac: str = "",
         bitrate: str = "11k",
         duration: str = "",
+        chip: str = "",
     ) -> PlaybackSession:
         with self._lock:
             # End any existing session for this user if active
@@ -124,7 +125,16 @@ class PlaybackTracker:
                         clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
                         clean_mac = clean_mac.strip().upper()
                         if len(clean_mac) >= 11:
-                            st.register_device(user_id, device_id=clean_mac, name=f"ESP32 ({clean_mac[-5:]})", device_type="esp32")
+                            c = (chip or "").lower().replace("-", "").strip()
+                            if "s3" in c:
+                                dev_name, dev_type = f"ESP32-S3 ({clean_mac[-5:]})", "esp32-s3"
+                            elif "c3" in c:
+                                dev_name, dev_type = f"ESP32-C3 ({clean_mac[-5:]})", "esp32-c3"
+                            elif "p4" in c:
+                                dev_name, dev_type = f"ESP32-P4 ({clean_mac[-5:]})", "esp32-p4"
+                            else:
+                                dev_name, dev_type = f"ESP32 ({clean_mac[-5:]})", "esp32"
+                            st.register_device(user_id, device_id=clean_mac, name=dev_name, device_type=dev_type)
                 except Exception as e:
                     logger.debug("Could not auto-register device_mac in tracker: %s", e)
 
