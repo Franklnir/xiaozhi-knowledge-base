@@ -92,6 +92,17 @@
 </style>
 
 <div class="app-page">
+    <!-- Notice if inside Hugging Face Spaces iframe -->
+    <div id="iframeNotice" style="display:none; margin-bottom:16px; padding:12px 16px; background:#fef3c7; border:2px solid #b45309; border-radius:var(--app-radius); color:#92400e; font-size:13px; font-weight:700; align-items:center; justify-content:space-between; gap:12px; box-shadow:var(--app-shadow);">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:20px;">⚠️</span>
+            <span>Peramban membatasi Web Serial API di dalam frame Hugging Face. Buka di tab mandiri agar tombol COM dapat terhubung normal.</span>
+        </div>
+        <a id="btnOpenDirectTab" href="/web-flasher" target="_blank" class="app-button app-button-primary" style="font-size:12px; padding:7px 14px; text-decoration:none; white-space:nowrap;">
+            🚀 Buka di Tab Mandiri
+        </a>
+    </div>
+
     <header class="app-page-header">
         <div>
             <p class="app-eyebrow">Hardware Flashing Tool</p>
@@ -120,10 +131,10 @@
                 </div>
 
                 <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-                    <button type="button" id="btnConnect" class="app-button app-button-primary" style="flex:1; justify-content:center;">
+                    <button type="button" id="btnConnect" class="app-button app-button-primary" style="flex:1; justify-content:center; cursor:pointer;">
                         <span>🔌</span> Pilih &amp; Hubungkan Port COM
                     </button>
-                    <button type="button" id="btnDisconnect" class="app-button app-button-danger" style="display:none; justify-content:center;">
+                    <button type="button" id="btnDisconnect" class="app-button app-button-danger" style="display:none; justify-content:center; cursor:pointer;">
                         <span>❌</span> Putuskan
                     </button>
                     <div style="min-width:140px;">
@@ -288,6 +299,18 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 <script type="module">
     import { ESPLoader, Transport } from '/static/js/esptool-bundle.js';
 
+    // Check if running inside Hugging Face Spaces iframe
+    if (window.self !== window.top) {
+        const notice = document.getElementById('iframeNotice');
+        if (notice) {
+            notice.style.display = 'flex';
+            const directLink = document.getElementById('btnOpenDirectTab');
+            if (directLink) {
+                directLink.href = window.location.href;
+            }
+        }
+    }
+
     let port = null;
     let transport = null;
     let esploader = null;
@@ -312,8 +335,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             consoleLog.textContent = '';
         },
         writeLine(data) {
-            consoleLog.textContent += data + '
-';
+            consoleLog.textContent += data + '\n';
             consoleLog.scrollTop = consoleLog.scrollHeight;
         },
         write(data) {
@@ -327,7 +349,11 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
     // Connect handler
     btnConnect.addEventListener('click', async () => {
         if (!navigator.serial) {
-            alert('Browser Anda tidak mendukung Web Serial API. Silakan gunakan Google Chrome, Microsoft Edge, Opera, atau Brave.');
+            if (window.self !== window.top) {
+                alert('Web Serial API dibatasi di dalam frame Hugging Face. Silakan klik tombol "Buka di Tab Mandiri" di bagian atas halaman agar port serial dapat dibuka.');
+            } else {
+                alert('Browser Anda tidak mendukung Web Serial API. Silakan gunakan Google Chrome, Microsoft Edge, Opera, atau Brave pada PC/Laptop.');
+            }
             return;
         }
         try {
@@ -480,8 +506,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         const eraseAll = document.getElementById('chkEraseAll').checked;
         const autoReset = document.getElementById('chkAutoReset').checked;
 
-        terminal.writeLine('
-========================================');
+        terminal.writeLine('\n========================================');
         terminal.writeLine('Memulai proses flashing...');
         terminal.writeLine('Offset: ' + offsetStr + ' (' + offset + ')');
         terminal.writeLine('Ukuran file: ' + selectedFileBuffer.length + ' bytes');
@@ -514,8 +539,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             progressBar.style.width = '100%';
             progressPercent.textContent = '100%';
             progressStatusText.textContent = '✅ Flashing Berhasil 100%!';
-            terminal.writeLine('
-🎉 Flashing berhasil diselesaikan!');
+            terminal.writeLine('\n🎉 Flashing berhasil diselesaikan!');
 
             if (autoReset) {
                 terminal.writeLine('Me-reset board ESP32...');
