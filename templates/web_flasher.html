@@ -191,7 +191,7 @@
                         Klik untuk memilih file firmware (.bin) atau seret ke sini
                     </div>
                     <p style="font-size:12px; color:var(--app-muted); margin-top:4px;" id="fileSubText">
-                        Mendukung binary firmware untuk ESP32-S3, ESP32 standar, ESP32-C3, dll.
+                        Mendukung Full Factory Binary (<code>0x0</code>) maupun Application Binary (<code>0x20000</code>).
                     </p>
                 </div>
 
@@ -213,12 +213,12 @@
                             Alamat Offset Flash:
                         </label>
                         <select id="offsetPreset" class="app-input" onchange="handleOffsetChange(this.value)">
-                            <option value="0x20000" selected>0x20000 (Standar App XiaoZhi / IDF)</option>
-                            <option value="0x0">0x0 (Full Factory Binary Merged)</option>
+                            <option value="0x0" selected>0x0 (Full Factory Binary Merged - Board Baru Kosong)</option>
+                            <option value="0x20000">0x20000 (Aplikasi Saja / Update)</option>
                             <option value="0x10000">0x10000 (Standar Arduino App)</option>
                             <option value="custom">Offset Kustom...</option>
                         </select>
-                        <input type="text" id="offsetInput" class="app-input" value="0x20000" style="display:none; margin-top:6px;" placeholder="Contoh: 0x20000">
+                        <input type="text" id="offsetInput" class="app-input" value="0x0" style="display:none; margin-top:6px;" placeholder="Contoh: 0x0">
                     </div>
                     <div>
                         <label style="display:block; font-size:12px; font-weight:700; color:var(--app-text); margin-bottom:4px;">
@@ -286,6 +286,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                     <span>💡</span> Tips &amp; Bantuan Flashing:
                 </div>
                 <ul style="padding-left:18px; margin:0; display:grid; gap:4px;">
+                    <li><strong>Untuk Board Baru:</strong> Gunakan file Full Factory (biasanya ~9 MB) dan pilih offset <strong>0x0</strong>.</li>
                     <li>Gunakan browser Chromium modern (Google Chrome, Microsoft Edge, Opera, atau Brave).</li>
                     <li>Pastikan kabel USB adalah kabel data (bukan sekadar kabel charging/power only).</li>
                     <li>Jika koneksi timeout atau port tidak merespons, tahan tombol <strong>BOOT (GPIO 0)</strong>, tekan tombol <strong>RST / EN</strong> 1 kali, lalu lepas tombol BOOT sebelum mengklik Hubungkan.</li>
@@ -452,6 +453,17 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         selectedFileName.textContent = file.name;
         selectedFileSize.textContent = (file.size / 1024).toFixed(1) + ' KB (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
 
+        // Smart auto-detect offset based on file size or name
+        if (file.size > 5 * 1024 * 1024 || file.name.toLowerCase().includes('factory') || file.name.toLowerCase().includes('merged')) {
+            document.getElementById('offsetPreset').value = '0x0';
+            handleOffsetChange('0x0');
+            terminal.writeLine('💡 File Full Factory terdeteksi (>5 MB). Alamat offset otomatis diset ke 0x0.');
+        } else {
+            document.getElementById('offsetPreset').value = '0x20000';
+            handleOffsetChange('0x20000');
+            terminal.writeLine('💡 File Aplikasi terdeteksi (<5 MB). Alamat offset otomatis diset ke 0x20000.');
+        }
+
         const reader = new FileReader();
         reader.onload = () => {
             selectedFileBuffer = reader.result;
@@ -497,7 +509,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         const offsetStr = document.getElementById('offsetInput').value.trim();
         const offset = parseInt(offsetStr, 16);
         if (isNaN(offset)) {
-            alert('Format offset salah! Gunakan format heksadesimal, misal: 0x20000');
+            alert('Format offset salah! Gunakan format heksadesimal, misal: 0x0 atau 0x20000');
             isFlashing = false;
             checkCanFlash();
             return;
