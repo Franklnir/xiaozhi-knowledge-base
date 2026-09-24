@@ -657,6 +657,19 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
     let transport = null;
     let esploader = null;
     let selectedFileBuffer = null;
+    // Helper: Convert ArrayBuffer / Uint8Array to Binary String for esptool-js
+    function ensureBinaryString(bufferOrString) {
+        if (!bufferOrString) return '';
+        if (typeof bufferOrString === 'string') return bufferOrString;
+        const bytes = bufferOrString instanceof Uint8Array ? bufferOrString : new Uint8Array(bufferOrString);
+        let binary = '';
+        const chunkSize = 32768; // 32KB chunks to prevent call-stack overflow
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+        }
+        return binary;
+    }
+
     let isFlashing = false;
     let currentSourceMode = 'custom';
 
@@ -1027,14 +1040,14 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             }
 
             const buffer = await resp.arrayBuffer();
-            selectedFileBuffer = buffer;
+            selectedFileBuffer = ensureBinaryString(buffer);
 
             // Update UI
             if (selectedFileInfo) selectedFileInfo.style.display = 'block';
             if (selectedFileName) selectedFileName.textContent = 'esp32_s3_n16r8_cam_full_factory.bin (Official Preset)';
             if (selectedFileSize) {
-                const mb = (buffer.byteLength / (1024 * 1024)).toFixed(2);
-                selectedFileSize.textContent = `${mb} MB (${buffer.byteLength.toLocaleString()} bytes) • Terkunci di Offset 0x0`;
+                const mb = (selectedFileBuffer.length / (1024 * 1024)).toFixed(2);
+                selectedFileSize.textContent = `${mb} MB (${selectedFileBuffer.length.toLocaleString()} bytes) • Terkunci di Offset 0x0`;
             }
 
             // Lock offset to 0x0
@@ -1103,11 +1116,11 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         }
         const reader = new FileReader();
         reader.onload = function(e) {
-            selectedFileBuffer = e.target.result;
+            selectedFileBuffer = ensureBinaryString(e.target.result);
             selectedFileInfo.style.display = 'block';
             selectedFileName.textContent = file.name;
-            const mb = (file.size / (1024 * 1024)).toFixed(2);
-            selectedFileSize.textContent = `${mb} MB (${file.size.toLocaleString()} bytes)`;
+            const mb = (selectedFileBuffer.length / (1024 * 1024)).toFixed(2);
+            selectedFileSize.textContent = `${mb} MB (${selectedFileBuffer.length.toLocaleString()} bytes)`;
             if (offsetPreset) offsetPreset.disabled = false;
 
             if (file.size > 2 * 1024 * 1024) {
@@ -1262,7 +1275,14 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         logToConsole('============================================================');
         logToConsole(`[FLASH] Memulai Flashing Firmware...`);
         logToConsole(`[FLASH] Alamat Offset : 0x${offset.toString(16).toUpperCase()}`);
-        logToConsole(`[FLASH] Ukuran File   : ${(selectedFileBuffer.byteLength / 1024).toFixed(1)} KB`);
+        const binaryData = ensureBinaryString(selectedFileBuffer);
+        if (!binaryData || binaryData.length === 0) {
+            alert('File firmware kosong atau belum terbaca sempurna!');
+            isFlashing = false;
+            btnFlash.disabled = false;
+            return;
+        }
+        logToConsole(`[FLASH] Ukuran File   : ${(binaryData.length / 1024).toFixed(1)} KB (${binaryData.length.toLocaleString()} bytes)`);
         logToConsole(`[FLASH] Erase All     : ${eraseAll ? 'YA' : 'TIDAK'}`);
         logToConsole(`[FLASH] Auto Reset    : ${autoReset ? 'YA' : 'TIDAK'}`);
         logToConsole('============================================================');
@@ -1276,7 +1296,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             }
 
             const fileArray = [{
-                data: selectedFileBuffer,
+                data: binaryData,
                 address: offset
             }];
 
