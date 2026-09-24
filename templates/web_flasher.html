@@ -1287,6 +1287,10 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         logToConsole(`[FLASH] Erase All     : ${eraseAll ? 'YA' : 'TIDAK'}`);
         logToConsole(`[FLASH] Auto Reset    : ${autoReset ? 'YA' : 'TIDAK'}`);
         logToConsole('============================================================');
+        progressStatusText.textContent = 'Mengompresi data & menyiapkan chip ESP32...';
+        logToConsole('[INFO] Mengompresi binary firmware & menyiapkan chip flash...');
+        // Yield thread agar DOM render update seketika di layar pengguna
+        await new Promise(resolve => setTimeout(resolve, 80));
 
         try {
             try {
@@ -1316,9 +1320,11 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                     const percent = Math.min(100, Math.round((written / total) * 100));
                     progressBar.style.width = `${percent}%`;
                     progressPercent.textContent = `${percent}%`;
-                    progressStatusText.textContent = `Menulis flash: ${percent}% (${(written/1024).toFixed(0)} KB / ${(total/1024).toFixed(0)} KB)`;
-                },
-                calculateMD5Hash: (image) => CryptoJS.MD5(CryptoJS.enc.Latin1.parse(image)).toString()
+                    const writtenKB = (written / 1024).toFixed(0);
+                    const totalKB = (total / 1024).toFixed(0);
+                    progressStatusText.textContent = `Menulis flash ke ESP32: ${percent}% (${writtenKB} KB / ${totalKB} KB)`;
+                }
+                // Hapus calculateMD5Hash dengan CryptoJS pada string 9.6MB agar browser tidak freeze/hang 20 detik
             };
 
             await esploader.writeFlash(flashOptions);
