@@ -1,4 +1,5 @@
-from fastapi import Response
+from fastapi import APIRouter, Query, Request, Form, WebSocket, WebSocketDisconnect, HTTPException, Response
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from xiaozhi.services.preset_approval_service import (
     get_user_status,
     is_user_authorized,
@@ -10,8 +11,15 @@ import asyncio
 import json
 import logging
 from typing import Optional
-from fastapi import APIRouter, Query, Request, Form, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, Request, Form, WebSocket, WebSocketDisconnect, HTTPException, Response
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from xiaozhi.services.preset_approval_service import (
+    get_user_status,
+    is_user_authorized,
+    request_access as request_preset_access,
+    get_decrypted_preset_binary,
+    PRESETS,
+)
 
 from xiaozhi.config import CHAT_HISTORY_DEFAULT_LIMIT, ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
@@ -361,7 +369,7 @@ async def stream_preset_binary_api(request: Request, preset_id: str):
     if not is_user_authorized(user, preset_id):
         raise HTTPException(
             status_code=403,
-            detail="Akses ditolak. Lisensi preset ini memerlukan persetujuan Admin.",
+            detail="Akses Ditolak: Preset komersial ini membutuhkan izin lisensi dari Administrator. Silakan ajukan izin akses terlebih dahulu.",
         )
     try:
         preset_info = PRESETS.get(preset_id)
@@ -378,7 +386,10 @@ async def stream_preset_binary_api(request: Request, preset_id: str):
                 "X-Firmware-Offset": preset_info.get("offset", "0x0"),
             },
         )
+    except HTTPException:
+        raise
     except Exception as exc:
+        logger.error(f"Error streaming preset binary: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Gagal memuat binary preset: {str(exc)}")
 
 

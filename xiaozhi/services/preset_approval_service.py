@@ -10,12 +10,15 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 logger = logging.getLogger("xiaozhi.preset_approval")
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
+
 PRESETS = {
     "esp32s3_cam": {
         "id": "esp32s3_cam",
         "name": "ESP32-S3 N16R8 / CAM (Full Factory Merged 0x0)",
         "filename": "esp32_s3_n16r8_cam_full_factory.bin",
-        "enc_rel_path": "xiaozhi/protected_assets/firmware/esp32_s3_n16r8_cam_full_factory.bin.enc",
+        "enc_rel_path": "protected_assets/firmware/esp32_s3_n16r8_cam_full_factory.bin.enc",
         "offset": "0x0",
         "size_bytes": 9651352,
         "chip": "ESP32-S3",
@@ -23,20 +26,26 @@ PRESETS = {
     }
 }
 
-DATA_FILE = Path("data/preset_flasher_access.json")
-
+def _get_data_file() -> Path:
+    # Check both project root data and relative data
+    p1 = PROJECT_ROOT / "data" / "preset_flasher_access.json"
+    if p1.parent.exists():
+        return p1
+    p2 = Path("data/preset_flasher_access.json")
+    p2.parent.mkdir(parents=True, exist_ok=True)
+    return p2
 
 def _get_aesgcm() -> AESGCM:
     secret = os.getenv("FIRMWARE_PRESET_SECRET", "xiaozhi-esp32-preset-secure-token-2026-v1")
     key = hashlib.sha256(secret.encode()).digest()
     return AESGCM(key)
 
-
 def _load_data() -> Dict[str, Any]:
-    if not DATA_FILE.exists():
+    data_file = _get_data_file()
+    if not data_file.exists():
         return {"requests": [], "granted_users": {}}
     try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
+        with open(data_file, "r", encoding="utf-8") as f:
             data = json.load(f)
             if "requests" not in data:
                 data["requests"] = []
@@ -47,14 +56,14 @@ def _load_data() -> Dict[str, Any]:
         logger.error(f"Gagal memuat preset_flasher_access.json: {e}")
         return {"requests": [], "granted_users": {}}
 
-
 def _save_data(data: Dict[str, Any]) -> None:
-    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temp_file = DATA_FILE.with_suffix(".tmp")
+    data_file = _get_data_file()
+    data_file.parent.mkdir(parents=True, exist_ok=True)
+    temp_file = data_file.with_suffix(".tmp")
     try:
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        temp_file.replace(DATA_FILE)
+        temp_file.replace(data_file)
     except Exception as e:
         logger.error(f"Gagal menyimpan preset_flasher_access.json: {e}")
         if temp_file.exists():
@@ -62,7 +71,6 @@ def _save_data(data: Dict[str, Any]) -> None:
                 temp_file.unlink()
             except Exception:
                 pass
-
 
 def is_user_authorized(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_cam") -> bool:
     if not user:
@@ -88,7 +96,6 @@ def is_user_authorized(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3
                 return True
 
     return False
-
 
 def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_cam") -> Dict[str, Any]:
     preset_info = PRESETS.get(preset_id)
@@ -152,7 +159,6 @@ def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_ca
         "message": "Preset berlisensi ini memerlukan persetujuan Admin",
     }
 
-
 def request_access(user: Dict[str, Any], preset_id: str = "esp32s3_cam", note: str = "") -> Dict[str, Any]:
     if is_user_authorized(user, preset_id):
         return {
@@ -196,7 +202,6 @@ def request_access(user: Dict[str, Any], preset_id: str = "esp32s3_cam", note: s
         "request_id": req_id,
     }
 
-
 def approve_request(request_id: str, admin_user: Dict[str, Any]) -> bool:
     data = _load_data()
     found = False
@@ -222,7 +227,6 @@ def approve_request(request_id: str, admin_user: Dict[str, Any]) -> bool:
         _save_data(data)
     return found
 
-
 def reject_request(request_id: str, admin_user: Dict[str, Any], reason: str = "") -> bool:
     data = _load_data()
     found = False
@@ -244,7 +248,6 @@ def reject_request(request_id: str, admin_user: Dict[str, Any], reason: str = ""
     if found:
         _save_data(data)
     return found
-
 
 def grant_access_direct(username: str, admin_user: Dict[str, Any], preset_id: str = "esp32s3_cam") -> bool:
     username = username.strip().lower()
@@ -268,7 +271,6 @@ def grant_access_direct(username: str, admin_user: Dict[str, Any], preset_id: st
     _save_data(data)
     return True
 
-
 def revoke_access(username: str, admin_user: Dict[str, Any], preset_id: str = "esp32s3_cam") -> bool:
     username = username.strip().lower()
     data = _load_data()
@@ -286,28 +288,39 @@ def revoke_access(username: str, admin_user: Dict[str, Any], preset_id: str = "e
         _save_data(data)
     return changed
 
-
 def list_all_requests() -> List[Dict[str, Any]]:
     data = _load_data()
     return data.get("requests", [])
 
-
 def list_granted_users() -> Dict[str, Any]:
     data = _load_data()
     return data.get("granted_users", {})
-
 
 def get_decrypted_preset_binary(preset_id: str = "esp32s3_cam") -> bytes:
     preset_info = PRESETS.get(preset_id)
     if not preset_info:
         raise ValueError(f"Preset tidak ditemukan: {preset_id}")
 
-    enc_path = Path(preset_info["enc_rel_path"])
-    if not enc_path.exists():
-        raise FileNotFoundError(f"File terenkripsi tidak ditemukan di server: {enc_path}")
+    # Check candidate paths
+    candidates = [
+        BASE_DIR / preset_info["enc_rel_path"],
+        PROJECT_ROOT / "xiaozhi" / preset_info["enc_rel_path"],
+        Path("xiaozhi") / preset_info["enc_rel_path"],
+    ]
+    enc_path = None
+    for cand in candidates:
+        if cand.exists():
+            enc_path = cand
+            break
+
+    if not enc_path:
+        raise FileNotFoundError(f"File terenkripsi firmware tidak ditemukan di: {[str(c) for c in candidates]}")
 
     aesgcm = _get_aesgcm()
     enc_data = enc_path.read_bytes()
+    if len(enc_data) < 28:
+        raise ValueError(f"File terenkripsi rusak atau belum diunduh lengkap dari Git LFS: ukuran {len(enc_data)} bytes.")
+
     nonce = enc_data[:12]
     ciphertext = enc_data[12:]
     raw_binary = aesgcm.decrypt(nonce, ciphertext, None)
