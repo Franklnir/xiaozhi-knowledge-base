@@ -166,16 +166,14 @@
         </a>
     </div>
 
+    <!-- CLEAN MINIMAL HEADER (Panduan dipindahkan ke dalam Preset agar tidak memenuhi tempat) -->
     <header class="app-page-header" style="margin-bottom:20px;">
         <div>
             <p class="app-eyebrow">Hardware Flashing Tool</p>
             <h1 class="app-title">⚡ Web Serial Flasher ESP32</h1>
             <p class="app-subtitle">Flash firmware binary langsung ke peranti ESP32 via peramban Web Serial API tanpa perlu instalasi driver atau tools Python.</p>
         </div>
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <button type="button" onclick="openGuideModal()" class="app-button app-button-ghost" style="font-size:12px; font-weight:800; border:1.5px solid var(--app-border-strong); display:flex; align-items:center; gap:6px;">
-                <span>📖</span> Panduan &amp; Dataset PIN GPIO
-            </button>
+        <div>
             <div id="connStatusBadge" class="app-status-pill is-offline">
                 <span class="app-status-dot"></span>
                 <span id="connStatusText">Port Belum Terhubung</span>
@@ -280,20 +278,29 @@
                 <!-- TAB 2: OFFICIAL PRESET VIEW (ADMIN APPROVED ONLY, FLASH ONLY - NO DOWNLOAD) -->
                 <div id="panelPreset" style="display:none;">
                     <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:14px;">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
                             <div>
                                 <strong style="font-size:14px; color:var(--app-text); display:flex; align-items:center; gap:6px;">
                                     <span>🎯</span> ESP32-S3 N16R8 / CAM Full Factory Merged
                                 </strong>
                                 <span style="font-size:11.5px; color:var(--app-muted); display:block; margin-top:2px;">
-                                    Binary resmi (~9.65 MB) • Lengkap Bootloader, Partisi, OTA, Voice App, Aset UI &amp; Audio.
+                                    Binary komersial resmi (~9.65 MB) • Bootloader, Partisi, OTA, Voice App, Aset UI &amp; Audio.
                                 </span>
                             </div>
-                            <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">Offset 0x0</span>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">Offset 0x0</span>
+                            </div>
+                        </div>
+
+                        <!-- TOMBOL BUKU PANDUAN & DATASET PIN (DITARUH DI DALAM PRESET AGAR TIDAK MEMENUHI TEMPAT) -->
+                        <div style="margin-bottom:12px;">
+                            <button type="button" onclick="openGuideModal()" class="app-button app-button-ghost app-button-small" style="font-size:11.5px; font-weight:750; width:100%; justify-content:center; border:1px solid var(--app-border-strong); background:var(--app-surface);">
+                                📖 Buka Panduan Flashing &amp; Dataset PIN GPIO Layar/Audio
+                            </button>
                         </div>
 
                         <!-- Status & Action Box -->
-                        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--app-border);">
+                        <div style="padding-top:10px; border-top:1px solid var(--app-border);">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
                                 <div>
                                     <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:850;">
@@ -405,7 +412,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                     <li>Gunakan <strong>Preset Resmi (ESP32-S3)</strong> dengan offset <strong>0x0</strong> untuk peranti yang masih baru.</li>
                     <li>Gunakan peramban Chromium (Google Chrome, Microsoft Edge, Opera, Brave).</li>
                     <li>Pastikan kabel USB mendukung transfer data (bukan sekadar kabel charging biasa).</li>
-                    <li>Untuk skema koneksi kabel modul layar/audio/kamera, klik tombol <strong>📖 Panduan &amp; Dataset PIN GPIO</strong> di atas.</li>
+                    <li>Panduan lengkap pinout layar/audio dapat dibuka lewat tombol panduan di dalam panel Preset.</li>
                 </ul>
             </div>
         </div>
@@ -506,15 +513,15 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 </div>
 
 <!-- ======================================================== -->
-<!-- MODAL: BUKU PANDUAN & DATASET PIN GPIO (WIFI-PORTAL STYLE) -->
+<!-- MODAL: BUKU PANDUAN & DATASET PIN LENGKAP SEMUA LAYAR    -->
 <!-- ======================================================== -->
 <div id="guideModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
-    <div class="mcp-blocking-box" style="max-width:680px; text-align:left; max-height:88vh; display:flex; flex-direction:column;">
+    <div class="mcp-blocking-box" style="max-width:700px; text-align:left; max-height:88vh; display:flex; flex-direction:column;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:10px;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:20px;">📖</span>
                 <h2 style="font-size:16.5px; font-weight:850; margin:0; color:var(--app-text);">
-                    Buku Panduan &amp; Dataset PIN GPIO Hardware
+                    Buku Panduan Flashing &amp; Dataset PIN GPIO Hardware
                 </h2>
             </div>
             <button type="button" onclick="closeGuideModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
@@ -526,7 +533,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 📑 Petunjuk Flashing Board Baru
             </button>
             <button type="button" id="modalTabBtnPin" class="source-tab-btn" style="padding:7px 12px; font-size:12px;" onclick="switchModalTab('pin')">
-                🔌 Dataset PIN GPIO (Dropdown Hardware)
+                🔌 Dataset PIN GPIO (Dropdown Hardware Lengkap)
             </button>
         </div>
 
@@ -566,25 +573,39 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 <div style="padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--app-radius); color:#1e3a8a;">
                     <strong>📶 Konfigurasi Wi-Fi Awal Setelah Flashing:</strong>
                     <p style="margin:4px 0 0; font-size:12px;">
-                        Setelah chip restart, sambungkan HP/Laptop ke hotspot Wi-Fi <strong>Xiaozhi-XXXX</strong>. Buka browser ke <strong>192.168.4.1</strong> untuk menyambungkan asisten suara ke Wi-Fi rumah/kantor Anda.
+                        Setelah chip restart, sambungkan HP/Laptop ke hotspot Wi-Fi <strong>Xiaozhi-XXXX</strong>. Buka browser ke <strong>192.168.4.1</strong> untuk menyambungkan asisten suara ke Wi-Fi rumah/kantor Anda dan memilih tipe layar Anda di portal Wi-Fi.
                     </p>
                 </div>
             </div>
 
-            <!-- SUB-TAB 2: DATASET PIN GPIO TERPAKAI (WIFI-PORTAL DROPDOWN STYLE) -->
+            <!-- SUB-TAB 2: DATASET PIN GPIO TERPAKAI (LENGKAP SEMUA JENIS LAYAR FIRMWARE) -->
             <div id="modalPanelPin" style="display:none;">
                 <div style="margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
                     <label style="font-size:12.5px; font-weight:800; color:var(--app-text); display:flex; align-items:center; gap:6px;">
-                        <span>⚙️</span> Pilih Preset Hardware / Layar:
+                        <span>⚙️</span> Pilih Jenis Layar / Modul Hardware:
                     </label>
-                    <select id="pinModuleSelect" class="app-input" onchange="renderPinDataset(this.value)" style="padding:7px 12px; font-size:12.5px; font-weight:750; min-width:260px; background:var(--app-surface);">
-                        <option value="st7789_240x280_8p" selected>📺 Layar ST7789 240x280 8-Pin SPI (Bawaan Preset)</option>
-                        <option value="st7789_240x240_7p">📺 Layar ST7789 240x240 7-Pin SPI (Tanpa CS)</option>
-                        <option value="oled_128x64">📺 Layar OLED SSD1306 128x64 (I2C)</option>
-                        <option value="audio">🎤 Audio I2S (Mic INMP441 &amp; Spk MAX98357A)</option>
-                        <option value="camera">📷 Modul Kamera OV2640 / GC2145 (ESP32-S3 CAM)</option>
-                        <option value="buttons">🔘 Tombol Kontrol, Sensor Baterai &amp; LED</option>
-                        <option value="all">📑 Lihat Seluruh Pin Sekaligus (Dataset Lengkap)</option>
+                    <select id="pinModuleSelect" class="app-input" onchange="renderPinDataset(this.value)" style="padding:7px 12px; font-size:12px; font-weight:750; min-width:300px; background:var(--app-surface);">
+                        <optgroup label="📺 Layar TFT LCD SPI (ST7789)">
+                            <option value="st7789_240x280_8p" selected>ST7789 240x280 1.69" (8-Pin SPI, CS=45) [Bawaan Firmware]</option>
+                            <option value="st7789_240x280_7p">ST7789 240x280 1.69" (7-Pin SPI, Tanpa CS)</option>
+                            <option value="st7789_240x240_8p">ST7789 240x240 1.54" (8-Pin SPI, CS=45)</option>
+                            <option value="st7789_240x240_7p">ST7789 240x240 1.3" / 1.54" (7-Pin SPI, Tanpa CS)</option>
+                            <option value="st7789_172x320_8p">ST7789 172x320 1.47" (8-Pin SPI, CS=45)</option>
+                            <option value="st7789_240x320_8p">ST7789 240x320 2.0" / 2.4" / 2.8" (8-Pin SPI, CS=45)</option>
+                        </optgroup>
+                        <optgroup label="📺 Layar OLED (I2C)">
+                            <option value="oled_128x64">OLED SSD1306 128x64 0.96" (I2C)</option>
+                            <option value="oled_sh1106_128x64">OLED SH1106 128x64 0.96" / 1.3" (I2C)</option>
+                        </optgroup>
+                        <optgroup label="🔇 Mode Lainnya">
+                            <option value="headless">Tanpa Layar (Headless / Speaker &amp; Mic Only)</option>
+                        </optgroup>
+                        <optgroup label="🎤 Modul Suara, Kamera &amp; Tombol">
+                            <option value="audio">Audio I2S (Mic INMP441 &amp; Speaker MAX98357A)</option>
+                            <option value="camera">Kamera OV2640 / OV3660 / OV5640 / GC2145 (ESP32-S3 CAM)</option>
+                            <option value="buttons">Tombol Kontrol, Sensor Baterai &amp; LED</option>
+                            <option value="all">📑 Ringkasan Seluruh Pin Hardware Terpakai</option>
+                        </optgroup>
                     </select>
                 </div>
 
@@ -593,7 +614,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 </div>
 
                 <div style="margin-top:10px; padding:8px 12px; background:var(--app-surface-muted); border-radius:var(--app-radius); font-size:11.5px; color:var(--app-muted); line-height:1.4;">
-                    🔒 <strong>Permanen:</strong> Skema dataset pin di atas telah diprogram secara tetap di firmware untuk kompatibilitas optimal hardware WeAct ESP32-S3 N16R8.
+                    🔒 <strong>Permanen:</strong> Skema dataset pin di atas telah diprogram secara native di firmware untuk kompatibilitas optimal hardware WeAct ESP32-S3 N16R8. Pengguna dapat berganti jenis layar kapan saja melalui portal Wi-Fi <strong>192.168.4.1</strong> setelah flashing.
                 </div>
             </div>
         </div>
@@ -809,40 +830,105 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         }
     };
 
-    // PIN DATASETS (Matches WeAct ESP32-S3 & Wi-Fi configuration portal exactly)
+    // ALL SUPPORTED HARDWARE & SCREENS DATASETS (ST7789 all variants, OLEDs, Headless, Audio, Camera, Buttons)
     const PIN_DATASETS = {
         'st7789_240x280_8p': {
-            title: '📺 Layar ST7789 240x280 SPI 8-Pin (Bawaan Preset Resmi)',
-            desc: 'Koneksi bus SPI LCD ST7789 1.69" 240x280 dengan chip select (CS)',
+            title: '📺 Layar ST7789 240x280 1.69" 8-Pin SPI (Bawaan Preset Resmi)',
+            desc: 'Koneksi SPI dengan Chip Select (CS) aktif low',
             pins: [
-                { name: 'SCL / SCK', desc: 'SPI3 Clock', gpio: 'GPIO 19' },
-                { name: 'SDA / MOSI', desc: 'SPI3 Master Out', gpio: 'GPIO 20' },
-                { name: 'RES / RST', desc: 'Display Hardware Reset', gpio: 'GPIO 21' },
-                { name: 'DC', desc: 'Data / Command Register', gpio: 'GPIO 47' },
-                { name: 'CS', desc: 'Chip Select Active-Low', gpio: 'GPIO 45' },
+                { name: 'SCL / SCK', desc: 'SPI Clock', gpio: 'GPIO 19' },
+                { name: 'SDA / MOSI', desc: 'SPI Master Out Data', gpio: 'GPIO 20' },
+                { name: 'RES / RST', desc: 'Hardware Reset Layar', gpio: 'GPIO 21' },
+                { name: 'DC', desc: 'Data / Command Control', gpio: 'GPIO 47' },
+                { name: 'CS', desc: 'Chip Select Pin', gpio: 'GPIO 45' },
                 { name: 'BLK / BL', desc: 'Backlight Brightness PWM', gpio: 'GPIO 38' },
-                { name: 'VCC & GND', desc: 'Daya Layar (Gunakan 3.3V)', gpio: '3.3V & GND' }
+                { name: 'VCC & GND', desc: 'Tegangan Operasional 3.3V', gpio: '3.3V & GND' }
             ]
         },
-        'st7789_240x240_7p': {
-            title: '📺 Layar ST7789 240x240 SPI 7-Pin (Tanpa Pin CS)',
-            desc: 'Koneksi layar ST7789 1.3" atau 1.54" tanpa pin Chip Select',
+        'st7789_240x280_7p': {
+            title: '📺 Layar ST7789 240x280 1.69" 7-Pin SPI (Tanpa Pin CS)',
+            desc: 'Koneksi SPI 7-Pin di mana pin CS internal terhubung ke GND',
             pins: [
                 { name: 'SCL / SCK', desc: 'SPI Clock', gpio: 'GPIO 19' },
                 { name: 'SDA / MOSI', desc: 'SPI Data Out', gpio: 'GPIO 20' },
                 { name: 'RES / RST', desc: 'Reset Layar', gpio: 'GPIO 21' },
                 { name: 'DC', desc: 'Data / Command', gpio: 'GPIO 47' },
                 { name: 'BLK / BL', desc: 'Backlight PWM', gpio: 'GPIO 38' },
-                { name: 'CS', desc: 'Tidak Digunakan (Internal Ground)', gpio: 'NC / GND' }
+                { name: 'CS Pin', desc: 'Tidak Digunakan (Internal Ground)', gpio: 'NC / GND' }
+            ]
+        },
+        'st7789_240x240_8p': {
+            title: '📺 Layar ST7789 240x240 1.54" 8-Pin SPI (CS=GPIO 45)',
+            desc: 'Koneksi layar persegi ST7789 1.54 inch 8-Pin dengan CS',
+            pins: [
+                { name: 'SCL / SCK', desc: 'SPI Clock', gpio: 'GPIO 19' },
+                { name: 'SDA / MOSI', desc: 'SPI Data Out', gpio: 'GPIO 20' },
+                { name: 'RES / RST', desc: 'Hardware Reset', gpio: 'GPIO 21' },
+                { name: 'DC', desc: 'Data / Command Control', gpio: 'GPIO 47' },
+                { name: 'CS', desc: 'Chip Select', gpio: 'GPIO 45' },
+                { name: 'BLK / BL', desc: 'Backlight Brightness', gpio: 'GPIO 38' }
+            ]
+        },
+        'st7789_240x240_7p': {
+            title: '📺 Layar ST7789 240x240 1.3" / 1.54" 7-Pin SPI (Tanpa CS)',
+            desc: 'Koneksi layar persegi ST7789 1.3 inch 7-Pin (Hanya 5 pin kontrol)',
+            pins: [
+                { name: 'SCL / SCK', desc: 'SPI Clock', gpio: 'GPIO 19' },
+                { name: 'SDA / MOSI', desc: 'SPI Data Out', gpio: 'GPIO 20' },
+                { name: 'RES / RST', desc: 'Reset Pin', gpio: 'GPIO 21' },
+                { name: 'DC', desc: 'Data / Command', gpio: 'GPIO 47' },
+                { name: 'BLK / BL', desc: 'Backlight PWM', gpio: 'GPIO 38' },
+                { name: 'CS Pin', desc: 'Tidak Digunakan (Internal Ground)', gpio: 'NC / GND' }
+            ]
+        },
+        'st7789_172x320_8p': {
+            title: '📺 Layar ST7789 172x320 1.47" 8-Pin SPI',
+            desc: 'Koneksi layar persegi panjang (narrow) ST7789 1.47 inch',
+            pins: [
+                { name: 'SCL / SCK', desc: 'SPI Clock', gpio: 'GPIO 19' },
+                { name: 'SDA / MOSI', desc: 'SPI Data Out', gpio: 'GPIO 20' },
+                { name: 'RES / RST', desc: 'Reset Layar', gpio: 'GPIO 21' },
+                { name: 'DC', desc: 'Data / Command', gpio: 'GPIO 47' },
+                { name: 'CS', desc: 'Chip Select', gpio: 'GPIO 45' },
+                { name: 'BLK / BL', desc: 'Backlight PWM', gpio: 'GPIO 38' }
+            ]
+        },
+        'st7789_240x320_8p': {
+            title: '📺 Layar ST7789 240x320 2.0" / 2.4" / 2.8" SPI',
+            desc: 'Koneksi layar ST7789 resolusi penuh 240x320',
+            pins: [
+                { name: 'SCL / SCK', desc: 'SPI Clock', gpio: 'GPIO 19' },
+                { name: 'SDA / MOSI', desc: 'SPI Data Out', gpio: 'GPIO 20' },
+                { name: 'RES / RST', desc: 'Reset Layar', gpio: 'GPIO 21' },
+                { name: 'DC', desc: 'Data / Command', gpio: 'GPIO 47' },
+                { name: 'CS', desc: 'Chip Select', gpio: 'GPIO 45' },
+                { name: 'BLK / BL', desc: 'Backlight PWM', gpio: 'GPIO 38' }
             ]
         },
         'oled_128x64': {
-            title: '📺 Layar OLED SSD1306 128x64 (I2C Bus)',
-            desc: 'Layar monokrom OLED I2C 0.96 inch',
+            title: '📺 Layar OLED SSD1306 128x64 0.96" (I2C Bus)',
+            desc: 'Layar monokrom OLED I2C 0.96 inch hemat daya',
             pins: [
                 { name: 'SCL', desc: 'I2C Clock Bus', gpio: 'GPIO 19' },
                 { name: 'SDA', desc: 'I2C Data Bus', gpio: 'GPIO 20' },
-                { name: 'VCC & GND', desc: 'Tegangan Operasional', gpio: '3.3V & GND' }
+                { name: 'VCC & GND', desc: 'Tegangan Operasional 3.3V', gpio: '3.3V & GND' }
+            ]
+        },
+        'oled_sh1106_128x64': {
+            title: '📺 Layar OLED SH1106 128x64 0.96" / 1.3" (I2C Bus)',
+            desc: 'Layar monokrom OLED SH1106 I2C 1.3 inch',
+            pins: [
+                { name: 'SCL', desc: 'I2C Clock Bus', gpio: 'GPIO 19' },
+                { name: 'SDA', desc: 'I2C Data Bus', gpio: 'GPIO 20' },
+                { name: 'VCC & GND', desc: 'Tegangan Operasional 3.3V', gpio: '3.3V & GND' }
+            ]
+        },
+        'headless': {
+            title: '🔇 Tanpa Layar (Headless / Voice Speaker Only)',
+            desc: 'Mode operasi tanpa layar tampilan (hanya audio suara dan mikrofon)',
+            pins: [
+                { name: 'Status Layar', desc: 'Layar dinonaktifkan di software', gpio: 'DISABLED' },
+                { name: 'Audio & Kamera', desc: 'Tetap berfungsi penuh normal', gpio: 'ACTIVE' }
             ]
         },
         'audio': {
@@ -858,7 +944,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             ]
         },
         'camera': {
-            title: '📷 Modul Kamera OV2640 / GC2145 (ESP32-S3 CAM)',
+            title: '📷 Modul Kamera OV2640 / OV3660 / OV5640 / GC2145 (ESP32-S3 CAM)',
             desc: 'Kamera DVP 8-bit bus untuk fitur vision asisten AI',
             pins: [
                 { name: 'SIOD / SDA', desc: 'SCCB I2C Data', gpio: 'GPIO 4' },
