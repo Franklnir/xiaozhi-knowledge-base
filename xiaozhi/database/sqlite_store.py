@@ -968,6 +968,57 @@ class SQLiteStore:
         conn.commit()
         return cursor.rowcount
 
+    def delete_chat_history_item(self, owner_id: int, chat_id: int) -> bool:
+        conn = self._get_conn()
+        cursor = conn.execute("DELETE FROM chat_history WHERE id = ? AND owner_id = ?", (chat_id, owner_id))
+        conn.commit()
+        return cursor.rowcount > 0
+
+    def get_today_users_activity(self, today_date: str = "") -> Dict[int, Dict[str, Any]]:
+        """Ambil ringkasan aktivitas user hari ini (stream youtube, mcp tools yang terpanggil)."""
+        if not today_date:
+            from datetime import datetime
+            today_date = datetime.now().strftime("%Y-%m-%d")
+        conn = self._get_conn()
+        sql = """
+            SELECT owner_id, tool_name, source, user_message, xiaozhi_answer, created_at
+            FROM chat_history
+            WHERE (DATE(created_at) = ? OR created_at LIKE ?)
+            ORDER BY id DESC
+        """
+        rows = conn.execute(sql, (today_date, f"{today_date}%")).fetchall()
+        activity: Dict[int, Dict[str, Any]] = {}
+        for r in rows:
+            uid = int(r["owner_id"])
+            if uid not in activity:
+                activity[uid] = {
+                    "tools_count": 0,
+                    "youtube_count": 0,
+                    "tools_list": [],
+                    "last_tool": "",
+                    "last_activity_time": "",
+                    "last_message_preview": "",
+                }
+            tname = str(r["tool_name"] or "").strip()
+            source = str(r["source"] or "").strip()
+            is_yt = ("youtube" in tname.lower()) or ("youtube" in source.lower())
+            if is_yt:
+                activity[uid]["youtube_count"] += 1
+            if tname:
+                activity[uid]["tools_count"] += 1
+                if tname not in activity[uid]["tools_list"]:
+                    activity[uid]["tools_list"].append(tname)
+            if not activity[uid]["last_tool"] and tname:
+                activity[uid]["last_tool"] = tname
+            if not activity[uid]["last_activity_time"] and r["created_at"]:
+                raw_time = str(r["created_at"])
+                activity[uid]["last_activity_time"] = raw_time[11:16] if len(raw_time) >= 16 else raw_time
+            if not activity[uid]["last_message_preview"]:
+                msg = str(r["user_message"] or r["xiaozhi_answer"] or "")
+                if msg:
+                    activity[uid]["last_message_preview"] = msg[:60]
+        return activity
+
     # ── User Persona & Preferences ─────────────────────────────────────────
 
     def save_user_preference(

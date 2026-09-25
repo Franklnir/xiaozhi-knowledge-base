@@ -1446,6 +1446,61 @@ class HFJsonStore:
                 self._commit(data, "Clear Xiaozhi chat history")
             return removed
 
+    def delete_chat_history_item(self, owner_id: int, chat_id: int) -> bool:
+        with self._lock:
+            data = self._load()
+            before = len(data.get("chat_history", []))
+            data["chat_history"] = [
+                item for item in data.get("chat_history", [])
+                if not (int(item.get("owner_id", 0)) == int(owner_id) and int(item.get("id", 0)) == int(chat_id))
+            ]
+            removed = before - len(data["chat_history"])
+            if removed:
+                self._commit(data, "Delete chat history item")
+            return removed > 0
+
+    def get_today_users_activity(self, today_date: str = "") -> Dict[int, Dict[str, Any]]:
+        """Ambil ringkasan aktivitas user hari ini (stream youtube, mcp tools yang terpanggil)."""
+        if not today_date:
+            from datetime import datetime
+            today_date = datetime.now().strftime("%Y-%m-%d")
+        data = self._load()
+        activity: Dict[int, Dict[str, Any]] = {}
+        for r in data.get("chat_history", []):
+            created_at = str(r.get("created_at", ""))
+            if not (created_at.startswith(today_date)):
+                continue
+            uid = int(r.get("owner_id", 0))
+            if not uid:
+                continue
+            if uid not in activity:
+                activity[uid] = {
+                    "tools_count": 0,
+                    "youtube_count": 0,
+                    "tools_list": [],
+                    "last_tool": "",
+                    "last_activity_time": "",
+                    "last_message_preview": "",
+                }
+            tname = str(r.get("tool_name") or "").strip()
+            source = str(r.get("source") or "").strip()
+            is_yt = ("youtube" in tname.lower()) or ("youtube" in source.lower())
+            if is_yt:
+                activity[uid]["youtube_count"] += 1
+            if tname:
+                activity[uid]["tools_count"] += 1
+                if tname not in activity[uid]["tools_list"]:
+                    activity[uid]["tools_list"].append(tname)
+            if not activity[uid]["last_tool"] and tname:
+                activity[uid]["last_tool"] = tname
+            if not activity[uid]["last_activity_time"] and created_at:
+                activity[uid]["last_activity_time"] = created_at[11:16] if len(created_at) >= 16 else created_at
+            if not activity[uid]["last_message_preview"]:
+                msg = str(r.get("user_message") or r.get("xiaozhi_answer") or "")
+                if msg:
+                    activity[uid]["last_message_preview"] = msg[:60]
+        return activity
+
     # ── User Persona & Preferences ─────────────────────────────────────────
 
     def save_user_preference(

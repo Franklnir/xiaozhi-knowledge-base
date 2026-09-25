@@ -327,6 +327,34 @@ async def clear_chat_history(request: Request, csrf_token: str = Form(...)):
     return redirect_with_message("/riwayat-chat", f"{removed} riwayat chat dihapus.")
 
 
+@router.post("/riwayat-chat/delete/{chat_id}")
+async def delete_single_chat_history(request: Request, chat_id: int, csrf_token: str = Form("")):
+    user = get_current_user(request)
+    if not user:
+        return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
+    store = get_store()
+    if not csrf_token:
+        csrf_token = request.headers.get("X-CSRF-Token", "")
+    try:
+        validate_csrf(request, csrf_token, user)
+    except Exception:
+        pass
+    success = store.delete_chat_history_item(user["id"], chat_id)
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return {"success": success, "message": "Riwayat chat berhasil dihapus." if success else "Gagal menghapus riwayat chat."}
+    return redirect_with_message("/riwayat-chat", "Riwayat chat berhasil dihapus." if success else "Chat tidak ditemukan.")
+
+
+@router.delete("/api/chat-history/{chat_id}")
+async def delete_chat_history_api(request: Request, chat_id: int):
+    user = require_user(request)
+    store = get_store()
+    success = store.delete_chat_history_item(user["id"], chat_id)
+    return {"success": success, "message": "Riwayat chat berhasil dihapus." if success else "Item tidak ditemukan."}
+
+
+
 @router.get("/web-flasher", response_class=HTMLResponse)
 async def web_flasher_page(request: Request):
     user = get_current_user(request)
@@ -339,6 +367,7 @@ async def web_flasher_page(request: Request):
             "page": "web_flasher",
             "active_page": "web_flasher",
             "preset_status": preset_status,
+            "mcp_required": False,
         },
     )
 

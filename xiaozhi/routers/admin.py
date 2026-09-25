@@ -48,9 +48,17 @@ def get_admin_dashboard_snapshot() -> Dict[str, Any]:
         for s in active_streams if s.get("device_mac") and not str(s.get("device_mac", "")).lower().startswith("esp32 board")
     }
 
-    # Attach YouTube active stream info to each user
+    # Fetch today's activity (stream youtube & mcp tools called)
+    today_activities = {}
+    try:
+        today_activities = store.get_today_users_activity()
+    except Exception as e:
+        logger.warning("Failed to fetch today activity: %s", e)
+
+    # Attach YouTube active stream info and today's activity to each user
     for u in managed_users:
-        stream = active_user_map.get(int(u["id"]))
+        uid = int(u["id"])
+        stream = active_user_map.get(uid)
         if not stream and u.get("device_mac"):
             clean_mac = str(u["device_mac"]).replace(":", "").replace("-", "").strip().lower()
             stream = active_mac_map.get(clean_mac)
@@ -59,12 +67,35 @@ def get_admin_dashboard_snapshot() -> Dict[str, Any]:
             u["is_playing"] = True
             u["current_track"] = stream.get("title", "")
 
+        user_act = dict(today_activities.get(uid, {
+            "tools_count": 0,
+            "youtube_count": 0,
+            "tools_list": [],
+            "last_tool": "",
+            "last_activity_time": "",
+            "last_message_preview": "",
+        }))
+        if stream or u.get("is_playing"):
+            user_act["youtube_count"] = max(1, user_act.get("youtube_count", 0))
+
+        has_stream_today = bool(user_act.get("youtube_count", 0) > 0 or u.get("is_playing") or stream)
+        has_tools_today = bool(user_act.get("tools_count", 0) > 0)
+        has_activity_today = has_stream_today or has_tools_today
+
+        user_act["has_activity"] = has_activity_today
+        user_act["has_stream"] = has_stream_today
+        user_act["has_tools"] = has_tools_today
+        u["activity_today"] = user_act
+
     totals = {
         "users": len(managed_users),
         "materials": sum(u.get("usage", {}).get("materials", 0) for u in managed_users),
         "live_apis": sum(u.get("usage", {}).get("live_apis", 0) for u in managed_users),
         "relay_rooms": sum(u.get("usage", {}).get("relay_rooms", 0) for u in managed_users),
         "youtube_active": len(active_streams),
+        "users_active_today": sum(1 for u in managed_users if u.get("activity_today", {}).get("has_activity")),
+        "users_tools_today": sum(1 for u in managed_users if u.get("activity_today", {}).get("has_tools")),
+        "users_stream_today": sum(1 for u in managed_users if u.get("activity_today", {}).get("has_stream")),
     }
 
     return {
