@@ -351,10 +351,10 @@
                             </div>
                         </div>
 
-                        <!-- TOMBOL BUKU PANDUAN & DATASET PIN -->
-                        <div style="margin-bottom:12px;">
+                        <!-- TOMBOL BUKU PANDUAN & DATASET PIN (KHUSUS PRESET ID: esp32s3_cam) -->
+                        <div id="boxGuideButton" style="{% if not preset_status or not preset_status.preset or preset_status.preset.id != 'esp32s3_cam' %}display:none;{% endif %} margin-bottom:12px;">
                             <button type="button" onclick="openGuideModal()" class="app-button app-button-ghost app-button-small" style="font-size:11.5px; font-weight:750; width:100%; justify-content:center; border:1px solid var(--app-border-strong); background:var(--app-surface);">
-                                📖 Buka Panduan Flashing &amp; Dataset PIN GPIO Layar/Audio
+                                📖 Buka Buku Panduan &amp; Skema PIN GPIO (Khusus ID: esp32s3_cam)
                             </button>
                         </div>
 
@@ -549,16 +549,20 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 </div>
 
 <!-- ======================================================== -->
-<!-- MODAL: BUKU PANDUAN & DATASET PIN LENGKAP SEMUA LAYAR    -->
+<!-- MODAL: BUKU PANDUAN & DATASET PIN (KHUSUS esp32s3_cam)   -->
 <!-- ======================================================== -->
 <div id="guideModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
     <div class="mcp-blocking-box" style="max-width:700px; text-align:left; max-height:88vh; display:flex; flex-direction:column;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:10px;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:20px;">📖</span>
-                <h2 style="font-size:16.5px; font-weight:850; margin:0; color:var(--app-text);">
-                    Buku Panduan Flashing &amp; Dataset PIN GPIO Hardware
-                </h2>
+                <span style="font-size:22px;">📖</span>
+                <div>
+                    <h2 style="font-size:16.5px; font-weight:850; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                        Buku Panduan Flashing &amp; Skema PIN GPIO
+                        <span class="app-chip app-chip-neutral" style="font-size:11px; font-weight:800;">ID: esp32s3_cam</span>
+                    </h2>
+                    <span style="font-size:11.5px; color:var(--app-muted);">Dokumentasi eksklusif firmware preset ESP32-S3 N16R8 CAM &amp; Layar ST7789</span>
+                </div>
             </div>
             <button type="button" onclick="closeGuideModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
         </div>
@@ -566,10 +570,10 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         <!-- Subtabs: Flashing Guide vs Pin Dataset -->
         <div style="display:flex; gap:6px; margin-bottom:14px;">
             <button type="button" id="modalTabBtnFlashing" class="source-tab-btn active" style="padding:7px 12px; font-size:12px;" onclick="switchModalTab('flashing')">
-                📑 Petunjuk Flashing Board Baru
+                📑 Petunjuk Flashing esp32s3_cam
             </button>
             <button type="button" id="modalTabBtnPin" class="source-tab-btn" style="padding:7px 12px; font-size:12px;" onclick="switchModalTab('pin')">
-                🔌 Dataset PIN GPIO (Dropdown Hardware Lengkap)
+                🔌 Dataset PIN GPIO esp32s3_cam
             </button>
         </div>
 
@@ -577,7 +581,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             <!-- SUB-TAB 1: PETUNJUK FLASHING -->
             <div id="modalPanelFlashing" style="display:grid; gap:12px;">
                 <div style="padding:10px 14px; background:rgba(5,150,105,0.08); border-radius:var(--app-radius); border-left:4px solid var(--app-accent, #059669);">
-                    <strong>Firmware Full Factory Merged (Offset 0x0):</strong><br>
+                    <strong>Firmware Full Factory Merged 0x0 (Khusus ID: esp32s3_cam):</strong><br>
                     Dirancang untuk board ESP32-S3 baru yang masih kosong. File ini mencakup Bootloader chip, Partition Table, OTA data, Aplikasi AI Voice Assistant, serta seluruh font &amp; aset suara.
                 </div>
 
@@ -650,7 +654,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 </div>
 
                 <div style="margin-top:10px; padding:8px 12px; background:var(--app-surface-muted); border-radius:var(--app-radius); font-size:11.5px; color:var(--app-muted); line-height:1.4;">
-                    🔒 <strong>Permanen:</strong> Skema dataset pin di atas telah diprogram secara native di firmware untuk kompatibilitas optimal hardware WeAct ESP32-S3 N16R8. Pengguna dapat berganti jenis layar kapan saja melalui portal Wi-Fi <strong>192.168.4.1</strong> setelah flashing.
+                    🔒 <strong>Khusus ID: esp32s3_cam:</strong> Skema dataset pin di atas telah diprogram secara native di firmware untuk kompatibilitas optimal hardware ESP32-S3 N16R8 CAM. Pengguna dapat berganti jenis layar kapan saja melalui portal Wi-Fi <strong>192.168.4.1</strong> setelah flashing.
                 </div>
             </div>
         </div>
@@ -925,10 +929,20 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         } catch (e) {
             console.error('Error fetching preset status:', e);
         }
+
+        // Tampilkan tombol panduan HANYA untuk preset 'esp32s3_cam'
+        const guideBtnBox = document.getElementById('boxGuideButton');
+        if (guideBtnBox) {
+            guideBtnBox.style.display = (presetId === 'esp32s3_cam') ? 'block' : 'none';
+        }
     };
 
-    // Guide Modal & Subtabs
+    // Guide Modal & Subtabs (Khusus ID: esp32s3_cam)
     window.openGuideModal = function() {
+        if (currentPresetId !== 'esp32s3_cam') {
+            alert('Buku panduan dan skema PIN GPIO ini khusus didedikasikan untuk preset ID: esp32s3_cam.');
+            return;
+        }
         document.getElementById('guideModal').style.display = 'flex';
         renderPinDataset('st7789_240x280_8p');
     };
