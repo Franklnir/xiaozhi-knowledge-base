@@ -46,7 +46,12 @@ async def accounts_search(
     q: str = Query("", max_length=32),
 ):
     store = get_store()
-    if len(q.strip()) < 3:
+    query_str = (q or "").strip().lower()
+    if len(query_str) < 3:
         return AccountSearchResponse(accounts=[])
-    accounts = store.search_users_by_prefix(q, limit=8)
+    try:
+        accounts = store.search_users_by_prefix(query_str, limit=15)
+    except Exception:
+        return AccountSearchResponse(accounts=[])
     return AccountSearchResponse(accounts=accounts)
+
