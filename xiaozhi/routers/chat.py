@@ -238,15 +238,34 @@ async def chat_history_page(
     date_list = store.chat_history_dates(user["id"], token_hash=token_hash)
     if not date_list and token_hash:
         date_list = store.chat_history_dates(user["id"], token_hash="")
-    # If no date filter, fetch recent N days
-    effective_date = date if date else ""
+
+    # Default filter: Tampilkan percakapan HARI INI
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    if date == "all":
+        effective_date = ""
+        active_date_val = ""
+    elif date:
+        effective_date = date
+        active_date_val = date
+    else:
+        # Default: hari ini
+        effective_date = today_str
+        active_date_val = today_str
+
     histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=effective_date)
-    # If no results with token_hash, fallback to fetching all user chats
+    # If no results with token_hash, fallback to fetching without token_hash
     if not histories and token_hash:
         histories = store.list_chat_history(user["id"], q, limit, token_hash="", date=effective_date)
+
     stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=effective_date)
     if not stats.get("total") and token_hash:
         stats = store.chat_history_stats(user["id"], token_hash="", date=effective_date)
+
+    # Also compute all-time stats for reference
+    all_stats = store.chat_history_stats(user["id"], token_hash=token_hash, date="")
+
     mcp_status = mcp_status_payload(
         user["id"],
         token_saved=bool(token_info),
@@ -260,14 +279,36 @@ async def chat_history_page(
             "user": user,
             "histories": histories,
             "stats": stats,
+            "all_stats": all_stats,
             "mcp_status": mcp_status,
             "query": q,
             "limit": limit,
-            "active_date": date,
+            "active_date": active_date_val,
+            "today_date": today_str,
             "recent_days": days,
             "date_list": date_list,
             "message": request.query_params.get("message", ""),
             "active_page": "chat_history",
+        },
+    )
+
+
+@router.get("/api/chat-history/stream")
+async def api_chat_history_stream(
+    request: Request,
+    date: str = Query("", max_length=10),
+):
+    """Real-time SSE token/chat event streaming endpoint for Chat History."""
+    user = require_user(request)
+    from xiaozhi.services.sse_service import stream_chat_history_events
+    effective_date = "" if date == "all" else date
+    return StreamingResponse(
+        stream_chat_history_events(user["id"], request, active_date=effective_date),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         },
     )
 
@@ -284,9 +325,10 @@ async def chat_history_api(
     store = get_store()
     token_info = store.get_xiaozhi_token_info(user["id"])
     token_hash = token_info.get("token_hash", "") if token_info else ""
-    histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=date)
+    req_date = "" if date == "all" else date
+    histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=req_date)
     if not histories and not q and token_hash:
-        histories = store.list_chat_history(user["id"], "", limit, token_hash="", date=date)
+        histories = store.list_chat_history(user["id"], "", limit, token_hash="", date=req_date)
     if after_id:
         recent_histories = histories[:5]
         new_histories = [item for item in histories if int(item.get("id", 0)) > int(after_id)]
@@ -294,9 +336,9 @@ async def chat_history_api(
         for item in [*new_histories, *recent_histories]:
             merged_by_id[int(item.get("id", 0))] = item
         histories = sorted(merged_by_id.values(), key=lambda item: int(item.get("id", 0)), reverse=True)
-    stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=date)
+    stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=req_date)
     if not stats.get("total") and token_hash:
-        stats = store.chat_history_stats(user["id"], token_hash="", date=date)
+        stats = store.chat_history_stats(user["id"], token_hash="", date=req_date)
     date_list = store.chat_history_dates(user["id"], token_hash=token_hash)
     if not date_list and token_hash:
         date_list = store.chat_history_dates(user["id"], token_hash="")

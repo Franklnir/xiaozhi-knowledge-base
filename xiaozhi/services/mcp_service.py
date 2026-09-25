@@ -110,8 +110,9 @@ def record_mcp_tool_history_to_store(
     *,
     xiaozhi_answer: str = "",
     source: str = "mcp_tool",
+    token_hash: str = "",
 ) -> None:
-    """Record MCP tool invocation to chat history."""
+    """Record MCP tool invocation to chat history with full Raw JSON Response."""
     if _store_ref is None:
         return
     if owner_id is None:
@@ -120,6 +121,14 @@ def record_mcp_tool_history_to_store(
         ans = xiaozhi_answer
         if not ans and isinstance(response, dict):
             ans = str(response.get("message") or response.get("result") or response.get("text") or "")
+        th = token_hash
+        if not th and hasattr(_store_ref, "get_xiaozhi_token_info"):
+            try:
+                t_info = _store_ref.get_xiaozhi_token_info(owner_id)
+                if t_info:
+                    th = t_info.get("token_hash", "")
+            except Exception:
+                pass
         _store_ref.add_chat_history(
             owner_id,
             source=source,
@@ -128,6 +137,7 @@ def record_mcp_tool_history_to_store(
             xiaozhi_answer=ans or str(response),
             request_payload=arguments,
             response_payload=response,
+            token_hash=th,
         )
     except Exception:
         logger.warning("Failed to record MCP tool history")

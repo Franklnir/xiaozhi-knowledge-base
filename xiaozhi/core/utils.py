@@ -166,12 +166,31 @@ def collect_chat_messages(value: Any) -> List[Dict[str, str]]:
     emote = extract_emote_value(value)
     if content:
         content = text_with_emote(content, emote)
-        if role_value in {"user", "human", "client", "request"} or "user" in role_value:
+        if role_value in {"user", "human", "client", "request", "stt", "listen", "input"} or "user" in role_value:
             messages.append({"role": "user", "content": content})
-        elif role_value in {"assistant", "ai", "bot", "xiaozhi", "response"} or "assistant" in role_value or "ai" == role_value:
+        elif role_value in {"assistant", "ai", "bot", "xiaozhi", "response", "tts", "llm", "output"} or "assistant" in role_value or "ai" == role_value:
             messages.append({"role": "assistant", "content": content})
 
-    for key in ("messages", "chat", "conversation", "history", "data", "payload", "result"):
+    # JSON-RPC tool calls from Xiaozhi
+    if value.get("method") == "tools/call":
+        params = value.get("params") or {}
+        args = params.get("arguments") or {}
+        t_user = args.get("user_message") or args.get("query") or args.get("search_keyword") or args.get("text") or args.get("expression") or args.get("topic")
+        if t_user:
+            messages.append({"role": "user", "content": str(t_user)})
+        if args.get("xiaozhi_answer"):
+            messages.append({"role": "assistant", "content": str(args.get("xiaozhi_answer"))})
+
+    # JSON-RPC results from tool executions
+    if "result" in value and isinstance(value.get("result"), dict):
+        res = value["result"]
+        c_list = res.get("content")
+        if isinstance(c_list, list):
+            res_text = "\n".join(str(c.get("text", "")) for c in c_list if isinstance(c, dict) and c.get("text"))
+            if res_text:
+                messages.append({"role": "assistant", "content": res_text})
+
+    for key in ("messages", "chat", "conversation", "history", "data", "payload"):
         nested = value.get(key)
         if isinstance(nested, (dict, list)):
             messages.extend(collect_chat_messages(nested))

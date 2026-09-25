@@ -320,6 +320,10 @@
             <p class="app-subtitle">Log lengkap percakapan asisten suara Xiaozhi, pemanggilan MCP tools, dan respon sistem.</p>
         </div>
         <div class="app-toolbar">
+            <span class="app-status-pill is-online" id="sseStatusPill" title="Koneksi SSE Real-Time Riwayat Chat">
+                <span class="app-status-dot"></span>
+                <span id="sseStatusText">SSE Live</span>
+            </span>
             <span class="app-status-pill {% if mcp_status.connected %}is-online{% elif not mcp_status.tokenSaved %}is-offline{% endif %}" id="mcpStatusPill">
                 <span class="app-status-dot"></span>
                 <span id="mcpStatusText">{{ mcp_status.statusText }}</span>
@@ -329,10 +333,10 @@
     </header>
 
     <section class="app-stat-grid">
-        <div class="app-stat-card"><p class="app-stat-label">Total Riwayat</p><p class="app-stat-value" id="statTotal">{{ stats.total }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Total Keseluruhan</p><p class="app-stat-value" id="statAllTotal">{{ all_stats.total if all_stats else stats.total }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Riwayat Filter</p><p class="app-stat-value" id="statTotal">{{ stats.total }}</p></div>
         <div class="app-stat-card"><p class="app-stat-label">Ditampilkan</p><p class="app-stat-value" id="statShown">{{ histories|length }}</p></div>
-        <div class="app-stat-card"><p class="app-stat-label">Hari Aktif</p><p class="app-stat-value">{{ date_list|length }}</p></div>
-        <div class="app-stat-card"><p class="app-stat-label">Filter Tanggal</p><p class="app-stat-value" id="statFilter">{{ active_date if active_date else "Semua" }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Filter Tanggal</p><p class="app-stat-value" id="statFilter">{% if active_date == today_date %}Hari Ini ({{ today_date }}){% elif active_date %}{{ active_date }}{% else %}Semua Tanggal{% endif %}</p></div>
     </section>
 
     <section class="chat-shell">
@@ -345,13 +349,17 @@
                         <button type="submit" class="app-button app-button-primary" style="padding:6px 12px;font-size:12px;">Filter</button>
                     </div>
                 </form>
+                <div class="chat-type-tabs" style="margin-top:6px;">
+                    <a href="/riwayat-chat" class="chat-type-tab {% if active_date == today_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;">📅 Hari Ini</a>
+                    <a href="/riwayat-chat?date=all" class="chat-type-tab {% if not active_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;">🗓️ Semua Tanggal</a>
+                </div>
                 <div class="chat-type-tabs">
                     <button type="button" class="chat-type-tab active" data-type="all" onclick="setTypeFilter('all')">Semua</button>
                     <button type="button" class="chat-type-tab" data-type="chat" onclick="setTypeFilter('chat')">💬 Chat AI</button>
                     <button type="button" class="chat-type-tab" data-type="tool" onclick="setTypeFilter('tool')">⚡ Tool MCP</button>
                 </div>
                 <div style="display:flex;gap:6px;margin-top:8px;">
-                    <a href="/riwayat-chat" class="app-button" style="flex:1;font-size:12px;padding:6px 8px;text-align:center;">Reset</a>
+                    <a href="/riwayat-chat?date=all" class="app-button" style="flex:1;font-size:12px;padding:6px 8px;text-align:center;">Reset</a>
                     <form action="/riwayat-chat/clear" method="POST" onsubmit="return confirm('Hapus semua riwayat chat? Tindakan ini tidak dapat dibatalkan.');" style="flex:1;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="submit" class="app-button app-button-danger" style="width:100%;font-size:12px;padding:6px 8px;">Hapus Semua</button>
@@ -373,9 +381,6 @@
                 <div class="chat-thread-actions" id="threadActionButtons" style="display:none;">
                     <button type="button" class="app-button app-button-small" onclick="copyCurrentChat()" title="Salin seluruh isi percakapan">
                         📋 Salin
-                    </button>
-                    <button type="button" class="app-button app-button-small app-button-danger" onclick="deleteCurrentChat()" title="Hapus pesan ini saja">
-                        🗑️ Hapus Item
                     </button>
                 </div>
             </div>
@@ -612,9 +617,12 @@
             m += '<div class="chat-bubble-body">' + E(aiAnswer) + '</div>';
 
             if (rawResponseStr && rawResponseStr !== "{}" && rawResponseStr !== JSON.stringify(aiAnswer)) {
-                m += '<div style="margin-top:10px;">';
+                m += '<div style="margin-top:12px;padding:8px 12px;background:rgba(0,0,0,0.03);border:1px solid var(--app-border);border-radius:8px;">';
+                m += '<div style="display:flex;justify-content:space-between;align-items:center;">';
                 m += '<button type="button" class="chat-collapse-toggle" onclick="toggleRawResponse(' + item.id + ')">🔍 Tampilkan Raw JSON Response ▾</button>';
-                m += '<div id="rawResponse-' + item.id + '" class="chat-json-box" style="display:none;">' + E(rawResponseStr) + '</div>';
+                m += '<button type="button" class="chat-collapse-toggle" style="color:var(--app-muted);font-size:11.5px;" onclick="copyRawResponse(' + item.id + ')">📋 Salin Raw JSON</button>';
+                m += '</div>';
+                m += '<div id="rawResponse-' + item.id + '" class="chat-json-box" style="display:none;margin-top:6px;">' + E(rawResponseStr) + '</div>';
                 m += '</div>';
             }
 
@@ -648,6 +656,20 @@
         el.style.display = (el.style.display === "none") ? "block" : "none";
     }
 
+    function copyRawResponse(id) {
+        var item = H.find(function(i){ return Number(i.id) === Number(id); });
+        if (!item) return;
+        var p = item.response_payload || item.request_payload;
+        if (!p) return;
+        var str = "";
+        try {
+            str = typeof p === "string" ? JSON.stringify(JSON.parse(p), null, 2) : JSON.stringify(p, null, 2);
+        } catch(e) {
+            str = String(p);
+        }
+        copyText(str);
+    }
+
     function copyText(str) {
         if (!str) return;
         if (navigator.clipboard) {
@@ -670,36 +692,6 @@
         copyText(full.trim());
     }
 
-    async function deleteCurrentChat() {
-        var item = H.find(function(i){ return Number(i.id) === sel; });
-        if (!item) return;
-        if (!confirm("Hapus item riwayat chat #" + item.id + "?")) return;
-
-        try {
-            var res = await fetch("/riwayat-chat/delete/" + item.id, {
-                method: "POST",
-                headers: {
-                    "X-CSRF-Token": CSRF_TOKEN,
-                    "Accept": "application/json"
-                },
-                credentials: "same-origin"
-            });
-            var d = await res.json().catch(function(){ return {}; });
-            if (res.ok && d.success) {
-                // Hapus dari H di memori
-                H = H.filter(function(i){ return Number(i.id) !== Number(item.id); });
-                sel = H.length ? Number(H[0].id) : null;
-                renderSidebar();
-                renderThread();
-                document.getElementById("statShown").textContent = H.length;
-                if (window.App && App.toast) App.toast.success("Riwayat chat #" + item.id + " berhasil dihapus.");
-            } else {
-                alert(d.message || "Gagal menghapus riwayat chat.");
-            }
-        } catch(e) {
-            alert("Terjadi kesalahan saat menghapus: " + e.message);
-        }
-    }
 
     function merge(items) {
         if (!Array.isArray(items) || !items.length) return false;
@@ -741,12 +733,69 @@
         } catch(e){}
     }
 
+    // ── Real-Time SSE Chat History Listener ──
+    function initSSE() {
+        if (!window.EventSource) return;
+        var sseParam = AD ? "?date=" + encodeURIComponent(AD) : "";
+        try {
+            var es = new EventSource("/api/chat-history/stream" + sseParam);
+
+            es.onopen = function() {
+                var pill = document.getElementById("sseStatusPill");
+                var txt = document.getElementById("sseStatusText");
+                if (pill) pill.className = "app-status-pill is-online";
+                if (txt) txt.textContent = "SSE Live";
+            };
+
+            es.addEventListener("new_chat", function(e) {
+                try {
+                    var item = JSON.parse(e.data);
+                    if (item && item.id) {
+                        if (merge([item])) {
+                            renderSidebar();
+                            renderThread();
+                            if (document.getElementById("statShown")) {
+                                document.getElementById("statShown").textContent = H.length;
+                            }
+                            if (document.getElementById("statTotal")) {
+                                var curT = parseInt(document.getElementById("statTotal").textContent || "0", 10);
+                                document.getElementById("statTotal").textContent = curT + 1;
+                            }
+                        }
+                    }
+                } catch(err){}
+            });
+
+            es.addEventListener("update_chat", function(e) {
+                try {
+                    var item = JSON.parse(e.data);
+                    if (item && item.id) {
+                        if (merge([item])) {
+                            renderSidebar();
+                            renderThread();
+                        }
+                    }
+                } catch(err){}
+            });
+
+            es.onerror = function() {
+                var pill = document.getElementById("sseStatusPill");
+                var txt = document.getElementById("sseStatusText");
+                if (pill) pill.className = "app-status-pill is-offline";
+                if (txt) txt.textContent = "Reconnecting...";
+            };
+        } catch(e) {
+            console.warn("SSE init error:", e);
+        }
+    }
+
     renderSidebar();
     renderThread();
+    initSSE();
     if (window.App && App.startPolling) {
-        App.startPolling("chat", poll, 3000);
+        App.startPolling("chat", poll, 6000);
     } else {
-        setInterval(poll, 3000);
+        setInterval(poll, 6000);
     }
 </script>
 {% endblock %}

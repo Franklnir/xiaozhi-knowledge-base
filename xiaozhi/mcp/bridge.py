@@ -40,20 +40,90 @@ async def start_mcp_background(store):
     # Set capture function
     from xiaozhi.core.utils import collect_chat_messages
     import json
+    import time
+
+    pending_tool_calls: Dict[str, Dict[str, Any]] = {}
 
     def _capture(owner_id, direction, raw_message, token_hash=""):
         try:
             payload = json.loads(raw_message)
         except (TypeError, json.JSONDecodeError):
             return
-        messages = collect_chat_messages(payload)
-        if not messages:
-            return
-        user_message = "\n\n".join(item["content"] for item in messages if item["role"] == "user")
-        xiaozhi_answer = "\n\n".join(item["content"] for item in messages if item["role"] == "assistant")
+
+        tool_name = f"xiaozhi_ws_{direction}"
+        user_message = ""
+        xiaozhi_answer = ""
+        req_payload = None
+        resp_payload = None
+
+        msg_id = str(payload.get("id")) if payload.get("id") is not None else None
+
+        # Clean old pending tool calls (> 120s)
+        now_ts = time.time()
+        for k in list(pending_tool_calls.keys()):
+            if now_ts - pending_tool_calls[k].get("time", 0) > 120:
+                pending_tool_calls.pop(k, None)
+
+        # 1. Inbound tool call from Xiaozhi
+        if direction == "inbound" and payload.get("method") == "tools/call":
+            params = payload.get("params") or {}
+            called_tool = params.get("name", "tool")
+            tool_name = called_tool
+            args = params.get("arguments") or {}
+            req_payload = args
+            user_message = str(args.get("user_message") or args.get("query") or args.get("search_keyword") or args.get("text") or args.get("expression") or args.get("topic") or "")
+            if not user_message and called_tool:
+                user_message = f"Panggil tool {called_tool}"
+            xiaozhi_answer = str(args.get("xiaozhi_answer") or "")
+
+            if msg_id:
+                pending_tool_calls[msg_id] = {
+                    "owner_id": owner_id,
+                    "tool_name": called_tool,
+                    "user_message": user_message,
+                    "request_payload": req_payload,
+                    "token_hash": token_hash,
+                    "time": now_ts,
+                }
+
+        # 2. Outbound tool response from server
+        elif direction == "outbound" and msg_id and msg_id in pending_tool_calls:
+            pending = pending_tool_calls.pop(msg_id)
+            tool_name = pending["tool_name"]
+            user_message = pending["user_message"]
+            req_payload = pending["request_payload"]
+            resp_payload = payload.get("result") or payload
+
+            res = payload.get("result")
+            if isinstance(res, dict) and "content" in res:
+                c_list = res.get("content", [])
+                xiaozhi_answer = "\n".join(str(c.get("text", "")) for c in c_list if isinstance(c, dict) and c.get("text"))
+            elif isinstance(res, (dict, list, str)):
+                xiaozhi_answer = str(res)
+
+        # 3. Fallback to generic message collection (STT, TTS, LLM)
         if not user_message and not xiaozhi_answer:
+            messages = collect_chat_messages(payload)
+            if messages:
+                user_message = "\n\n".join(item["content"] for item in messages if item["role"] == "user")
+                xiaozhi_answer = "\n\n".join(item["content"] for item in messages if item["role"] == "assistant")
+                if direction == "inbound":
+                    req_payload = payload
+                else:
+                    resp_payload = payload
+
+        if not user_message and not xiaozhi_answer and not resp_payload:
             return
-        store.upsert_chat_transcript(owner_id, tool_name=f"xiaozhi_ws_{direction}", user_message=user_message, xiaozhi_answer=xiaozhi_answer, payload=payload, token_hash=token_hash)
+
+        store.upsert_chat_transcript(
+            owner_id,
+            tool_name=tool_name,
+            user_message=user_message,
+            xiaozhi_answer=xiaozhi_answer,
+            payload=req_payload or (payload if direction == "inbound" else None),
+            response_payload=resp_payload or (payload if direction == "outbound" else None),
+            token_hash=token_hash
+        )
 
     set_capture_function(_capture)
 

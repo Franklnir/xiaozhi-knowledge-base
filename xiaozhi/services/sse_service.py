@@ -119,6 +119,75 @@ async def stream_admin_logs(request: Request) -> AsyncGenerator[str, None]:
         admin_log_hub.unsubscribe(q)
 
 
+# ── Real-Time Chat History Hub (SSE) ─────────────────────────────────────────
+
+class ChatHistoryHub:
+    """Manages active SSE connections for real-time chat history updates per user."""
+
+    def __init__(self) -> None:
+        self._subscribers: Dict[int, Set[asyncio.Queue]] = {}
+
+    def emit(self, user_id: int, item: Dict[str, Any], event_type: str = "new_chat"):
+        """Broadcast chat history event to user's active SSE connections."""
+        queues = self._subscribers.get(int(user_id), set())
+        if not queues:
+            return
+        payload = {
+            "type": event_type,
+            "item": item,
+            "timestamp": utc_now(),
+        }
+        for q in list(queues):
+            try:
+                q.put_nowait(payload)
+            except Exception:
+                pass
+
+    async def subscribe(self, user_id: int) -> asyncio.Queue:
+        q: asyncio.Queue = asyncio.Queue(maxsize=100)
+        uid = int(user_id)
+        if uid not in self._subscribers:
+            self._subscribers[uid] = set()
+        self._subscribers[uid].add(q)
+        return q
+
+    def unsubscribe(self, user_id: int, q: asyncio.Queue):
+        uid = int(user_id)
+        if uid in self._subscribers:
+            self._subscribers[uid].discard(q)
+            if not self._subscribers[uid]:
+                del self._subscribers[uid]
+
+
+chat_history_hub = ChatHistoryHub()
+
+
+def broadcast_chat_history(user_id: int, item: Dict[str, Any], event_type: str = "new_chat"):
+    """Global helper to broadcast chat history item to SSE clients in real time."""
+    chat_history_hub.emit(user_id, item, event_type)
+
+
+async def stream_chat_history_events(user_id: int, request: Request, active_date: str = "") -> AsyncGenerator[str, None]:
+    """Stream real-time chat history events (new_chat, update_chat) to user via SSE."""
+    q = await chat_history_hub.subscribe(user_id)
+    try:
+        yield format_sse("connected", {"status": "ok", "user_id": user_id, "active_date": active_date, "message": "Live Chat History SSE connected."})
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                payload = await asyncio.wait_for(q.get(), timeout=15.0)
+                item = payload.get("item", {})
+                item_date = str(item.get("created_at") or "")[:10]
+                if active_date and item_date and item_date != active_date and active_date != "all":
+                    continue
+                yield format_sse(payload.get("type", "new_chat"), item, event_id=str(item.get("id", "")))
+            except asyncio.TimeoutError:
+                yield ": ping\n\n"
+    finally:
+        chat_history_hub.unsubscribe(user_id, q)
+
+
 # ── 2. AI Chat Streaming (Token-by-Token Typing Effect) ──────────────────────
 
 async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request) -> AsyncGenerator[str, None]:
@@ -593,25 +662,35 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
             yield format_sse("token", {"token": chunk, "index": idx})
             await asyncio.sleep(0.025)
 
-    # Save to chat history transcript
+    # Save to chat history transcript with full request and response payloads (Raw JSON Response)
+    final_sources = sources or ([{"id": m.get("id"), "title": m.get("title"), "category": m.get("category")} for m in matched_materials[:3]] if matched_materials else [])
+    req_payload = {
+        "query": clean_q,
+        "matched_materials": final_sources,
+    }
+    resp_payload = {
+        "status": "success",
+        "answer": full_text,
+        "sources": final_sources,
+        "mode": "rag_sse",
+        "timestamp": utc_now(),
+    }
     try:
         store.upsert_chat_transcript(
             user_id,
             tool_name="web_chat_sse",
             user_message=clean_q,
             xiaozhi_answer=full_text,
+            payload=req_payload,
+            response_payload=resp_payload,
             token_hash=token_hash,
         )
     except Exception as e:
         logger.debug("Failed to record chat history: %s", e)
 
-    # Send final done event with sources
-    if not sources and matched_materials:
-        sources = [{"id": m.get("id"), "title": m.get("title"), "category": m.get("category")} for m in matched_materials[:3]]
-
     yield format_sse("done", {
         "full_text": full_text,
-        "sources": sources,
+        "sources": final_sources,
         "timestamp": utc_now(),
     })
 

@@ -1304,6 +1304,7 @@ class HFJsonStore:
         user_message: str = "",
         xiaozhi_answer: str = "",
         payload: Any = None,
+        response_payload: Any = None,
         token_hash: str = "",
     ) -> None:
         user_message = clamp_text_bytes(user_message) if user_message else ""
@@ -1323,7 +1324,7 @@ class HFJsonStore:
                         item["xiaozhi_answer"] = xiaozhi_answer
                         if token_hash:
                             item["token_hash"] = token_hash
-                        item["response_payload"] = serialize_history_value(payload)
+                        item["response_payload"] = serialize_history_value(response_payload if response_payload is not None else payload)
                         self._commit(data, "Update Xiaozhi chat transcript")
                         return
             row = {
@@ -1335,7 +1336,7 @@ class HFJsonStore:
                 "user_message": user_message,
                 "xiaozhi_answer": xiaozhi_answer,
                 "request_payload": serialize_history_value(payload if user_message else {}),
-                "response_payload": serialize_history_value(payload if xiaozhi_answer else {}),
+                "response_payload": serialize_history_value(response_payload if response_payload is not None else (payload if xiaozhi_answer else {})),
                 "created_at": utc_now(),
             }
             data["chat_history"].append(row)
