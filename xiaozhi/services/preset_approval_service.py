@@ -118,8 +118,49 @@ def _save_data(data: Dict[str, Any]) -> None:
                 pass
 
 
+def ensure_default_presets_in_bucket() -> None:
+    """
+    Jika server memiliki koneksi Object Storage S3/R2 aktif, otomatis upload
+    file terenkripsi dari preset bawaan ke S3 private bucket agar tidak membebani VPS.
+    """
+    if not storage_service.has_s3:
+        return
+    data = _load_data()
+    changed = False
+    presets = data.get("presets", {})
+    for pid, p in presets.items():
+        versions = p.get("versions", [])
+        for v in versions:
+            if v.get("storage_bucket") == "local-private":
+                candidates = [
+                    BASE_DIR / (p.get("enc_rel_path") or ""),
+                    BASE_DIR / "protected_assets" / "firmware" / (v.get("filename", "") + ".enc"),
+                    BASE_DIR / "protected_assets" / "firmware" / "esp32_s3_n16r8_cam_full_factory.bin.enc",
+                    PROJECT_ROOT / "xiaozhi" / (p.get("enc_rel_path") or ""),
+                ]
+                for c in candidates:
+                    if c.exists() and c.is_file():
+                        try:
+                            enc_bytes = c.read_bytes()
+                            b_name, s_key = storage_service.upload_encrypted_preset(
+                                pid, v.get("version", "v001"), enc_bytes
+                            )
+                            v["storage_bucket"] = b_name
+                            v["storage_key"] = s_key
+                            changed = True
+                            logger.info(
+                                f"Otomatis menyinkronkan preset bawaan '{pid}' versi '{v.get('version')}' ke bucket S3 '{b_name}/{s_key}'."
+                            )
+                        except Exception as exc:
+                            logger.warning(f"Gagal sinkronisasi preset bawaan '{pid}' ke S3: {exc}")
+                        break
+    if changed:
+        _save_data(data)
+
+
 def list_presets() -> List[Dict[str, Any]]:
     """Daftar seluruh preset yang terdaftar, diurutkan berdasarkan nama."""
+    ensure_default_presets_in_bucket()
     data = _load_data()
     presets_dict = data.get("presets", {})
     return list(presets_dict.values())
