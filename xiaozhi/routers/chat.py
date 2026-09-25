@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from xiaozhi.services.preset_approval_service import (
     get_user_status,
     is_user_authorized,
-    request_access as request_preset_access,
     get_decrypted_preset_binary,
     get_preset,
     list_presets,
@@ -415,20 +414,6 @@ async def web_flasher_page(request: Request):
 async def get_preset_status_api(request: Request, preset_id: str):
     user = get_current_user(request)
     return get_user_status(user, preset_id)
-
-
-@router.post("/api/v1/flasher/preset/{preset_id}/request")
-async def request_preset_access_api(request: Request, preset_id: str):
-    user = get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Silakan masuk terlebih dahulu.")
-    try:
-        body = await request.json()
-        note = body.get("note", "")
-    except Exception:
-        note = ""
-    res = request_preset_access(user, preset_id, note)
-    return res
 
 
 @router.post("/api/v1/flasher/preset/claim")

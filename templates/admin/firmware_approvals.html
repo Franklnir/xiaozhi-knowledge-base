@@ -291,10 +291,10 @@
     <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:18px;">
         <div>
             <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-                <span>🎯</span> Hak Akses Pengguna &amp; Permohonan Izin Manual
+                <span>👥</span> Pengguna Berlisensi &amp; Beri Akses Langsung
             </h2>
             <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
-                Beri akses langsung ke username tertentu atau setujui permohonan lisensi dari antrean.
+                Beri akses langsung ke username pengguna atau kelola lisensi aktif preset firmware.
             </p>
         </div>
 
@@ -327,100 +327,11 @@
                 ➕ Beri Akses Langsung
             </button>
         </form>
-    </div>
-
-    <!-- Tabel Permohonan User -->
-    <h3 style="font-size:14px; font-weight:800; margin:0 0 10px; color:var(--app-text);">
-        Antrean Permohonan Izin dari Pengguna:
-    </h3>
-    {% if not preset_requests %}
-    <div style="padding:20px; background:var(--app-surface-muted); border-radius:var(--app-radius); text-align:center; color:var(--app-muted); font-size:13px; margin-bottom:20px;">
-        Belum ada permohonan izin preset dari pengguna.
-    </div>
-    {% else %}
-    <div class="app-table-wrap" style="margin-bottom:20px;">
-        <table class="app-table">
-            <thead>
-                <tr>
-                    <th>Waktu</th>
-                    <th>Pengguna</th>
-                    <th>Target Preset</th>
-                    <th>Catatan / Pesan User</th>
-                    <th>Status</th>
-                    <th>Aksi Admin</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for req in preset_requests %}
-                <tr>
-                    <td style="color:var(--app-muted); font-size:12px; white-space:nowrap;">
-                        {{ req.requested_at[:16].replace('T', ' ') if req.requested_at else '-' }}
-                    </td>
-                    <td>
-                        <strong style="color:var(--app-text); font-size:13.5px;">{{ req.username }}</strong>
-                        <span style="font-size:11px; color:var(--app-muted); display:block;">ID: {{ req.user_id }}</span>
-                    </td>
-                    <td>
-                        <strong style="font-size:12.5px;">{{ req.preset_id }}</strong>
-                    </td>
-                    <td style="font-size:12.5px; color:var(--app-muted); max-width:250px;">
-                        {{ req.note if req.note else '<span style="font-style:italic;">Tidak ada catatan</span>'|safe }}
-                    </td>
-                    <td>
-                        {% if req.status == 'APPROVED' %}
-                        <span class="app-chip app-chip-success" style="font-size:11px; font-weight:800;">APPROVED</span>
-                        {% elif req.status == 'PENDING' %}
-                        <span class="app-chip app-chip-warning" style="font-size:11px; font-weight:800;">PENDING</span>
-                        {% elif req.status == 'REJECTED' %}
-                        <span class="app-chip app-chip-danger" style="font-size:11px; font-weight:800;">DITOLAK</span>
-                        {% else %}
-                        <span class="app-chip app-chip-neutral" style="font-size:11px;">{{ req.status }}</span>
-                        {% endif %}
-                    </td>
-                    <td style="vertical-align:middle; white-space:nowrap;">
-                        {% if req.status == 'PENDING' %}
-                        <div style="display:flex; gap:6px;">
-                            <form method="POST" action="/admin/firmware/preset-approvals/{{ req.id }}/approve">
-                                <button type="submit" class="app-button app-button-primary app-button-small" style="font-weight:800;" onclick="return confirm('Setujui izin akses preset untuk {{ req.username }}?')">
-                                    ✅ Setujui
-                                </button>
-                            </form>
-                            <form method="POST" action="/admin/firmware/preset-approvals/{{ req.id }}/reject">
-                                <button type="submit" class="app-button app-button-danger app-button-small" style="font-weight:800;" onclick="return confirm('Tolak permohonan {{ req.username }}?')">
-                                    ❌ Tolak
-                                </button>
-                            </form>
-                        </div>
-                        {% elif req.status == 'APPROVED' %}
-                        <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="display:inline;">
-                            <input type="hidden" name="username" value="{{ req.username }}">
-                            <input type="hidden" name="preset_id" value="{{ req.preset_id }}">
-                            <button type="submit" class="app-button app-button-ghost app-button-small" style="color:#dc2626; font-size:11px;" onclick="return confirm('Cabut akses preset untuk {{ req.username }}?')">
-                                Cabut Akses
-                            </button>
-                        </form>
-                        {% else %}
-                        <form method="POST" action="/admin/firmware/preset-approvals/grant" style="display:inline;">
-                            <input type="hidden" name="username" value="{{ req.username }}">
-                            <input type="hidden" name="preset_id" value="{{ req.preset_id }}">
-                            <button type="submit" class="app-button app-button-ghost app-button-small" style="font-size:11px;">
-                                Beri Ulang Akses
-                            </button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% endif %}
-
     <!-- Daftar Pengguna Berlisensi Aktif -->
-    {% if preset_granted %}
     <h3 style="font-size:13.5px; font-weight:800; margin:16px 0 10px; color:var(--app-text);">
-        Pengguna dengan Lisensi Preset Aktif ({{ preset_granted|length }} user):
+        Pengguna dengan Lisensi Preset Aktif ({{ preset_granted|length if preset_granted else 0 }} user):
     </h3>
+    {% if preset_granted %}
     <div style="display:flex; flex-wrap:wrap; gap:8px;">
         {% for uname, g in preset_granted.items() %}
         <div style="display:inline-flex; align-items:center; gap:8px; padding:5px 12px; background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); font-size:12px;">
@@ -433,6 +344,10 @@
             </form>
         </div>
         {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding:16px; background:var(--app-surface-muted); border-radius:var(--app-radius); text-align:center; color:var(--app-muted); font-size:13px;">
+        Belum ada pengguna dengan lisensi aktif. Berikan akses langsung di atas atau bagikan Kode Lisensi sekali pakai.
     </div>
     {% endif %}
 </div>

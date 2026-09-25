@@ -471,19 +471,12 @@ def is_user_authorized(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3
     username = str(user.get("username") or "").lower()
     data = _load_data()
 
-    # Cek tabel granted_users
+    # Cek tabel granted_users (akses langsung dari admin atau melalui klaim kode lisensi)
     granted = data.get("granted_users", {})
     if username in granted:
         user_grant = granted[username]
         if user_grant.get("preset_id") in (preset_id, "all"):
             return True
-
-    # Cek permohonan yang berstatus APPROVED
-    uid = int(user.get("id", 0))
-    for req in data.get("requests", []):
-        if int(req.get("user_id", 0)) == uid and req.get("preset_id") == preset_id:
-            if req.get("status") == "APPROVED":
-                return True
 
     return False
 
@@ -523,41 +516,12 @@ def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_ca
             "message": "Izin akses preset resmi aktif",
         }
 
-    uid = int(user.get("id", 0))
-    for req in reversed(data.get("requests", [])):
-        if int(req.get("user_id", 0)) == uid and req.get("preset_id") == preset_id:
-            st = req.get("status")
-            if st == "APPROVED":
-                return {
-                    "authorized": True,
-                    "status": "APPROVED",
-                    "preset": preset_info,
-                    "active_version": active_version,
-                    "message": "Izin akses preset disetujui",
-                }
-            elif st == "PENDING":
-                return {
-                    "authorized": False,
-                    "status": "PENDING",
-                    "preset": preset_info,
-                    "active_version": active_version,
-                    "message": "Permintaan izin sedang menunggu persetujuan Admin",
-                }
-            elif st == "REJECTED":
-                return {
-                    "authorized": False,
-                    "status": "REJECTED",
-                    "preset": preset_info,
-                    "active_version": active_version,
-                    "message": f"Permintaan izin ditolak: {req.get('rejection_reason', 'Tidak memenuhi syarat')}",
-                }
-
     return {
         "authorized": False,
         "status": "NONE",
         "preset": preset_info,
         "active_version": active_version,
-        "message": "Preset berlisensi ini memerlukan kode klaim sekali pakai atau persetujuan Admin",
+        "message": "Preset berlisensi ini memerlukan klaim Kode Lisensi sekali pakai atau akses langsung dari Admin.",
     }
 
 
