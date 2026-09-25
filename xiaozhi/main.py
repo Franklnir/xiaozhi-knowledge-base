@@ -285,6 +285,22 @@ async def download_mobile_app():
     )
 
 
+@app.get("/download/qr.png", include_in_schema=False)
+async def download_qr_image():
+    """Serve self-hosted standalone QR barcode image."""
+    for candidate in [
+        STATIC_DIR / "img" / "download_qr.png",
+        STATIC_DIR / "download" / "qr.png",
+    ]:
+        if candidate.exists():
+            return FileResponse(path=str(candidate), media_type="image/png")
+    # In-memory fallback if file missing
+    return RedirectResponse(
+        url="/static/img/download_qr.png",
+        status_code=302
+    )
+
+
 # SEO Endpoints
 
 
