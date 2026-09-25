@@ -100,7 +100,7 @@
     </section>
 
     <section class="app-content-grid">
-        <div class="app-card">
+        <div class="app-card" id="databaseMateriSection" style="scroll-margin-top: 80px;">
             <div class="app-card-header">
                 <div>
                     <h2 class="app-section-title">Database Materi</h2>
@@ -117,7 +117,7 @@
                 </div>
             </div>
 
-            <div class="app-table-wrap">
+            <div class="app-table-wrap" style="scrollbar-gutter: stable;">
                 <table class="app-table" id="dataTable">
                     <thead>
                         <tr>
@@ -762,7 +762,7 @@
 
     if (liveMaterialRows.length) {
         refreshAllSavedLiveMaterials();
-        window.setInterval(refreshAllSavedLiveMaterials, 1000);
+        window.setInterval(refreshAllSavedLiveMaterials, 5000);
     }
 </script>
 <script>

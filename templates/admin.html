@@ -317,11 +317,23 @@
         </div>
 
         <!-- Quick Filter Pills -->
+        <!-- Quick Filter Pills -->
         {% set mac_count = managed_users|selectattr('device_mac')|list|length %}
+        {% set active_today_count = totals.users_active_today or 0 %}
+        {% set stream_today_count = totals.users_stream_today or 0 %}
+        {% set tools_today_count = totals.users_tools_today or 0 %}
         <div class="user-filter-pills" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
             <span style="font-size:12px;font-weight:600;color:#64748b;margin-right:2px">Filter:</span>
             <button type="button" class="filter-pill active" data-filter="all" onclick="setQuickFilter('all')">Semua User</button>
-            <button type="button" class="filter-pill" data-filter="stream_youtube" onclick="setQuickFilter('stream_youtube')">🎵 Stream YouTube</button>
+            <button type="button" class="filter-pill" data-filter="active_today" onclick="setQuickFilter('active_today')">
+                ⚡ Aktivitas Hari Ini {% if active_today_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ active_today_count }}</span>{% endif %}
+            </button>
+            <button type="button" class="filter-pill" data-filter="stream_youtube" onclick="setQuickFilter('stream_youtube')">
+                🎵 Stream YouTube {% if stream_today_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ stream_today_count }}</span>{% endif %}
+            </button>
+            <button type="button" class="filter-pill" data-filter="tools_today" onclick="setQuickFilter('tools_today')">
+                🔧 MCP Tools Hari Ini {% if tools_today_count > 0 %}<span class="app-chip app-chip-small app-chip-info" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ tools_today_count }}</span>{% endif %}
+            </button>
             <button type="button" class="filter-pill" data-filter="mac_saved" onclick="setQuickFilter('mac_saved')">
                 📟 MAC Tersimpan {% if mac_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ mac_count }}</span>{% endif %}
             </button>
@@ -336,7 +348,7 @@
                 <thead>
                     <tr>
                         <th style="width:40px">ID</th>
-                        <th>Username</th>
+                        <th>Username & Aktivitas</th>
                         <th>MCP Status</th>
                         <th>Board (MAC)</th>
                         <th>Materi</th>
@@ -348,6 +360,7 @@
                 </thead>
                 <tbody>
                     {% for item in managed_users %}
+                    {% set act = item.activity_today or {} %}
                     <tr class="admin-user-row" 
                         id="user-row-{{ item.id }}"
                         data-user-id="{{ item.id }}"
@@ -355,19 +368,48 @@
                         data-playing="{% if item.is_playing or item.youtube_stream %}true{% else %}false{% endif %}"
                         data-mcp="{% if item.mcp_status and item.mcp_status.connected %}true{% else %}false{% endif %}"
                         data-has-mac="{% if item.device_mac %}true{% else %}false{% endif %}"
-                        data-search="{{ (item.username ~ ' ' ~ item.id ~ ' ' ~ (item.device_mac or '') ~ ' ' ~ ('mac tersimpan ada mac' if item.device_mac else '') ~ ' ' ~ ('mcp konek terhubung' if item.mcp_status and item.mcp_status.connected else 'blom belum terhubung mcp') ~ ' ' ~ ('stream youtube playing memutar' if item.is_playing or item.youtube_stream else ''))|lower|e }}">
+                        data-active-today="{% if act.has_activity %}true{% else %}false{% endif %}"
+                        data-stream-today="{% if act.has_stream or item.is_playing or item.youtube_stream %}true{% else %}false{% endif %}"
+                        data-tools-today="{% if act.has_tools %}true{% else %}false{% endif %}"
+                        data-tools-count="{{ act.tools_count or 0 }}"
+                        data-search="{{ (item.username ~ ' ' ~ item.id ~ ' ' ~ (item.device_mac or '') ~ ' ' ~ ('mac tersimpan ada mac' if item.device_mac else '') ~ ' ' ~ ('mcp konek terhubung' if item.mcp_status and item.mcp_status.connected else 'blom belum terhubung mcp') ~ ' ' ~ ('stream youtube playing memutar' if item.is_playing or item.youtube_stream else '') ~ ' ' ~ ('aktivitas hari ini aktif' if act.has_activity else '') ~ ' ' ~ ('mcp tools terpanggil ' ~ (act.tools_list|join(' ') if act.tools_list else '')))|lower|e }}">
                         <td><span class="app-table-subtext">{{ item.id }}</span></td>
                         <td>
-                            <span class="app-table-title">{{ item.username }}</span>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span class="app-table-title">{{ item.username }}</span>
+                                {% if act.has_activity %}
+                                <span class="app-chip app-chip-small app-chip-success" style="font-size:9.5px; padding:1px 6px; font-weight:800;" title="User aktif hari ini">Aktif Hari Ini</span>
+                                {% endif %}
+                            </div>
                             {% if item.created_at %}
-                            <br><span class="app-table-subtext">{{ (item.created_at|string)[:10] }}</span>
+                            <span class="app-table-subtext">Terdaftar: {{ (item.created_at|string)[:10] }}</span>
                             {% endif %}
-                            <div id="user-playback-badge-{{ item.id }}" class="user-playback-badge" style="margin-top: 4px; {% if not item.youtube_stream %}display:none;{% endif %}">
+                            
+                            <!-- Aktivitas Stream YouTube -->
+                            <div id="user-playback-badge-{{ item.id }}" class="user-playback-badge" style="margin-top: 4px; {% if not item.youtube_stream and not item.is_playing %}display:none;{% endif %}">
                                 <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 2px 6px;">
                                     <span class="music-bar-anim" style="height:10px"><span></span><span></span><span></span></span>
-                                    <span class="playback-title">{% if item.youtube_stream %}{{ item.youtube_stream.title[:24] }}...{% endif %}</span>
+                                    <span class="playback-title">{% if item.youtube_stream %}{{ item.youtube_stream.title[:24] }}...{% elif item.current_track %}{{ item.current_track[:24] }}...{% else %}Sedang Stream YouTube{% endif %}</span>
                                 </span>
                             </div>
+
+                            <!-- Aktivitas MCP Tools Hari Ini -->
+                            {% if act.has_tools %}
+                            <div style="margin-top: 4px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                                <span class="app-chip app-chip-small" style="font-size: 10px; padding: 2px 6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700;" title="Tools terpanggil hari ini: {{ act.tools_list|join(', ') }}">
+                                    ⚡ {{ act.tools_count }} Tool Hari Ini ({{ act.last_tool or 'MCP' }})
+                                </span>
+                                {% if act.last_activity_time %}
+                                <span style="font-size:10px; color:#64748b;">jam {{ act.last_activity_time }}</span>
+                                {% endif %}
+                            </div>
+                            {% elif act.has_stream and not item.is_playing and not item.youtube_stream %}
+                            <div style="margin-top: 4px;">
+                                <span class="app-chip app-chip-small" style="font-size: 10px; padding: 2px 6px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-weight:700;">
+                                    🎵 Stream YouTube Hari Ini
+                                </span>
+                            </div>
+                            {% endif %}
                         </td>
                         <td>
                             {% if item.mcp_status.connected %}
@@ -913,8 +955,12 @@
         let effectiveFilter = currentFilter;
 
         // Auto-detect filter intent from search query keywords
-        if (q === "stream" || q === "youtube" || q.includes("stream youtube")) {
+        if (q.includes("aktivitas") || q.includes("hari ini") || q === "aktif") {
+            effectiveFilter = "active_today";
+        } else if (q === "stream" || q === "youtube" || q.includes("stream youtube")) {
             effectiveFilter = "stream_youtube";
+        } else if (q.includes("tool") || q.includes("mcp tool")) {
+            effectiveFilter = "tools_today";
         } else if (q === "mac" || q.includes("mac tersimpan") || q.includes("tersimpan mac") || q.includes("ada mac")) {
             effectiveFilter = "mac_saved";
         } else if (q === "mcp" || q === "konek" || q.includes("mcp konek")) {
@@ -937,16 +983,23 @@
             const isPlaying = row.dataset.playing === "true";
             const isConnected = row.dataset.mcp === "true";
             const hasMac = row.dataset.hasMac === "true";
+            const isActiveToday = row.dataset.activeToday === "true";
+            const isStreamToday = row.dataset.streamToday === "true" || isPlaying;
+            const isToolsToday = row.dataset.toolsToday === "true" || (parseInt(row.dataset.toolsCount || 0) > 0);
             const searchData = row.dataset.search || "";
 
             // Check keyword text match
-            const isSpecialKeyword = ["stream", "youtube", "mac", "konek", "blom", "belum", "baru", "lama"].some(k => q === k || q.includes(k));
+            const isSpecialKeyword = ["stream", "youtube", "tool", "mcp", "aktivitas", "hari ini", "aktif", "mac", "konek", "blom", "belum", "baru", "lama"].some(k => q === k || q.includes(k));
             const textMatch = !q || isSpecialKeyword || searchData.includes(q);
 
             // Check pill filter condition
             let filterMatch = true;
-            if (effectiveFilter === "stream_youtube") {
-                filterMatch = isPlaying;
+            if (effectiveFilter === "active_today") {
+                filterMatch = isActiveToday;
+            } else if (effectiveFilter === "stream_youtube") {
+                filterMatch = isStreamToday;
+            } else if (effectiveFilter === "tools_today") {
+                filterMatch = isToolsToday;
             } else if (effectiveFilter === "mac_saved") {
                 filterMatch = hasMac;
             } else if (effectiveFilter === "mcp_connected") {
@@ -967,6 +1020,19 @@
             matchingRows.sort((a, b) => parseInt(a.dataset.userId || 0) - parseInt(b.dataset.userId || 0));
         } else if (effectiveFilter === "newest") {
             matchingRows.sort((a, b) => parseInt(b.dataset.userId || 0) - parseInt(a.dataset.userId || 0));
+        } else if (effectiveFilter === "active_today" || effectiveFilter === "tools_today") {
+            // Prioritas: yang ada stream aktif -> jumlah tools terpanggil terbanyak -> ID terbaru
+            matchingRows.sort((a, b) => {
+                const playA = a.dataset.playing === "true" ? 0 : 1;
+                const playB = b.dataset.playing === "true" ? 0 : 1;
+                if (playA !== playB) return playA - playB;
+
+                const toolsA = parseInt(a.dataset.toolsCount || 0);
+                const toolsB = parseInt(b.dataset.toolsCount || 0);
+                if (toolsA !== toolsB) return toolsB - toolsA;
+
+                return parseInt(b.dataset.userId || 0) - parseInt(a.dataset.userId || 0);
+            });
         } else if (effectiveFilter === "mac_saved") {
             // Prioritize users with saved MAC, then active playing, then newest ID
             matchingRows.sort((a, b) => {
@@ -983,12 +1049,17 @@
         } else {
             // Default Priority (Semua User):
             // 1. Paling atas: Sedang memutar YouTube
-            // 2. Kedua: Sudah terhubung ke MCP
-            // 3. Ketiga: User lainnya (terbaru lebih dahulu)
+            // 2. Kedua: Memiliki aktivitas hari ini
+            // 3. Ketiga: Sudah terhubung ke MCP
+            // 4. Keempat: User lainnya (terbaru lebih dahulu)
             matchingRows.sort((a, b) => {
                 const playA = a.dataset.playing === "true" ? 0 : 1;
                 const playB = b.dataset.playing === "true" ? 0 : 1;
                 if (playA !== playB) return playA - playB;
+
+                const actA = a.dataset.activeToday === "true" ? 0 : 1;
+                const actB = b.dataset.activeToday === "true" ? 0 : 1;
+                if (actA !== actB) return actA - actB;
 
                 const mcpA = a.dataset.mcp === "true" ? 0 : 1;
                 const mcpB = b.dataset.mcp === "true" ? 0 : 1;

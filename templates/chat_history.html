@@ -4,10 +4,10 @@
 <style>
     .chat-shell {
         display: grid;
-        grid-template-columns: 360px 1fr;
-        height: calc(100vh - 270px);
-        min-height: 650px;
-        max-height: 860px;
+        grid-template-columns: 380px 1fr;
+        height: calc(100vh - 250px);
+        min-height: 680px;
+        max-height: 900px;
         overflow: hidden;
         border: 1px solid var(--app-border);
         border-radius: var(--app-radius);
@@ -39,6 +39,35 @@
     :root[data-theme="neo"] .chat-sidebar-header {
         border-bottom: 2px solid #111;
     }
+    .chat-type-tabs {
+        display: flex;
+        gap: 4px;
+        margin-top: 8px;
+        background: rgba(0,0,0,0.05);
+        padding: 3px;
+        border-radius: 6px;
+    }
+    .chat-type-tab {
+        flex: 1;
+        text-align: center;
+        padding: 4px 6px;
+        font-size: 11px;
+        font-weight: 700;
+        border: none;
+        background: transparent;
+        border-radius: 4px;
+        cursor: pointer;
+        color: var(--app-muted);
+        transition: all 0.15s ease;
+    }
+    .chat-type-tab.active {
+        background: var(--app-surface);
+        color: var(--app-text);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    :root[data-theme="neo"] .chat-type-tab.active {
+        border: 1.5px solid #111;
+    }
     .chat-sidebar-scroll {
         flex: 1;
         overflow-y: auto;
@@ -58,10 +87,6 @@
     .chat-thread-body::-webkit-scrollbar-thumb {
         background: var(--app-border-strong, #cbd5e1);
         border-radius: 4px;
-    }
-    .chat-sidebar-scroll::-webkit-scrollbar-thumb:hover,
-    .chat-thread-body::-webkit-scrollbar-thumb:hover {
-        background: var(--app-muted, #94a3b8);
     }
     .chat-date-group { margin-bottom: 8px; }
     .chat-date-label {
@@ -96,14 +121,18 @@
     .chat-sessions { display: grid; gap: 4px; }
     .chat-sessions.collapsed { display: none; }
     .chat-item {
+        position: relative;
         width: 100%;
         border: 1.5px solid transparent;
         border-radius: 8px;
         background: transparent;
-        padding: 10px 14px;
+        padding: 9px 12px;
         text-align: left;
         color: var(--app-text);
         transition: all 0.15s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
     }
     .chat-item:hover {
         background: var(--app-surface-muted, #f8fafc);
@@ -123,15 +152,24 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-size: 13.5px;
+        font-size: 13px;
         font-weight: 700;
         line-height: 1.4;
     }
     .chat-item-meta {
-        display: block;
-        margin-top: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 2px;
         font-size: 11px;
         color: var(--app-muted);
+    }
+    .chat-item-badge {
+        font-size: 9.5px;
+        font-weight: 800;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: rgba(0,0,0,0.06);
     }
     .chat-date-input { display: flex; gap: 6px; margin-top: 8px; }
     .chat-date-input input[type="date"] {
@@ -153,16 +191,22 @@
     }
     .chat-thread-head {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: space-between;
         gap: 14px;
-        padding: 16px 18px;
+        padding: 14px 18px;
         border-bottom: 1px solid var(--app-border);
         background: var(--app-surface);
         flex-shrink: 0;
+        flex-wrap: wrap;
     }
     :root[data-theme="neo"] .chat-thread-head {
         border-bottom: 2px solid #111;
+    }
+    .chat-thread-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
     .chat-thread-body {
         flex: 1;
@@ -173,9 +217,9 @@
     }
     .chat-msg { display: block; margin-bottom: 20px; }
     .chat-bubble {
-        width: min(100%, 760px);
-        border-radius: 8px;
-        padding: 12px 14px;
+        width: min(100%, 820px);
+        border-radius: 10px;
+        padding: 14px 16px;
         box-shadow: var(--app-shadow);
         border: 1px solid var(--app-border);
     }
@@ -184,32 +228,65 @@
         box-shadow: 3px 3px 0 #111;
     }
     .chat-bubble-user { background: #e0f2fe; }
-    .chat-bubble-ai { background: var(--app-surface-muted, #f1f5f9); }
-    .chat-bubble-tool { background: var(--app-surface-muted, #f1f5f9); }
+    .chat-bubble-ai { background: var(--app-surface-muted, #f8fafc); }
+    .chat-bubble-tool { background: #fdf4ff; border-color: #f0abfc; }
+    :root[data-theme="dark"] .chat-bubble-tool { background: #2e1065; border-color: #7e22ce; }
     .chat-bubble-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 14px;
-        margin-bottom: 8px;
-        font-size: 11px;
-        color: #64748b;
+        margin-bottom: 10px;
+        font-size: 11.5px;
+        color: var(--app-muted);
     }
-    .chat-bubble-role { font-weight: 800; }
+    .chat-bubble-role { font-weight: 800; display: flex; align-items: center; gap: 6px; }
     .chat-bubble-time { white-space: nowrap; font-weight: 600; }
     .chat-bubble-body {
         color: var(--app-text);
-        font-size: 13.5px;
-        line-height: 1.6;
+        font-size: 14px;
+        line-height: 1.65;
         white-space: pre-wrap;
         word-break: break-word;
     }
     .chat-bubble-foot {
-        margin-top: 6px;
-        text-align: right;
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         font-size: 11px;
-        color: #64748b;
-        font-weight: 600;
+        color: var(--app-muted);
+        border-top: 1px dashed var(--app-border);
+        padding-top: 8px;
+    }
+    .chat-json-box {
+        background: #0b1120;
+        color: #38bdf8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        padding: 12px;
+        border-radius: 6px;
+        overflow-x: auto;
+        max-height: 280px;
+        margin-top: 8px;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+    .chat-collapse-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--app-accent, #059669);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 4px 0;
+    }
+    .chat-collapse-toggle:hover {
+        text-decoration: underline;
     }
     .chat-empty {
         display: grid;
@@ -238,9 +315,9 @@
 <div class="app-page">
     <header class="app-page-header">
         <div>
-            <p class="app-eyebrow">Riwayat Xiaozhi</p>
-            <h1 class="app-title">Riwayat Chat</h1>
-            <p class="app-subtitle">Percakapan terbaru dari MCP. Klik tanggal untuk filter per hari.</p>
+            <p class="app-eyebrow">Riwayat Percakapan & MCP</p>
+            <h1 class="app-title">Riwayat Chat & Tool MCP</h1>
+            <p class="app-subtitle">Log lengkap percakapan asisten suara Xiaozhi, pemanggilan MCP tools, dan respon sistem.</p>
         </div>
         <div class="app-toolbar">
             <span class="app-status-pill {% if mcp_status.connected %}is-online{% elif not mcp_status.tokenSaved %}is-offline{% endif %}" id="mcpStatusPill">
@@ -252,27 +329,32 @@
     </header>
 
     <section class="app-stat-grid">
-        <div class="app-stat-card"><p class="app-stat-label">Total</p><p class="app-stat-value" id="statTotal">{{ stats.total }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Total Riwayat</p><p class="app-stat-value" id="statTotal">{{ stats.total }}</p></div>
         <div class="app-stat-card"><p class="app-stat-label">Ditampilkan</p><p class="app-stat-value" id="statShown">{{ histories|length }}</p></div>
         <div class="app-stat-card"><p class="app-stat-label">Hari Aktif</p><p class="app-stat-value">{{ date_list|length }}</p></div>
-        <div class="app-stat-card"><p class="app-stat-label">Filter</p><p class="app-stat-value" id="statFilter">{{ active_date if active_date else "Semua" }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Filter Tanggal</p><p class="app-stat-value" id="statFilter">{{ active_date if active_date else "Semua" }}</p></div>
     </section>
 
     <section class="chat-shell">
         <aside class="chat-sidebar">
             <div class="chat-sidebar-header">
                 <form action="/riwayat-chat" method="GET" class="grid gap-2">
-                    <input type="search" name="q" value="{{ query }}" placeholder="Cari chat..." class="app-input" style="font-size:13px;padding:8px 10px;">
+                    <input type="search" name="q" id="chatSearchInput" value="{{ query }}" placeholder="Cari pesan atau tool..." class="app-input" style="font-size:13px;padding:8px 10px;">
                     <div class="chat-date-input">
                         <input type="date" name="date" value="{{ active_date }}">
                         <button type="submit" class="app-button app-button-primary" style="padding:6px 12px;font-size:12px;">Filter</button>
                     </div>
                 </form>
+                <div class="chat-type-tabs">
+                    <button type="button" class="chat-type-tab active" data-type="all" onclick="setTypeFilter('all')">Semua</button>
+                    <button type="button" class="chat-type-tab" data-type="chat" onclick="setTypeFilter('chat')">💬 Chat AI</button>
+                    <button type="button" class="chat-type-tab" data-type="tool" onclick="setTypeFilter('tool')">⚡ Tool MCP</button>
+                </div>
                 <div style="display:flex;gap:6px;margin-top:8px;">
-                    <a href="/riwayat-chat" class="app-button" style="flex:1;font-size:12px;padding:6px 8px;text-align:center;">Semua</a>
-                    <form action="/riwayat-chat/clear" method="POST" onsubmit="return confirm('Hapus semua?');" style="flex:1;">
+                    <a href="/riwayat-chat" class="app-button" style="flex:1;font-size:12px;padding:6px 8px;text-align:center;">Reset</a>
+                    <form action="/riwayat-chat/clear" method="POST" onsubmit="return confirm('Hapus semua riwayat chat? Tindakan ini tidak dapat dibatalkan.');" style="flex:1;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="app-button app-button-danger" style="width:100%;font-size:12px;padding:6px 8px;">Hapus</button>
+                        <button type="submit" class="app-button app-button-danger" style="width:100%;font-size:12px;padding:6px 8px;">Hapus Semua</button>
                     </form>
                 </div>
             </div>
@@ -281,14 +363,30 @@
 
         <div class="chat-thread">
             <div class="chat-thread-head">
-                <div>
-                    <h2 class="app-section-title" id="threadTitle">Pilih riwayat</h2>
-                    <p class="app-section-subtitle" id="threadMeta">Klik chat di sidebar untuk lihat detail.</p>
+                <div style="min-width:0; flex:1;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <h2 class="app-section-title" id="threadTitle" style="font-size:16px; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Pilih riwayat</h2>
+                        <span class="app-chip app-chip-small app-chip-neutral" id="threadBadge">-</span>
+                    </div>
+                    <p class="app-section-subtitle" id="threadMeta" style="margin:2px 0 0 0; font-size:11.5px;">Klik salah satu chat di sidebar untuk melihat isi lengkap.</p>
                 </div>
-                <span class="app-chip app-chip-small app-chip-neutral" id="threadBadge">-</span>
+                <div class="chat-thread-actions" id="threadActionButtons" style="display:none;">
+                    <button type="button" class="app-button app-button-small" onclick="copyCurrentChat()" title="Salin seluruh isi percakapan">
+                        📋 Salin
+                    </button>
+                    <button type="button" class="app-button app-button-small app-button-danger" onclick="deleteCurrentChat()" title="Hapus pesan ini saja">
+                        🗑️ Hapus Item
+                    </button>
+                </div>
             </div>
             <div class="chat-thread-body" id="threadBody">
-                <div class="chat-empty"><div><p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih chat</p><p class="mt-2 text-sm">Klik salah satu item di sidebar kiri.</p></div></div>
+                <div class="chat-empty">
+                    <div>
+                        <div style="font-size:36px; margin-bottom:10px;">💬</div>
+                        <p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih Riwayat Chat</p>
+                        <p class="mt-2 text-sm" style="color:var(--app-muted);">Pilih salah satu item di sidebar kiri untuk memeriksa prompt dan respon lengkap.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -299,9 +397,12 @@
     var DL = {{ date_list|tojson }};
     var MQ = {{ query|tojson }};
     var AD = {{ active_date|tojson }};
+    var CSRF_TOKEN = {{ csrf_token|tojson }};
+    var currentTypeFilter = 'all';
     var sel = H.length ? Number(H[0].id) : null;
     var maxId = H.reduce(function(m,i){ return Math.max(m, Number(i.id||0)); }, 0);
     var collapsed = {};
+
     function escapeHtml(value) {
         return String(value ?? "")
             .replaceAll("&", "&amp;")
@@ -312,17 +413,61 @@
     }
     var E = (window.App && App.escapeHtml) ? App.escapeHtml : escapeHtml;
 
-    function fmt(v){ var d=new Date(v); return isNaN(d)?v||"-":d.toLocaleString("id-ID",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}); }
-    function fmtShort(v){ var d=new Date(v); return isNaN(d)?"":d.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}); }
-    function relDay(s){ if(!s)return""; var t=new Date();t.setHours(0,0,0,0); var d=new Date(s+"T00:00:00"); var diff=Math.round((t-d)/864e5); if(diff===0)return"Hari Ini"; if(diff===1)return"Kemarin"; if(diff<7)return diff+" hari lalu"; return d.toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}); }
-    function cmp(v,m){ m=m||76; var t=String(v||"").replace(/\s+/g," ").trim(); return t.length<=m?t:t.slice(0,m-3).trim()+"..."; }
-    function kind(i){ if(i.source==="chat_transcript")return"Transcript"; if(String(i.tool_name||"").startsWith("xiaozhi_ws"))return"Chat MCP"; return"Tool"; }
+    function fmt(v){
+        var d = new Date(v);
+        return isNaN(d) ? (v || "-") : d.toLocaleString("id-ID", {
+            day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit", second: "2-digit"
+        });
+    }
+
+    function fmtShort(v){
+        var d = new Date(v);
+        return isNaN(d) ? "" : d.toLocaleTimeString("id-ID", {hour: "2-digit", minute: "2-digit"});
+    }
+
+    function relDay(s){
+        if(!s) return "";
+        var t = new Date(); t.setHours(0,0,0,0);
+        var d = new Date(s + "T00:00:00");
+        var diff = Math.round((t - d) / 864e5);
+        if (diff === 0) return "Hari Ini";
+        if (diff === 1) return "Kemarin";
+        if (diff < 7) return diff + " hari lalu";
+        return d.toLocaleDateString("id-ID", {weekday: "long", day: "numeric", month: "long", year: "numeric"});
+    }
+
+    function isToolItem(i) {
+        if (!i) return false;
+        var src = String(i.source || "").toLowerCase();
+        var tool = String(i.tool_name || "").toLowerCase();
+        if (src === "chat_transcript" || src === "web_chat") return false;
+        return (tool && !tool.startsWith("xiaozhi_ws") && tool !== "save_chat_history") || src === "mcp_tool";
+    }
+
+    function kind(i){
+        if (!i) return "-";
+        if (isToolItem(i)) return "Tool MCP";
+        if (i.source === "chat_transcript") return "Transcript Suara";
+        if (String(i.tool_name || "").startsWith("xiaozhi_ws")) return "WebSocket MCP";
+        return "Chat AI";
+    }
+
+    function setTypeFilter(t) {
+        currentTypeFilter = t;
+        document.querySelectorAll('.chat-type-tab').forEach(function(btn) {
+            btn.classList.toggle('active', btn.dataset.type === t);
+        });
+        renderSidebar();
+    }
 
     function groupByDate(items) {
         var g = {};
         items.forEach(function(i) {
-            var d = (i.created_at||"").slice(0,10) || "?";
-            if(!g[d]) g[d] = [];
+            if (currentTypeFilter === 'chat' && isToolItem(i)) return;
+            if (currentTypeFilter === 'tool' && !isToolItem(i)) return;
+            var d = (i.created_at || "").slice(0, 10) || "?";
+            if (!g[d]) g[d] = [];
             g[d].push(i);
         });
         return g;
@@ -331,14 +476,10 @@
     function renderSidebar() {
         var el = document.getElementById("sidebarList");
         var grouped = groupByDate(H);
-        // Merge dateList dates with grouped dates
-        var allDates = {};
-        DL.forEach(function(e) { allDates[e.date] = e.count; });
-        Object.keys(grouped).forEach(function(d) { if(!allDates[d]) allDates[d] = grouped[d].length; });
-        var dates = Object.keys(allDates).sort().reverse();
+        var dates = Object.keys(grouped).sort().reverse();
 
-        if (!dates.length && !H.length) {
-            el.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--app-muted);">Belum ada riwayat chat.</div>';
+        if (!dates.length) {
+            el.innerHTML = '<div style="padding:24px 14px;text-align:center;font-size:13px;color:var(--app-muted);">Tidak ada riwayat untuk filter ini.</div>';
             return;
         }
 
@@ -347,18 +488,23 @@
             var isActive = d === AD;
             var isCol = collapsed[d] && !isActive;
             var items = grouped[d] || [];
-            var cnt = allDates[d] || items.length;
             html += '<div class="chat-date-group">';
-            html += '<div class="chat-date-label '+(isActive?'is-active':'')+'" onclick="navDate(\''+E(d)+'\')">';
-            html += '<span>'+E(relDay(d) || d)+'</span>';
-            html += '<span class="chat-date-badge">'+cnt+'</span>';
+            html += '<div class="chat-date-label ' + (isActive ? 'is-active' : '') + '" onclick="navDate(\'' + E(d) + '\')">';
+            html += '<span>' + E(relDay(d) || d) + '</span>';
+            html += '<span class="chat-date-badge">' + items.length + '</span>';
             html += '</div>';
-            html += '<div class="chat-sessions '+(isCol?'collapsed':'')+'">';
+            html += '<div class="chat-sessions ' + (isCol ? 'collapsed' : '') + '">';
             items.forEach(function(i) {
                 var id = Number(i.id);
-                html += '<button type="button" class="chat-item '+(id===sel?'active':'')+'" onclick="selChat('+id+')">';
-                html += '<span class="chat-item-title">'+E(cmp(i.user_message||i.xiaozhi_answer||i.tool_name))+'</span>';
-                html += '<span class="chat-item-meta">'+E(kind(i))+' &middot; '+E(fmtShort(i.created_at))+'</span>';
+                var isSelected = (id === sel);
+                var previewTitle = i.user_message || i.xiaozhi_answer || i.tool_name || ("Pesan #" + id);
+                var isTool = isToolItem(i);
+                html += '<button type="button" class="chat-item ' + (isSelected ? 'active' : '') + '" onclick="selChat(' + id + ')">';
+                html += '<span class="chat-item-title">' + E(previewTitle) + '</span>';
+                html += '<div class="chat-item-meta">';
+                html += '<span class="chat-item-badge" style="' + (isTool ? 'color:#9333ea;background:#f5d0fe;' : '') + '">' + E(kind(i)) + '</span>';
+                html += '<span>' + E(fmtShort(i.created_at)) + '</span>';
+                html += '</div>';
                 html += '</button>';
             });
             html += '</div></div>';
@@ -381,73 +527,227 @@
     }
 
     function renderThread() {
-        var item = H.find(function(i){ return Number(i.id)===sel; });
+        var item = H.find(function(i){ return Number(i.id) === sel; });
         var body = document.getElementById("threadBody");
+        var actions = document.getElementById("threadActionButtons");
+
         if (!item) {
             document.getElementById("threadTitle").textContent = AD ? relDay(AD) : "Pilih riwayat";
-            document.getElementById("threadMeta").textContent = "Klik chat dari sidebar.";
+            document.getElementById("threadMeta").textContent = "Klik chat dari sidebar untuk melihat detail.";
             document.getElementById("threadBadge").textContent = "-";
-            body.innerHTML = '<div class="chat-empty"><div><p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih chat</p><p class="mt-2 text-sm">Klik salah satu item di sidebar.</p></div></div>';
+            if (actions) actions.style.display = "none";
+            body.innerHTML = '<div class="chat-empty"><div><div style="font-size:36px;margin-bottom:10px;">💬</div><p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih Chat</p><p class="mt-2 text-sm" style="color:var(--app-muted);">Klik salah satu item di sidebar kiri.</p></div></div>';
             return;
         }
-        document.getElementById("threadTitle").textContent = cmp(item.user_message||item.xiaozhi_answer||item.tool_name);
+
+        if (actions) actions.style.display = "flex";
+        var fullTitle = item.user_message || item.xiaozhi_answer || item.tool_name || ("Chat #" + item.id);
+        document.getElementById("threadTitle").textContent = fullTitle;
         document.getElementById("threadBadge").textContent = kind(item);
-        document.getElementById("threadMeta").textContent = fmt(item.created_at);
+        document.getElementById("threadMeta").textContent = "ID #" + item.id + " · " + fmt(item.created_at) + (item.source ? " · Sumber: " + item.source : "");
 
         var m = "";
-        if (item.user_message) m += '<div class="chat-msg"><div class="chat-bubble chat-bubble-user"><div class="chat-bubble-head"><span class="chat-bubble-role">User</span><time class="chat-bubble-time">'+E(fmt(item.created_at))+'</time></div><div class="chat-bubble-body">'+E(item.user_message)+'</div></div></div>';
-        
-        var aiAnswer = item.xiaozhi_answer;
-        if (!aiAnswer && item.response_payload) {
+
+        // 1. Pesan User (Jika ada)
+        if (item.user_message) {
+            m += '<div class="chat-msg">';
+            m += '<div class="chat-bubble chat-bubble-user">';
+            m += '<div class="chat-bubble-head">';
+            m += '<span class="chat-bubble-role">👤 User</span>';
+            m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
+            m += '</div>';
+            m += '<div class="chat-bubble-body">' + E(item.user_message) + '</div>';
+            m += '<div class="chat-bubble-foot">';
+            m += '<span>Input Pengguna</span>';
+            m += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(item.user_message).replace(/`/g, '\\`') + '`)">📋 Salin Teks</button>';
+            m += '</div>';
+            m += '</div></div>';
+        }
+
+        // 2. Request Payload (Argumen Tool jika ada)
+        var reqPayload = item.request_payload;
+        if (reqPayload) {
+            var reqStr = "";
             try {
-                var rp = typeof item.response_payload === "string" ? JSON.parse(item.response_payload) : item.response_payload;
-                aiAnswer = rp.message || rp.result || rp.text || (typeof rp === "object" ? "" : String(rp));
+                reqStr = typeof reqPayload === "string" ? JSON.stringify(JSON.parse(reqPayload), null, 2) : JSON.stringify(reqPayload, null, 2);
             } catch(e) {
-                aiAnswer = String(item.response_payload);
+                reqStr = String(reqPayload);
+            }
+            if (reqStr && reqStr !== "{}" && reqStr !== "null") {
+                m += '<div class="chat-msg">';
+                m += '<div class="chat-bubble chat-bubble-tool">';
+                m += '<div class="chat-bubble-head">';
+                m += '<span class="chat-bubble-role">⚙️ Parameter Tool (' + E(item.tool_name || "Tool") + ')</span>';
+                m += '<span class="app-chip app-chip-small" style="font-size:10px;">Input Request</span>';
+                m += '</div>';
+                m += '<div class="chat-json-box">' + E(reqStr) + '</div>';
+                m += '</div></div>';
             }
         }
-        if (aiAnswer) {
-            var label = item.tool_name ? 'Xiaozhi AI (' + E(item.tool_name) + ')' : 'Xiaozhi AI';
-            m += '<div class="chat-msg"><div class="chat-bubble chat-bubble-ai"><div class="chat-bubble-head"><span class="chat-bubble-role">'+label+'</span><time class="chat-bubble-time">'+E(fmt(item.created_at))+'</time></div><div class="chat-bubble-body">'+E(aiAnswer)+'</div><div class="chat-bubble-foot">Content generated by AI</div></div></div>';
-        } else if (item.tool_name) {
-            m += '<div class="chat-msg"><div class="chat-bubble chat-bubble-tool"><div class="chat-bubble-head"><span class="chat-bubble-role">Tool: '+E(item.tool_name)+'</span><time>'+E(fmt(item.created_at))+'</time></div><div class="chat-bubble-body">Tool call tercatat.</div></div></div>';
+
+        // 3. Jawaban AI / Hasil Respon Tool
+        var aiAnswer = item.xiaozhi_answer;
+        var rawResponseStr = "";
+        if (item.response_payload) {
+            try {
+                var rp = typeof item.response_payload === "string" ? JSON.parse(item.response_payload) : item.response_payload;
+                rawResponseStr = JSON.stringify(rp, null, 2);
+                if (!aiAnswer) {
+                    aiAnswer = rp.message || rp.result || rp.text || (typeof rp === "object" ? JSON.stringify(rp, null, 2) : String(rp));
+                }
+            } catch(e) {
+                rawResponseStr = String(item.response_payload);
+                if (!aiAnswer) aiAnswer = rawResponseStr;
+            }
         }
-        if (!m) m = '<div class="chat-empty"><p>Chat kosong</p></div>';
+
+        if (aiAnswer) {
+            var label = item.tool_name ? '🤖 Xiaozhi AI · Tool: ' + E(item.tool_name) : '🤖 Xiaozhi AI';
+            m += '<div class="chat-msg">';
+            m += '<div class="chat-bubble chat-bubble-ai">';
+            m += '<div class="chat-bubble-head">';
+            m += '<span class="chat-bubble-role">' + label + '</span>';
+            m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
+            m += '</div>';
+            m += '<div class="chat-bubble-body">' + E(aiAnswer) + '</div>';
+
+            if (rawResponseStr && rawResponseStr !== "{}" && rawResponseStr !== JSON.stringify(aiAnswer)) {
+                m += '<div style="margin-top:10px;">';
+                m += '<button type="button" class="chat-collapse-toggle" onclick="toggleRawResponse(' + item.id + ')">🔍 Tampilkan Raw JSON Response ▾</button>';
+                m += '<div id="rawResponse-' + item.id + '" class="chat-json-box" style="display:none;">' + E(rawResponseStr) + '</div>';
+                m += '</div>';
+            }
+
+            m += '<div class="chat-bubble-foot">';
+            m += '<span>Respon Lengkap AI & MCP</span>';
+            m += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(aiAnswer).replace(/`/g, '\\`') + '`)">📋 Salin Jawaban</button>';
+            m += '</div>';
+            m += '</div></div>';
+        } else if (item.tool_name) {
+            m += '<div class="chat-msg">';
+            m += '<div class="chat-bubble chat-bubble-tool">';
+            m += '<div class="chat-bubble-head">';
+            m += '<span class="chat-bubble-role">🔧 Eksekusi Tool: ' + E(item.tool_name) + '</span>';
+            m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
+            m += '</div>';
+            m += '<div class="chat-bubble-body">Tool berhasil dipanggil dan dieksekusi oleh sistem Xiaozhi.</div>';
+            m += '</div></div>';
+        }
+
+        if (!m) {
+            m = '<div class="chat-empty"><p>Percakapan kosong.</p></div>';
+        }
+
         body.innerHTML = m;
-        body.scrollTop = body.scrollHeight;
+        body.scrollTop = 0;
+    }
+
+    function toggleRawResponse(id) {
+        var el = document.getElementById("rawResponse-" + id);
+        if (!el) return;
+        el.style.display = (el.style.display === "none") ? "block" : "none";
+    }
+
+    function copyText(str) {
+        if (!str) return;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(str).then(function() {
+                if (window.App && App.toast) App.toast.success("Teks berhasil disalin!");
+                else alert("Teks berhasil disalin!");
+            }).catch(function() {
+                alert("Gagal menyalin otomatis.");
+            });
+        }
+    }
+
+    function copyCurrentChat() {
+        var item = H.find(function(i){ return Number(i.id) === sel; });
+        if (!item) return;
+        var full = "";
+        if (item.user_message) full += "User: " + item.user_message + "\n\n";
+        if (item.tool_name) full += "Tool: " + item.tool_name + "\n\n";
+        if (item.xiaozhi_answer) full += "Xiaozhi AI: " + item.xiaozhi_answer + "\n";
+        copyText(full.trim());
+    }
+
+    async function deleteCurrentChat() {
+        var item = H.find(function(i){ return Number(i.id) === sel; });
+        if (!item) return;
+        if (!confirm("Hapus item riwayat chat #" + item.id + "?")) return;
+
+        try {
+            var res = await fetch("/riwayat-chat/delete/" + item.id, {
+                method: "POST",
+                headers: {
+                    "X-CSRF-Token": CSRF_TOKEN,
+                    "Accept": "application/json"
+                },
+                credentials: "same-origin"
+            });
+            var d = await res.json().catch(function(){ return {}; });
+            if (res.ok && d.success) {
+                // Hapus dari H di memori
+                H = H.filter(function(i){ return Number(i.id) !== Number(item.id); });
+                sel = H.length ? Number(H[0].id) : null;
+                renderSidebar();
+                renderThread();
+                document.getElementById("statShown").textContent = H.length;
+                if (window.App && App.toast) App.toast.success("Riwayat chat #" + item.id + " berhasil dihapus.");
+            } else {
+                alert(d.message || "Gagal menghapus riwayat chat.");
+            }
+        } catch(e) {
+            alert("Terjadi kesalahan saat menghapus: " + e.message);
+        }
     }
 
     function merge(items) {
-        if (!Array.isArray(items)||!items.length) return false;
-        var byId = new Map(H.map(function(i){return [Number(i.id),i];}));
+        if (!Array.isArray(items) || !items.length) return false;
+        var byId = new Map(H.map(function(i){ return [Number(i.id), i]; }));
         var ch = false;
-        items.forEach(function(i){ var id=Number(i.id||0); var ex=byId.get(id); if(!ex||JSON.stringify(ex)!==JSON.stringify(i)){byId.set(id,i);ch=true;} });
+        items.forEach(function(i){
+            var id = Number(i.id || 0);
+            var ex = byId.get(id);
+            if (!ex || JSON.stringify(ex) !== JSON.stringify(i)) {
+                byId.set(id, i);
+                ch = true;
+            }
+        });
         if (!ch) return false;
-        H = Array.from(byId.values()).sort(function(a,b){return Number(b.id||0)-Number(a.id||0);}).slice(0,{{ limit }});
-        maxId = Math.max.apply(null,[maxId].concat(items.map(function(i){return Number(i.id||0);})));
+        H = Array.from(byId.values()).sort(function(a,b){ return Number(b.id||0) - Number(a.id||0); }).slice(0, {{ limit }});
+        maxId = Math.max.apply(null, [maxId].concat(items.map(function(i){ return Number(i.id || 0); })));
         return true;
     }
 
     async function poll() {
         try {
-            var p = new URLSearchParams({after_id:String(maxId),q:MQ||"",limit:"{{ limit }}",date:AD||""});
-            var r = await fetch("/api/chat-history?"+p,{headers:{Accept:"application/json"},credentials:"same-origin"});
-            var d = await r.json().catch(function(){return{};});
-            if(!r.ok||!d.success) return;
-            if(d.date_list) DL = d.date_list;
-            if(merge(d.items)) { renderSidebar(); renderThread(); }
-            else if(d.date_list) { renderSidebar(); }
-            document.getElementById("statTotal").textContent = d.stats ? d.stats.total : 0;
-            document.getElementById("statShown").textContent = H.length;
+            var p = new URLSearchParams({after_id: String(maxId), q: MQ || "", limit: "{{ limit }}", date: AD || ""});
+            var r = await fetch("/api/chat-history?" + p, {headers: {Accept: "application/json"}, credentials: "same-origin"});
+            var d = await r.json().catch(function(){ return {}; });
+            if (!r.ok || !d.success) return;
+            if (d.date_list) DL = d.date_list;
+            if (merge(d.items)) {
+                renderSidebar();
+                renderThread();
+            } else if (d.date_list) {
+                renderSidebar();
+            }
+            if (d.stats && document.getElementById("statTotal")) {
+                document.getElementById("statTotal").textContent = d.stats.total;
+            }
+            if (document.getElementById("statShown")) {
+                document.getElementById("statShown").textContent = H.length;
+            }
         } catch(e){}
     }
 
     renderSidebar();
     renderThread();
     if (window.App && App.startPolling) {
-        App.startPolling("chat", poll, 2000);
+        App.startPolling("chat", poll, 3000);
     } else {
-        setInterval(poll, 2000);
+        setInterval(poll, 3000);
     }
 </script>
 {% endblock %}
+

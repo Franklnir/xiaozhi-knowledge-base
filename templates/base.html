@@ -838,7 +838,7 @@
     <script src="/static/js/app.js"></script>
 </head>
 {% set page = active_page|default('') %}
-{% set is_mcp_unlocked_page = (page in ['dashboard', 'chat', 'documentation', 'login', 'register', 'profile', 'admin', 'admin_mcp', 'admin_analytics', '']) %}
+{% set is_mcp_unlocked_page = (page in ['dashboard', 'dashboard_materi', 'chat', 'documentation', 'login', 'register', 'profile', 'admin', 'admin_mcp', 'admin_analytics', 'web_flasher', 'marketplace', 'marketplace_chats', '']) %}
 {% set show_mcp_block_overlay = (user and user.role != 'admin' and (mcp_required is not defined or mcp_required) and not mcp_connected and not is_mcp_unlocked_page) %}
 <body>
     {% if show_mcp_block_overlay %}
@@ -1036,6 +1036,10 @@
             <a href="/dashboard" class="app-sidebar-link {% if page == 'dashboard' %}is-active{% endif %}">
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
                 Dashboard
+            </a>
+            <a href="/dashboard#dataTable" class="app-sidebar-link {% if page == 'dashboard_materi' %}is-active{% endif %}" title="Kelola Database Materi & Knowledge Base">
+                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+                Database Materi
             </a>
             <a href="/chat" class="app-sidebar-link {% if page == 'chat' or active_page == 'chat' %}is-active{% endif %}" style="display:flex;align-items:center;justify-content:space-between;">
                 <div style="display:flex;align-items:center;gap:8px;">
