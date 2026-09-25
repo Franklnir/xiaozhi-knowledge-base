@@ -178,7 +178,10 @@ def rank_chat_history_semantically(
     for idx, r in enumerate(records):
         user_msg = str(r.get("user_message") or "")
         ai_ans = str(r.get("xiaozhi_answer") or "")
-        combined_text = f"{user_msg} {ai_ans}"
+        tool_name = str(r.get("tool_name") or "")
+        req_p = str(r.get("request_payload") or "")
+        res_p = str(r.get("response_payload") or "")
+        combined_text = f"{user_msg} {ai_ans} {tool_name} {req_p} {res_p}"
 
         sim_score = calculate_semantic_similarity(query, combined_text)
 

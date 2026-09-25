@@ -1053,7 +1053,7 @@ class PostgresStore:
         request_payload: Any = None,
         response_payload: Any = None,
         token_hash: str = "",
-    ) -> None:
+    ) -> Dict[str, Any]:
         """Log chat/tool execution with scoped asynchronous commit for maximum throughput."""
         req_json = json.dumps(request_payload) if request_payload is not None else None
         res_json = json.dumps(response_payload) if response_payload is not None else None
@@ -1069,6 +1069,7 @@ class PostgresStore:
                         xiaozhi_answer, request_payload, response_payload, created_at
                     )
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, created_at
                     """,
                     (
                         int(owner_id),
@@ -1082,18 +1083,96 @@ class PostgresStore:
                         now,
                     ),
                 )
+                row = cur.fetchone()
             conn.commit()
 
+        inserted_id = row["id"] if row and "id" in row else 0
+        ts_val = _format_ts(row["created_at"]) if row and "created_at" in row else now
+        record = {
+            "id": inserted_id,
+            "owner_id": int(owner_id),
+            "token_hash": token_hash or "",
+            "source": source,
+            "tool_name": tool_name,
+            "user_message": user_message,
+            "xiaozhi_answer": xiaozhi_answer,
+            "request_payload": req_json,
+            "response_payload": res_json,
+            "created_at": ts_val,
+        }
+        try:
+            from xiaozhi.services.sse_service import broadcast_chat_history
+            broadcast_chat_history(owner_id, record, event_type="new_chat")
+        except Exception:
+            pass
+        return record
+
     def upsert_chat_transcript(
-        self, owner_id: int, *, tool_name: str, user_message: str = "", xiaozhi_answer: str = "", payload=None, token_hash: str = ""
-    ) -> None:
-        self.add_chat_history(
+        self,
+        owner_id: int,
+        *,
+        tool_name: str,
+        user_message: str = "",
+        xiaozhi_answer: str = "",
+        payload: Any = None,
+        response_payload: Any = None,
+        token_hash: str = "",
+    ) -> Dict[str, Any]:
+        user_message = str(user_message or "").strip()
+        xiaozhi_answer = str(xiaozhi_answer or "").strip()
+        res_json = json.dumps(response_payload) if response_payload is not None else None
+        req_json = json.dumps(payload) if payload is not None else None
+
+        # If we have an answer but no user_message, attempt to merge with the latest pending message without answer
+        if xiaozhi_answer and not user_message:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id, user_message, request_payload, created_at
+                        FROM chat_history
+                        WHERE owner_id = %s AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
+                        ORDER BY id DESC LIMIT 1
+                        """,
+                        (int(owner_id),)
+                    )
+                    pending = cur.fetchone()
+                    if pending:
+                        p_id = pending["id"]
+                        cur.execute(
+                            """
+                            UPDATE chat_history
+                            SET xiaozhi_answer = %s,
+                                response_payload = COALESCE(%s, response_payload),
+                                tool_name = CASE WHEN tool_name LIKE '%%inbound%%' THEN %s ELSE tool_name END,
+                                token_hash = COALESCE(%s, token_hash)
+                            WHERE id = %s
+                            RETURNING id, owner_id, token_hash, source, tool_name, user_message, xiaozhi_answer, request_payload, response_payload, created_at
+                            """,
+                            (xiaozhi_answer, res_json, tool_name, token_hash or None, p_id)
+                        )
+                        row = cur.fetchone()
+                        conn.commit()
+                        if row:
+                            updated_rec = dict(row)
+                            if "created_at" in updated_rec:
+                                updated_rec["created_at"] = _format_ts(updated_rec["created_at"]) or ""
+                            try:
+                                from xiaozhi.services.sse_service import broadcast_chat_history
+                                broadcast_chat_history(owner_id, updated_rec, event_type="update_chat")
+                            except Exception:
+                                pass
+                            return updated_rec
+
+        # Otherwise create a new history record
+        return self.add_chat_history(
             owner_id=owner_id,
-            source="transcript",
+            source="chat_transcript",
             tool_name=tool_name,
             user_message=user_message,
             xiaozhi_answer=xiaozhi_answer,
             request_payload=payload,
+            response_payload=response_payload,
             token_hash=token_hash,
         )
 
@@ -1116,7 +1195,7 @@ class PostgresStore:
                     sql += " AND TO_CHAR(created_at, 'YYYY-MM-DD') = %s"
                     params.append(date)
                 if token_hash:
-                    sql += " AND (token_hash = %s OR token_hash = '')"
+                    sql += " AND (token_hash = %s OR token_hash = '' OR token_hash IS NULL)"
                     params.append(token_hash)
                 if tool_name:
                     sql += " AND tool_name = %s"
@@ -1160,7 +1239,7 @@ class PostgresStore:
                 """
                 params: List[Any] = [int(owner_id)]
                 if token_hash:
-                    sql += " AND (token_hash = %s OR token_hash = '')"
+                    sql += " AND (token_hash = %s OR token_hash = '' OR token_hash IS NULL)"
                     params.append(token_hash)
                 sql += " GROUP BY date ORDER BY date DESC LIMIT 60"
                 cur.execute(sql, params)
@@ -1175,7 +1254,7 @@ class PostgresStore:
                     sql += " AND TO_CHAR(created_at, 'YYYY-MM-DD') = %s"
                     params.append(date)
                 if token_hash:
-                    sql += " AND (token_hash = %s OR token_hash = '')"
+                    sql += " AND (token_hash = %s OR token_hash = '' OR token_hash IS NULL)"
                     params.append(token_hash)
                 cur.execute(sql, params)
                 row = cur.fetchone()

@@ -886,23 +886,93 @@ class SQLiteStore:
 
     # ── Chat History ───────────────────────────────────────────────────────
 
-    def add_chat_history(self, owner_id: int, *, source: str, tool_name: str, user_message: str = "", xiaozhi_answer: str = "", request_payload=None, response_payload=None, token_hash: str = "") -> None:
+    def add_chat_history(self, owner_id: int, *, source: str, tool_name: str, user_message: str = "", xiaozhi_answer: str = "", request_payload=None, response_payload=None, token_hash: str = "") -> Dict[str, Any]:
         conn = self._get_conn()
-        conn.execute(
+        req_json = json.dumps(request_payload, default=str) if request_payload is not None else None
+        res_json = json.dumps(response_payload, default=str) if response_payload is not None else None
+        now = utc_now()
+        cur = conn.execute(
             """INSERT INTO chat_history (owner_id, token_hash, source, tool_name, user_message, xiaozhi_answer, request_payload, response_payload, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (owner_id, token_hash, source, tool_name, user_message, xiaozhi_answer,
-             json.dumps(request_payload, default=str) if request_payload else None,
-             json.dumps(response_payload, default=str) if response_payload else None,
-             utc_now())
+            (owner_id, token_hash or None, source, tool_name, user_message, xiaozhi_answer,
+             req_json, res_json, now)
         )
         conn.commit()
+        inserted_id = cur.lastrowid or 0
+        record = {
+            "id": inserted_id,
+            "owner_id": int(owner_id),
+            "token_hash": token_hash or "",
+            "source": source,
+            "tool_name": tool_name,
+            "user_message": user_message,
+            "xiaozhi_answer": xiaozhi_answer,
+            "request_payload": req_json,
+            "response_payload": res_json,
+            "created_at": now,
+        }
+        try:
+            from xiaozhi.services.sse_service import broadcast_chat_history
+            broadcast_chat_history(owner_id, record, event_type="new_chat")
+        except Exception:
+            pass
+        return record
 
-    def upsert_chat_transcript(self, owner_id: int, *, tool_name: str, user_message: str = "", xiaozhi_answer: str = "", payload=None, token_hash: str = "") -> None:
-        self.add_chat_history(
-            owner_id, source="chat_transcript", tool_name=tool_name,
-            user_message=user_message, xiaozhi_answer=xiaozhi_answer,
-            request_payload=payload, token_hash=token_hash
+    def upsert_chat_transcript(
+        self,
+        owner_id: int,
+        *,
+        tool_name: str,
+        user_message: str = "",
+        xiaozhi_answer: str = "",
+        payload: Any = None,
+        response_payload: Any = None,
+        token_hash: str = "",
+    ) -> Dict[str, Any]:
+        user_message = str(user_message or "").strip()
+        xiaozhi_answer = str(xiaozhi_answer or "").strip()
+        res_json = json.dumps(response_payload, default=str) if response_payload is not None else None
+        req_json = json.dumps(payload, default=str) if payload is not None else None
+
+        if xiaozhi_answer and not user_message:
+            conn = self._get_conn()
+            pending = conn.execute(
+                """SELECT id, user_message, request_payload, created_at
+                   FROM chat_history
+                   WHERE owner_id = ? AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
+                   ORDER BY id DESC LIMIT 1""",
+                (owner_id,)
+            ).fetchone()
+            if pending:
+                p_id = pending["id"]
+                conn.execute(
+                    """UPDATE chat_history
+                       SET xiaozhi_answer = ?,
+                           response_payload = COALESCE(?, response_payload),
+                           token_hash = COALESCE(?, token_hash)
+                       WHERE id = ?""",
+                    (xiaozhi_answer, res_json, token_hash or None, p_id)
+                )
+                conn.commit()
+                updated_row = conn.execute("SELECT * FROM chat_history WHERE id = ?", (p_id,)).fetchone()
+                if updated_row:
+                    rec = dict(updated_row)
+                    try:
+                        from xiaozhi.services.sse_service import broadcast_chat_history
+                        broadcast_chat_history(owner_id, rec, event_type="update_chat")
+                    except Exception:
+                        pass
+                    return rec
+
+        return self.add_chat_history(
+            owner_id,
+            source="chat_transcript",
+            tool_name=tool_name,
+            user_message=user_message,
+            xiaozhi_answer=xiaozhi_answer,
+            request_payload=payload,
+            response_payload=response_payload,
+            token_hash=token_hash,
         )
 
     def list_chat_history(
@@ -925,7 +995,7 @@ class SQLiteStore:
             params.append(date)
 
         if token_hash:
-            sql += " AND (token_hash = ? OR token_hash = '')"
+            sql += " AND (token_hash = ? OR token_hash = '' OR token_hash IS NULL)"
             params.append(token_hash)
 
         if tool_name:
@@ -958,7 +1028,7 @@ class SQLiteStore:
         sql = "SELECT DATE(created_at) as date, COUNT(*) as count FROM chat_history WHERE owner_id = ?"
         params: List[Any] = [owner_id]
         if token_hash:
-            sql += " AND (token_hash = ? OR token_hash = '')"
+            sql += " AND (token_hash = ? OR token_hash = '' OR token_hash IS NULL)"
             params.append(token_hash)
         sql += " GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC LIMIT 60"
         rows = conn.execute(sql, params).fetchall()
@@ -972,7 +1042,7 @@ class SQLiteStore:
             sql += " AND DATE(created_at) = ?"
             params.append(date)
         if token_hash:
-            sql += " AND (token_hash = ? OR token_hash = '')"
+            sql += " AND (token_hash = ? OR token_hash = '' OR token_hash IS NULL)"
             params.append(token_hash)
         row = conn.execute(sql, params).fetchone()
         return {"total": row["total"] if row else 0}

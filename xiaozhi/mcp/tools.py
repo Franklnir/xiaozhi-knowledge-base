@@ -220,14 +220,30 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             for r in records:
                 user_msg = str(r.get("user_message") or "").strip()
                 ai_ans = str(r.get("xiaozhi_answer") or "").strip()
-                if not user_msg and not ai_ans:
+                tool_name = str(r.get("tool_name") or "").strip()
+                req_p = r.get("request_payload")
+                res_p = r.get("response_payload")
+                if not user_msg and not ai_ans and not res_p:
                     continue
                 item_dict = {
                     "waktu": str(r.get("created_at") or ""),
-                    "pesan_user": user_msg,
-                    "jawaban_xiaozhi": ai_ans[:350] + ("..." if len(ai_ans) > 350 else ""),
-                    "tool_dipakai": str(r.get("tool_name") or "")
+                    "pesan_user": user_msg or f"(Pemanggilan {tool_name})" if tool_name else "-",
+                    "jawaban_xiaozhi": ai_ans[:800] + ("..." if len(ai_ans) > 800 else ""),
+                    "tool_dipakai": tool_name
                 }
+                # Attach Raw JSON Response & parameters so RAG tool fully understands past context
+                if res_p:
+                    try:
+                        rp = res_p if isinstance(res_p, dict) else json.loads(res_p)
+                        item_dict["raw_response"] = rp
+                    except Exception:
+                        item_dict["raw_response"] = str(res_p)[:400]
+                if req_p:
+                    try:
+                        rq = req_p if isinstance(req_p, dict) else json.loads(req_p)
+                        item_dict["parameter_tool"] = rq
+                    except Exception:
+                        pass
                 if "similarity_score" in r:
                     item_dict["relevansi_semantik"] = r["similarity_score"]
                 parsed_history.append(item_dict)
@@ -239,8 +255,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 "total_ditemukan": len(parsed_history),
                 "riwayat_percakapan": parsed_history,
                 "instruksi_xiaozhi": (
-                    "Gunakan memori percakapan di atas untuk merespons pertanyaan pengguna secara akurat, ramah, dan kontekstual. "
-                    "Tunjukkan bahwa kamu mengingat percakapan sebelumnya dengan menyebutkan topik atau rincian yang pernah dibicarakan."
+                    "Gunakan memori percakapan, parameter tool, dan data raw response di atas untuk merespons pertanyaan pengguna secara akurat, ramah, dan kontekstual. "
+                    "Jika pengguna menanyakan hal yang pernah dibahas, diputar, atau dieksekusi sebelumnya, manfaatkan data detail di atas agar jawaban kamu sangat nyambung dan paham konteksnya."
                 )
             }
             return response
