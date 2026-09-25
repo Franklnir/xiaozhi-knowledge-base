@@ -113,7 +113,28 @@
                         <option value="{{ cat.name }}">{{ cat.name }}</option>
                         {% endfor %}
                     </select>
-                    <input type="search" id="searchInput" oninput="filterTable()" placeholder="Cari data..." class="app-input sm:w-72">
+                    <div style="position:relative; display:inline-flex; align-items:center;">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            name="materi_search_filter" 
+                            oninput="filterTable()" 
+                            placeholder="🔍 Cari data materi..." 
+                            autocomplete="off" 
+                            autocorrect="off" 
+                            autocapitalize="off" 
+                            spellcheck="false" 
+                            class="app-input sm:w-72" 
+                            style="padding-right:28px;"
+                        >
+                        <button 
+                            type="button" 
+                            id="clearSearchBtn" 
+                            onclick="clearSearchInput()" 
+                            style="position:absolute; right:8px; background:none; border:none; font-size:15px; color:var(--app-muted); cursor:pointer; display:none; line-height:1; padding:2px;" 
+                            title="Hapus pencarian"
+                        >&times;</button>
+                    </div>
                 </div>
             </div>
 
@@ -537,11 +558,25 @@
         element.classList.add("app-live-flash");
     }
 
+    function clearSearchInput() {
+        const inp = document.getElementById("searchInput");
+        if (inp) {
+            inp.value = "";
+            inp.focus();
+            filterTable();
+        }
+    }
+
     function filterTable() {
-        const input = document.getElementById("searchInput").value.toLowerCase();
+        const inputElem = document.getElementById("searchInput");
+        const clearBtn = document.getElementById("clearSearchBtn");
+        const input = (inputElem ? inputElem.value : "").trim().toLowerCase();
+        if (clearBtn) {
+            clearBtn.style.display = input.length > 0 ? "block" : "none";
+        }
         const filterCat = document.getElementById("filterCategory").value;
         document.querySelectorAll(".data-row").forEach((row) => {
-            const matchSearch = row.dataset.search.includes(input);
+            const matchSearch = !input || (row.dataset.search && row.dataset.search.includes(input));
             const matchCat = filterCat === "all" || row.dataset.category === filterCat;
             row.style.display = matchSearch && matchCat ? "" : "none";
         });
@@ -836,6 +871,25 @@ document.addEventListener("DOMContentLoaded", function() {
             setTimeout(() => { card.style.outline = 'none'; }, 4000);
         }
         if (inp) setTimeout(() => inp.focus(), 600);
+    }
+
+    // Reset autofill browser pada input pencarian materi
+    const sInput = document.getElementById("searchInput");
+    if (sInput) {
+        sInput.value = "";
+        filterTable();
+        setTimeout(() => {
+            if (sInput.value && sInput.value.toLowerCase().includes("irsyad")) {
+                sInput.value = "";
+                filterTable();
+            }
+        }, 150);
+        setTimeout(() => {
+            if (sInput.value && sInput.value.toLowerCase().includes("irsyad")) {
+                sInput.value = "";
+                filterTable();
+            }
+        }, 500);
     }
 });
 </script>
