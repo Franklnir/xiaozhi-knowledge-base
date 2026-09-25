@@ -270,15 +270,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse,
 @app.get("/download/app", include_in_schema=False)
 @app.get("/download/espbridge.apk", include_in_schema=False)
 async def download_mobile_app():
-    """Serve latest ESPBridge Android APK or redirect to GitHub release."""
-    local_apk = STATIC_DIR / "download" / "espbridge.apk"
-    if local_apk.exists():
-        return FileResponse(
-            path=str(local_apk),
-            filename="espbridge-xiaozhi-v1.4.4.apk",
-            media_type="application/vnd.android.package-archive"
-        )
-    # Fallback: Redirect to GitHub releases on Franklnir/Chronchi
+    """Always redirect to official latest ESPBridge Android APK on GitHub releases."""
     return RedirectResponse(
         url="https://github.com/Franklnir/Chronchi/releases/latest/download/espbridge-xiaozhi-latest.apk",
         status_code=302
