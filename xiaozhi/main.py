@@ -264,8 +264,28 @@ async def mount_mcp_endpoint():
         logger.warning("MCP package not available. /mcp endpoint disabled: %s", e)
 
 
+# Mobile App APK Download Endpoint
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
+
+@app.get("/download/app", include_in_schema=False)
+@app.get("/download/espbridge.apk", include_in_schema=False)
+async def download_mobile_app():
+    """Serve latest ESPBridge Android APK or redirect to GitHub release."""
+    local_apk = STATIC_DIR / "download" / "espbridge.apk"
+    if local_apk.exists():
+        return FileResponse(
+            path=str(local_apk),
+            filename="espbridge-xiaozhi.apk",
+            media_type="application/vnd.android.package-archive"
+        )
+    # Fallback: Redirect to GitHub releases on Franklnir/Chronchi
+    return RedirectResponse(
+        url="https://github.com/Franklnir/Chronchi/releases/latest/download/espbridge-xiaozhi-latest.apk",
+        status_code=302
+    )
+
+
 # SEO Endpoints
-from fastapi.responses import PlainTextResponse, Response
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)

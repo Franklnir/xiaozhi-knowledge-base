@@ -1089,6 +1089,13 @@
                 <span id="globalMktChatBadge" class="app-chip app-chip-small" style="display:none; font-size:10px; padding:1px 6px; background:#ef4444; color:#fff; font-weight:800; border-radius:10px;">0</span>
             </a>
 
+            <div class="app-sidebar-section">Aplikasi Mobile</div>
+            <a href="javascript:void(0)" onclick="window.openMobileAppModal()" class="app-sidebar-link" style="color: #047857; font-weight: 800;">
+                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="3"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span>
+                <span>Aplikasi Android</span>
+                <span class="app-chip app-chip-small" style="font-size:10px; padding:2px 7px; background:#10b981; color:#fff; font-weight:900; border-radius:10px; margin-left:auto;">APK</span>
+            </a>
+
 
             {% if user.role == 'admin' %}
             <div class="app-sidebar-section">Admin</div>
@@ -1424,5 +1431,127 @@
         })();
     </script>
 
+    <!-- MOBILE APP PROMO MODAL WITH QR BARCODE -->
+    <div id="mobileAppOverlay" style="display:none; position:fixed; inset:0; z-index:99998; background:rgba(15,23,42,0.85); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); align-items:center; justify-content:center; padding:16px;">
+        <div style="background:var(--app-surface); border:3px solid #111; border-radius:18px; box-shadow:8px 8px 0 #111; max-width:680px; width:100%; position:relative; overflow:hidden; animation:mcpPopIn 0.25s cubic-bezier(0.175,0.885,0.32,1.275);">
+            <!-- Top Color Bar -->
+            <div style="height:6px; background:linear-gradient(90deg, #10b981, #0284c7, #f59e0b);"></div>
+            
+            <!-- Close Button -->
+            <button type="button" onclick="window.closeMobileAppModal()" style="position:absolute; top:14px; right:14px; width:34px; height:34px; border:2px solid #111; border-radius:8px; background:var(--app-surface); cursor:pointer; font-size:16px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 #111; z-index:10;" aria-label="Tutup Modal">
+                ✕
+            </button>
+
+            <div style="padding:24px 28px;">
+                <!-- Header Badge -->
+                <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:#d1fae5; color:#065f46; border:2px solid #047857; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:12px;">
+                    <span>📱</span> APLIKASI ANDROID RESMI
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:24px; align-items:center;">
+                    <!-- Left Column: App Description & Features -->
+                    <div style="flex:1 1 300px;">
+                        <h2 style="font-size:22px; font-weight:900; color:var(--app-text); margin:0 0 8px; line-height:1.25;">
+                            Unduh Xiaozhi & ESPBridge Mobile
+                        </h2>
+                        <p style="font-size:13px; line-height:1.55; color:var(--app-muted); margin:0 0 16px;">
+                            Bawa asisten suara cerdas, kontrol perangkat IoT ESP32 via Bluetooth Low Energy (BLE), dan 35+ Tools MCP langsung di ponsel Anda.
+                        </p>
+
+                        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
+                            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--app-text);">
+                                <span style="color:#10b981; font-weight:900;">✓</span> Login Terpadu & Google Sign-In
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--app-text);">
+                                <span style="color:#10b981; font-weight:900;">✓</span> Auto-Connect Bluetooth BLE ESP32
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--app-text);">
+                                <span style="color:#10b981; font-weight:900;">✓</span> 100% Gratis, Cepat & Tanpa Iklan
+                            </div>
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <a href="/download/app" class="app-button app-button-primary" style="background:#047857; color:#fff; font-size:13.5px; font-weight:900; padding:12px 18px; border:2px solid #111; box-shadow:3px 3px 0 #111; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:10px;">
+                                <span>⬇️</span> Unduh File APK Langsung (~15 MB)
+                            </a>
+                            <span style="font-size:11px; color:var(--app-muted); text-align:center;">Kompatibel dengan Android 8.0 Oreo ke atas</span>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Barcode / QR Code Card -->
+                    <div style="flex:0 0 200px; margin:0 auto; background:#f8fafc; border:2px solid #111; border-radius:14px; padding:14px; text-align:center; box-shadow:4px 4px 0 #111;">
+                        <div style="font-size:12px; font-weight:900; color:#111; margin-bottom:10px; display:flex; align-items:center; justify-content:center; gap:4px;">
+                            <span>📸</span> Scan Barcode HP
+                        </div>
+                        <div style="background:#fff; padding:8px; border:1.5px solid #111; border-radius:10px; display:inline-block;">
+                            <img id="mobileAppQrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fxiaozhiscig.biz.id%2Fdownload%2Fapp" alt="Barcode Download APK" style="width:140px; height:140px; display:block; border-radius:4px;">
+                        </div>
+                        <div style="font-size:11px; line-height:1.4; color:#64748b; margin-top:10px; font-weight:600;">
+                            Arahkan kamera HP ke barcode untuk unduh otomatis.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer options -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:22px; padding-top:14px; border-top:1px solid var(--app-border); flex-wrap:wrap; gap:10px;">
+                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--app-muted); cursor:pointer; user-select:none;">
+                        <input type="checkbox" id="dontShowMobilePopupToday" style="accent-color:#047857;">
+                        Jangan ingatkan lagi selama 24 jam
+                    </label>
+                    <button type="button" onclick="window.closeMobileAppModal()" class="app-button" style="padding:6px 14px; font-size:12px; font-weight:800; border:1.5px solid #111; background:var(--app-surface);">
+                        Nanti Saja
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Controller for Mobile App Overlay & Barcode
+        window.openMobileAppModal = function() {
+            const overlay = document.getElementById('mobileAppOverlay');
+            if (!overlay) return;
+            // Ensure QR Code URL matches current hostname dynamically
+            const qrImg = document.getElementById('mobileAppQrCodeImg');
+            if (qrImg) {
+                const currentHost = window.location.origin;
+                const dlUrl = currentHost + '/download/app';
+                qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(dlUrl);
+            }
+            overlay.style.display = 'flex';
+        };
+
+        window.closeMobileAppModal = function() {
+            const overlay = document.getElementById('mobileAppOverlay');
+            if (overlay) overlay.style.display = 'none';
+            const checkbox = document.getElementById('dontShowMobilePopupToday');
+            if (checkbox && checkbox.checked) {
+                const tomorrow = Date.now() + 24 * 60 * 60 * 1000;
+                localStorage.setItem('xiaozhi_mobile_promo_dismissed_until', tomorrow.toString());
+            } else {
+                // If user just closed without checking, snooze for 6 hours so it doesn't annoy on every single refresh
+                const snooze = Date.now() + 6 * 60 * 60 * 1000;
+                localStorage.setItem('xiaozhi_mobile_promo_dismissed_until', snooze.toString());
+            }
+        };
+
+        (function() {
+            // Auto popup on fresh visit or fresh login
+            try {
+                const dismissedUntil = localStorage.getItem('xiaozhi_mobile_promo_dismissed_until');
+                const now = Date.now();
+                if (!dismissedUntil || now > parseInt(dismissedUntil, 10)) {
+                    // Delay slightly (1.5s) to allow main page content to finish rendering smoothly
+                    setTimeout(function() {
+                        // Don't pop up on auth pages to avoid obstructing login/register form
+                        const path = window.location.pathname;
+                        if (!path.startsWith('/login') && !path.startsWith('/register')) {
+                            window.openMobileAppModal();
+                        }
+                    }, 1500);
+                }
+            } catch (e) {}
+        })();
+    </script>
 </body>
 </html>
