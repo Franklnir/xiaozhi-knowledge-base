@@ -396,11 +396,8 @@
                                         🔓 Buka Kunci dengan Kode
                                     </button>
                                 </form>
-                                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; color:var(--app-muted); padding-top:4px;">
-                                    <span>Belum memiliki kode lisensi?</span>
-                                    <button type="button" onclick="openRequestModal()" style="background:none; border:none; color:var(--app-accent, #059669); font-weight:800; cursor:pointer; text-decoration:underline;">
-                                        🔑 Ajukan Permohonan ke Admin ↗
-                                    </button>
+                                <div style="font-size:11.5px; color:var(--app-muted); padding-top:4px; line-height:1.4;">
+                                    ℹ️ Hubungi Admin untuk mendapatkan Kode Lisensi atau melalui paket pembelian kit resmi.
                                 </div>
                             </div>
                         </div>
@@ -516,14 +513,14 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
     <div class="mcp-blocking-box" style="max-width:480px; text-align:left;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:8px;">
             <h2 style="font-size:16.5px; font-weight:850; margin:0; color:#dc2626; display:flex; align-items:center; gap:8px;">
-                <span>🔒</span> Izin Lisensi Admin Diperlukan
+                <span>🔒</span> Izin Lisensi Diperlukan
             </h2>
             <button type="button" onclick="closePermissionModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
         </div>
 
         <div style="font-size:13px; color:var(--app-text); line-height:1.6; margin-bottom:14px;">
             <p style="margin:0 0 10px;">
-                Preset ini adalah firmware komersial resmi berlisensi. Anda dapat membuka aksesnya menggunakan <strong>Kode Lisensi Sekali Pakai</strong> atau mengajukan permohonan ke Admin.
+                Preset ini adalah firmware komersial resmi berlisensi. Anda dapat membuka aksesnya menggunakan <strong>Kode Lisensi Sekali Pakai</strong> atau melalui izin langsung dari Admin.
             </p>
 
             <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:12px; margin-bottom:12px;">
@@ -543,75 +540,11 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             </div>
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px;">
             <button type="button" onclick="closePermissionModal()" class="app-button">
-                Batal
-            </button>
-            <button type="button" onclick="openRequestFromPermissionModal()" class="app-button app-button-ghost" style="font-weight:850; color:var(--app-accent, #059669);">
-                🔑 Minta Izin ke Admin
+                Tutup
             </button>
         </div>
-    </div>
-</div>
-
-<!-- ======================================================== -->
-<!-- MODAL: STATUS PENDING APPROVAL                          -->
-<!-- ======================================================== -->
-<div id="pendingModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
-    <div class="mcp-blocking-box" style="max-width:460px; text-align:left;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:8px;">
-            <h2 style="font-size:16.5px; font-weight:850; margin:0; color:#b45309; display:flex; align-items:center; gap:8px;">
-                <span>⏳</span> Permohonan Sedang Ditinjau Admin
-            </h2>
-            <button type="button" onclick="closePendingModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
-        </div>
-
-        <p style="font-size:13px; color:var(--app-text); line-height:1.6; margin:0 0 14px;">
-            Permohonan izin preset Anda telah terkirim dan saat ini berada dalam antrean peninjauan Admin.
-            <br><br>
-            Jika Anda telah menyelesaikan pembelian kit / board ESP32, silakan hubungi Admin atau konfirmasikan pesanan Anda agar lisensi preset dapat segera diaktifkan.
-        </p>
-
-        <div style="display:flex; justify-content:flex-end; gap:8px;">
-            <button type="button" onclick="closePendingModal()" class="app-button">Tutup</button>
-            <button type="button" onclick="checkPresetStatus()" class="app-button app-button-primary" style="font-weight:850;">
-                🔄 Cek Ulang Status Izin
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- ======================================================== -->
-<!-- MODAL: FORM PERMOHONAN IZIN KE ADMIN                     -->
-<!-- ======================================================== -->
-<div id="requestModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
-    <div class="mcp-blocking-box" style="max-width:480px; text-align:left;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:8px;">
-            <h2 style="font-size:16.5px; font-weight:850; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-                <span>🔑</span> Form Permohonan Izin Preset
-            </h2>
-            <button type="button" onclick="closeRequestModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
-        </div>
-
-        <p style="font-size:12.5px; color:var(--app-muted); margin:0 0 14px;">
-            Kirimkan pesan atau nomor pesanan Anda agar Admin dapat memverifikasi dan menyetujui akses flashing preset ini.
-        </p>
-
-        <form id="reqAccessForm" onsubmit="submitAccessRequest(event)">
-            <div style="margin-bottom:14px;">
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    Nomor Pesanan / Catatan untuk Admin (Opsional):
-                </label>
-                <textarea id="reqNote" rows="3" placeholder="Contoh: Pembeli kit ESP32 Tokopedia/Shopee/WA no order #12345..." class="app-input" style="width:100%; font-size:12.5px;"></textarea>
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:8px;">
-                <button type="button" onclick="closeRequestModal()" class="app-button">Batal</button>
-                <button type="submit" id="btnSubmitReq" class="app-button app-button-primary" style="font-weight:850;">
-                    Kirim Permohonan ke Admin
-                </button>
-            </div>
-        </form>
     </div>
 </div>
 
@@ -896,23 +829,6 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         document.getElementById('permissionModal').style.display = 'none';
     };
 
-    window.openRequestFromPermissionModal = function() {
-        document.getElementById('permissionModal').style.display = 'none';
-        document.getElementById('requestModal').style.display = 'flex';
-    };
-
-    window.closePendingModal = function() {
-        document.getElementById('pendingModal').style.display = 'none';
-    };
-
-    window.openRequestModal = function() {
-        document.getElementById('requestModal').style.display = 'flex';
-    };
-
-    window.closeRequestModal = function() {
-        document.getElementById('requestModal').style.display = 'none';
-    };
-
     // Klaim Kode Lisensi Sekali Pakai (Inline Form & Modal)
     window.submitInlineClaimCode = async function(e) {
         e.preventDefault();
@@ -1008,44 +924,6 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             }
         } catch (e) {
             console.error('Error fetching preset status:', e);
-        }
-    };
-
-    window.submitAccessRequest = async function(e) {
-        e.preventDefault();
-        const btn = document.getElementById('btnSubmitReq');
-        btn.disabled = true;
-        btn.textContent = 'Mengirim...';
-        const note = document.getElementById('reqNote').value;
-        try {
-            const resp = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(currentPresetId) + '/request', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify({ note })
-            });
-            const data = await resp.json();
-            alert(data.message || 'Permohonan berhasil dikirim ke Admin.');
-            window.location.reload();
-        } catch (err) {
-            alert('Gagal mengirim permohonan: ' + err.message);
-            btn.disabled = false;
-            btn.textContent = 'Kirim Permohonan ke Admin';
-        }
-    };
-
-    window.checkPresetStatus = async function() {
-        try {
-            const resp = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(currentPresetId) + '/status', { credentials: 'same-origin' });
-            const data = await resp.json();
-            if (data.authorized) {
-                alert('Selamat! Akses lisensi preset Anda telah disetujui Admin.');
-                window.location.reload();
-            } else {
-                alert('Status saat ini: ' + (data.status || 'Pending') + '. ' + (data.message || 'Menunggu peninjauan Admin.'));
-            }
-        } catch (e) {
-            alert('Gagal mengecek status: ' + e.message);
         }
     };
 
