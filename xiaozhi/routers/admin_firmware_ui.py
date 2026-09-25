@@ -5,9 +5,14 @@ from xiaozhi.services.preset_approval_service import (
     reject_request as reject_preset_request,
     grant_access_direct as grant_preset_direct,
     revoke_access as revoke_preset_access,
+    list_presets,
+    save_or_update_preset,
+    generate_claim_code,
+    list_claim_codes,
+    delete_claim_code,
 )
 import logging
-from fastapi import APIRouter, Request, Form, Query, HTTPException, status
+from fastapi import APIRouter, Request, Form, Query, HTTPException, status, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from xiaozhi.dependencies import render, require_admin, redirect_with_message, get_store
@@ -50,12 +55,16 @@ async def admin_approvals_page(request: Request):
     approvals = service.get_pending_approvals()
     preset_requests = list_preset_requests()
     preset_granted = list_preset_granted_users()
+    presets = list_presets()
+    claim_codes = list_claim_codes()
     return render(request, "admin/firmware_approvals.html", {
         "user": user,
         "page": "admin_firmware_approvals",
         "approvals": approvals,
         "preset_requests": preset_requests,
         "preset_granted": preset_granted,
+        "presets": presets,
+        "claim_codes": claim_codes,
     })
 
 
@@ -109,6 +118,75 @@ async def admin_revoke_preset_action(request: Request, username: str = Form(...)
     if success:
         return redirect_with_message("/admin/firmware/approvals", f"Akses preset '{username}' berhasil dicabut.")
     return redirect_with_message("/admin/firmware/approvals", "Pengguna tidak ditemukan.")
+
+
+@router.post("/presets/save")
+async def admin_save_preset_action(
+    request: Request,
+    preset_id: str = Form(""),
+    title: str = Form(""),
+    chip: str = Form("ESP32-S3"),
+    offset: str = Form("0x0"),
+    description: str = Form(""),
+    changelog: str = Form(""),
+    firmware_file: Optional[UploadFile] = File(None),
+):
+    user = require_admin(request)
+    file_bytes = None
+    filename = None
+    if firmware_file and firmware_file.filename:
+        file_bytes = await firmware_file.read()
+        filename = firmware_file.filename
+
+    if not title and not preset_id:
+        return redirect_with_message("/admin/firmware/approvals", "Gagal: Judul preset atau ID wajib diisi.")
+
+    try:
+        updated_preset = save_or_update_preset(
+            preset_id=preset_id or title,
+            title=title or preset_id,
+            chip=chip,
+            offset=offset,
+            description=description,
+            file_bytes=file_bytes,
+            filename=filename,
+            admin_user=user,
+            changelog=changelog,
+        )
+        ver = updated_preset.get("active_version", "v001")
+        msg = f"Preset '{updated_preset.get('title')}' berhasil disimpan. Versi aktif: {ver}."
+        if file_bytes:
+            msg += " File .bin berhasil dienkripsi dan diunggah ke Bucket Storage."
+        return redirect_with_message("/admin/firmware/approvals", msg)
+    except Exception as exc:
+        logger.exception("Error saving preset firmware")
+        return redirect_with_message("/admin/firmware/approvals", f"Gagal menyimpan preset: {str(exc)}")
+
+
+@router.post("/claim-codes/generate")
+async def admin_generate_claim_code_action(
+    request: Request,
+    preset_id: str = Form("esp32s3_cam"),
+    note: str = Form(""),
+):
+    user = require_admin(request)
+    try:
+        code_rec = generate_claim_code(preset_id=preset_id, note=note, admin_user=user)
+        return redirect_with_message(
+            "/admin/firmware/approvals",
+            f"Kode lisensi sekali pakai '{code_rec['code']}' berhasil dibuat! Berikan kode ini ke pembeli.",
+        )
+    except Exception as exc:
+        return redirect_with_message("/admin/firmware/approvals", f"Gagal membuat kode: {str(exc)}")
+
+
+@router.post("/claim-codes/{code_id}/delete")
+async def admin_delete_claim_code_action(request: Request, code_id: str):
+    user = require_admin(request)
+    success = delete_claim_code(code_id, user)
+    if success:
+        return redirect_with_message("/admin/firmware/approvals", "Kode lisensi berhasil dihapus.")
+    return redirect_with_message("/admin/firmware/approvals", "Kode tidak ditemukan atau sudah pernah diklaim.")
 
 
 @router.post("/approvals/{approval_id}/approve")

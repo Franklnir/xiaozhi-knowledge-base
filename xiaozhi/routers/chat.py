@@ -5,21 +5,15 @@ from xiaozhi.services.preset_approval_service import (
     is_user_authorized,
     request_access as request_preset_access,
     get_decrypted_preset_binary,
+    get_preset,
+    list_presets,
+    redeem_claim_code,
     PRESETS,
 )
 import asyncio
 import json
 import logging
 from typing import Optional
-from fastapi import APIRouter, Query, Request, Form, WebSocket, WebSocketDisconnect, HTTPException, Response
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-from xiaozhi.services.preset_approval_service import (
-    get_user_status,
-    is_user_authorized,
-    request_access as request_preset_access,
-    get_decrypted_preset_binary,
-    PRESETS,
-)
 
 from xiaozhi.config import CHAT_HISTORY_DEFAULT_LIMIT, ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
@@ -400,7 +394,9 @@ async def delete_chat_history_api(request: Request, chat_id: int):
 @router.get("/web-flasher", response_class=HTMLResponse)
 async def web_flasher_page(request: Request):
     user = get_current_user(request)
-    preset_status = get_user_status(user, "esp32s3_cam")
+    all_presets = list_presets()
+    default_preset_id = all_presets[0]["id"] if all_presets else "esp32s3_cam"
+    preset_status = get_user_status(user, default_preset_id)
     return render(
         request,
         "web_flasher.html",
@@ -409,6 +405,7 @@ async def web_flasher_page(request: Request):
             "page": "web_flasher",
             "active_page": "web_flasher",
             "preset_status": preset_status,
+            "presets": all_presets,
             "mcp_required": False,
         },
     )
@@ -434,27 +431,43 @@ async def request_preset_access_api(request: Request, preset_id: str):
     return res
 
 
+@router.post("/api/v1/flasher/preset/claim")
+async def claim_preset_code_api(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Silakan masuk terlebih dahulu untuk mengklaim kode lisensi.")
+    try:
+        body = await request.json()
+        code = str(body.get("code") or "").strip()
+    except Exception:
+        code = ""
+    res = redeem_claim_code(code, user)
+    return res
+
+
 @router.get("/api/v1/flasher/preset/{preset_id}/stream")
-async def stream_preset_binary_api(request: Request, preset_id: str):
+async def stream_preset_binary_api(request: Request, preset_id: str, version: Optional[str] = None):
     user = get_current_user(request)
     if not is_user_authorized(user, preset_id):
         raise HTTPException(
             status_code=403,
-            detail="Akses Ditolak: Preset komersial ini membutuhkan izin lisensi dari Administrator. Silakan ajukan izin akses terlebih dahulu.",
+            detail="Akses Ditolak: Preset komersial ini membutuhkan izin lisensi dari Administrator atau klaim kode sekali pakai. Silakan masukkan kode lisensi atau ajukan izin akses.",
         )
     try:
-        preset_info = PRESETS.get(preset_id)
+        preset_info = get_preset(preset_id) or PRESETS.get(preset_id)
         if not preset_info:
             raise HTTPException(status_code=404, detail="Preset tidak ditemukan.")
-        raw_bytes = get_decrypted_preset_binary(preset_id)
+        raw_bytes = get_decrypted_preset_binary(preset_id, version=version)
+        fn = preset_info.get("filename", f"{preset_id}.bin")
+        offset = preset_info.get("offset", "0x0")
         return Response(
             content=raw_bytes,
             media_type="application/octet-stream",
             headers={
-                "Content-Disposition": f'inline; filename="{preset_info["filename"]}"',
+                "Content-Disposition": f'inline; filename="{fn}"',
                 "Content-Length": str(len(raw_bytes)),
                 "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                "X-Firmware-Offset": preset_info.get("offset", "0x0"),
+                "X-Firmware-Offset": offset,
             },
         )
     except HTTPException:

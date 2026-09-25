@@ -6,21 +6,295 @@
         Approval & Lisensi Firmware
     </h1>
     <p style="font-size:13.5px; color:var(--app-muted); margin:0;">
-        Kelola persetujuan produk marketplace dan perizinan akses Preset Web Flasher resmi (ESP32-S3 N16R8/CAM).
+        Kelola preset firmware resmi (upload .bin ke bucket &amp; auto-versioning), generator kode lisensi sekali pakai, dan persetujuan produk marketplace.
     </p>
 </div>
 
 <!-- ======================================================== -->
-<!-- SECTION 1: PERMOHONAN AKSES PRESET FLASHER RESMI        -->
+<!-- SECTION 1: MANAJEMEN PRESET FIRMWARE (.BIN KE BUCKET)    -->
+<!-- ======================================================== -->
+<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:30px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:18px; border-bottom:1px solid var(--app-border); padding-bottom:14px;">
+        <div>
+            <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                <span>💾</span> Preset Firmware BIN &amp; Auto-Versioning (Bucket S3 / R2)
+            </h2>
+            <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
+                Unggah file binary firmware (.bin) baru atau perbarui preset yang ada. File dienkripsi AES-256-GCM dan disimpan di Object Storage agar tidak membebani VPS. Jika mengupdate preset yang ada, versi otomatis naik (v001 ➔ v002 ➔ dst).
+            </p>
+        </div>
+    </div>
+
+    <!-- Form Upload / Update Preset -->
+    <form method="POST" action="/admin/firmware/presets/save" enctype="multipart/form-data" style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:16px; margin-bottom:24px;">
+        <div style="font-weight:800; font-size:14px; margin-bottom:12px; color:var(--app-text); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <span id="presetFormTitle">➕ Tambah Preset Firmware Baru atau Update Versi</span>
+            <span class="app-chip app-chip-neutral" id="presetVersionPreview" style="font-size:11px;">Versi Target: Otomatis</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:14px;">
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                    Mode / Pilih Preset:
+                </label>
+                <select id="presetSelector" class="app-input" onchange="onPresetSelected(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                    <option value="__NEW__">➕ -- Buat Preset Baru --</option>
+                    {% for p in presets %}
+                    <option value="{{ p.id }}" data-title="{{ p.title }}" data-chip="{{ p.chip }}" data-offset="{{ p.offset }}" data-desc="{{ p.description }}" data-activever="{{ p.active_version }}">
+                        {{ p.title }} (ID: {{ p.id }}) [{{ p.active_version }}]
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                    ID Preset (Unik &amp; Permanen):
+                </label>
+                <input type="text" id="presetIdInput" name="preset_id" placeholder="misal: esp32s3_cam" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;" required>
+            </div>
+
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                    Judul / Nama Preset:
+                </label>
+                <input type="text" id="presetTitleInput" name="title" placeholder="misal: ESP32-S3 N16R8 Cam Full Factory" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;" required>
+            </div>
+
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                    Tipe Chip ESP:
+                </label>
+                <select id="presetChipSelect" name="chip" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                    <option value="ESP32-S3">ESP32-S3 (Recommended)</option>
+                    <option value="ESP32">ESP32 Klasik</option>
+                    <option value="ESP32-C3">ESP32-C3</option>
+                    <option value="ESP32-C6">ESP32-C6</option>
+                    <option value="ESP8266">ESP8266</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                    Flash Offset:
+                </label>
+                <input type="text" id="presetOffsetInput" name="offset" value="0x0" placeholder="0x0" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
+            </div>
+
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                    File Firmware Binary (.bin):
+                </label>
+                <input type="file" name="firmware_file" accept=".bin" class="app-input" style="width:100%; font-size:12px; padding:5px 8px;">
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                    Deskripsi Preset:
+                </label>
+                <textarea id="presetDescInput" name="description" rows="2" placeholder="Keterangan fungsi binary, dukungan layar, modul kamera, dll." class="app-input" style="width:100%; font-size:12px;"></textarea>
+            </div>
+            <div>
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                    Catatan Rilis / Changelog Versi (Opsional):
+                </label>
+                <textarea name="changelog" rows="2" placeholder="misal: Optimasi latency mic I2S dan perbaikan resolusi kamera..." class="app-input" style="width:100%; font-size:12px;"></textarea>
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button type="submit" class="app-button app-button-primary" style="font-weight:850; font-size:13px; padding:8px 18px;">
+                ☁️ Simpan &amp; Upload ke Bucket Private
+            </button>
+        </div>
+    </form>
+
+    <!-- Daftar Preset Aktif & Histori Versi -->
+    <h3 style="font-size:14px; font-weight:800; margin:0 0 10px; color:var(--app-text);">
+        Daftar Preset Tersedia di Sistem:
+    </h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px;">
+        {% for p in presets %}
+        <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px;">
+                <div>
+                    <strong style="font-size:14.5px; color:var(--app-text); display:block;">{{ p.title }}</strong>
+                    <code style="font-size:11.5px; color:var(--app-muted);">ID: {{ p.id }}</code>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+                    <span class="app-chip app-chip-success" style="font-size:11px; font-weight:900;">
+                        🔓 Versi Aktif: {{ p.active_version }}
+                    </span>
+                    <span style="font-size:11px; color:var(--app-muted);">Chip: <strong>{{ p.chip }}</strong></span>
+                </div>
+            </div>
+
+            <p style="font-size:12px; color:var(--app-muted); margin:0 0 10px; line-height:1.45;">
+                {{ p.description or 'Tidak ada deskripsi.' }}
+            </p>
+
+            <div style="border-top:1px dashed var(--app-border); padding-top:8px; font-size:11.5px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span>Offset: <strong>{{ p.offset }}</strong></span>
+                    <span>Ukuran: <strong>{{ (p.size_bytes / (1024*1024))|round(2) if p.size_bytes else '0' }} MB</strong></span>
+                    <span>Total Rilis: <strong>{{ p.versions|length }} versi</strong></span>
+                </div>
+
+                {% if p.versions %}
+                <details style="margin-top:6px; cursor:pointer;">
+                    <summary style="font-weight:750; color:var(--app-accent, #059669); outline:none;">
+                        📜 Lihat Histori Versi ({{ p.versions|length }})
+                    </summary>
+                    <div style="margin-top:8px; display:grid; gap:6px;">
+                        {% for v in p.versions|reverse %}
+                        <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:6px; padding:6px 10px; font-size:11px;">
+                            <div style="display:flex; justify-content:space-between; font-weight:800;">
+                                <span>{{ v.version }} - {{ v.filename }}</span>
+                                <span style="color:var(--app-muted);">{{ v.uploaded_at[:16].replace('T', ' ') if v.uploaded_at else '' }}</span>
+                            </div>
+                            <div style="color:var(--app-muted); margin-top:2px;">
+                                {{ v.changelog or 'Tanpa catatan' }} • {{ (v.size_bytes / (1024*1024))|round(2) }} MB
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- SECTION 2: GENERATOR KODE LISENSI SEKALI PAKAI           -->
+<!-- ======================================================== -->
+<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:30px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:18px; border-bottom:1px solid var(--app-border); padding-bottom:14px;">
+        <div>
+            <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                <span>🔑</span> Generator Kode Lisensi Sekali Pakai (One-Time Claim Code)
+            </h2>
+            <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
+                Buat kode lisensi unik yang hanya dapat diklaim <strong>satu kali</strong> oleh pengguna mana pun. Setelah diklaim, kode otomatis hangus dan akses preset user tersebut langsung terbuka 🔓 permanen termasuk update versi terbaru.
+            </p>
+        </div>
+    </div>
+
+    <!-- Form Generate Kode -->
+    <form method="POST" action="/admin/firmware/claim-codes/generate" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:20px; background:var(--app-surface-muted); padding:12px; border-radius:var(--app-radius); border:1px solid var(--app-border-strong);">
+        <div style="flex:1; min-width:200px;">
+            <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                Target Preset:
+            </label>
+            <select name="preset_id" class="app-input" style="width:100%; font-size:12.5px; padding:6px 10px;">
+                {% for p in presets %}
+                <option value="{{ p.id }}">{{ p.title }} (ID: {{ p.id }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="flex:2; min-width:240px;">
+            <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                Catatan Penerima / Nomor Pesanan (Opsional):
+            </label>
+            <input type="text" name="note" placeholder="misal: Pembeli Kit Tokopedia Order #99182 / Pak Budi" class="app-input" style="width:100%; font-size:12.5px; padding:6px 10px;">
+        </div>
+
+        <button type="submit" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:8px 16px; white-space:nowrap;">
+            ⚡ Generate Kode Baru
+        </button>
+    </form>
+
+    <!-- Tabel Kode Klaim -->
+    <h3 style="font-size:14px; font-weight:800; margin:0 0 10px; color:var(--app-text);">
+        Daftar Kode Lisensi yang Diterbitkan:
+    </h3>
+    {% if not claim_codes %}
+    <div style="padding:16px; background:var(--app-surface-muted); border-radius:var(--app-radius); text-align:center; color:var(--app-muted); font-size:12.5px; margin-bottom:10px;">
+        Belum ada kode lisensi yang digenerate. Klik tombol di atas untuk membuat kode baru.
+    </div>
+    {% else %}
+    <div class="app-table-wrap" style="max-height:360px; overflow-y:auto; margin-bottom:10px;">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th>Kode Lisensi (Sekali Pakai)</th>
+                    <th>Target Preset</th>
+                    <th>Catatan / Label</th>
+                    <th>Status Penggunaan</th>
+                    <th>Dibuat Oleh</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in claim_codes %}
+                <tr>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <code style="font-size:13px; font-weight:900; background:var(--app-surface); padding:3px 8px; border-radius:4px; border:1.5px solid var(--app-border-strong); letter-spacing:0.5px; color:var(--app-text);">
+                                {{ c.code }}
+                            </code>
+                            <button type="button" class="app-button app-button-small" style="padding:2px 8px; font-size:11px;" onclick="navigator.clipboard.writeText('{{ c.code }}'); alert('Kode {{ c.code }} berhasil disalin ke clipboard!');">
+                                📋 Salin
+                            </button>
+                        </div>
+                    </td>
+                    <td>
+                        <strong style="font-size:12.5px;">{{ c.preset_id }}</strong>
+                    </td>
+                    <td style="font-size:12px; color:var(--app-muted); max-width:200px;">
+                        {{ c.note or '-' }}
+                    </td>
+                    <td>
+                        {% if c.is_used %}
+                        <span class="app-chip app-chip-neutral" style="font-size:11px; text-decoration:line-through;">
+                            SUDAH DIKLAIM
+                        </span>
+                        <div style="font-size:11px; color:var(--app-muted); margin-top:2px;">
+                            Oleh: <strong>{{ c.claimed_by }}</strong> ({{ c.claimed_at[:10] if c.claimed_at else '' }})
+                        </div>
+                        {% else %}
+                        <span class="app-chip app-chip-success" style="font-size:11px; font-weight:850;">
+                            🟢 SIAP DIKLAIM (1x)
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:11.5px; color:var(--app-muted);">
+                        {{ c.created_by }} • {{ c.created_at[:10] if c.created_at else '' }}
+                    </td>
+                    <td>
+                        {% if not c.is_used %}
+                        <form method="POST" action="/admin/firmware/claim-codes/{{ c.id }}/delete" style="display:inline;" onsubmit="return confirm('Hapus kode lisensi {{ c.code }}?')">
+                            <button type="submit" class="app-button app-button-danger app-button-small" style="font-size:11px; padding:3px 8px;">
+                                🗑️ Hapus
+                            </button>
+                        </form>
+                        {% else %}
+                        <span style="font-size:11px; color:var(--app-muted);">Hangus</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ======================================================== -->
+<!-- SECTION 3: PERMOHONAN AKSES & PENGGUNA BERLISENSI        -->
 <!-- ======================================================== -->
 <div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:30px;">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:18px;">
         <div>
             <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-                <span>🎯</span> Izin Akses Preset Flasher: ESP32-S3 N16R8 / CAM
+                <span>🎯</span> Hak Akses Pengguna &amp; Permohonan Izin Manual
             </h2>
             <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
-                Kelola pengguna yang berhak memuat & flashing binary Full Factory Merged (~9.65 MB, Offset 0x0).
+                Beri akses langsung ke username tertentu atau setujui permohonan lisensi dari antrean.
             </p>
         </div>
 
@@ -38,12 +312,17 @@
                     class="app-input" 
                     style="width:100%; padding:6px 12px; font-size:12.5px; box-sizing:border-box;"
                 >
-                <!-- Dropdown suggestions -->
                 <div 
                     id="grantUsernameDropdown" 
                     style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; min-width:200px; max-height:220px; overflow-y:auto; background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); box-shadow:0 8px 24px rgba(0,0,0,0.18); z-index:1050; padding:4px 0;"
                 ></div>
             </div>
+            <select name="preset_id" class="app-input" style="padding:6px 10px; font-size:12.5px;">
+                <option value="all">Semua Preset (Global)</option>
+                {% for p in presets %}
+                <option value="{{ p.id }}">{{ p.title }}</option>
+                {% endfor %}
+            </select>
             <button type="submit" class="app-button app-button-primary app-button-small" style="font-weight:800; white-space:nowrap;">
                 ➕ Beri Akses Langsung
             </button>
@@ -65,6 +344,7 @@
                 <tr>
                     <th>Waktu</th>
                     <th>Pengguna</th>
+                    <th>Target Preset</th>
                     <th>Catatan / Pesan User</th>
                     <th>Status</th>
                     <th>Aksi Admin</th>
@@ -79,6 +359,9 @@
                     <td>
                         <strong style="color:var(--app-text); font-size:13.5px;">{{ req.username }}</strong>
                         <span style="font-size:11px; color:var(--app-muted); display:block;">ID: {{ req.user_id }}</span>
+                    </td>
+                    <td>
+                        <strong style="font-size:12.5px;">{{ req.preset_id }}</strong>
                     </td>
                     <td style="font-size:12.5px; color:var(--app-muted); max-width:250px;">
                         {{ req.note if req.note else '<span style="font-style:italic;">Tidak ada catatan</span>'|safe }}
@@ -111,6 +394,7 @@
                         {% elif req.status == 'APPROVED' %}
                         <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="display:inline;">
                             <input type="hidden" name="username" value="{{ req.username }}">
+                            <input type="hidden" name="preset_id" value="{{ req.preset_id }}">
                             <button type="submit" class="app-button app-button-ghost app-button-small" style="color:#dc2626; font-size:11px;" onclick="return confirm('Cabut akses preset untuk {{ req.username }}?')">
                                 Cabut Akses
                             </button>
@@ -118,6 +402,7 @@
                         {% else %}
                         <form method="POST" action="/admin/firmware/preset-approvals/grant" style="display:inline;">
                             <input type="hidden" name="username" value="{{ req.username }}">
+                            <input type="hidden" name="preset_id" value="{{ req.preset_id }}">
                             <button type="submit" class="app-button app-button-ghost app-button-small" style="font-size:11px;">
                                 Beri Ulang Akses
                             </button>
@@ -138,11 +423,13 @@
     </h3>
     <div style="display:flex; flex-wrap:wrap; gap:8px;">
         {% for uname, g in preset_granted.items() %}
-        <div style="display:inline-flex; align-items:center; gap:8px; padding:5px 10px; background:var(--app-surface-muted); border:1px solid var(--app-border-strong); border-radius:var(--app-radius); font-size:12px;">
-            <span style="font-weight:750; color:var(--app-text);">👤 {{ uname }}</span>
+        <div style="display:inline-flex; align-items:center; gap:8px; padding:5px 12px; background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); font-size:12px;">
+            <span style="font-weight:800; color:var(--app-text);">👤 {{ uname }}</span>
+            <span class="app-chip app-chip-neutral" style="font-size:10px; padding:2px 6px;">{{ g.preset_id }}</span>
             <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
                 <input type="hidden" name="username" value="{{ uname }}">
-                <button type="submit" title="Cabut Akses" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; padding:0 2px;" onclick="return confirm('Cabut akses {{ uname }}?')">&times;</button>
+                <input type="hidden" name="preset_id" value="{{ g.preset_id }}">
+                <button type="submit" title="Cabut Akses (Status Kembali Terkunci)" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:14px; padding:0 2px;" onclick="return confirm('Cabut akses preset untuk {{ uname }}? Pengguna tidak akan dapat mengakses update firmware lagi.')">&times;</button>
             </form>
         </div>
         {% endfor %}
@@ -151,7 +438,7 @@
 </div>
 
 <!-- ======================================================== -->
-<!-- SECTION 2: APPROVAL PRODUK MARKETPLACE DARI USER         -->
+<!-- SECTION 4: APPROVAL PRODUK MARKETPLACE DARI USER         -->
 <!-- ======================================================== -->
 <div style="margin-bottom:16px;">
     <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text);">
@@ -248,17 +535,14 @@
 
         <form method="POST" id="rejectForm" action="">
             <div style="margin-bottom:16px;">
-                <label class="app-label" style="display:block; font-weight:800; font-size:12.5px; margin-bottom:4px;">
-                    Alasan Penolakan Wajib Diisi (Minimal 10 karakter) <span style="color:#dc2626;">*</span>
+                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:6px;">
+                    Alasan Penolakan:
                 </label>
-                <textarea name="reason" id="rejectReason" required minlength="10" rows="4" placeholder="Contoh: Firmware tidak sesuai dengan deskripsi ESP32-C3 atau file rusak..." class="app-input" style="width:100%;"></textarea>
+                <textarea name="rejection_reason" rows="3" class="app-input" style="width:100%; font-size:13px;" placeholder="Tuliskan alasan penolakan secara jelas agar seller dapat memperbaikinya..." required></textarea>
             </div>
-
             <div style="display:flex; justify-content:flex-end; gap:8px;">
                 <button type="button" onclick="closeRejectModal()" class="app-button">Batal</button>
-                <button type="submit" class="app-button app-button-danger" style="font-weight:800;">
-                    Konfirmasi Penolakan
-                </button>
+                <button type="submit" class="app-button app-button-danger" style="font-weight:800;">Tolak Produk</button>
             </div>
         </form>
     </div>
@@ -267,16 +551,56 @@
 <script>
     function openRejectModal(approvalId, title) {
         document.getElementById('rejectForm').action = '/admin/firmware/approvals/' + approvalId + '/reject';
-        document.getElementById('rejectModalTitle').innerText = 'Produk: ' + title;
-        document.getElementById('rejectReason').value = '';
+        document.getElementById('rejectModalTitle').textContent = 'Produk: ' + title;
         document.getElementById('rejectModal').style.display = 'flex';
     }
+
     function closeRejectModal() {
         document.getElementById('rejectModal').style.display = 'none';
     }
 
-    // Autocomplete Username "Beri Akses Langsung"
-    (function initPresetUsernameAutocomplete() {
+    // Handler Selector Preset Form
+    function onPresetSelected(val) {
+        var opt = document.querySelector('#presetSelector option[value="' + val + '"]');
+        var formTitle = document.getElementById('presetFormTitle');
+        var verPreview = document.getElementById('presetVersionPreview');
+        var idInput = document.getElementById('presetIdInput');
+        var titleInput = document.getElementById('presetTitleInput');
+        var chipSelect = document.getElementById('presetChipSelect');
+        var offsetInput = document.getElementById('presetOffsetInput');
+        var descInput = document.getElementById('presetDescInput');
+
+        if (val === '__NEW__' || !opt) {
+            formTitle.textContent = '➕ Tambah Preset Firmware Baru';
+            verPreview.textContent = 'Versi Target: v001 (Awal)';
+            verPreview.className = 'app-chip app-chip-neutral';
+            idInput.value = '';
+            idInput.readOnly = false;
+            titleInput.value = '';
+            chipSelect.value = 'ESP32-S3';
+            offsetInput.value = '0x0';
+            descInput.value = '';
+        } else {
+            var activeVer = opt.dataset.activever || 'v001';
+            var match = activeVer.match(/\d+/);
+            var nextNum = match ? parseInt(match[0], 10) + 1 : 2;
+            var nextVerCode = 'v' + ('000' + nextNum).slice(-3);
+
+            formTitle.textContent = '🔄 Update Versi Preset: ' + (opt.dataset.title || val);
+            verPreview.textContent = 'Jika upload .bin ➔ Otomatis jadi ' + nextVerCode + ' (saat ini: ' + activeVer + ')';
+            verPreview.className = 'app-chip app-chip-success';
+
+            idInput.value = val;
+            idInput.readOnly = true;
+            titleInput.value = opt.dataset.title || '';
+            chipSelect.value = opt.dataset.chip || 'ESP32-S3';
+            offsetInput.value = opt.dataset.offset || '0x0';
+            descInput.value = opt.dataset.desc || '';
+        }
+    }
+
+    // Autocomplete pencarian username real dari database
+    (function() {
         const input = document.getElementById('grantUsernameInput');
         const dropdown = document.getElementById('grantUsernameDropdown');
         if (!input || !dropdown) return;
@@ -285,135 +609,89 @@
         let activeIndex = -1;
         let currentAccounts = [];
 
-        function escapeHtml(str) {
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;');
-        }
-
-        function highlightPrefix(username, prefix) {
-            const safeUser = escapeHtml(username);
-            const pLen = prefix.length;
-            if (safeUser.toLowerCase().startsWith(prefix.toLowerCase())) {
-                const matched = safeUser.slice(0, pLen);
-                const rest = safeUser.slice(pLen);
-                return '<strong style="color:var(--app-accent, #008f5f); font-weight:800;">' + matched + '</strong>' + rest;
-            }
-            return safeUser;
-        }
-
-        function selectUser(username) {
-            input.value = username;
-            hideDropdown();
-            input.focus();
+        function showDropdown() {
+            dropdown.style.display = 'block';
         }
 
         function hideDropdown() {
             dropdown.style.display = 'none';
-            dropdown.innerHTML = '';
             activeIndex = -1;
-            currentAccounts = [];
         }
 
-        function showLoading() {
-            dropdown.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--app-muted); display:flex; align-items:center; gap:6px;">' +
-                '<span>🔍</span><span>Mencari username...</span>' +
-                '</div>';
-            dropdown.style.display = 'block';
-        }
-
-        function renderDropdown(accounts, prefix) {
-            dropdown.innerHTML = '';
-            activeIndex = -1;
+        function renderSuggestions(accounts) {
             currentAccounts = accounts;
+            dropdown.innerHTML = '';
 
             if (!accounts || accounts.length === 0) {
-                dropdown.innerHTML = '<div style="padding:10px 12px; font-size:12px; color:var(--app-muted); text-align:center;">' +
-                    'Tidak ada akun berawalan "<strong>' + escapeHtml(prefix) + '</strong>"' +
-                    '</div>';
-                dropdown.style.display = 'block';
+                dropdown.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--app-muted); text-align:center;">Pengguna tidak ditemukan</div>';
+                showDropdown();
                 return;
             }
 
             accounts.forEach(function(acc, idx) {
                 const item = document.createElement('div');
                 item.className = 'preset-user-item';
-                item.setAttribute('data-index', idx);
-                item.style.cssText = 'padding: 7px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--app-text); border-bottom: 1px solid var(--app-border, #e2e8f0); transition: background 0.15s ease;';
-                if (idx === accounts.length - 1) {
-                    item.style.borderBottom = 'none';
-                }
-                item.innerHTML = '<span style="font-size:13px; opacity:0.8;">👤</span>' +
-                    '<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' +
-                    highlightPrefix(acc.username, prefix) +
-                    '</span>';
+                item.style.padding = '8px 12px';
+                item.style.cursor = 'pointer';
+                item.style.fontSize = '12.5px';
+                item.style.display = 'flex';
+                item.style.alignItems = 'center';
+                item.style.justifyContent = 'space-between';
+                item.style.borderBottom = idx < accounts.length - 1 ? '1px solid var(--app-border)' : 'none';
+
+                item.innerHTML = '<div>' +
+                    '<span style="font-weight:750; color:var(--app-text);">' + acc.username + '</span>' +
+                    (acc.email ? '<span style="font-size:11px; color:var(--app-muted); display:block;">' + acc.email + '</span>' : '') +
+                    '</div>' +
+                    '<span class="app-chip app-chip-neutral" style="font-size:10px; padding:2px 6px;">ID: ' + acc.id + '</span>';
 
                 item.addEventListener('mouseenter', function() {
                     updateActiveItem(idx);
                 });
 
                 item.addEventListener('mousedown', function(e) {
-                    e.preventDefault(); // Mencegah blur sebelum klik terproses
+                    e.preventDefault();
                     selectUser(acc.username);
                 });
 
                 dropdown.appendChild(item);
             });
 
-            dropdown.style.display = 'block';
+            showDropdown();
         }
 
         function updateActiveItem(index) {
             activeIndex = index;
             const items = dropdown.querySelectorAll('.preset-user-item');
-            items.forEach(function(el, idx) {
-                if (idx === activeIndex) {
-                    el.style.background = 'var(--app-surface-muted, #f1f5f9)';
-                    el.scrollIntoView({ block: 'nearest' });
+            items.forEach(function(el, i) {
+                if (i === activeIndex) {
+                    el.style.backgroundColor = 'var(--app-surface-muted)';
                 } else {
-                    el.style.background = 'transparent';
+                    el.style.backgroundColor = 'transparent';
                 }
             });
         }
 
+        function selectUser(username) {
+            input.value = username;
+            hideDropdown();
+        }
+
         async function fetchSuggestions(query) {
-            if (query.length < 3) {
-                hideDropdown();
-                return;
-            }
-
-            showLoading();
-
             try {
-                const res = await fetch('/accounts/search?q=' + encodeURIComponent(query), {
-                    headers: { 'Accept': 'application/json' }
-                });
-                if (!res.ok) {
-                    hideDropdown();
-                    return;
-                }
+                const res = await fetch('/api/v1/users/search?q=' + encodeURIComponent(query));
+                if (!res.ok) return;
                 const data = await res.json();
-                const rawAccounts = data.accounts || [];
-
-                // Filter hanya nama yang depannya sesuai dengan huruf yang diketikkan
-                const prefixLower = query.toLowerCase();
-                const filtered = rawAccounts.filter(function(acc) {
-                    return acc.username && acc.username.toLowerCase().startsWith(prefixLower);
-                });
-
-                renderDropdown(filtered, query);
+                renderSuggestions(data.users || []);
             } catch (err) {
-                hideDropdown();
+                console.error('Error fetching user suggestions:', err);
             }
         }
 
-        input.addEventListener('input', function(e) {
+        input.addEventListener('input', function() {
             clearTimeout(debounceTimer);
-            const query = e.target.value.trim();
-
-            if (query.length < 3) {
+            const query = input.value.trim();
+            if (query.length < 2) {
                 hideDropdown();
                 return;
             }
@@ -425,38 +703,11 @@
 
         input.addEventListener('focus', function() {
             const query = input.value.trim();
-            if (query.length >= 3 && dropdown.style.display === 'none') {
+            if (query.length >= 2 && dropdown.style.display === 'none') {
                 fetchSuggestions(query);
             }
         });
 
-        input.addEventListener('keydown', function(e) {
-            if (dropdown.style.display === 'none') return;
-
-            const items = dropdown.querySelectorAll('.preset-user-item');
-            if (items.length === 0) return;
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                let nextIdx = activeIndex + 1;
-                if (nextIdx >= items.length) nextIdx = 0;
-                updateActiveItem(nextIdx);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                let prevIdx = activeIndex - 1;
-                if (prevIdx < 0) prevIdx = items.length - 1;
-                updateActiveItem(prevIdx);
-            } else if (e.key === 'Enter') {
-                if (activeIndex >= 0 && currentAccounts[activeIndex]) {
-                    e.preventDefault();
-                    selectUser(currentAccounts[activeIndex].username);
-                }
-            } else if (e.key === 'Escape') {
-                hideDropdown();
-            }
-        });
-
-        // Tutup dropdown jika klik di luar
         document.addEventListener('click', function(e) {
             if (!input.contains(e.target) && !dropdown.contains(e.target)) {
                 hideDropdown();
