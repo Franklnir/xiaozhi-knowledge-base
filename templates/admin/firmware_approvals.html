@@ -24,9 +24,26 @@
             </p>
         </div>
 
-        <!-- Form Beri Akses Langsung -->
-        <form method="POST" action="/admin/firmware/preset-approvals/grant" style="display:flex; gap:8px; align-items:center;">
-            <input type="text" name="username" placeholder="Ketik Username..." required class="app-input" style="padding:6px 12px; font-size:12.5px; min-width:170px;">
+        <!-- Form Beri Akses Langsung dengan Autocomplete -->
+        <form method="POST" action="/admin/firmware/preset-approvals/grant" style="display:flex; gap:8px; align-items:center; position:relative;" autocomplete="off">
+            <div style="position:relative; flex:1; min-width:180px;">
+                <input 
+                    type="text" 
+                    id="grantUsernameInput" 
+                    name="username" 
+                    placeholder="Ketik Username..." 
+                    required 
+                    autocomplete="off" 
+                    spellcheck="false"
+                    class="app-input" 
+                    style="width:100%; padding:6px 12px; font-size:12.5px; box-sizing:border-box;"
+                >
+                <!-- Dropdown suggestions -->
+                <div 
+                    id="grantUsernameDropdown" 
+                    style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; min-width:200px; max-height:220px; overflow-y:auto; background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); box-shadow:0 8px 24px rgba(0,0,0,0.18); z-index:1050; padding:4px 0;"
+                ></div>
+            </div>
             <button type="submit" class="app-button app-button-primary app-button-small" style="font-weight:800; white-space:nowrap;">
                 ➕ Beri Akses Langsung
             </button>
@@ -257,5 +274,194 @@
     function closeRejectModal() {
         document.getElementById('rejectModal').style.display = 'none';
     }
+
+    // Autocomplete Username "Beri Akses Langsung"
+    (function initPresetUsernameAutocomplete() {
+        const input = document.getElementById('grantUsernameInput');
+        const dropdown = document.getElementById('grantUsernameDropdown');
+        if (!input || !dropdown) return;
+
+        let debounceTimer = null;
+        let activeIndex = -1;
+        let currentAccounts = [];
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function highlightPrefix(username, prefix) {
+            const safeUser = escapeHtml(username);
+            const pLen = prefix.length;
+            if (safeUser.toLowerCase().startsWith(prefix.toLowerCase())) {
+                const matched = safeUser.slice(0, pLen);
+                const rest = safeUser.slice(pLen);
+                return '<strong style="color:var(--app-accent, #008f5f); font-weight:800;">' + matched + '</strong>' + rest;
+            }
+            return safeUser;
+        }
+
+        function selectUser(username) {
+            input.value = username;
+            hideDropdown();
+            input.focus();
+        }
+
+        function hideDropdown() {
+            dropdown.style.display = 'none';
+            dropdown.innerHTML = '';
+            activeIndex = -1;
+            currentAccounts = [];
+        }
+
+        function showLoading() {
+            dropdown.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--app-muted); display:flex; align-items:center; gap:6px;">' +
+                '<span>🔍</span><span>Mencari username...</span>' +
+                '</div>';
+            dropdown.style.display = 'block';
+        }
+
+        function renderDropdown(accounts, prefix) {
+            dropdown.innerHTML = '';
+            activeIndex = -1;
+            currentAccounts = accounts;
+
+            if (!accounts || accounts.length === 0) {
+                dropdown.innerHTML = '<div style="padding:10px 12px; font-size:12px; color:var(--app-muted); text-align:center;">' +
+                    'Tidak ada akun berawalan "<strong>' + escapeHtml(prefix) + '</strong>"' +
+                    '</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            accounts.forEach(function(acc, idx) {
+                const item = document.createElement('div');
+                item.className = 'preset-user-item';
+                item.setAttribute('data-index', idx);
+                item.style.cssText = 'padding: 7px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--app-text); border-bottom: 1px solid var(--app-border, #e2e8f0); transition: background 0.15s ease;';
+                if (idx === accounts.length - 1) {
+                    item.style.borderBottom = 'none';
+                }
+                item.innerHTML = '<span style="font-size:13px; opacity:0.8;">👤</span>' +
+                    '<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' +
+                    highlightPrefix(acc.username, prefix) +
+                    '</span>';
+
+                item.addEventListener('mouseenter', function() {
+                    updateActiveItem(idx);
+                });
+
+                item.addEventListener('mousedown', function(e) {
+                    e.preventDefault(); // Mencegah blur sebelum klik terproses
+                    selectUser(acc.username);
+                });
+
+                dropdown.appendChild(item);
+            });
+
+            dropdown.style.display = 'block';
+        }
+
+        function updateActiveItem(index) {
+            activeIndex = index;
+            const items = dropdown.querySelectorAll('.preset-user-item');
+            items.forEach(function(el, idx) {
+                if (idx === activeIndex) {
+                    el.style.background = 'var(--app-surface-muted, #f1f5f9)';
+                    el.scrollIntoView({ block: 'nearest' });
+                } else {
+                    el.style.background = 'transparent';
+                }
+            });
+        }
+
+        async function fetchSuggestions(query) {
+            if (query.length < 3) {
+                hideDropdown();
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const res = await fetch('/accounts/search?q=' + encodeURIComponent(query), {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!res.ok) {
+                    hideDropdown();
+                    return;
+                }
+                const data = await res.json();
+                const rawAccounts = data.accounts || [];
+
+                // Filter hanya nama yang depannya sesuai dengan huruf yang diketikkan
+                const prefixLower = query.toLowerCase();
+                const filtered = rawAccounts.filter(function(acc) {
+                    return acc.username && acc.username.toLowerCase().startsWith(prefixLower);
+                });
+
+                renderDropdown(filtered, query);
+            } catch (err) {
+                hideDropdown();
+            }
+        }
+
+        input.addEventListener('input', function(e) {
+            clearTimeout(debounceTimer);
+            const query = e.target.value.trim();
+
+            if (query.length < 3) {
+                hideDropdown();
+                return;
+            }
+
+            debounceTimer = setTimeout(function() {
+                fetchSuggestions(query);
+            }, 180);
+        });
+
+        input.addEventListener('focus', function() {
+            const query = input.value.trim();
+            if (query.length >= 3 && dropdown.style.display === 'none') {
+                fetchSuggestions(query);
+            }
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (dropdown.style.display === 'none') return;
+
+            const items = dropdown.querySelectorAll('.preset-user-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                let nextIdx = activeIndex + 1;
+                if (nextIdx >= items.length) nextIdx = 0;
+                updateActiveItem(nextIdx);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                let prevIdx = activeIndex - 1;
+                if (prevIdx < 0) prevIdx = items.length - 1;
+                updateActiveItem(prevIdx);
+            } else if (e.key === 'Enter') {
+                if (activeIndex >= 0 && currentAccounts[activeIndex]) {
+                    e.preventDefault();
+                    selectUser(currentAccounts[activeIndex].username);
+                }
+            } else if (e.key === 'Escape') {
+                hideDropdown();
+            }
+        });
+
+        // Tutup dropdown jika klik di luar
+        document.addEventListener('click', function(e) {
+            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                hideDropdown();
+            }
+        });
+    })();
 </script>
 {% endblock %}
