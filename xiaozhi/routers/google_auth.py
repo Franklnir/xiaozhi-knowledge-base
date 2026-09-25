@@ -198,7 +198,7 @@ async def google_callback(
         return redirect_with_message("/login", "Sesi autentikasi Google kedaluwarsa. Silakan coba lagi.")
 
     action = state_data.get("action", "login")
-    is_mobile = (state_data.get("source") == "mobile")
+    is_mobile = (state_data.get("source") in ("mobile", "mobile_app", "app"))
 
     def respond_error(msg: str, target: str = "/login"):
         if is_mobile:
