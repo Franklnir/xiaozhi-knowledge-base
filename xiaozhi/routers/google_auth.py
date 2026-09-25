@@ -211,6 +211,7 @@ async def google_callback(
             "access_token": token_pair["access_token"],
             "refresh_token": token_pair["refresh_token"],
             "username": u["username"],
+            "email": u.get("google_email") or google_email or "",
             "role": r,
             "user_id": str(u["id"]),
         }
@@ -333,6 +334,15 @@ async def google_callback(
             "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
         }
 
+        # Synchronize with Firebase
+        from xiaozhi.services.firebase_service import sync_firebase_user
+        fb_res = sync_firebase_user(user["username"], email=google_email, display_name=google_name or user["username"])
+        if fb_res:
+            try:
+                store.link_firebase_account(int(user["id"]), fb_res["firebase_uid"], fb_res["firebase_email"])
+            except Exception:
+                pass
+
         if is_mobile:
             return mobile_success_response(user, role)
 
@@ -397,6 +407,15 @@ async def google_callback(
         "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
         "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
     }
+
+    # Synchronize with Firebase
+    from xiaozhi.services.firebase_service import sync_firebase_user
+    fb_res = sync_firebase_user(user["username"], email=google_email, display_name=google_name or user["username"])
+    if fb_res:
+        try:
+            store.link_firebase_account(int(user["id"]), fb_res["firebase_uid"], fb_res["firebase_email"])
+        except Exception:
+            pass
 
     if is_mobile:
         return mobile_success_response(user, role)

@@ -137,6 +137,9 @@ class PostgresStore:
                         CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
                         CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
                         CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
+                        ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid VARCHAR(128);
+                        ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_email VARCHAR(255);
+                        CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
                     """)
 
                     # 3. Categories Table
@@ -496,6 +499,15 @@ class PostgresStore:
                 cur.execute(
                     "UPDATE users SET google_id = NULL, google_email = NULL, updated_at = %s WHERE id = %s",
                     (utc_now(), int(user_id)),
+                )
+            conn.commit()
+
+    def link_firebase_account(self, user_id: int, firebase_uid: str, firebase_email: Optional[str] = None) -> None:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE users SET firebase_uid = %s, firebase_email = %s, updated_at = %s WHERE id = %s",
+                    (str(firebase_uid), str(firebase_email) if firebase_email else None, utc_now(), int(user_id)),
                 )
             conn.commit()
 
