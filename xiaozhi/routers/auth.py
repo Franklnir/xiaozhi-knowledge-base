@@ -90,13 +90,24 @@ async def login_post(
         user_record = store.get_user_by_username(username)
         if user_record and verify_password(password, user_record.get("password_hash", "")):
             role = str(user_record.get("role") or "user").lower()
+            user_id = int(user_record["id"])
             user = {
-                "id": int(user_record["id"]),
+                "id": user_id,
                 "username": user_record["username"],
                 "role": role,
                 "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
                 "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
             }
+
+            # Synchronize with Firebase
+            from xiaozhi.services.firebase_service import sync_firebase_user
+            fb_res = sync_firebase_user(user_record["username"], password=password, email=user_record.get("google_email"), is_register=False)
+            if fb_res:
+                try:
+                    store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
+                except Exception:
+                    pass
+
             # Admin always bypasses MCP gating
             if role == "admin" or is_mcp_connected(user["id"]):
                 redirect = RedirectResponse(url="/admin" if role == "admin" else "/dashboard", status_code=303)
@@ -178,6 +189,15 @@ async def web_login_api(request: Request):
         "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
     }
 
+    # Synchronize with Firebase
+    from xiaozhi.services.firebase_service import sync_firebase_user
+    fb_res = sync_firebase_user(user_record["username"], password=password, email=user_record.get("google_email"), is_register=False)
+    if fb_res:
+        try:
+            store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
+        except Exception:
+            pass
+
     token_info = store.get_xiaozhi_token_info(user_id)
     mcp_ok = is_mcp_connected(user_id)
 
@@ -238,6 +258,16 @@ async def register_post(
             "session_version": 1,
             "ui_theme": DEFAULT_UI_THEME,
         }
+
+        # Synchronize with Firebase
+        from xiaozhi.services.firebase_service import sync_firebase_user
+        fb_res = sync_firebase_user(username, password=password, is_register=True)
+        if fb_res:
+            try:
+                store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
+            except Exception:
+                pass
+
         # Render register page with MCP input section smoothly shown below
         response = render(
             request,
@@ -279,13 +309,24 @@ async def web_register_api(request: Request):
     store = get_store()
     try:
         user_record = store.create_user(username, password)
+        user_id = int(user_record["id"])
         user = {
-            "id": int(user_record["id"]),
+            "id": user_id,
             "username": user_record["username"],
             "role": "user",
             "session_version": 1,
             "ui_theme": DEFAULT_UI_THEME,
         }
+
+        # Synchronize with Firebase
+        from xiaozhi.services.firebase_service import sync_firebase_user
+        fb_res = sync_firebase_user(username, password=password, is_register=True)
+        if fb_res:
+            try:
+                store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
+            except Exception:
+                pass
+
         new_csrf = make_csrf_token(user)
         res = JSONResponse({
             "success": True,

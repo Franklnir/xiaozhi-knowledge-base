@@ -733,6 +733,18 @@ class HFJsonStore:
             user["updated_at"] = utc_now()
             self._commit(data, "Unlink Google account")
 
+    def link_firebase_account(self, user_id: int, firebase_uid: str, firebase_email: Optional[str] = None) -> None:
+        with self._lock:
+            data = self._load()
+            user = next((u for u in data["users"] if int(u.get("id", 0)) == int(user_id)), None)
+            if not user:
+                raise ValueError("Pengguna tidak ditemukan.")
+            user["firebase_uid"] = str(firebase_uid)
+            if firebase_email:
+                user["firebase_email"] = str(firebase_email).strip().lower()
+            user["updated_at"] = utc_now()
+            self._commit(data, "Link Firebase account")
+
     def create_google_user(self, username: str, google_id: str, google_email: str) -> Dict[str, Any]:
         username = normalize_username(username)
         random_pwd = secrets.token_urlsafe(32)

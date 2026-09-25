@@ -74,6 +74,15 @@ async def api_register(body: RegisterRequest, request: Request):
     role = str(user.get("role") or "user").lower()
     session_version = max(1, int(user.get("session_version", 1) or 1))
 
+    # Synchronize with Firebase
+    from xiaozhi.services.firebase_service import sync_firebase_user
+    fb_res = sync_firebase_user(body.username, password=body.password, is_register=True)
+    if fb_res:
+        try:
+            store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
+        except Exception:
+            pass
+
     tokens = create_token_pair(user_id, body.username, role, session_version)
     mcp_required = (role != "admin")
     mcp_connected = bool(is_mcp_connected(user_id))
@@ -85,6 +94,8 @@ async def api_register(body: RegisterRequest, request: Request):
                 "id": user_id,
                 "username": body.username,
                 "role": role,
+                "firebase_uid": fb_res.get("firebase_uid") if fb_res else None,
+                "firebase_email": fb_res.get("firebase_email") if fb_res else None,
             },
             **tokens,
             "mcp_required": mcp_required,
@@ -114,6 +125,15 @@ async def api_login(body: LoginRequest, request: Request):
     user_id = int(user_record["id"])
     session_version = max(1, int(user_record.get("session_version", 1) or 1))
 
+    # Synchronize with Firebase
+    from xiaozhi.services.firebase_service import sync_firebase_user
+    fb_res = sync_firebase_user(body.username, password=body.password, email=user_record.get("google_email"), is_register=False)
+    if fb_res:
+        try:
+            store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
+        except Exception:
+            pass
+
     tokens = create_token_pair(user_id, body.username, role, session_version)
     mcp_required = (role != "admin")
     mcp_connected = bool(is_mcp_connected(user_id))
@@ -125,6 +145,8 @@ async def api_login(body: LoginRequest, request: Request):
                 "id": user_id,
                 "username": body.username,
                 "role": role,
+                "firebase_uid": fb_res.get("firebase_uid") if fb_res else user_record.get("firebase_uid"),
+                "firebase_email": fb_res.get("firebase_email") if fb_res else user_record.get("firebase_email"),
             },
             **tokens,
             "mcp_required": mcp_required,
@@ -362,6 +384,16 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
     user_id = int(user_record["id"])
     role = str(user_record.get("role") or "user").lower()
     session_version = max(1, int(user_record.get("session_version", 1) or 1))
+
+    # Synchronize with Firebase
+    from xiaozhi.services.firebase_service import sync_firebase_user
+    fb_res = sync_firebase_user(user_record["username"], email=google_email, display_name=google_name)
+    if fb_res:
+        try:
+            store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
+        except Exception:
+            pass
+
     tokens = create_token_pair(user_id, user_record["username"], role, session_version)
     mcp_required = (role != "admin")
     mcp_connected = bool(is_mcp_connected(user_id))
@@ -376,6 +408,8 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
                 "google_id": google_id,
                 "google_email": google_email,
                 "registered_with_google": bool(user_record.get("registered_with_google", False)),
+                "firebase_uid": fb_res.get("firebase_uid") if fb_res else user_record.get("firebase_uid"),
+                "firebase_email": fb_res.get("firebase_email") if fb_res else user_record.get("firebase_email"),
             },
             **tokens,
             "mcp_required": mcp_required,

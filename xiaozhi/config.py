@@ -678,3 +678,11 @@ MIDTRANS_SERVER_KEY = os.getenv("MIDTRANS_SERVER_KEY", "").strip()
 MIDTRANS_CLIENT_KEY = os.getenv("MIDTRANS_CLIENT_KEY", "").strip()
 MIDTRANS_IS_PRODUCTION = os.getenv("MIDTRANS_IS_PRODUCTION", "false").strip().lower() == "true"
 
+# ── Firebase Integration ──────────────────────────────────────────────────
+FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY", "").strip()
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "espbridge-companion-2026-d2c93").strip()
+FIREBASE_RTDB_URL = os.getenv(
+    "FIREBASE_RTDB_URL",
+    "https://espbridge-companion-2026-d2c93-default-rtdb.asia-southeast1.firebasedatabase.app"
+).strip()
+

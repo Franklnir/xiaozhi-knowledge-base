@@ -336,7 +336,12 @@ class SQLiteStore:
             conn.execute("ALTER TABLE users ADD COLUMN google_email TEXT")
         if "registered_with_google" not in user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN registered_with_google INTEGER NOT NULL DEFAULT 0")
+        if "firebase_uid" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN firebase_uid TEXT")
+        if "firebase_email" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN firebase_email TEXT")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid)")
 
         conn.commit()
 
@@ -373,6 +378,8 @@ class SQLiteStore:
             "google_id": row["google_id"] if "google_id" in keys else None,
             "google_email": row["google_email"] if "google_email" in keys else None,
             "registered_with_google": bool(row["registered_with_google"]) if "registered_with_google" in keys else False,
+            "firebase_uid": row["firebase_uid"] if "firebase_uid" in keys else None,
+            "firebase_email": row["firebase_email"] if "firebase_email" in keys else None,
             "created_at": row["created_at"] if "created_at" in keys else None,
         }
 
@@ -423,6 +430,14 @@ class SQLiteStore:
         conn.execute(
             "UPDATE users SET google_id = NULL, google_email = NULL, updated_at = ? WHERE id = ?",
             (utc_now(), user_id)
+        )
+        conn.commit()
+
+    def link_firebase_account(self, user_id: int, firebase_uid: str, firebase_email: Optional[str] = None) -> None:
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE users SET firebase_uid = ?, firebase_email = ?, updated_at = ? WHERE id = ?",
+            (str(firebase_uid), str(firebase_email) if firebase_email else None, utc_now(), user_id)
         )
         conn.commit()
 
