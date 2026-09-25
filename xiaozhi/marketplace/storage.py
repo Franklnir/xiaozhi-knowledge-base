@@ -362,6 +362,56 @@ class StorageService:
                 return target
         return None
 
+    def upload_encrypted_preset(self, preset_id: str, version_code: str, enc_bytes: bytes) -> Tuple[str, str]:
+        """
+        Uploads an AES-GCM encrypted preset firmware to S3 bucket or local private fallback.
+        Returns (storage_bucket, storage_key).
+        """
+        clean_preset_id = str(preset_id).strip().lower()
+        storage_key = f"firmware_presets/{clean_preset_id}/{version_code}.bin.enc"
+        bucket_name = S3_BUCKET_PRIVATE if self.has_s3 else "local-private"
+
+        s3 = self._get_s3()
+        if s3:
+            s3.put_object(
+                Bucket=bucket_name,
+                Key=storage_key,
+                Body=enc_bytes,
+                ContentType="application/octet-stream",
+            )
+        else:
+            local_target = LOCAL_STORAGE_DIR / "private" / "presets" / clean_preset_id / f"{version_code}.bin.enc"
+            local_target.parent.mkdir(parents=True, exist_ok=True)
+            local_target.write_bytes(enc_bytes)
+
+        return bucket_name, storage_key
+
+    def get_encrypted_preset_bytes(self, bucket_name: str, storage_key: str) -> bytes:
+        """
+        Fetches encrypted preset bytes from S3 or local storage fallback.
+        """
+        s3 = self._get_s3()
+        if s3 and bucket_name != "local-private":
+            resp = s3.get_object(Bucket=bucket_name, Key=storage_key)
+            return resp["Body"].read()
+
+        # Local fallback resolution
+        filename = Path(storage_key).name
+        parts = storage_key.split("/")
+        preset_id = parts[1] if len(parts) >= 3 else ""
+
+        candidates = [
+            LOCAL_STORAGE_DIR / "private" / "presets" / preset_id / filename,
+            LOCAL_STORAGE_DIR / "private" / "presets" / filename,
+            BASE_DIR / storage_key,
+            BASE_DIR / "protected_assets" / "firmware" / filename,
+        ]
+        for c in candidates:
+            if c.exists() and c.is_file():
+                return c.read_bytes()
+
+        raise FileNotFoundError(f"File preset terenkripsi '{storage_key}' tidak ditemukan di S3 maupun penyimpanan lokal.")
+
 
 # Global storage service instance
 storage_service = StorageService()

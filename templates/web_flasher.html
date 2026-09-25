@@ -312,44 +312,96 @@
                     </div>
                 </div>
 
-                <!-- TAB 2: OFFICIAL PRESET VIEW (ADMIN APPROVED ONLY, FLASH ONLY - NO DOWNLOAD) -->
+                <!-- TAB 2: OFFICIAL PRESET VIEW (ADMIN APPROVED / CLAIM CODE, FLASH ONLY) -->
                 <div id="panelPreset" style="display:none;">
-                    <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:14px;">
+                    <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:16px;">
+                        
+                        <!-- Dropdown Pemilihan Preset jika ada > 1 -->
+                        {% if presets and presets|length > 1 %}
+                        <div style="margin-bottom:12px;">
+                            <label style="font-size:12px; font-weight:800; color:var(--app-text); display:block; margin-bottom:4px;">
+                                🎯 Pilih Preset Firmware:
+                            </label>
+                            <select id="userPresetSelect" class="app-input" onchange="onUserPresetChange(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                                {% for p in presets %}
+                                <option value="{{ p.id }}" data-title="{{ p.title }}" data-chip="{{ p.chip }}" data-offset="{{ p.offset }}" data-desc="{{ p.description }}" data-activever="{{ p.active_version }}" data-size="{{ (p.size_bytes / (1024*1024))|round(2) if p.size_bytes else '0' }}" {% if preset_status and preset_status.preset and preset_status.preset.id == p.id %}selected{% endif %}>
+                                    {{ p.title }} ({{ p.chip }} • {{ p.active_version }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
                             <div>
-                                <strong style="font-size:14px; color:var(--app-text); display:flex; align-items:center; gap:6px;">
-                                    <span>🎯</span> ESP32-S3 N16R8 / CAM Full Factory Merged
+                                <strong id="presetCardTitle" style="font-size:14.5px; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                                    <span>🎯</span> <span id="lblPresetTitle">{{ preset_status.preset.title if preset_status and preset_status.preset else 'ESP32-S3 N16R8 / CAM Full Factory' }}</span>
                                 </strong>
-                                <span style="font-size:11.5px; color:var(--app-muted); display:block; margin-top:2px;">
-                                    Binary komersial resmi (~9.65 MB) • Bootloader, Partisi, OTA, Voice App, Aset UI &amp; Audio.
+                                <span id="lblPresetDesc" style="font-size:11.5px; color:var(--app-muted); display:block; margin-top:2px;">
+                                    {{ preset_status.preset.description if preset_status and preset_status.preset else 'Binary komersial resmi • Bootloader, Partisi, OTA, Voice App, Aset UI & Audio.' }}
                                 </span>
                             </div>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">Offset 0x0</span>
+                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                <span class="app-chip app-chip-neutral" id="lblPresetVersion" style="font-size:11px; font-weight:900;">
+                                    Versi: {{ preset_status.active_version if preset_status and preset_status.active_version else 'v001' }}
+                                </span>
+                                <span class="app-chip app-chip-success" id="lblPresetOffset" style="font-size:10.5px; font-weight:800;">
+                                    Offset {{ preset_status.preset.offset if preset_status and preset_status.preset else '0x0' }}
+                                </span>
                             </div>
                         </div>
 
-                        <!-- TOMBOL BUKU PANDUAN & DATASET PIN (DITARUH DI DALAM PRESET AGAR TIDAK MEMENUHI TEMPAT) -->
+                        <!-- TOMBOL BUKU PANDUAN & DATASET PIN -->
                         <div style="margin-bottom:12px;">
                             <button type="button" onclick="openGuideModal()" class="app-button app-button-ghost app-button-small" style="font-size:11.5px; font-weight:750; width:100%; justify-content:center; border:1px solid var(--app-border-strong); background:var(--app-surface);">
                                 📖 Buka Panduan Flashing &amp; Dataset PIN GPIO Layar/Audio
                             </button>
                         </div>
 
-                        <!-- Status & Action Box -->
+                        <!-- Status & Action Box: DUA KONDISI (GEMBOK TERBUKA vs GEMBOK TERKUNCI) -->
                         <div style="padding-top:10px; border-top:1px solid var(--app-border);">
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                                <div>
-                                    <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:850;">
-                                        {% if user and user.role == 'admin' %}🛡️ ADMINISTRATOR RESMI{% else %}✅ LISENSI RESMI AKTIF{% endif %}
+                            <!-- KONDISI 1: GEMBOK TERBUKA 🔓 -->
+                            <div id="boxPresetUnlocked" style="{% if not preset_status or not preset_status.authorized %}display:none;{% endif %}">
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                                    <div>
+                                        <span class="app-chip app-chip-success" style="font-size:11px; font-weight:850;">
+                                            {% if user and user.role == 'admin' %}🛡️ ADMINISTRATOR RESMI (AKSES PENUH){% else %}🔓 GEMBOK TERBUKA • LISENSI RESMI AKTIF{% endif %}
+                                        </span>
+                                        <span style="font-size:11px; color:var(--app-muted); display:block; margin-top:3px;">
+                                            ⚡ Akses Anda aktif untuk versi <strong>{{ preset_status.active_version if preset_status else 'v001' }}</strong> dan otomatis menerima pembaruan versi berikutnya.
+                                        </span>
+                                    </div>
+                                    <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:7px 16px;">
+                                        ⚡ Muat Preset Ini ke Flasher
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- KONDISI 2: GEMBOK TERKUNCI 🔒 -->
+                            <div id="boxPresetLocked" style="{% if preset_status and preset_status.authorized %}display:none;{% endif %} background:rgba(220,38,38,0.05); border:1.5px solid rgba(220,38,38,0.25); border-radius:var(--app-radius); padding:12px 14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                                    <span class="app-chip app-chip-danger" style="font-size:11px; font-weight:900;">
+                                        🔒 GEMBOK TERKUNCI • LISENSI DIPERLUKAN
                                     </span>
-                                    <span style="font-size:11px; color:var(--app-muted); display:block; margin-top:3px;">
-                                        ⚡ File langsung di-stream ke memori peramban untuk flashing (Flash Only, tidak dapat diunduh).
+                                    <span style="font-size:11px; color:var(--app-muted);">
+                                        Tersedia: <strong>{{ preset_status.active_version if preset_status else 'v001' }}</strong>
                                     </span>
                                 </div>
-                                <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:7px 16px;">
-                                    ⚡ Muat Preset Ini ke Flasher
-                                </button>
+                                <p style="font-size:12px; color:var(--app-text); margin:0 0 10px; line-height:1.5;">
+                                    Masukkan <strong>Kode Lisensi Sekali Pakai</strong> yang Anda peroleh dari pembelian kit atau Admin untuk langsung membuka akses firmware dan update otomatis:
+                                </p>
+                                <form onsubmit="submitInlineClaimCode(event)" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+                                    <input type="text" id="inlineClaimCodeInput" placeholder="Ketik Kode: XZ-PRESET-XXXX-YYYY" class="app-input" style="flex:1; min-width:200px; padding:7px 10px; font-size:12.5px; text-transform:uppercase; font-family:monospace; font-weight:bold;" required>
+                                    <button type="submit" id="btnSubmitInlineClaim" class="app-button app-button-primary" style="font-weight:850; font-size:12px; padding:7px 14px; white-space:nowrap;">
+                                        🔓 Buka Kunci dengan Kode
+                                    </button>
+                                </form>
+                                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; color:var(--app-muted); padding-top:4px;">
+                                    <span>Belum memiliki kode lisensi?</span>
+                                    <button type="button" onclick="openRequestModal()" style="background:none; border:none; color:var(--app-accent, #059669); font-weight:800; cursor:pointer; text-decoration:underline;">
+                                        🔑 Ajukan Permohonan ke Admin ↗
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -469,21 +521,34 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             <button type="button" onclick="closePermissionModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted);">&times;</button>
         </div>
 
-        <div style="font-size:13px; color:var(--app-text); line-height:1.6; margin-bottom:16px;">
+        <div style="font-size:13px; color:var(--app-text); line-height:1.6; margin-bottom:14px;">
             <p style="margin:0 0 10px;">
-                Preset <strong>ESP32-S3 N16R8 / CAM Full Factory</strong> adalah firmware komersial resmi. Anda <strong>harus meminta perizinan Admin</strong> terlebih dahulu sebelum dapat menggunakan preset ini.
+                Preset ini adalah firmware komersial resmi berlisensi. Anda dapat membuka aksesnya menggunakan <strong>Kode Lisensi Sekali Pakai</strong> atau mengajukan permohonan ke Admin.
             </p>
-            <div style="padding:10px 12px; background:rgba(220,38,38,0.06); border:1px solid rgba(220,38,38,0.2); border-radius:var(--app-radius); font-size:12px; color:var(--app-muted);">
-                🛡️ <strong>Catatan:</strong> Firmware ini dilindungi hak cipta dan hanya dapat di-flash langsung ke perangkat ESP32 setelah diapprove (tidak dapat diunduh).
+
+            <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:12px; margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:800; color:var(--app-text); display:block; margin-bottom:4px;">
+                    🎟️ Klaim Kode Lisensi Sekali Pakai:
+                </label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="modalClaimCodeInput" placeholder="Ketik Kode: XZ-PRESET-XXXX-YYYY" class="app-input" style="flex:1; padding:6px 10px; font-size:12px; text-transform:uppercase; font-family:monospace; font-weight:bold;">
+                    <button type="button" onclick="submitModalClaimCode()" class="app-button app-button-primary app-button-small" style="font-weight:850; white-space:nowrap;">
+                        🔓 Buka Kunci
+                    </button>
+                </div>
+            </div>
+
+            <div style="padding:8px 12px; background:rgba(220,38,38,0.06); border:1px solid rgba(220,38,38,0.2); border-radius:var(--app-radius); font-size:11.5px; color:var(--app-muted);">
+                🛡️ <strong>Catatan:</strong> Setelah lisensi aktif, firmware dapat langsung di-flash ke ESP32 dan Anda otomatis menerima pembaruan versi berikutnya.
             </div>
         </div>
 
-        <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <button type="button" onclick="closePermissionModal()" class="app-button">
                 Batal
             </button>
-            <button type="button" onclick="openRequestFromPermissionModal()" class="app-button app-button-primary" style="font-weight:850;">
-                🔑 Minta Izin ke Admin Sekarang
+            <button type="button" onclick="openRequestFromPermissionModal()" class="app-button app-button-ghost" style="font-weight:850; color:var(--app-accent, #059669);">
+                🔑 Minta Izin ke Admin
             </button>
         </div>
     </div>
@@ -683,13 +748,15 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
     }
 
     // USER AUTHORIZATION STATE
+    let currentPresetId = "{{ preset_status.preset.id if preset_status and preset_status.preset else 'esp32s3_cam' }}";
     const userAuthStatus = {
         isLoggedIn: {{ 'true' if user else 'false' }},
         role: "{{ user.role if user else '' }}",
         username: "{{ user.username if user else '' }}",
         authorized: {{ 'true' if preset_status and preset_status.authorized else 'false' }},
         status: "{{ preset_status.status if preset_status else 'NONE' }}",
-        message: "{{ preset_status.message if preset_status else '' }}"
+        message: "{{ preset_status.message if preset_status else '' }}",
+        activeVersion: "{{ preset_status.active_version if preset_status and preset_status.active_version else 'v001' }}"
     };
 
     // Multi-platform Serial Resolver (Desktop & Android OTG WebUSB)
@@ -788,20 +855,12 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         if (consoleLog) consoleLog.textContent = '';
     };
 
-    // Mode Switcher: Preset vs Custom GATED by Admin Approval
+    // Mode Switcher: Preset vs Custom
     window.switchSourceMode = function(mode) {
         if (mode === 'preset') {
             if (!userAuthStatus.isLoggedIn) {
-                alert('🔒 Preset Berlisensi: Anda harus masuk ke akun dan meminta izin Admin terlebih dahulu.');
+                alert('🔒 Preset Berlisensi: Anda harus masuk ke akun terlebih dahulu.');
                 window.location.href = '/login?next=/web-flasher';
-                return;
-            }
-            if (!userAuthStatus.authorized) {
-                if (userAuthStatus.status === 'PENDING') {
-                    document.getElementById('pendingModal').style.display = 'flex';
-                } else {
-                    document.getElementById('permissionModal').style.display = 'flex';
-                }
                 return;
             }
         }
@@ -821,8 +880,8 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             btnCustom.classList.remove('active');
             panelPreset.style.display = 'block';
             panelCustom.style.display = 'none';
-            badge.textContent = 'Official Preset';
-            badge.className = 'app-chip app-chip-success';
+            badge.textContent = userAuthStatus.authorized ? '🔓 Official Preset' : '🔒 Locked Preset';
+            badge.className = userAuthStatus.authorized ? 'app-chip app-chip-success' : 'app-chip app-chip-danger';
         } else {
             btnCustom.classList.add('active');
             btnPreset.classList.remove('active');
@@ -854,6 +913,104 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         document.getElementById('requestModal').style.display = 'none';
     };
 
+    // Klaim Kode Lisensi Sekali Pakai (Inline Form & Modal)
+    window.submitInlineClaimCode = async function(e) {
+        e.preventDefault();
+        const codeInput = document.getElementById('inlineClaimCodeInput');
+        const btn = document.getElementById('btnSubmitInlineClaim');
+        const code = codeInput ? codeInput.value.trim() : '';
+        if (!code) return;
+
+        btn.disabled = true;
+        btn.textContent = 'Memvalidasi...';
+        await executeClaimCode(code, btn, '🔓 Buka Kunci dengan Kode');
+    };
+
+    window.submitModalClaimCode = async function() {
+        const codeInput = document.getElementById('modalClaimCodeInput');
+        const code = codeInput ? codeInput.value.trim() : '';
+        if (!code) {
+            alert('Silakan ketik kode lisensi sekali pakai terlebih dahulu.');
+            return;
+        }
+        await executeClaimCode(code);
+    };
+
+    async function executeClaimCode(code, btnEl, originalText) {
+        try {
+            const resp = await fetch('/api/v1/flasher/preset/claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ code: code })
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                alert(data.message || 'Selamat! Lisensi preset berhasil diaktifkan.');
+                window.location.reload();
+            } else {
+                alert(data.message || 'Gagal mengklaim kode lisensi. Periksa kembali kode Anda.');
+                if (btnEl) {
+                    btnEl.disabled = false;
+                    btnEl.textContent = originalText || '🔓 Buka Kunci';
+                }
+            }
+        } catch (err) {
+            alert('Terjadi kesalahan saat memproses klaim kode: ' + err.message);
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.textContent = originalText || '🔓 Buka Kunci';
+            }
+        }
+    }
+
+    // Handler Switch Preset Antar Pilihan yang Ada
+    window.onUserPresetChange = async function(presetId) {
+        currentPresetId = presetId;
+        const sel = document.getElementById('userPresetSelect');
+        const opt = sel ? sel.querySelector('option[value="' + presetId + '"]') : null;
+        if (opt) {
+            const t = opt.dataset.title || presetId;
+            const d = opt.dataset.desc || '';
+            const v = opt.dataset.activever || 'v001';
+            const o = opt.dataset.offset || '0x0';
+            const elT = document.getElementById('lblPresetTitle');
+            const elD = document.getElementById('lblPresetDesc');
+            const elV = document.getElementById('lblPresetVersion');
+            const elO = document.getElementById('lblPresetOffset');
+            if (elT) elT.textContent = t;
+            if (elD) elD.textContent = d;
+            if (elV) elV.textContent = 'Versi: ' + v;
+            if (elO) elO.textContent = 'Offset ' + o;
+        }
+        try {
+            const res = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(presetId) + '/status', { credentials: 'same-origin' });
+            if (res.ok) {
+                const st = await res.json();
+                userAuthStatus.authorized = !!st.authorized;
+                userAuthStatus.status = st.status || 'NONE';
+                const unlockedBox = document.getElementById('boxPresetUnlocked');
+                const lockedBox = document.getElementById('boxPresetLocked');
+                if (unlockedBox && lockedBox) {
+                    if (st.authorized) {
+                        unlockedBox.style.display = 'block';
+                        lockedBox.style.display = 'none';
+                    } else {
+                        unlockedBox.style.display = 'none';
+                        lockedBox.style.display = 'block';
+                    }
+                }
+                const badge = document.getElementById('sourceBadge');
+                if (badge && currentSourceMode === 'preset') {
+                    badge.textContent = st.authorized ? '🔓 Official Preset' : '🔒 Locked Preset';
+                    badge.className = st.authorized ? 'app-chip app-chip-success' : 'app-chip app-chip-danger';
+                }
+            }
+        } catch (e) {
+            console.error('Error fetching preset status:', e);
+        }
+    };
+
     window.submitAccessRequest = async function(e) {
         e.preventDefault();
         const btn = document.getElementById('btnSubmitReq');
@@ -861,7 +1018,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         btn.textContent = 'Mengirim...';
         const note = document.getElementById('reqNote').value;
         try {
-            const resp = await fetch('/api/v1/flasher/preset/esp32s3_cam/request', {
+            const resp = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(currentPresetId) + '/request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
@@ -879,7 +1036,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 
     window.checkPresetStatus = async function() {
         try {
-            const resp = await fetch('/api/v1/flasher/preset/esp32s3_cam/status', { credentials: 'same-origin' });
+            const resp = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(currentPresetId) + '/status', { credentials: 'same-origin' });
             const data = await resp.json();
             if (data.authorized) {
                 alert('Selamat! Akses lisensi preset Anda telah disetujui Admin.');
@@ -1104,47 +1261,53 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             btn.disabled = true;
             btn.innerHTML = '⏳ Menyiapkan firmware ke memori...';
         }
-        logToConsole('[INFO] Mengambil binary preset dari server aman...');
+        logToConsole('[INFO] Mengambil binary preset ' + currentPresetId + ' dari server aman...');
         try {
-            const resp = await fetch('/api/v1/flasher/preset/esp32s3_cam/stream', {
+            const resp = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(currentPresetId) + '/stream', {
                 credentials: 'same-origin'
             });
 
             if (!resp.ok) {
                 if (resp.status === 403 || resp.status === 401) {
-                    alert('⚠️ Akses Terbatas: Anda belum memiliki izin lisensi untuk menggunakan preset ini. Silakan minta izin ke Admin terlebih dahulu.');
+                    alert('⚠️ Akses Terbatas: Anda belum memiliki izin lisensi untuk menggunakan preset ini. Silakan masukkan kode lisensi atau minta izin ke Admin.');
                     throw new Error('Akses lisensi belum disetujui Admin.');
                 }
                 throw new Error('Server error code: ' + resp.status);
             }
+
+            const customOffset = resp.headers.get('X-Firmware-Offset') || '0x0';
+            const contentDisposition = resp.headers.get('Content-Disposition') || '';
+            let presetFn = currentPresetId + '.bin';
+            const fnMatch = contentDisposition.match(/filename="?([^";]+)"?/);
+            if (fnMatch) presetFn = fnMatch[1];
 
             const buffer = await resp.arrayBuffer();
             selectedFileBuffer = ensureBinaryString(buffer);
 
             // Update UI
             if (selectedFileInfo) selectedFileInfo.style.display = 'block';
-            if (selectedFileName) selectedFileName.textContent = 'esp32_s3_n16r8_cam_full_factory.bin (Official Preset)';
+            if (selectedFileName) selectedFileName.textContent = presetFn + ' (Official Preset)';
             if (selectedFileSize) {
                 const mb = (selectedFileBuffer.length / (1024 * 1024)).toFixed(2);
-                selectedFileSize.textContent = `${mb} MB (${selectedFileBuffer.length.toLocaleString()} bytes) • Terkunci di Offset 0x0`;
+                selectedFileSize.textContent = `${mb} MB (${selectedFileBuffer.length.toLocaleString()} bytes) • Terkunci di Offset ${customOffset}`;
             }
 
-            // Lock offset to 0x0
+            // Lock offset
             if (offsetPreset) {
-                offsetPreset.value = '0x0';
+                offsetPreset.value = customOffset;
                 offsetPreset.disabled = true;
             }
             if (offsetInput) {
-                offsetInput.value = '0x0';
+                offsetInput.value = customOffset;
                 offsetInput.style.display = 'none';
             }
 
-            logToConsole(`[OK] Preset ESP32-S3 N16R8/CAM Full Factory Merged siap di memori (${buffer.byteLength.toLocaleString()} bytes). Offset dikunci ke 0x0.`);
+            logToConsole(`[OK] Preset ${presetFn} siap di memori (${buffer.byteLength.toLocaleString()} bytes). Offset dikunci ke ${customOffset}.`);
             updateFlashButtonState();
 
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '✅ Preset Terpasang di Memori (0x0)';
+                btn.innerHTML = `✅ Preset Terpasang di Memori (${customOffset})`;
                 btn.classList.remove('app-button-primary');
                 btn.classList.add('app-button-ghost');
             }
