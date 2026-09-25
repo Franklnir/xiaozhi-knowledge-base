@@ -1484,7 +1484,7 @@
                             <span>📸</span> Scan Barcode HP
                         </div>
                         <div style="background:#fff; padding:8px; border:1.5px solid #111; border-radius:10px; display:inline-block;">
-                            <img id="mobileAppQrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fxiaozhiscig.biz.id%2Fdownload%2Fapp" alt="Barcode Download APK" style="width:140px; height:140px; display:block; border-radius:4px;">
+                            <img id="mobileAppQrCodeImg" src="/download/qr.png" onerror="this.src='/static/img/download_qr.png'" alt="Barcode Download APK" style="width:140px; height:140px; display:block; border-radius:4px;">
                         </div>
                         <div style="font-size:11px; line-height:1.4; color:#64748b; margin-top:10px; font-weight:600;">
                             Arahkan kamera HP ke barcode untuk unduh otomatis.
@@ -1507,17 +1507,10 @@
     </div>
 
     <script>
-        // Controller for Mobile App Overlay & Barcode
+        // Controller for Mobile App Overlay & Barcode (Self-Hosted on VPS)
         window.openMobileAppModal = function() {
             const overlay = document.getElementById('mobileAppOverlay');
             if (!overlay) return;
-            // Ensure QR Code URL matches current hostname dynamically
-            const qrImg = document.getElementById('mobileAppQrCodeImg');
-            if (qrImg) {
-                const currentHost = window.location.origin;
-                const dlUrl = currentHost + '/download/app';
-                qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(dlUrl);
-            }
             overlay.style.display = 'flex';
         };
 
