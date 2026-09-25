@@ -96,7 +96,7 @@ async def google_login(
 
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         logger.error("Google OAuth credentials not configured.")
-        if source == "mobile":
+        if source in ("mobile", "mobile_app", "app"):
             return RedirectResponse(url=f"espbridge://oauth/callback?error={urlencode({'msg': 'Integrasi Google belum dikonfigurasi di server.'})}", status_code=303)
         return redirect_with_message("/login", "Integrasi Google belum dikonfigurasi di server.")
 
@@ -139,7 +139,7 @@ async def google_link(
             user = store.get_user(int(user_info["user_id"]))
 
     if not user:
-        if source == "mobile":
+        if source in ("mobile", "mobile_app", "app"):
             return RedirectResponse(
                 url=f"espbridge://oauth/callback?error={urlencode({'msg': 'Sesi login tidak valid atau telah berakhir.'})}",
                 status_code=303
@@ -147,7 +147,7 @@ async def google_link(
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu untuk menautkan Google.")
 
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        if source == "mobile":
+        if source in ("mobile", "mobile_app", "app"):
             return RedirectResponse(
                 url=f"espbridge://oauth/callback?error={urlencode({'msg': 'Integrasi Google belum dikonfigurasi di server.'})}",
                 status_code=303
