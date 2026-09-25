@@ -9,9 +9,15 @@ license: apache-2.0
 short_description: untuk xiaozhi
 ---
 
-# Xiaozhi Indonesia
+# Xiaozhi Indonesia (xiaozhiscig)
 
-FastAPI dashboard untuk mengelola knowledge base Xiaozhi. Database tidak lagi memakai Supabase; data disimpan sebagai JSON di private Hugging Face Dataset repo lewat `huggingface_hub`.
+🌐 **Website Resmi:** [https://xiaozhiscig.biz.id](https://xiaozhiscig.biz.id)  
+📖 **Dokumentasi Lengkap:** [https://xiaozhiscig.biz.id/dokumentasi](https://xiaozhiscig.biz.id/dokumentasi)  
+📱 **Unduh Aplikasi Mobile (Xichi / ESPBridge):** [https://xiaozhiscig.biz.id/download/app](https://xiaozhiscig.biz.id/download/app)  
+
+Platform resmi **Xiaozhi Indonesia** (`xiaozhiscig.biz.id`): ekosistem asisten suara cerdas berbasis IoT ESP32, integrasi 36 MCP tools, Smart Home, dan manajemen knowledge base materi edukasi.
+
+FastAPI dashboard untuk mengelola knowledge base Xiaozhi. Database didukung oleh PostgreSQL di VPS dan sinkronisasi realtime Firebase.
 
 ## Secret yang perlu diset
 
