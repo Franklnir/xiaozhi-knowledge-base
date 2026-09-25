@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, Request, Form, Query, HTTPException, status
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from xiaozhi.dependencies import render, require_admin, redirect_with_message
+from xiaozhi.dependencies import render, require_admin, redirect_with_message, get_store
 from typing import Optional
 from xiaozhi.marketplace.deps import get_approval_service, get_wallet_service, get_marketplace_repo, get_product_service
 
@@ -80,10 +80,26 @@ async def admin_reject_preset_action(request: Request, request_id: str, reason: 
 @router.post("/preset-approvals/grant")
 async def admin_grant_preset_action(request: Request, username: str = Form(...), preset_id: str = Form("esp32s3_cam")):
     user = require_admin(request)
-    success = grant_preset_direct(username, user, preset_id)
+    store = get_store()
+    raw_username = (username or "").strip()
+
+    # Validasi keberadaan akun di database agar nama asal-asalan tidak bisa diberi akses
+    try:
+        target_user = store.get_user_by_username(raw_username)
+    except Exception:
+        target_user = None
+
+    if not target_user:
+        return redirect_with_message(
+            "/admin/firmware/approvals",
+            f"Gagal: Pengguna '{raw_username}' tidak terdaftar di sistem. Akses hanya dapat diberikan ke akun resmi yang ada."
+        )
+
+    exact_username = target_user.get("username", raw_username)
+    success = grant_preset_direct(exact_username, user, preset_id)
     if success:
-        return redirect_with_message("/admin/firmware/approvals", f"Akses preset berhasil diberikan langsung ke '{username}'.")
-    return redirect_with_message("/admin/firmware/approvals", "Username tidak valid.")
+        return redirect_with_message("/admin/firmware/approvals", f"Akses preset berhasil diberikan langsung ke '{exact_username}'.")
+    return redirect_with_message("/admin/firmware/approvals", "Gagal memproses pemberian akses.")
 
 
 @router.post("/preset-approvals/revoke")
