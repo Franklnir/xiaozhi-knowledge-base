@@ -285,69 +285,35 @@
 </div>
 
 <!-- ======================================================== -->
-<!-- SECTION 3: PERMOHONAN AKSES & PENGGUNA BERLISENSI        -->
+<!-- SECTION 3: PENGGUNA DENGAN LISENSI PRESET AKTIF          -->
 <!-- ======================================================== -->
 <div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:30px;">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:18px;">
-        <div>
-            <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-                <span>👥</span> Pengguna Berlisensi &amp; Beri Akses Langsung
-            </h2>
-            <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
-                Beri akses langsung ke username pengguna atau kelola lisensi aktif preset firmware.
-            </p>
-        </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+        <h2 style="font-size:18px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+            <span>👥</span> Pengguna dengan Lisensi Preset Aktif
+            <span class="app-chip app-chip-success" style="font-size:12px; font-weight:800; padding:2px 8px;">
+                {{ preset_granted|length if preset_granted else 0 }} user
+            </span>
+        </h2>
+    </div>
 
-        <!-- Form Beri Akses Langsung dengan Autocomplete -->
-        <form method="POST" action="/admin/firmware/preset-approvals/grant" style="display:flex; gap:8px; align-items:center; position:relative;" autocomplete="off">
-            <div style="position:relative; flex:1; min-width:180px;">
-                <input 
-                    type="text" 
-                    id="grantUsernameInput" 
-                    name="username" 
-                    placeholder="Ketik Username..." 
-                    required 
-                    autocomplete="off" 
-                    spellcheck="false"
-                    class="app-input" 
-                    style="width:100%; padding:6px 12px; font-size:12.5px; box-sizing:border-box;"
-                >
-                <div 
-                    id="grantUsernameDropdown" 
-                    style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; min-width:200px; max-height:220px; overflow-y:auto; background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); box-shadow:0 8px 24px rgba(0,0,0,0.18); z-index:1050; padding:4px 0;"
-                ></div>
-            </div>
-            <select name="preset_id" class="app-input" style="padding:6px 10px; font-size:12.5px;">
-                <option value="all">Semua Preset (Global)</option>
-                {% for p in presets %}
-                <option value="{{ p.id }}">{{ p.title }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="app-button app-button-primary app-button-small" style="font-weight:800; white-space:nowrap;">
-                ➕ Beri Akses Langsung
-            </button>
-        </form>
-    <!-- Daftar Pengguna Berlisensi Aktif -->
-    <h3 style="font-size:13.5px; font-weight:800; margin:16px 0 10px; color:var(--app-text);">
-        Pengguna dengan Lisensi Preset Aktif ({{ preset_granted|length if preset_granted else 0 }} user):
-    </h3>
     {% if preset_granted %}
     <div style="display:flex; flex-wrap:wrap; gap:8px;">
         {% for uname, g in preset_granted.items() %}
-        <div style="display:inline-flex; align-items:center; gap:8px; padding:5px 12px; background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); font-size:12px;">
+        <div style="display:inline-flex; align-items:center; gap:8px; padding:6px 12px; background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); font-size:12.5px;">
             <span style="font-weight:800; color:var(--app-text);">👤 {{ uname }}</span>
-            <span class="app-chip app-chip-neutral" style="font-size:10px; padding:2px 6px;">{{ g.preset_id }}</span>
+            <span class="app-chip app-chip-neutral" style="font-size:10.5px; padding:2px 6px;">{{ g.preset_id }}</span>
             <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
                 <input type="hidden" name="username" value="{{ uname }}">
                 <input type="hidden" name="preset_id" value="{{ g.preset_id }}">
-                <button type="submit" title="Cabut Akses (Status Kembali Terkunci)" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:14px; padding:0 2px;" onclick="return confirm('Cabut akses preset untuk {{ uname }}? Pengguna tidak akan dapat mengakses update firmware lagi.')">&times;</button>
+                <button type="submit" title="Cabut Akses (Status Kembali Terkunci)" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:16px; padding:0 2px; line-height:1;" onclick="return confirm('Cabut akses preset untuk {{ uname }}? Pengguna tidak akan dapat mengakses update firmware lagi.')">&times;</button>
             </form>
         </div>
         {% endfor %}
     </div>
     {% else %}
     <div style="padding:16px; background:var(--app-surface-muted); border-radius:var(--app-radius); text-align:center; color:var(--app-muted); font-size:13px;">
-        Belum ada pengguna dengan lisensi aktif. Berikan akses langsung di atas atau bagikan Kode Lisensi sekali pakai.
+        Belum ada pengguna dengan lisensi aktif.
     </div>
     {% endif %}
 </div>
@@ -513,121 +479,5 @@
             descInput.value = opt.dataset.desc || '';
         }
     }
-
-    // Autocomplete pencarian username real dari database
-    (function() {
-        const input = document.getElementById('grantUsernameInput');
-        const dropdown = document.getElementById('grantUsernameDropdown');
-        if (!input || !dropdown) return;
-
-        let debounceTimer = null;
-        let activeIndex = -1;
-        let currentAccounts = [];
-
-        function showDropdown() {
-            dropdown.style.display = 'block';
-        }
-
-        function hideDropdown() {
-            dropdown.style.display = 'none';
-            activeIndex = -1;
-        }
-
-        function renderSuggestions(accounts) {
-            currentAccounts = accounts;
-            dropdown.innerHTML = '';
-
-            if (!accounts || accounts.length === 0) {
-                dropdown.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--app-muted); text-align:center;">Pengguna tidak ditemukan</div>';
-                showDropdown();
-                return;
-            }
-
-            accounts.forEach(function(acc, idx) {
-                const item = document.createElement('div');
-                item.className = 'preset-user-item';
-                item.style.padding = '8px 12px';
-                item.style.cursor = 'pointer';
-                item.style.fontSize = '12.5px';
-                item.style.display = 'flex';
-                item.style.alignItems = 'center';
-                item.style.justifyContent = 'space-between';
-                item.style.borderBottom = idx < accounts.length - 1 ? '1px solid var(--app-border)' : 'none';
-
-                item.innerHTML = '<div>' +
-                    '<span style="font-weight:750; color:var(--app-text);">' + acc.username + '</span>' +
-                    (acc.email ? '<span style="font-size:11px; color:var(--app-muted); display:block;">' + acc.email + '</span>' : '') +
-                    '</div>' +
-                    '<span class="app-chip app-chip-neutral" style="font-size:10px; padding:2px 6px;">ID: ' + acc.id + '</span>';
-
-                item.addEventListener('mouseenter', function() {
-                    updateActiveItem(idx);
-                });
-
-                item.addEventListener('mousedown', function(e) {
-                    e.preventDefault();
-                    selectUser(acc.username);
-                });
-
-                dropdown.appendChild(item);
-            });
-
-            showDropdown();
-        }
-
-        function updateActiveItem(index) {
-            activeIndex = index;
-            const items = dropdown.querySelectorAll('.preset-user-item');
-            items.forEach(function(el, i) {
-                if (i === activeIndex) {
-                    el.style.backgroundColor = 'var(--app-surface-muted)';
-                } else {
-                    el.style.backgroundColor = 'transparent';
-                }
-            });
-        }
-
-        function selectUser(username) {
-            input.value = username;
-            hideDropdown();
-        }
-
-        async function fetchSuggestions(query) {
-            try {
-                const res = await fetch('/api/v1/users/search?q=' + encodeURIComponent(query));
-                if (!res.ok) return;
-                const data = await res.json();
-                renderSuggestions(data.users || []);
-            } catch (err) {
-                console.error('Error fetching user suggestions:', err);
-            }
-        }
-
-        input.addEventListener('input', function() {
-            clearTimeout(debounceTimer);
-            const query = input.value.trim();
-            if (query.length < 2) {
-                hideDropdown();
-                return;
-            }
-
-            debounceTimer = setTimeout(function() {
-                fetchSuggestions(query);
-            }, 180);
-        });
-
-        input.addEventListener('focus', function() {
-            const query = input.value.trim();
-            if (query.length >= 2 && dropdown.style.display === 'none') {
-                fetchSuggestions(query);
-            }
-        });
-
-        document.addEventListener('click', function(e) {
-            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-                hideDropdown();
-            }
-        });
-    })();
 </script>
 {% endblock %}
