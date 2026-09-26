@@ -275,7 +275,7 @@ async def download_mobile_app():
     if local_apk.exists():
         return FileResponse(
             path=str(local_apk),
-            filename="espbridge-xiaozhi-v1.4.4.apk",
+            filename="espbridge-xiaozhi-v1.4.5.apk",
             media_type="application/vnd.android.package-archive"
         )
     return RedirectResponse(
