@@ -2046,6 +2046,55 @@ void ackCommand(String cmdId) {
                 </div>
             </div>
 
+            
+            <!-- Section: Multi-SSID Failover & Screen Animation -->
+            <div class="doc-section" style="margin-top:28px;">
+                <div class="doc-section-title">
+                    <span>📶</span> Konfigurasi Multi-SSID Backup &amp; Gaya Animasi Layar
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
+                    Portal konfigurasi <code>192.168.4.1</code> menyediakan fitur fleksibel untuk keandalan jaringan internet tanpa putus serta kustomisasi visual ekspresi layar:
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">A</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Pilihan Mode 1 Wi-Fi vs Multi-SSID Failover (Backup Wi-Fi)</div>
+                        <div class="doc-step-desc">
+                            Pada tab <strong>Jaringan Wi-Fi</strong>, terdapat tombol pilihan mode koneksi:
+                            <ul style="margin:6px 0 0 16px; padding:0;">
+                                <li><strong>Mode 1 Wi-Fi (Utama):</strong> Menyimpan 1 jaringan Wi-Fi tetap (misal Wi-Fi rumah).</li>
+                                <li><strong>Mode Multi Wi-Fi (Failover Otomatis):</strong> Anda dapat mendaftarkan beberapa SSID sekaligus dengan sistem prioritas:
+                                    <ul style="margin:4px 0 0 16px;">
+                                        <li><strong>Prioritas 1 (Utama):</strong> Wi-Fi rumah atau router utama.</li>
+                                        <li><strong>Prioritas 2 (Cadangan 1):</strong> Hotspot pribadi dari smartphone Anda.</li>
+                                        <li><strong>Prioritas 3 (Cadangan 2):</strong> Wi-Fi kantor atau modem cadangan.</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                            <div class="doc-tip" style="margin-top:8px;">
+                                <strong>💡 Sistem Failover Cerdas:</strong> Jika Wi-Fi utama mati lampu atau di luar jangkauan, ESP32 otomatis memindai dan menyambung ke Wi-Fi Cadangan dalam hitungan detik tanpa perlu masuk ke mode setup ulang!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">B</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Gaya Tampilan &amp; Animasi Layar (Klasik vs Dinamis)</div>
+                        <div class="doc-step-desc">
+                            Tergantung modul layar yang dipilih pada tab <strong>Pengaturan Hardware</strong>:
+                            <ul style="margin:6px 0 0 16px; padding:0;">
+                                <li><strong>Animasi Ekspresi Dinamis (LCD ST7789 IPS):</strong> Menampilkan animasi wajah AI yang hidup (mata berkedip santai saat standby, melebar saat mendengarkan, memutar bola mata saat berpikir, dan animasi mulut yang bergerak selaras dengan intonasi suara bicara).</li>
+                                <li><strong>Animasi Klasik / Minimalis (OLED SSD1306):</strong> Menampilkan animasi gelombang audio (waveform), ikon ekspresi klasik monokrom, serta teks bar status yang sangat hemat memori dan daya.</li>
+                                <li><strong>Kustomisasi Tema Jam (Mode Chronchi):</strong> Saat beralih ke mode Chronchi, tampilan jam digital memiliki beberapa pilihan tema visual (Retro Cyber, Minimal Digital, Modern Sport) yang dapat diubah tampilannya dengan gestur tombol.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Section 4: MCP Tools for Hardware -->
             <div class="doc-section" style="margin-top:24px;">
                 <div class="doc-section-title">
@@ -2188,6 +2237,55 @@ void ackCommand(String cmdId) {
 
 <strong>[ Sensor Pembagi Tegangan Baterai 1S (Opsional) ]</strong>
 • ADC1_CH1 : GPIO 1 (Menggunakan resistor pembagi tegangan 100kΩ / 100kΩ dari BAT+)
+                </div>
+            </div>
+
+            
+            <!-- Section: Multi-SSID Failover & Screen Animation -->
+            <div class="doc-section" style="margin-top:28px;">
+                <div class="doc-section-title">
+                    <span>📶</span> Konfigurasi Multi-SSID Backup &amp; Gaya Animasi Layar
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
+                    Portal konfigurasi <code>192.168.4.1</code> menyediakan fitur fleksibel untuk keandalan jaringan internet tanpa putus serta kustomisasi visual ekspresi layar:
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">A</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Pilihan Mode 1 Wi-Fi vs Multi-SSID Failover (Backup Wi-Fi)</div>
+                        <div class="doc-step-desc">
+                            Pada tab <strong>Jaringan Wi-Fi</strong>, terdapat tombol pilihan mode koneksi:
+                            <ul style="margin:6px 0 0 16px; padding:0;">
+                                <li><strong>Mode 1 Wi-Fi (Utama):</strong> Menyimpan 1 jaringan Wi-Fi tetap (misal Wi-Fi rumah).</li>
+                                <li><strong>Mode Multi Wi-Fi (Failover Otomatis):</strong> Anda dapat mendaftarkan beberapa SSID sekaligus dengan sistem prioritas:
+                                    <ul style="margin:4px 0 0 16px;">
+                                        <li><strong>Prioritas 1 (Utama):</strong> Wi-Fi rumah atau router utama.</li>
+                                        <li><strong>Prioritas 2 (Cadangan 1):</strong> Hotspot pribadi dari smartphone Anda.</li>
+                                        <li><strong>Prioritas 3 (Cadangan 2):</strong> Wi-Fi kantor atau modem cadangan.</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                            <div class="doc-tip" style="margin-top:8px;">
+                                <strong>💡 Sistem Failover Cerdas:</strong> Jika Wi-Fi utama mati lampu atau di luar jangkauan, ESP32 otomatis memindai dan menyambung ke Wi-Fi Cadangan dalam hitungan detik tanpa perlu masuk ke mode setup ulang!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">B</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Gaya Tampilan &amp; Animasi Layar (Klasik vs Dinamis)</div>
+                        <div class="doc-step-desc">
+                            Tergantung modul layar yang dipilih pada tab <strong>Pengaturan Hardware</strong>:
+                            <ul style="margin:6px 0 0 16px; padding:0;">
+                                <li><strong>Animasi Ekspresi Dinamis (LCD ST7789 IPS):</strong> Menampilkan animasi wajah AI yang hidup (mata berkedip santai saat standby, melebar saat mendengarkan, memutar bola mata saat berpikir, dan animasi mulut yang bergerak selaras dengan intonasi suara bicara).</li>
+                                <li><strong>Animasi Klasik / Minimalis (OLED SSD1306):</strong> Menampilkan animasi gelombang audio (waveform), ikon ekspresi klasik monokrom, serta teks bar status yang sangat hemat memori dan daya.</li>
+                                <li><strong>Kustomisasi Tema Jam (Mode Chronchi):</strong> Saat beralih ke mode Chronchi, tampilan jam digital memiliki beberapa pilihan tema visual (Retro Cyber, Minimal Digital, Modern Sport) yang dapat diubah tampilannya dengan gestur tombol.</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
 
