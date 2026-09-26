@@ -1399,3 +1399,48 @@ Seluruh ekosistem Xiaozhi terintegrasi dengan **44 Tools MCP terstandarisasi**. 
 | 42 | `it_code_and_architecture_helper` | Analisis Spesialis | `query` | Konsultasi arsitektur cloud, IT engineering, dan debug kode. |
 | 43 | `lookup_scripture_and_verse` | Kitab Suci | `reference` | Pencarian ayat Al-Qur'an dan Alkitab secara netral & hormat. |
 | 44 | `get_prayer_and_worship_guide` | Kitab Suci | `topic` | Panduan tata cara sholat, wudhu, doa harian, & tata ibadah. |
+
+---
+
+## 24. Arsitektur Keamanan Database Multi-Tenant & Row-Level Security (RLS)
+
+Sistem database Xiaozhi Indonesia menerapkan strategi pertahanan berlapis ganda (**Defense-in-Depth**) untuk menjamin isolasi total data antar-pengguna dan kebal 100% dari serangan **IDOR (Insecure Direct Object Reference)**.
+
+### 24.1 Dua Lapisan Pertahanan (Two-Layer Security Architecture)
+
+1. **Lapisan 1: Application-Level Scoping (FastAPI & Store Logic)**
+   - Setiap operasi data (`SELECT`, `UPDATE`, `DELETE`) secara eksplisit diverifikasi dan difilter menggunakan parameter identitas terautentikasi: `WHERE owner_id = :current_user_id` atau `WHERE user_id = :current_user_id`.
+   - Mengeliminasi kemungkinan data bocor antar pengguna di level logika aplikasi.
+
+2. **Lapisan 2: Kernel Database PostgreSQL Native RLS (`FORCE ROW LEVEL SECURITY`)**
+   - Diaktifkan langsung pada mesin kernel database PostgreSQL.
+   - Menggunakan instruksi `FORCE ROW LEVEL SECURITY` sehingga hak akses pemilik tabel (*table owner*) pun tetap wajib mematuhi aturan RLS.
+   - Aturan kebijakan:
+     ```sql
+     CREATE POLICY p_table_isolation ON table_name
+     FOR ALL USING (
+         owner_id = app_current_user_id() OR app_is_admin_or_system()
+     ) WITH CHECK (
+         owner_id = app_current_user_id() OR app_is_admin_or_system()
+     );
+     ```
+
+### 24.2 Matriks 27 Tabel Privat yang Diproteksi Native RLS
+
+| Kategori Sistem | Daftar Tabel yang Dilindungi RLS | Kunci Isolasi |
+| :--- | :--- | :--- |
+| **Knowledge Base & RAG** | `materials`, `categories` | `owner_id` |
+| **Memori Suara & AI Persona** | `chat_history`, `user_persona` | `owner_id` |
+| **Smart Home Virtual & Fisik** | `relay_rooms`, `relay_devices`, `registered_devices` | `owner_id` |
+| **Otentikasi Token Hardware** | `xiaozhi_tokens` | `user_id` |
+| **Multimedia & Jadwal IoT** | `audio_queue`, `reminders` | `owner_id` |
+| **Preferensi & Kuota MCP Tools** | `mcp_user_settings`, `mcp_tool_toggles`, `user_limits` | `user_id` |
+| **Marketplace Firmware & STL** | `firmware_products`, `firmware_product_images`, `firmware_product_links`, `firmware_product_versions`, `firmware_assets`, `product_stl_assets`, `orders`, `purchase_entitlements`, `wallet_accounts`, `wallet_ledger`, `withdrawals`, `product_approvals`, `chat_conversations`, `chat_messages` | `seller_id` / `buyer_id` / `created_by` |
+
+### 24.3 Tabel Global yang Dikecualikan dari RLS (Public / System Scope)
+- `users`: Dibutuhkan oleh middleware login publik untuk memverifikasi username dan password hash sebelum sesi autentikasi terbentuk.
+- `feature_settings`: Berisi konfigurasi toggle fitur global platform.
+- `audit_logs`: Log audit sistem append-only.
+- `community_chats`: Ruang obrolan publik komunitas antar pengguna.
+- `user_chat_read_state`: Penanda status pesan belum terbaca pada ruang obrolan komunitas.
+- `payment_webhook_events`: Respon webhook callback otomatis dari gateway pembayaran pihak ketiga.

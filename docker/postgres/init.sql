@@ -261,3 +261,101 @@ CREATE TABLE IF NOT EXISTS user_chat_read_state (
     last_read_message_id BIGINT NOT NULL DEFAULT 0,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- =============================================================================
+-- 18. NATIVE POSTGRESQL ROW LEVEL SECURITY (RLS) POLICIES
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION app_current_user_id()
+RETURNS BIGINT
+LANGUAGE sql
+STABLE
+AS $$
+    SELECT NULLIF(current_setting('app.user_id', true), '')::bigint;
+$$;
+
+CREATE OR REPLACE FUNCTION app_is_admin_or_system()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+AS $$
+    SELECT COALESCE(current_setting('app.user_role', true) IN ('admin', 'system'), false);
+$$;
+
+-- Enable and force RLS on all private entities
+ALTER TABLE IF EXISTS categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS categories FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_categories_all ON categories;
+CREATE POLICY p_categories_all ON categories
+    FOR ALL USING (owner_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (owner_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS materials FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_materials_all ON materials;
+CREATE POLICY p_materials_all ON materials
+    FOR ALL USING (owner_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (owner_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS chat_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS chat_history FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_chat_history_all ON chat_history;
+CREATE POLICY p_chat_history_all ON chat_history
+    FOR ALL USING (owner_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (owner_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS user_persona ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS user_persona FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_user_persona_all ON user_persona;
+CREATE POLICY p_user_persona_all ON user_persona
+    FOR ALL USING (owner_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (owner_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS relay_rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS relay_rooms FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_relay_rooms_all ON relay_rooms;
+CREATE POLICY p_relay_rooms_all ON relay_rooms
+    FOR ALL USING (owner_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (owner_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS registered_devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS registered_devices FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_registered_devices_all ON registered_devices;
+CREATE POLICY p_registered_devices_all ON registered_devices
+    FOR ALL USING (owner_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (owner_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS audio_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS audio_queue FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_audio_queue_all ON audio_queue;
+CREATE POLICY p_audio_queue_all ON audio_queue
+    FOR ALL USING (owner_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (owner_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS reminders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS reminders FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_reminders_all ON reminders;
+CREATE POLICY p_reminders_all ON reminders
+    FOR ALL USING (owner_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (owner_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS mcp_user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS mcp_user_settings FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_mcp_user_settings_all ON mcp_user_settings;
+CREATE POLICY p_mcp_user_settings_all ON mcp_user_settings
+    FOR ALL USING (user_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (user_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS mcp_tool_toggles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS mcp_tool_toggles FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_mcp_tool_toggles_all ON mcp_tool_toggles;
+CREATE POLICY p_mcp_tool_toggles_all ON mcp_tool_toggles
+    FOR ALL USING (user_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (user_id = app_current_user_id() OR app_is_admin_or_system());
+
+ALTER TABLE IF EXISTS user_limits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS user_limits FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS p_user_limits_all ON user_limits;
+CREATE POLICY p_user_limits_all ON user_limits
+    FOR ALL USING (user_id = app_current_user_id() OR app_is_admin_or_system())
+    WITH CHECK (user_id = app_current_user_id() OR app_is_admin_or_system());
