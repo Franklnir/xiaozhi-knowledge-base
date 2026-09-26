@@ -229,6 +229,7 @@
         <button class="doc-tab" onclick="switchTab('tools')">Tools MCP</button>
         <button class="doc-tab" onclick="switchTab('knowledge')">Knowledge Base</button>
         <button class="doc-tab" onclick="switchTab('hardware')">ESP32-S3 Hardware &amp; Tombol</button>
+        <button class="doc-tab" onclick="switchTab('hardware-c3')">ESP32-C3 Super Mini</button>
         <button class="doc-tab" onclick="switchTab('faq')">FAQ</button>
     </div>
 
@@ -2071,6 +2072,168 @@ void ackCommand(String cmdId) {
             </div>
         </div>
     </div>
+
+    
+    <!-- ESP32-C3 Super Mini Hardware & Buttons Tab -->
+    <div id="tab-hardware-c3" class="doc-tab-content">
+        <div class="app-card">
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>🚀</span> Panduan Operasional ESP32-C3 Super Mini / Pro
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:16px;">
+                    Firmware khusus untuk mikrokontroler <strong>ESP32-C3 RISC-V 32-bit Single-Core @ 160MHz</strong> (4MB Flash, ~400KB SRAM internal). Dirancang untuk solusi mini smart speaker yang sangat compact, hemat daya, dan hemat biaya (~Rp 35.000).
+                </div>
+
+                <div class="doc-warning">
+                    <strong>⚠️ Perhatian Khusus Arsitektur Audio ESP32-C3 (Shared Clock):</strong><br>
+                    ESP32-C3 hanya memiliki <strong>1 periferal I2S</strong>. Oleh karena itu, modul Microphone (INMP441) dan Amplifier Speaker (MAX98357A) <strong>wajib berbagi pin Clock (BCLK = GPIO 5, WS/LRC = GPIO 6) bersamaan</strong> pada mode Full Duplex.
+                </div>
+            </div>
+
+            <!-- Section 1: Button Guide (Updated as requested) -->
+            <div class="doc-section" style="margin-top:24px;">
+                <div class="doc-section-title">
+                    <span>🎮</span> Panduan Lengkap Fungsi Tombol Fisik ESP32-C3
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); margin-bottom:12px;">
+                    Navigasi tombol dibuat ringkas dan multifungsi menggunakan kombinasi klik tunggal, klik ganda, dan tekan tahan:
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Tombol &amp; Pin</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:20%;">Gestur</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Fungsi Utama</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Deskripsi / Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    Tombol 1: Utama (BOOT / Chat)<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 3</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x (Singkat)</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Bicara / Stop / Interupsi</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    • Mulai bicara manual (Push-to-Talk).<br>
+                                    • Interupsi / potong suara AI jika sedang bicara.<br>
+                                    • Hentikan musik jika lagu lokal atau YouTube sedang diputar.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x Cepat</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#8b5cf6; font-weight:600;">Switch Mode (XiaoZhi ↔ Chronchi)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    • <strong>Beralih ke Chronchi</strong> (Jam Meja Pintar / BLE Companion).<br>
+                                    • Untuk kembali ke XiaoZhi AI, <strong>klik 2x cepat lagi</strong>.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan 5 Detik</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Masuk Konfigurasi Wi-Fi</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    Mengaktifkan kembali Web Portal Wi-Fi Access Point (<code>192.168.4.1</code>) untuk setup jaringan baru.
+                                </td>
+                            </tr>
+
+                            <tr style="background:var(--app-surface);">
+                                <td rowspan="2" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    Tombol 2: Sekunder (Opsional)<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 2</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x (Singkat)</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Toggle Hands-Free (ON/OFF)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    Mengaktifkan atau mematikan mode bicara otomatis tanpa tombol.
+                                </td>
+                            </tr>
+                            <tr style="background:var(--app-surface);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan 5 Detik</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Hapus SSID Tersimpan</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    Membersihkan kata sandi Wi-Fi lama di NVS dan melakukan reboot.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Section 2: Pinout Diagram -->
+            <div class="doc-section" style="margin-top:24px;">
+                <div class="doc-section-title">
+                    <span>📌</span> Referensi Pinout Hardware ESP32-C3 Mini
+                </div>
+
+                <div class="doc-code">
+<strong>[ I2S Audio Bus (Shared Clock Full Duplex) ]</strong>
+• BCLK / SCK (Bit Clock Bersama) : GPIO 5  ──> Hubungkan ke SCK (INMP441) & BCLK (MAX98357A)
+• WS / LRC (Word Select Bersama) : GPIO 6  ──> Hubungkan ke WS (INMP441) & LRC (MAX98357A)
+• Data Mic Masuk (SD INMP441)    : GPIO 4
+• Data Speaker Keluar (DIN MAX)  : GPIO 7
+• Catu Daya Speaker (VIN)        : 5V (Wajib 5V dari USB/VBUS untuk suara jernih & kencang)
+• Catu Daya Mic (VDD)            : 3.3V
+• GND Mic L/R                    : GND (Wajib terhubung ke Ground untuk mono channel kiri)
+
+<strong>[ Layar OLED SSD1306 128x64 (I2C) ]</strong>
+• SDA Data   : GPIO 0
+• SCL Clock  : GPIO 10
+• Daya       : 3.3V & GND
+
+<strong>[ Tombol Fisik (Active Low - Terhubung ke GND saat ditekan) ]</strong>
+• Tombol Utama (Bicara / Klik 2x Chronchi / Tahan 5s Setup Wi-Fi) : GPIO 3
+• Tombol Sekunder (Toggle Hands-free / Reset SSID)                 : GPIO 2
+
+<strong>[ Sensor Pembagi Tegangan Baterai 1S (Opsional) ]</strong>
+• ADC1_CH1 : GPIO 1 (Menggunakan resistor pembagi tegangan 100kΩ / 100kΩ dari BAT+)
+                </div>
+            </div>
+
+            <!-- Section 3: Smart Voice Commands -->
+            <div class="doc-section" style="margin-top:24px;">
+                <div class="doc-section-title">
+                    <span>🗣️</span> Fitur Perintah Suara &amp; Mode Offline
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Mode Hands-Free Cerdas</div>
+                        <div class="doc-step-desc">
+                            Bicara langsung ke mikrofon tanpa perlu memencet tombol. Sensor VAD akan mendeteksi ketika Anda berhenti bicara dan AI langsung merespons. Jika hening selama 30 detik, perangkat otomatis masuk ke mode <em>Low-Power Standby</em>.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Pemutar Musik Lokal Offline (SPIFFS)</div>
+                        <div class="doc-step-desc">
+                            Perangkat dapat memutar lagu bawaan yang tersimpan di flash tanpa internet:<br>
+                            • <em>"Putar lagu"</em> atau <em>"Nyanyi"</em> ──> Memutar <code>song1.ogg</code><br>
+                            • <em>"Lagu dua"</em> ──> Memutar <code>song2.ogg</code><br>
+                            • <em>"Lagu tiga"</em> ──> Memutar <code>song3.ogg</code><br>
+                            • <em>"Stop"</em> atau <em>"Berhenti"</em> ──> Menghentikan pemutaran lagu
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Reset Wi-Fi via Suara (Dua Langkah Aman)</div>
+                        <div class="doc-step-desc">
+                            Cukup ucapkan <em>"Reset wifi"</em>, lalu konfirmasi dalam waktu 15 detik dengan mengucapkan <em>"Ya"</em>. Perangkat akan menghapus kredensial Wi-Fi dan masuk kembali ke mode setup.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- FAQ Tab -->
     <div id="tab-faq" class="doc-tab-content">

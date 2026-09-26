@@ -1203,3 +1203,19 @@ Tersedia dokumentasi khusus untuk hardware ESP32-S3 N16R8 pada file terpisah: [`
   - **VOL UP (GPIO 14):** 1x Klik (Volume +10% / Zoom In), 2x Klik (Rotasi Layar 180°), Long Press (Volume 100%).
   - **VOL DOWN (GPIO 46):** 1x Klik (Volume -10% / Zoom Out), 2x Klik (Switch Mode XiaoZhi ↔ Chronchi Smartwatch), Long Press (Mute 0%).
 - **MCP Tools Internal:** `self.get_hardware_specs` & `self.get_buttons_guide`.
+
+
+---
+
+## 21. Panduan Hardware: ESP32-C3 Super Mini / Pro
+
+Tersedia dokumentasi khusus untuk hardware ESP32-C3 Super Mini pada file terpisah: [`PANDUAN_HARDWARE_ESP32_C3_SUPER_MINI.md`](./PANDUAN_HARDWARE_ESP32_C3_SUPER_MINI.md) serta pada Web Portal Dokumentasi (`/documentation` tab **ESP32-C3 Super Mini**).
+
+### Rangkuman Cepat:
+- **Arsitektur:** RISC-V 32-bit Single-Core @ 160MHz, 4MB Flash, ~400KB internal SRAM (Shared I2S Clock).
+- **Wiring Shared Clock:** Clock I2S dibagi bersama: `GPIO 5` (BCLK) & `GPIO 6` (WS/LRC) untuk INMP441 & MAX98357A. Layar OLED I2C di `GPIO 0` (SDA) & `GPIO 10` (SCL).
+- **Gestur Tombol Utama (GPIO 3):**
+  - **Klik 1x:** Bicara manual / Push to Talk / Stop musik & interupsi suara AI.
+  - **Klik 2x Cepat:** Beralih mode ke **Chronchi**; klik 2x cepat lagi untuk kembali ke **XiaoZhi AI**.
+  - **Tahan 5 Detik:** Masuk ke mode **Konfigurasi Wi-Fi** (`192.168.4.1`).
+- **Hands-Free & Suara:** Dukungan deteksi hening (VAD) otomatis dan pemutaran lagu lokal offline (SPIFFS).
