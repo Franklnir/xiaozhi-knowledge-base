@@ -1,7 +1,12 @@
 import logging
 import os
 import re
+import socket
+import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
+import requests
+from bs4 import BeautifulSoup
 
 from xiaozhi.core.utils import clean_text
 from xiaozhi.mcp.context import mcp_active_owner_ctx
@@ -27,6 +32,275 @@ def format_material_for_xiaozhi(item: dict, keyword: str = "") -> dict:
         "content": item.get("content", ""),
         "source_type": item.get("source_type", ""),
     }
+
+
+
+def _scrape_page_content(url: str, max_chars: int = 1500) -> str:
+    """Scrape clean textual content from a webpage."""
+    if not url or not url.startswith("http"):
+        return ""
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        r = requests.get(url, headers=headers, timeout=5)
+        if r.status_code != 200:
+            return ""
+        soup = BeautifulSoup(r.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "form", "noscript"]):
+            tag.decompose()
+        main = soup.find("article") or soup.find("main") or soup.body
+        if not main:
+            return ""
+        text = main.get_text(separator=" ", strip=True)
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text[:max_chars]
+    except Exception:
+        return ""
+
+
+def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True) -> dict:
+    """Multi-source deep web search: Wikipedia + Google News + Web Scraper."""
+    results = []
+    
+    # 1. Wikipedia Search & Full Intro Extract
+    try:
+        w_url = "https://id.wikipedia.org/w/api.php"
+        w_params = {
+            "action": "query",
+            "list": "search",
+            "srsearch": query,
+            "format": "json",
+            "utf8": 1,
+            "srlimit": 2
+        }
+        headers = {"User-Agent": "XiaozhiDeepSearch/1.0"}
+        wr = requests.get(w_url, params=w_params, headers=headers, timeout=4)
+        if wr.status_code == 200:
+            w_data = wr.json()
+            for hit in w_data.get("query", {}).get("search", [])[:1]:
+                pageid = hit["pageid"]
+                ex_params = {
+                    "action": "query",
+                    "prop": "extracts",
+                    "pageids": pageid,
+                    "explaintext": 1,
+                    "exintro": 1,
+                    "format": "json"
+                }
+                er = requests.get(w_url, params=ex_params, headers=headers, timeout=4)
+                if er.status_code == 200:
+                    pages = er.json().get("query", {}).get("pages", {})
+                    extract = pages.get(str(pageid), {}).get("extract", "")
+                    if extract:
+                        results.append({
+                            "title": hit["title"],
+                            "url": f"https://id.wikipedia.org/?curid={pageid}",
+                            "snippet": extract[:1000],
+                            "source": "Wikipedia Ensiklopedia",
+                            "is_deep_content": True
+                        })
+    except Exception:
+        pass
+
+    # 2. Google News & Web RSS
+    try:
+        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=id&gl=ID&ceid=ID:id"
+        resp = requests.get(url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+        if resp.status_code == 200:
+            items = re.findall(r'<item>(.*?)</item>', resp.text, re.DOTALL)
+            for item in items[:max_results]:
+                t = re.search(r'<title>(.*?)</title>', item)
+                l = re.search(r'<link>(.*?)</link>', item)
+                d = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
+                src = re.search(r'<source.*?>(.*?)</source>', item)
+                if t:
+                    raw_link = l.group(1) if l else ""
+                    raw_desc = re.sub(r'<[^>]+>', '', d.group(1)) if d else ""
+                    clean_desc = re.sub(r'&[a-zA-Z]+;', ' ', raw_desc).strip()
+                    
+                    item_data = {
+                        "title": t.group(1),
+                        "url": raw_link,
+                        "snippet": clean_desc[:300],
+                        "source": src.group(1) if src else "Web / Berita",
+                        "is_deep_content": False
+                    }
+                    results.append(item_data)
+    except Exception:
+        pass
+
+    # 3. Deep Page Reader: For top non-wiki result, attempt to scrape deeper text if requested
+    if read_content:
+        for r in results:
+            if r.get("source") != "Wikipedia Ensiklopedia" and r.get("url"):
+                deep_text = _scrape_page_content(r["url"], max_chars=1500)
+                if deep_text and len(deep_text) > len(r.get("snippet", "")):
+                    r["snippet"] = deep_text
+                    r["is_deep_content"] = True
+                    break
+
+    return {
+        "success": bool(results),
+        "query": query,
+        "message": f"Ditemukan {len(results)} sumber informasi mendalam di internet.",
+        "results": results[:max_results]
+    }
+
+
+def _search_social_media(query: str, platform: str = "all", max_results: int = 5) -> dict:
+    """Search social media discussions, opinions, and sentiments."""
+    platform_map = {
+        "reddit": [("Reddit", f"site:reddit.com {query}")],
+        "twitter": [("X / Twitter", f"site:x.com OR site:twitter.com {query}")],
+        "x": [("X / Twitter", f"site:x.com OR site:twitter.com {query}")],
+        "youtube": [("YouTube", f"site:youtube.com {query}")],
+        "tiktok": [("TikTok", f"site:tiktok.com {query}")],
+        "all": [
+            ("Reddit", f"site:reddit.com {query}"),
+            ("X / Twitter", f"site:x.com OR site:twitter.com {query}"),
+            ("YouTube", f"site:youtube.com {query}")
+        ]
+    }
+    
+    target_queries = platform_map.get(platform.lower(), platform_map["all"])
+    results = []
+
+    for plat_name, target_q in target_queries:
+        try:
+            url = f"https://news.google.com/rss/search?q={urllib.parse.quote(target_q)}&hl=id&gl=ID&ceid=ID:id"
+            resp = requests.get(url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+            if resp.status_code == 200:
+                items = re.findall(r'<item>(.*?)</item>', resp.text, re.DOTALL)
+                for item in items[:2]:
+                    t = re.search(r'<title>(.*?)</title>', item)
+                    l = re.search(r'<link>(.*?)</link>', item)
+                    d = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
+                    if t:
+                        raw_desc = re.sub(r'<[^>]+>', '', d.group(1)) if d else ""
+                        clean_desc = re.sub(r'&[a-zA-Z]+;', ' ', raw_desc).strip()
+                        results.append({
+                            "platform": plat_name,
+                            "title": t.group(1),
+                            "url": l.group(1) if l else "",
+                            "discussion_snippet": clean_desc[:300]
+                        })
+        except Exception:
+            pass
+
+    return {
+        "success": bool(results),
+        "platform": platform,
+        "query": query,
+        "message": f"Ditemukan {len(results)} opini & diskusi dari media sosial terkait '{query}'.",
+        "results": results[:max_results]
+    }
+
+
+def _osint_recon(target: str, target_type: str = "auto") -> dict:
+    """Passive OSINT reconnaissance for IP, Domain, or Username."""
+    target = target.strip()
+    is_ip = bool(re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', target))
+    is_domain = bool(re.match(r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', target)) and not is_ip
+
+    if target_type == "ip" or (target_type == "auto" and is_ip):
+        # IP Intelligence
+        data = {}
+        try:
+            r = requests.get(f"http://ip-api.com/json/{target}?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,query", timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+        except Exception as e:
+            data["error"] = str(e)
+
+        try:
+            hostname, _, _ = socket.gethostbyaddr(target)
+            data["reverse_dns"] = hostname
+        except Exception:
+            data["reverse_dns"] = "Tidak ada PTR record"
+
+        return {
+            "success": True,
+            "type": "IP Address Intelligence",
+            "target": target,
+            "ip_intel": data
+        }
+
+    elif target_type == "domain" or (target_type == "auto" and is_domain):
+        # Domain Intelligence
+        data = {}
+        try:
+            ips = socket.getaddrinfo(target, 80)
+            data["resolved_ips"] = list(set([item[4][0] for item in ips]))
+        except Exception as e:
+            data["resolved_ips"] = [f"Gagal resolve DNS: {str(e)}"]
+
+        # Check Web Headers & Tech Stack
+        try:
+            resp = requests.get(f"https://{target}", timeout=4, headers={"User-Agent": "Mozilla/5.0"})
+            h = resp.headers
+            data["tech_headers"] = {
+                "server": h.get("Server", "Unknown"),
+                "status_code": resp.status_code,
+                "x_powered_by": h.get("X-Powered-By", "Hidden"),
+                "hsts": "Strict-Transport-Security" in h,
+                "waf_or_cdn": "Cloudflare" if "cf-ray" in h or "cloudflare" in h.get("Server", "").lower() else "Standard"
+            }
+        except Exception as e:
+            data["tech_headers"] = {"error": str(e)}
+
+        # Certificate Transparency Subdomain Lookup
+        try:
+            crt_url = f"https://crt.sh/?q=%.{target}&output=json"
+            cr = requests.get(crt_url, timeout=4)
+            if cr.status_code == 200:
+                entries = cr.json()
+                subdomains = list(set([item.get("name_value", "") for item in entries if item.get("name_value")]))
+                clean_subs = [s for s in subdomains if "\n" not in s][:8]
+                data["discovered_subdomains"] = clean_subs
+        except Exception:
+            data["discovered_subdomains"] = []
+
+        return {
+            "success": True,
+            "type": "Domain Reconnaissance",
+            "target": target,
+            "domain_recon": data
+        }
+
+    else:
+        # Username Intelligence across platforms
+        username = target.lstrip("@")
+        profiles_to_check = {
+            "GitHub": f"https://api.github.com/users/{username}",
+            "Reddit": f"https://www.reddit.com/user/{username}/about.json",
+            "Telegram": f"https://t.me/{username}",
+            "Pinterest": f"https://www.pinterest.com/{username}/",
+            "Dev.to": f"https://dev.to/{username}",
+            "GitLab": f"https://gitlab.com/{username}",
+            "Medium": f"https://medium.com/@{username}"
+        }
+
+        found_profiles = []
+        def check_profile(site, url):
+            try:
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                r = requests.get(url, headers=headers, timeout=3)
+                if r.status_code == 200:
+                    public_url = url.replace("/about.json", "").replace("api.github.com/users", "github.com")
+                    found_profiles.append({"platform": site, "url": public_url})
+            except Exception:
+                pass
+
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            for site, url in profiles_to_check.items():
+                ex.submit(check_profile, site, url)
+
+        return {
+            "success": True,
+            "type": "Username Digital Footprint (OSINT)",
+            "username": username,
+            "profiles_found_count": len(found_profiles),
+            "profiles": found_profiles
+        }
 
 
 def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn=None):
@@ -715,25 +989,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         try:
             query = clean_text(query, max_len=200, min_len=1, field="Pencarian")
             max_results = max(1, min(int(max_results or 5), 10))
-            results = []
-            url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=id&gl=ID&ceid=ID:id"
-            resp = __import__("requests").get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-            items = re.findall(r'<item>(.*?)</item>', resp.text, re.DOTALL)
-            for item in items[:max_results]:
-                title = re.search(r'<title>(.*?)</title>', item)
-                link = re.search(r'<link>(.*?)</link>', item)
-                desc = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
-                pubdate = re.search(r'<pubDate>(.*?)</pubDate>', item)
-                source = re.search(r'<source.*?>(.*?)</source>', item)
-                if title:
-                    results.append({
-                        "title": title.group(1),
-                        "url": link.group(1) if link else "",
-                        "snippet": re.sub(r'<[^>]+>', '', desc.group(1))[:200] if desc else "",
-                        "date": pubdate.group(1) if pubdate else "",
-                        "source": source.group(1) if source else "Google News",
-                    })
-            response = {"success": True, "message": f"Ditemukan {len(results)} hasil. Jawab berdasarkan informasi dari hasil pencarian.", "query": query, "results": results}
+            response = _deep_web_search(query, max_results=max_results, read_content=True)
             if owner_id:
                 record_mcp_tool_history(owner_id, "search_web", query, {"query": query}, response)
             return response
@@ -742,6 +998,82 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             response = {"success": False, "message": f"Pencarian gagal: {str(exc)[:100]}", "results": []}
             if owner_id:
                 record_mcp_tool_history(owner_id, "search_web", query, {"query": query}, response)
+            return response
+
+    @mcp_server.tool()
+    def search_web_deep(query: str, max_results: int = 5, read_content: bool = True) -> dict:
+        """
+        Pencarian web mendalam multi-sumber (Wikipedia, berita terkini, web artikel) dan membaca isi artikel utuh.
+        Gunakan tool ini untuk riset topik mendalam, fakta ilmiah, sejarah, panduan teknis, tutorial, atau pertanyaan kompleks.
+
+        Args:
+            query: Kata kunci atau topik riset mendalam.
+            max_results: Jumlah sumber yang dikumpulkan (default 5).
+            read_content: Ekstrak dan baca isi artikel secara mendalam (default True).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        try:
+            query = clean_text(query, max_len=200, min_len=1, field="Pencarian Mendalam")
+            max_results = max(1, min(int(max_results or 5), 10))
+            response = _deep_web_search(query, max_results=max_results, read_content=read_content)
+            if owner_id:
+                record_mcp_tool_history(owner_id, "search_web_deep", query, {"query": query, "read_content": read_content}, response)
+            return response
+        except Exception as exc:
+            logger.exception("Deep web search error")
+            response = {"success": False, "message": f"Riset mendalam gagal: {str(exc)[:100]}", "results": []}
+            if owner_id:
+                record_mcp_tool_history(owner_id, "search_web_deep", query, {"query": query}, response)
+            return response
+
+    @mcp_server.tool()
+    def search_social_media(query: str, platform: str = "all", max_results: int = 5) -> dict:
+        """
+        Cari opini, review pengguna, sentimen publik, dan topik viral di media sosial (Reddit, X/Twitter, YouTube).
+        Gunakan tool ini saat user menanyakan apa kata orang, opini netizen, review pengalaman pengguna, atau tren media sosial.
+
+        Args:
+            query: Topik atau produk yang dicari di media sosial.
+            platform: Platform target: 'all', 'reddit', 'twitter' / 'x', 'youtube' (default 'all').
+            max_results: Batas jumlah diskusi/opini yang diambil (default 5).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        try:
+            query = clean_text(query, max_len=200, min_len=1, field="Pencarian Media Sosial")
+            max_results = max(1, min(int(max_results or 5), 10))
+            response = _search_social_media(query, platform=platform, max_results=max_results)
+            if owner_id:
+                record_mcp_tool_history(owner_id, "search_social_media", query, {"query": query, "platform": platform}, response)
+            return response
+        except Exception as exc:
+            logger.exception("Social media search error")
+            response = {"success": False, "message": f"Pencarian medsos gagal: {str(exc)[:100]}", "results": []}
+            if owner_id:
+                record_mcp_tool_history(owner_id, "search_social_media", query, {"query": query}, response)
+            return response
+
+    @mcp_server.tool()
+    def osint_recon(target: str, target_type: str = "auto") -> dict:
+        """
+        Lakukan penyelidikan intelijen sumber terbuka (OSINT - Open Source Intelligence) pasif.
+        Mendukung profiling jejak digital username (di 12+ platform), intelijen alamat IP (geolokasi, ISP, ASN), dan recon domain (DNS, subdomain, header server).
+
+        Args:
+            target: Username (@username), IP address (misal 8.8.8.8), atau domain (misal github.com).
+            target_type: Tipe target: 'auto', 'username', 'ip', atau 'domain' (default 'auto').
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        try:
+            target = clean_text(target, max_len=150, min_len=1, field="Target OSINT")
+            response = _osint_recon(target, target_type=target_type)
+            if owner_id:
+                record_mcp_tool_history(owner_id, "osint_recon", target, {"target": target, "type": target_type}, response)
+            return response
+        except Exception as exc:
+            logger.exception("OSINT recon error")
+            response = {"success": False, "message": f"OSINT recon gagal: {str(exc)[:100]}", "error": str(exc)}
+            if owner_id:
+                record_mcp_tool_history(owner_id, "osint_recon", target, {"target": target}, response)
             return response
 
     @mcp_server.tool()

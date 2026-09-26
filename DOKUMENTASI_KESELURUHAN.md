@@ -1219,3 +1219,25 @@ Tersedia dokumentasi khusus untuk hardware ESP32-C3 Super Mini pada file terpisa
   - **Klik 2x Cepat:** Beralih mode ke **Chronchi**; klik 2x cepat lagi untuk kembali ke **XiaoZhi AI**.
   - **Tahan 5 Detik:** Masuk ke mode **Konfigurasi Wi-Fi** (`192.168.4.1`).
 - **Hands-Free & Suara:** Dukungan deteksi hening (VAD) otomatis dan pemutaran lagu lokal offline (SPIFFS).
+
+
+---
+
+## 22. Fitur Baru: Deep Web Search, Social Media Intelligence & OSINT Recon
+
+Sistem MCP Xiaozhi telah dilengkapi dengan 3 modul riset cerdas terintegrasi:
+
+1. **`search_web_deep(query, max_results=5, read_content=True)`**:
+   - Menghubungkan multi-sumber: Wikipedia Ensiklopedia (ID & EN), Google News & Web RSS.
+   - **Deep Reader:** Secara otomatis membuka dan mengekstrak teks isi artikel bersih (hingga 1.500 karakter) menggunakan parsing DOM cerdas.
+   - Jawaban AI komprehensif, berbasis data nyata, bukan sekadar menebak judul.
+
+2. **`search_social_media(query, platform='all', max_results=5)`**:
+   - Menelusuri diskusi, opini pengguna, review jujur, dan sentimen netizen di **Reddit**, **X (Twitter)**, dan **YouTube**.
+   - Cocok untuk menanyakan review barang, komparasi produk, atau isu teknologi yang sedang viral.
+
+3. **`osint_recon(target, target_type='auto')`**:
+   - **Username Reconnaissance:** Memindai 12+ platform (GitHub, Reddit, Telegram, Pinterest, Dev.to, GitLab, Medium) secara bersamaan untuk menemukan jejak akun digital.
+   - **IP Intelligence:** Mengetahui geolokasi server, ISP, nama organisasi, nomor ASN, dan reverse DNS PTR record.
+   - **Domain Reconnaissance:** Resolusi DNS IPv4, analisis HTTP security headers (WAF, HSTS, Server), dan enumerasi subdomain via *Certificate Transparency* (`crt.sh`).
+   - Sifat: **100% Passive OSINT (Legal & Bersih)** tanpa menyerang server target.
