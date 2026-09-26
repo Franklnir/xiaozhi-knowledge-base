@@ -103,9 +103,12 @@ Firmware dilengkapi logika deteksi klik tunggal (*single click*), klik ganda (*d
 
 ### 1. Tombol BOOT (GPIO 0) — Asisten Suara & Kontrol Musik
 - **Klik 1x (Single Click):**
-  - Jika musik YouTube sedang diputar $ightarrow$ **Stop pemutaran musik**.
-  - Jika AI sedang berbicara $ightarrow$ **Interupsi / hentikan suara AI** seketika.
-  - Jika dalam kondisi standby $ightarrow$ **Mulai mendengarkan / Toggle Chat** (bicara langsung tanpa wake word).
+  - Jika musik YouTube sedang diputar $
+ightarrow$ **Stop pemutaran musik**.
+  - Jika AI sedang berbicara $
+ightarrow$ **Interupsi / hentikan suara AI** seketika.
+  - Jika dalam kondisi standby $
+ightarrow$ **Mulai mendengarkan / Toggle Chat** (bicara langsung tanpa wake word).
 - **Klik 2x Cepat (Double Click):**
   - **Auto Play Test Music:** Otomatis mencari dan memutar musik remix santai dari YouTube.
 - **Tekan Tahan (> 3 Detik):**
@@ -113,8 +116,12 @@ Firmware dilengkapi logika deteksi klik tunggal (*single click*), klik ganda (*d
 
 ### 2. Tombol Volume UP (GPIO 14) — Volume & Rotasi
 - **Klik 1x (Single Click):**
-  - Mode Normal/Musik $ightarrow$ **Menaikkan volume speaker +10%** (disertai indikator level pada layar).
-  - Mode Live Camera Streaming $ightarrow$ **Zoom In** (perbesar gambar 1x $ightarrow$ 2x $ightarrow$ 3x).
+  - Mode Normal/Musik $
+ightarrow$ **Menaikkan volume speaker +10%** (disertai indikator level pada layar).
+  - Mode Live Camera Streaming $
+ightarrow$ **Zoom In** (perbesar gambar 1x $
+ightarrow$ 2x $
+ightarrow$ 3x).
 - **Klik 2x Cepat (Double Click):**
   - **Rotasi Layar 180°:** Membalikkan orientasi tampilan layar 180 derajat secara langsung tanpa restart.
 - **Tekan Tahan (Long Press):**
@@ -122,8 +129,10 @@ Firmware dilengkapi logika deteksi klik tunggal (*single click*), klik ganda (*d
 
 ### 3. Tombol Volume DOWN (GPIO 46) — Volume & Switch Mode
 - **Klik 1x (Single Click):**
-  - Mode Normal/Musik $ightarrow$ **Menurunkan volume speaker -10%**.
-  - Mode Live Camera Streaming $ightarrow$ **Zoom Out** (memperkecil tingkat zoom gambar).
+  - Mode Normal/Musik $
+ightarrow$ **Menurunkan volume speaker -10%**.
+  - Mode Live Camera Streaming $
+ightarrow$ **Zoom Out** (memperkecil tingkat zoom gambar).
 - **Klik 2x Cepat (Double Click):**
   - **Beralih Mode (Switch Mode):** Berpindah antara **Mode XiaoZhi (Voice Assistant)** dan **Mode Chronchi (Smartwatch / BLE Clock)**.
 - **Tekan Tahan (Long Press):**
@@ -160,3 +169,21 @@ Firmware XiaoZhi menyertakan tool MCP internal khusus untuk diagnosa perangkat:
 2. **`self.get_buttons_guide`**:
    - Menjelaskan seluruh daftar fungsi ketiga tombol fisik kepada pengguna lewat suara.
    - *Contoh ucapan:* *"Halo XiaoZhi, jelaskan fungsi tombol yang ada di perangkatmu."*
+
+---
+
+## 7. Konfigurasi Lanjutan: Multi-SSID Failover & Gaya Animasi
+
+### A. Pengaturan Backup Wi-Fi (Multi-SSID Failover)
+Di Web Portal `http://192.168.4.1` pada tab **Jaringan Wi-Fi**, Anda dapat memilih mode koneksi:
+- **Mode 1 Wi-Fi (Standar):** Hanya menghubungkan ke satu titik akses Wi-Fi rumah.
+- **Mode Multi Wi-Fi (Failover Otomatis):** Anda dapat mendaftarkan beberapa SSID cadangan sekaligus:
+  - **Prioritas 1 (Utama):** Wi-Fi rumah atau router utama.
+  - **Prioritas 2 (Cadangan 1):** Hotspot smartphone Anda saat dibawa bepergian.
+  - **Prioritas 3 (Cadangan 2):** Wi-Fi kantor atau modem darurat.
+- **Mekanisme Failover:** Jika koneksi utama terputus atau mati lampu, ESP32 otomatis mencari dan menyambung ke jaringan cadangan secara bergantian tanpa perlu mengatur ulang dari awal.
+
+### B. Gaya Animasi & Ekspresi Layar
+- **Animasi Ekspresi Dinamis (LCD ST7789 IPS):** Wajah interaktif AI dengan animasi mata berkedip santai (*idle*), responsif membesar (*listening*), berpikir melirik (*thinking*), dan animasi mulut bergerak selaras dengan intonasi suara AI saat berbicara (*speaking*).
+- **Animasi Klasik / Minimalis (OLED SSD1306):** Menampilkan animasi gelombang audio suara (*waveform*), status teks hemat daya, dan emote minimalis klasik.
+- **Tema Chronchi Jam Pintar:** Di mode Chronchi, tema jam digital (Retro, Cyberpunk, Minimalist) dapat diganti secara instan dengan gestur tombol fisik.

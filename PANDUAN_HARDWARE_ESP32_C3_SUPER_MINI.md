@@ -101,11 +101,30 @@ Firmware ESP32-C3 Super Mini telah diperbarui dengan gestur tombol yang ringkas 
 
 ### B. Pemutar Musik Lokal (Offline)
 Dapat memutar file audio yang tersimpan di flash internal tanpa koneksi internet:
-- *"Putar lagu"* / *"Nyanyi"* $ightarrow$ Memutar `song1.ogg`.
-- *"Lagu dua"* $ightarrow$ Memutar `song2.ogg`.
-- *"Lagu tiga"* $ightarrow$ Memutar `song3.ogg`.
-- *"Stop"* / *"Berhenti"* $ightarrow$ Menghentikan pemutaran musik.
+- *"Putar lagu"* / *"Nyanyi"* $
+ightarrow$ Memutar `song1.ogg`.
+- *"Lagu dua"* $
+ightarrow$ Memutar `song2.ogg`.
+- *"Lagu tiga"* $
+ightarrow$ Memutar `song3.ogg`.
+- *"Stop"* / *"Berhenti"* $
+ightarrow$ Menghentikan pemutaran musik.
 
 ### C. Perintah Suara Standby & Reset
 - Ucapkan *"Udahan dulu"*, *"Sampai jumpa"*, atau *"Bye"* untuk memasukkan perangkat ke mode hening standby.
-- Ucapkan *"Reset wifi"* $ightarrow$ Konfirmasi dengan *"Ya"* untuk mereset kredensial Wi-Fi secara hands-free.
+- Ucapkan *"Reset wifi"* $
+ightarrow$ Konfirmasi dengan *"Ya"* untuk mereset kredensial Wi-Fi secara hands-free.
+
+---
+
+## 6. Konfigurasi Lanjutan: Multi-SSID Failover & Animasi Layar
+
+### A. Pengaturan Multi-SSID Backup (Failover)
+Pada halaman konfigurasi Web Portal `192.168.4.1`, Anda dapat memilih antara:
+1. **Mode 1 Wi-Fi:** Menghubungkan ke 1 router utama.
+2. **Mode Multi Wi-Fi (Failover):** Menyimpan daftar Wi-Fi cadangan (Wi-Fi Utama, Hotspot HP Cadangan 1, Hotspot Cadangan 2). Jika Wi-Fi utama tidak terdeteksi, ESP32-C3 otomatis mengalihkan koneksi ke Hotspot HP tanpa terputus lama.
+
+### B. Animasi Klasik vs Dinamis pada Layar
+- **Animasi Klasik (OLED SSD1306 128x64):** Menggunakan ikon minimalis, visual bar status jaringan, dan animasi waveform audio yang sangat ringan dan hemat memori SRAM (~400KB).
+- **Animasi Dinamis:** Ekspresi wajah emotif yang berubah saat AI mendengarkan, berpikir, atau berbicara.
+- **Tema Jam Chronchi:** Pilihan tema tampilan jam digital pada mode Chronchi yang dapat diubah sesuai selera.
