@@ -60,7 +60,7 @@ async def delete_mcp_endpoint(request: Request, csrf_token: str = Form(...)):
     if user_task and not user_task.done():
         user_task.cancel()
     signal_mcp_reload()
-    return JSONResponse({"success": True, "deleted": deleted, "message": "Endpoint dihapus."})
+    return JSONResponse({"success": True, "deleted": deleted, "message": "Endpoint dihapus. Tautan Board ESP32 berhasil dipisahkan (riwayat board tetap tersimpan)."})
 
 
 @router.post("/reconnect_mcp")
@@ -153,7 +153,7 @@ async def delete_mcp_by_token(request: Request):
     return {
         "success": True,
         "deleted": deleted,
-        "message": f"Endpoint milik {owner['username']} berhasil dihapus.",
+        "message": f"Endpoint milik {owner['username']} berhasil dihapus dan tautan board telah dipisahkan.",
     }
 
 

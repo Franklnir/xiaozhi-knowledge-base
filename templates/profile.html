@@ -889,27 +889,34 @@
                     <span style="font-size: 14px;">📟</span>
                     <span style="color: var(--app-muted); font-weight: 600;">ESP32 Board ID:</span>
                     <code style="font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 800; color: #10b981; background: transparent; padding: 0;">{{ device_mac }}</code>
-                    <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 2px 7px; font-weight: 700; background: #10b981; color: #ffffff; border-radius: 999px;">Tersimpan OK</span>
+                    {% if device_mac == 'E8:3D:C1:9B:B5:14' %}
+                    <span class="app-chip app-chip-small" style="font-size: 10px; padding: 2px 7px; font-weight: 700; background: #6366f1; color: #ffffff; border-radius: 999px;" title="Board ID Permanen Terlindungi (Tidak Pernah Dihapus)">🛡️ Master Protected</span>
+                    {% endif %}
+                    <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 2px 7px; font-weight: 700; background: #10b981; color: #ffffff; border-radius: 999px;">Tertaut Aktif</span>
                     <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
                 </div>
+                <button type="button" onclick="viewBoardHistory('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #3b82f6; font-weight: 700; cursor: pointer;">📜 Riwayat Tautan Board</button>
+                <button type="button" onclick="unlinkMyBoard('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-weight: 700; cursor: pointer;" title="Pisahkan board ini dari akun Anda agar bisa menautkan board lain">✂️ Putus Tautan</button>
                 {% if user.role == 'admin' %}
-                <button type="button" onclick="promptSaveMac('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">✏️ Ubah MAC</button>
+                <button type="button" onclick="promptSaveMac('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">✏️ Ganti MAC</button>
                 {% endif %}
                 {% elif mcp_status.connected %}
                 <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 999px; font-size: 12px; font-weight: 650; color: #3b82f6;">
                     <span style="font-size: 14px;">📟</span>
-                    <span>MCP Aktif (Menunggu board ESP32 terhubung)</span>
+                    <span>MCP Aktif (Board belum tertaut - siap pakai board lain)</span>
                 </div>
+                <button type="button" onclick="viewMyPastBoards()" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: var(--app-soft); border: 1px solid var(--app-border); color: var(--app-muted); font-weight: 600; cursor: pointer;">📜 Riwayat Board Akun</button>
                 {% if user.role == 'admin' %}
-                <button type="button" onclick="promptSaveMac('')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: #10b981; color: #ffffff; cursor: pointer;">➕ Simpan MAC Board</button>
+                <button type="button" onclick="promptSaveMac('')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: #10b981; color: #ffffff; cursor: pointer;">➕ Tautkan MAC Board</button>
                 {% endif %}
                 {% else %}
                 <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: var(--app-soft); border: 1px solid var(--app-border); border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--app-muted);">
                     <span style="font-size: 14px;">📟</span>
-                    <span>ESP32: Belum terhubung</span>
+                    <span>ESP32: Belum tertaut (Bisa pakai Board ID manapun)</span>
                 </div>
+                <button type="button" onclick="viewMyPastBoards()" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: var(--app-soft); border: 1px solid var(--app-border); color: var(--app-muted); font-weight: 600; cursor: pointer;">📜 Riwayat Board Akun</button>
                 {% if user.role == 'admin' %}
-                <button type="button" onclick="promptSaveMac('')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">➕ Simpan MAC Board</button>
+                <button type="button" onclick="promptSaveMac('')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">➕ Tautkan MAC Board</button>
                 {% endif %}
                 {% endif %}
             </div>
@@ -3921,5 +3928,171 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<!-- 📜 Modal Riwayat Tautan Board ID -->
+<div id="boardHistoryModal" style="display: none; position: fixed; inset: 0; z-index: 99999; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: var(--app-surface, #1e293b); border: 1px solid var(--app-border, #334155); border-radius: 16px; width: 100%; max-width: 680px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+        <div style="padding: 18px 24px; border-bottom: 1px solid var(--app-border, #334155); display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--app-text, #f8fafc); display: flex; align-items: center; gap: 8px;">
+                    <span>📜</span>
+                    <span id="boardHistoryModalTitle">Riwayat Tautan Board</span>
+                </h3>
+                <p id="boardHistoryModalSubtitle" style="margin: 4px 0 0 0; font-size: 12.5px; color: var(--app-muted, #94a3b8);">Audit trail siapa yang pernah tertaut & linimasa aktivitas</p>
+            </div>
+            <button type="button" onclick="closeBoardHistoryModal()" style="background: transparent; border: none; font-size: 22px; cursor: pointer; color: var(--app-muted, #94a3b8); line-height: 1;">&times;</button>
+        </div>
+        <div id="boardHistoryContent" style="padding: 20px 24px; overflow-y: auto; flex: 1;">
+            <div style="text-align: center; padding: 30px; color: var(--app-muted, #94a3b8);">Memuat riwayat...</div>
+        </div>
+        <div style="padding: 14px 24px; border-top: 1px solid var(--app-border, #334155); background: var(--app-soft, #0f172a); display: flex; justify-content: flex-end;">
+            <button type="button" onclick="closeBoardHistoryModal()" class="app-button" style="padding: 6px 18px; border-radius: 8px; font-size: 13px;">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function unlinkMyBoard(currentMac) {
+    if (!confirm("Putus tautan Board ID (" + currentMac + ") dari akun Anda?\n\nID Board dan seluruh riwayatnya akan tetap aman di database, dan Anda bebas menautkan board ESP32 lain kapan saja.")) {
+        return;
+    }
+    try {
+        const res = await fetch("/api/devices/detach", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_id: currentMac })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert("Board berhasil dipisahkan! Anda sekarang bebas menautkan board ESP32 lain.");
+            window.location.reload();
+        } else {
+            alert(data.detail || data.message || "Gagal memisahkan board.");
+        }
+    } catch(err) {
+        alert("Terjadi kesalahan: " + err.message);
+    }
+}
+
+async function viewBoardHistory(deviceMac) {
+    const modal = document.getElementById("boardHistoryModal");
+    const title = document.getElementById("boardHistoryModalTitle");
+    const sub = document.getElementById("boardHistoryModalSubtitle");
+    const content = document.getElementById("boardHistoryContent");
+    if (!modal) return;
+    modal.style.display = "flex";
+    title.innerHTML = `Riwayat Board: <code style="color: #10b981; font-family: monospace;">${deviceMac}</code>`;
+    content.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--app-muted);">⏳ Mengambil riwayat tautan...</div>`;
+    
+    try {
+        const res = await fetch("/api/devices/history/" + encodeURIComponent(deviceMac));
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            content.innerHTML = `<div style="color: #ef4444; padding: 20px; text-align: center;">${data.detail || "Gagal memuat riwayat."}</div>`;
+            return;
+        }
+        
+        let html = '';
+        if (data.is_protected) {
+            html += `<div style="margin-bottom: 16px; padding: 10px 14px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 10px; font-size: 12.5px; color: #818cf8; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 16px;">🛡️</span>
+                <span><strong>Protected Master Board:</strong> ID perangkat ini terlindungi permanen di sistem dan tidak akan pernah dihapus walau MCP diputus.</span>
+            </div>`;
+        }
+        
+        if (!data.history || data.history.length === 0) {
+            html += `<div style="text-align: center; padding: 30px; color: var(--app-muted);">Belum ada catatan riwayat untuk board ini.</div>`;
+        } else {
+            html += `<div style="display: flex; flex-direction: column; gap: 12px;">`;
+            data.history.forEach((h, idx) => {
+                const isActive = h.status === 'ACTIVE';
+                const statusBadge = isActive 
+                    ? `<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">🟢 Sedang Tertaut (Aktif)</span>`
+                    : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600;">⚪ Terputus / Riwayat Lampau</span>`;
+                
+                html += `
+                <div style="background: var(--app-card, rgba(255,255,255,0.03)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 12px; padding: 14px 16px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                        <div style="font-weight: 700; font-size: 14px; color: var(--app-text, #fff); display: flex; align-items: center; gap: 6px;">
+                            <span>👤</span>
+                            <span>${h.username || 'User ID: ' + h.user_id}</span>
+                            <span style="font-size: 11px; color: var(--app-muted, #94a3b8); font-weight: 500;">(ID: ${h.user_id})</span>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 12px; color: var(--app-muted, #94a3b8);">
+                        <div>📅 <strong>Pernah Tertaut:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
+                        <div>⏱️ <strong>Terakhir Aktif:</strong> ${h.last_active_str || h.last_active_at || '-'}</div>
+                        <div>🔌 <strong>Terakhir Tertaut / Diputus:</strong> ${h.unlinked_at_str ? h.unlinked_at_str : '<span style="color: #10b981; font-weight: 600;">Masih aktif sampai sekarang</span>'}</div>
+                        <div>📝 <strong>Catatan:</strong> ${h.notes || 'Normal binding'}</div>
+                    </div>
+                </div>`;
+            });
+            html += `</div>`;
+        }
+        content.innerHTML = html;
+    } catch(err) {
+        content.innerHTML = `<div style="color: #ef4444; padding: 20px; text-align: center;">Error: ${err.message}</div>`;
+    }
+}
+
+async function viewMyPastBoards() {
+    const modal = document.getElementById("boardHistoryModal");
+    const title = document.getElementById("boardHistoryModalTitle");
+    const content = document.getElementById("boardHistoryContent");
+    if (!modal) return;
+    modal.style.display = "flex";
+    title.innerHTML = `Riwayat Semua Board Akun Saya`;
+    content.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--app-muted);">⏳ Mengambil riwayat...</div>`;
+    
+    try {
+        const res = await fetch("/api/devices/my-history");
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            content.innerHTML = `<div style="color: #ef4444; padding: 20px; text-align: center;">${data.detail || "Gagal memuat riwayat."}</div>`;
+            return;
+        }
+        
+        let html = '';
+        if (!data.history || data.history.length === 0) {
+            html += `<div style="text-align: center; padding: 30px; color: var(--app-muted);">Belum ada board yang pernah tertaut ke akun Anda.</div>`;
+        } else {
+            html += `<div style="display: flex; flex-direction: column; gap: 12px;">`;
+            data.history.forEach((h) => {
+                const isActive = h.status === 'ACTIVE';
+                const statusBadge = isActive 
+                    ? `<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">🟢 Sedang Tertaut</span>`
+                    : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600;">⚪ Terputus</span>`;
+                
+                html += `
+                <div style="background: var(--app-card, rgba(255,255,255,0.03)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 12px; padding: 14px 16px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="font-weight: 700; font-size: 14px; color: var(--app-text, #fff); font-family: monospace;">
+                            📟 ${h.device_mac}
+                            ${h.is_protected ? '<span style="color: #818cf8; font-size: 11px; margin-left: 6px;">🛡️ Protected</span>' : ''}
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 12px; color: var(--app-muted, #94a3b8);">
+                        <div>📅 <strong>Tertaut Pada:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
+                        <div>🔌 <strong>Diputus Pada:</strong> ${h.unlinked_at_str || '<span style="color: #10b981;">Masih aktif</span>'}</div>
+                        <div>📝 <strong>Catatan:</strong> ${h.notes || 'Normal binding'}</div>
+                    </div>
+                </div>`;
+            });
+            html += `</div>`;
+        }
+        content.innerHTML = html;
+    } catch(err) {
+        content.innerHTML = `<div style="color: #ef4444; padding: 20px; text-align: center;">Error: ${err.message}</div>`;
+    }
+}
+
+function closeBoardHistoryModal() {
+    const modal = document.getElementById("boardHistoryModal");
+    if (modal) modal.style.display = "none";
+}
+</script>
+
 {% endblock %}
 

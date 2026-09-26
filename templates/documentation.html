@@ -455,6 +455,20 @@ Header: Device-Id: {MAC_ADDRESS}
                             • Gunakan <code>WiFi.macAddress()</code> di ESP32.<br>
                             • Jika parameter <code>token</code> juga disertakan, pairing ke akun pemilik terjadi secara instan tanpa perlu setting manual di profil.
                         </div>
+
+                        <!-- 🛡️ Proteksi Board ID & Riwayat Tautan (Audit Trail) -->
+                        <div style="margin-top: 14px; padding: 14px 16px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; font-size: 13px; color: var(--app-text, #334155);">
+                            <div style="font-weight: 700; color: #6366f1; display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 6px;">
+                                <span>🛡️</span>
+                                <span>Proteksi Permanen Board ID &amp; Riwayat Tautan Lengkap (Audit Trail)</span>
+                            </div>
+                            <ul style="margin: 0; padding-left: 18px; line-height: 1.6; font-size: 12.5px;">
+                                <li><strong>Master Board ID Terlindungi:</strong> Board ID <code>E8:3D:C1:9B:B5:14</code> (dan board berstatus protected) <em>TIDAK PERNAH DIHAPUS</em> dari database. Dilindungi langsung di level trigger PostgreSQL (<code>trg_protect_master_board</code>).</li>
+                                <li><strong>Pemisahan Saat Putus / Hapus MCP:</strong> Jika user menghapus atau memutus endpoint MCP Xiaozhi, tautan board dan user otomatis dipisahkan (<code>owner_id = NULL</code>). User bebas menggunakan dan menautkan Board ID baru kapan saja.</li>
+                                <li><strong>Riwayat Tautan Board (<code>board_binding_history</code>):</strong> Setiap kali board tertaut atau diputus, sistem mencatat riwayat lengkap: <em>siapa yang pernah tertaut</em> (User ID &amp; Username), <em>kapan pernah tertaut</em> (<code>linked_at</code>), <em>kapan terakhir aktif</em> (<code>last_active_at</code>), dan <em>kapan terakhir tertaut / diputus</em> (<code>unlinked_at</code>).</li>
+                                <li><strong>API Baru:</strong> <code>POST /api/devices/detach</code> (memutus tautan tanpa menghapus board), <code>GET /api/devices/history/{device_id}</code> (melihat riwayat board), dan <code>GET /api/devices/my-history</code> (melihat semua board yang pernah dipakai user).</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 

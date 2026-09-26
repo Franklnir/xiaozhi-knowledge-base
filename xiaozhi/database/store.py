@@ -74,6 +74,8 @@ from xiaozhi.services.mcp_service import mcp_connection_states
 
 logger = logging.getLogger("xiaozhi.store")
 
+PROTECTED_DEVICE_MACS = {"E8:3D:C1:9B:B5:14"}
+
 
 class HFJsonStore:
     def __init__(self) -> None:
@@ -1207,7 +1209,11 @@ class HFJsonStore:
             changed = len(data["xiaozhi_tokens"]) != before
             if changed:
                 self._commit(data, "Delete Xiaozhi token")
-            return changed
+        try:
+            self.detach_user_devices(int(owner_id), reason="MCP Xiaozhi diputus / dihapus")
+        except Exception as exc:
+            logger.warning("Gagal detach devices memory user %s: %s", owner_id, exc)
+        return changed
 
     def find_user_by_mcp_token(self, token: str) -> Optional[Dict[str, Any]]:
         """Find user by MCP token hash. Returns user info if found."""
@@ -2062,57 +2068,247 @@ class HFJsonStore:
                     return True
             return False
 
-    def register_device(self, owner_id: int, mac_address: str = "", device_name: str = "", device_type: str = "") -> Dict[str, Any]:
-        normalized_id = normalize_mac_address(mac_address)
+    def is_device_protected(self, device_id: str) -> bool:
+        if not device_id:
+            return False
+        norm = normalize_mac_address(device_id)
+        if norm in PROTECTED_DEVICE_MACS:
+            return True
+        with self._lock:
+            data = self._load()
+            for d in data.get("registered_devices", []):
+                stored_mac = normalize_mac_address(d.get("mac_address", "") or d.get("device_id", ""))
+                if stored_mac and stored_mac.lower() == norm.lower():
+                    return bool(d.get("is_protected"))
+        return False
+
+    def register_device(self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = "") -> Dict[str, Any]:
+        raw_mac = device_id or mac_address
+        normalized_id = normalize_mac_address(raw_mac)
         if not normalized_id:
             raise ValueError("Device ID / MAC address diperlukan.")
-        device_name = clean_text(device_name or f"ESP32 ({normalized_id[-5:]})", max_len=80, min_len=1, field="Nama device")
-        device_type = str(device_type or "esp32").strip()
+        dev_name = clean_text(name or device_name or f"ESP32 ({normalized_id[-5:]})", max_len=80, min_len=1, field="Nama device")
+        dev_type = str(device_type or "esp32").strip()
+        is_protected = (normalized_id in PROTECTED_DEVICE_MACS)
+        now = utc_now()
+
         with self._lock:
             data = self._load()
             data.setdefault("registered_devices", [])
-            existing_by_owner = None
-            existing_by_other = None
+            data.setdefault("board_binding_history", [])
+
+            # Lookup username
+            username = f"user_{owner_id}"
+            for u in data.get("users", []):
+                if int(u.get("id", 0)) == int(owner_id):
+                    username = u.get("username", username)
+                    break
+
+            existing = None
             for d in data["registered_devices"]:
                 stored_mac = normalize_mac_address(d.get("mac_address", "") or d.get("device_id", ""))
                 if stored_mac and stored_mac.lower() == normalized_id.lower():
-                    if int(d.get("owner_id", 0)) == int(owner_id):
-                        existing_by_owner = d
-                    else:
-                        existing_by_other = d
-            if existing_by_other:
-                raise ValueError(f"Device MAC '{normalized_id}' sudah terdaftar di akun lain. 1 ESP32 hanya bisa terikat ke 1 akun.")
-            if existing_by_owner:
-                existing_by_owner["mac_address"] = normalized_id
-                existing_by_owner["device_name"] = device_name
-                existing_by_owner["device_type"] = device_type
-                existing_by_owner["last_seen_at"] = utc_now()
-                self._commit(data, "Update registered device")
-                return existing_by_owner
-            device = {
-                "id": secrets.token_hex(8),
-                "owner_id": int(owner_id),
-                "mac_address": normalized_id,
-                "device_name": device_name,
-                "device_type": device_type,
-                "is_audio_player": True,
-                "created_at": utc_now(),
-                "last_seen_at": utc_now(),
-            }
-            data["registered_devices"].append(device)
-            self._commit(data, "Register new device")
-            return device
+                    existing = d
+                    break
+
+            if existing:
+                prev_owner = existing.get("owner_id")
+                if prev_owner and int(prev_owner) != int(owner_id):
+                    for h in data["board_binding_history"]:
+                        if (normalize_mac_address(h.get("device_mac", "")).lower() == normalized_id.lower() 
+                                and int(h.get("user_id", 0)) == int(prev_owner) 
+                                and h.get("status") == "ACTIVE"):
+                            h["status"] = "DETACHED"
+                            h["unlinked_at"] = now
+                            h["notes"] = f"Dialihkan ke user {username} (ID: {owner_id})"
+
+                existing["owner_id"] = int(owner_id)
+                existing["mac_address"] = normalized_id
+                existing["device_id"] = normalized_id
+                existing["device_name"] = dev_name
+                existing["device_type"] = dev_type
+                existing["is_protected"] = bool(existing.get("is_protected") or is_protected)
+                existing["status"] = "ACTIVE"
+                existing["last_active_at"] = now
+                existing["last_seen_at"] = now
+                dev_res = existing
+            else:
+                dev_res = {
+                    "id": secrets.token_hex(8),
+                    "owner_id": int(owner_id),
+                    "mac_address": normalized_id,
+                    "device_id": normalized_id,
+                    "device_name": dev_name,
+                    "device_type": dev_type,
+                    "is_protected": is_protected,
+                    "status": "ACTIVE",
+                    "is_audio_player": True,
+                    "created_at": now,
+                    "last_active_at": now,
+                    "last_seen_at": now,
+                }
+                data["registered_devices"].append(dev_res)
+
+            # Record history
+            hist_found = False
+            for h in data["board_binding_history"]:
+                if (normalize_mac_address(h.get("device_mac", "")).lower() == normalized_id.lower()
+                        and int(h.get("user_id", 0)) == int(owner_id)
+                        and h.get("status") == "ACTIVE"):
+                    h["last_active_at"] = now
+                    h["device_name"] = dev_name
+                    h["device_type"] = dev_type
+                    h["username"] = username
+                    hist_found = True
+                    break
+
+            if not hist_found:
+                data["board_binding_history"].append({
+                    "id": len(data["board_binding_history"]) + 1,
+                    "device_mac": normalized_id,
+                    "user_id": int(owner_id),
+                    "username": username,
+                    "device_name": dev_name,
+                    "device_type": dev_type,
+                    "linked_at": now,
+                    "last_active_at": now,
+                    "unlinked_at": None,
+                    "status": "ACTIVE",
+                    "notes": "Tautan aktif (Device Registered)",
+                    "created_at": now,
+                })
+
+            self._commit(data, "Register/rebind device and update history")
+            return dev_res
+
+    def detach_device(self, device_id: str, owner_id: Optional[int] = None, reason: str = "Tautan dipisahkan") -> bool:
+        norm = normalize_mac_address(device_id)
+        if not norm:
+            return False
+        now = utc_now()
+        with self._lock:
+            data = self._load()
+            data.setdefault("registered_devices", [])
+            data.setdefault("board_binding_history", [])
+            found = False
+            for d in data["registered_devices"]:
+                sm = normalize_mac_address(d.get("mac_address", "") or d.get("device_id", ""))
+                if sm and sm.lower() == norm.lower():
+                    if owner_id is not None and d.get("owner_id") and int(d.get("owner_id")) != int(owner_id):
+                        return False
+                    d["owner_id"] = None
+                    d["status"] = "DETACHED"
+                    d["last_active_at"] = now
+                    found = True
+                    break
+            if found:
+                for h in data["board_binding_history"]:
+                    if normalize_mac_address(h.get("device_mac", "")).lower() == norm.lower() and h.get("status") == "ACTIVE":
+                        h["status"] = "DETACHED"
+                        h["unlinked_at"] = now
+                        h["notes"] = reason
+                self._commit(data, "Detach device")
+            return found
+
+    def detach_user_devices(self, user_id: int, reason: str = "MCP diputuskan") -> List[str]:
+        now = utc_now()
+        detached = []
+        with self._lock:
+            data = self._load()
+            data.setdefault("registered_devices", [])
+            data.setdefault("board_binding_history", [])
+            for d in data["registered_devices"]:
+                if d.get("owner_id") and int(d.get("owner_id")) == int(user_id):
+                    mac = normalize_mac_address(d.get("mac_address", "") or d.get("device_id", ""))
+                    d["owner_id"] = None
+                    d["status"] = "DETACHED"
+                    d["last_active_at"] = now
+                    detached.append(mac)
+                    for h in data["board_binding_history"]:
+                        if (normalize_mac_address(h.get("device_mac", "")).lower() == mac.lower()
+                                and int(h.get("user_id", 0)) == int(user_id)
+                                and h.get("status") == "ACTIVE"):
+                            h["status"] = "DETACHED"
+                            h["unlinked_at"] = now
+                            h["notes"] = reason
+            if detached:
+                self._commit(data, "Detach user devices")
+        return detached
+
+    def record_device_activity(self, device_id: str, owner_id: Optional[int] = None) -> None:
+        norm = normalize_mac_address(device_id)
+        if not norm:
+            return
+        now = utc_now()
+        with self._lock:
+            data = self._load()
+            for d in data.get("registered_devices", []):
+                sm = normalize_mac_address(d.get("mac_address", "") or d.get("device_id", ""))
+                if sm and sm.lower() == norm.lower():
+                    d["last_active_at"] = now
+                    d["last_seen_at"] = now
+            for h in data.get("board_binding_history", []):
+                if normalize_mac_address(h.get("device_mac", "")).lower() == norm.lower() and h.get("status") == "ACTIVE":
+                    if not owner_id or int(h.get("user_id", 0)) == int(owner_id):
+                        h["last_active_at"] = now
+            self._commit(data, "Record device activity")
+
+    def get_board_binding_history(self, device_mac: str) -> List[Dict[str, Any]]:
+        norm = normalize_mac_address(device_mac)
+        if not norm:
+            return []
+        with self._lock:
+            data = self._load()
+            rows = [
+                dict(h) for h in data.get("board_binding_history", [])
+                if normalize_mac_address(h.get("device_mac", "")).lower() == norm.lower()
+            ]
+            rows.sort(key=lambda x: (str(x.get("linked_at", "")), int(x.get("id", 0))), reverse=True)
+            for r in rows:
+                r["linked_at_str"] = str(r.get("linked_at", ""))
+                r["last_active_str"] = str(r.get("last_active_at", ""))
+                r["unlinked_at_str"] = str(r.get("unlinked_at", "")) if r.get("unlinked_at") else None
+                r["status_label"] = "Sedang Tertaut" if r.get("status") == "ACTIVE" else "Terputus / Riwayat Lampau"
+            return rows
+
+    def get_user_board_history(self, user_id: int) -> List[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            rows = [
+                dict(h) for h in data.get("board_binding_history", [])
+                if int(h.get("user_id", 0)) == int(user_id)
+            ]
+            rows.sort(key=lambda x: (str(x.get("linked_at", "")), int(x.get("id", 0))), reverse=True)
+            for r in rows:
+                r["linked_at_str"] = str(r.get("linked_at", ""))
+                r["last_active_str"] = str(r.get("last_active_at", ""))
+                r["unlinked_at_str"] = str(r.get("unlinked_at", "")) if r.get("unlinked_at") else None
+                r["status_label"] = "Sedang Tertaut" if r.get("status") == "ACTIVE" else "Terputus / Riwayat Lampau"
+            return rows
+
+    def list_all_devices(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            user_map = {int(u.get("id", 0)): u.get("username", "") for u in data.get("users", [])}
+            res = []
+            for d in data.get("registered_devices", []):
+                item = dict(d)
+                if item.get("owner_id"):
+                    item["owner_username"] = user_map.get(int(item["owner_id"]), "")
+                res.append(item)
+            res.sort(key=lambda x: (not x.get("is_protected", False), str(x.get("created_at", ""))), reverse=False)
+            return res
 
     def list_devices(self, owner_id: int) -> list:
         with self._lock:
             data = self._load()
-            return [d for d in data.get("registered_devices", []) if int(d.get("owner_id", 0)) == int(owner_id)]
+            return [d for d in data.get("registered_devices", []) if d.get("owner_id") is not None and int(d.get("owner_id")) == int(owner_id)]
 
     def get_user_mac_address(self, user_id: int) -> Optional[str]:
         with self._lock:
             data = self._load()
             for dev in data.get("registered_devices", []):
-                if int(dev.get("owner_id", 0)) == int(user_id):
+                if dev.get("owner_id") is not None and int(dev.get("owner_id")) == int(user_id):
                     return str(dev.get("device_id", "")).upper()
             return None
 
@@ -2148,15 +2344,27 @@ class HFJsonStore:
         dev = self.find_device_by_id(device_id)
         if not dev:
             return False
-        return int(dev.get("owner_id", 0)) == int(owner_id)
+        return bool(dev.get("owner_id") is not None and int(dev.get("owner_id")) == int(owner_id))
 
     def delete_device(self, owner_id: int, device_id: str) -> bool:
+        norm = normalize_mac_address(device_id)
+        if norm in PROTECTED_DEVICE_MACS or self.is_device_protected(norm):
+            return self.detach_device(norm, owner_id=owner_id, reason="Perangkat terlindungi (protected) - dipisahkan bukan dihapus")
         with self._lock:
             data = self._load()
+            data.setdefault("registered_devices", [])
+            data.setdefault("board_binding_history", [])
+            now = utc_now()
+            for h in data["board_binding_history"]:
+                if normalize_mac_address(h.get("device_mac", "")).lower() == norm.lower() and h.get("status") == "ACTIVE":
+                    h["status"] = "DETACHED"
+                    h["unlinked_at"] = now
+                    h["notes"] = "Device dihapus dari sistem"
             before = len(data.get("registered_devices", []))
             data["registered_devices"] = [
                 d for d in data.get("registered_devices", [])
-                if not (d.get("id") == device_id and int(d.get("owner_id", 0)) == int(owner_id))
+                if not ((d.get("id") == device_id or normalize_mac_address(d.get("device_id", "") or d.get("mac_address", "")).lower() == norm.lower())
+                        and int(d.get("owner_id", 0)) == int(owner_id))
             ]
             changed = len(data.get("registered_devices", [])) != before
             if changed:
