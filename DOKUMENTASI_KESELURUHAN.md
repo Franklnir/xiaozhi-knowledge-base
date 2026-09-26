@@ -1186,3 +1186,20 @@ Semua ini berjalan di atas protokol jaringan yang bisa diukur dan dianalisis —
 ---
 
 *Dokumentasi ini dibuat berdasarkan analisis source code: `xiaozhi/mcp/server.py`, `xiaozhi/mcp/tools.py`, `xiaozhi/mcp/bridge.py`, `xiaozhi/services/youtube_streamer.py`, `xiaozhi/services/playback_tracker.py`, `xiaozhi/routers/youtube.py`, `xiaozhi/routers/devices.py`, `xiaozhi/routers/mcp_endpoints.py`, `xiaozhi/config.py`, `xiaozhi/main.py`, `README.md`*
+
+
+---
+
+## 20. Panduan Hardware: ESP32-S3 N16R8 (CAM & Standar Non-CAM)
+
+Tersedia dokumentasi khusus untuk hardware ESP32-S3 N16R8 pada file terpisah: [`PANDUAN_HARDWARE_ESP32_S3_N16R8.md`](./PANDUAN_HARDWARE_ESP32_S3_N16R8.md) serta pada Web Portal Dokumentasi (`/documentation` tab **ESP32-S3 Hardware & Tombol**).
+
+### Rangkuman Cepat:
+- **Kompatibilitas:** ESP32-S3 N16R8 CAM & ESP32-S3 N16R8 DevKitC-1 biasa.
+- **Fail-safe Kamera:** Driver tidak crash jika modul kamera tidak dipasang pada varian standar.
+- **Alur Setup Web Portal (`192.168.4.1`):** Konfigurasi SSID Wi-Fi, modul layar (ST7789 / OLED / Headless), audio I2S (INMP441 + MAX98357A), dan status kamera.
+- **Fungsi Tombol Fisik:**
+  - **BOOT (GPIO 0):** 1x Klik (Bicara / Stop YouTube / Interupsi), 2x Klik (Auto Play Lagu Remix), Long Press (Reset Wi-Fi Web Portal).
+  - **VOL UP (GPIO 14):** 1x Klik (Volume +10% / Zoom In), 2x Klik (Rotasi Layar 180°), Long Press (Volume 100%).
+  - **VOL DOWN (GPIO 46):** 1x Klik (Volume -10% / Zoom Out), 2x Klik (Switch Mode XiaoZhi ↔ Chronchi Smartwatch), Long Press (Mute 0%).
+- **MCP Tools Internal:** `self.get_hardware_specs` & `self.get_buttons_guide`.
