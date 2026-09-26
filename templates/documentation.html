@@ -2163,8 +2163,6 @@ void ackCommand(String cmdId) {
 
     </div>
 
-<script>>
-
 <script>
     function switchTab(tabName) {
         document.querySelectorAll('.doc-tab-content').forEach(el => {
@@ -2174,13 +2172,33 @@ void ackCommand(String cmdId) {
             el.classList.remove('active');
         });
         const target = document.getElementById('tab-' + tabName);
-        if (target) target.classList.add('active');
-        if (window.event && window.event.currentTarget) {
+        if (target) {
+            target.classList.add('active');
+        }
+        const btn = document.querySelector(`.doc-tab[onclick*="'${tabName}'"]`);
+        if (btn) {
+            btn.classList.add('active');
+        } else if (window.event && window.event.currentTarget) {
             window.event.currentTarget.classList.add('active');
-        } else if (window.event && window.event.target) {
-            window.event.target.classList.add('active');
+        }
+        if (history.replaceState) {
+            history.replaceState(null, null, '#' + tabName);
         }
     }
+
+    // Auto-switch based on URL hash (e.g., #hardware)
+    function checkHashTab() {
+        const hash = (window.location.hash || '').replace('#', '');
+        if (hash) {
+            const valid = document.getElementById('tab-' + hash);
+            if (valid) {
+                switchTab(hash);
+            }
+        }
+    }
+    window.addEventListener('DOMContentLoaded', checkHashTab);
+    window.addEventListener('hashchange', checkHashTab);
+    checkHashTab();
 
     function filterToolsCatalog(q) {
         q = (q || '').toLowerCase().trim();
