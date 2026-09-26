@@ -444,11 +444,15 @@
                             </div>
                             {% elif item.device_mac %}
                             <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
-                                <div style="display: inline-flex; align-items: center; gap: 5px;">
+                                <div style="display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap;">
                                     <code style="font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
                                         {{ item.device_mac }}
                                     </code>
+                                    {% if item.device_mac == 'E8:3D:C1:9B:B5:14' %}
+                                    <span class="app-chip app-chip-small" style="font-size: 9px; padding: 1px 5px; font-weight: 700; background: #6366f1; color: #fff; border-radius: 4px;" title="Board ID Terlindungi Permanen">🛡️ Master</span>
+                                    {% endif %}
                                     <span class="app-chip app-chip-small app-chip-success" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; border-radius: 4px;">Tersimpan OK</span>
+                                    <button type="button" onclick="viewBoardHistoryAdmin('{{ item.device_mac }}')" style="background: transparent; border: 1px solid rgba(59, 130, 246, 0.4); color: #3b82f6; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 6px; cursor: pointer;" title="Lihat audit riwayat tautan board ini">📜 Riwayat</button>
                                 </div>
                                 {% if item.device_name %}
                                 <span style="font-size: 10px; color: var(--app-muted); padding-left: 2px;">{{ item.device_name }}</span>
@@ -1514,4 +1518,92 @@
         }
     }, 5000);
 </script>
+
+<!-- 📜 Modal Riwayat Tautan Board ID (Admin) -->
+<div id="adminBoardHistoryModal" style="display: none; position: fixed; inset: 0; z-index: 99999; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: var(--app-surface, #1e293b); border: 1px solid var(--app-border, #334155); border-radius: 16px; width: 100%; max-width: 720px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+        <div style="padding: 18px 24px; border-bottom: 1px solid var(--app-border, #334155); display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--app-text, #f8fafc); display: flex; align-items: center; gap: 8px;">
+                    <span>📜</span>
+                    <span id="adminBoardHistTitle">Audit Riwayat Tautan Board ESP32</span>
+                </h3>
+                <p style="margin: 4px 0 0 0; font-size: 12.5px; color: var(--app-muted, #94a3b8);">Linimasa lengkap siapa yang pernah tertaut, kapan tertaut, dan kapan terakhir aktif</p>
+            </div>
+            <button type="button" onclick="document.getElementById('adminBoardHistoryModal').style.display='none'" style="background: transparent; border: none; font-size: 22px; cursor: pointer; color: var(--app-muted, #94a3b8); line-height: 1;">&times;</button>
+        </div>
+        <div id="adminBoardHistContent" style="padding: 20px 24px; overflow-y: auto; flex: 1;">
+            <div style="text-align: center; padding: 30px; color: var(--app-muted, #94a3b8);">Memuat riwayat...</div>
+        </div>
+        <div style="padding: 14px 24px; border-top: 1px solid var(--app-border, #334155); background: var(--app-soft, #0f172a); display: flex; justify-content: flex-end;">
+            <button type="button" onclick="document.getElementById('adminBoardHistoryModal').style.display='none'" class="app-button" style="padding: 6px 18px; border-radius: 8px; font-size: 13px;">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function viewBoardHistoryAdmin(mac) {
+    const modal = document.getElementById("adminBoardHistoryModal");
+    const title = document.getElementById("adminBoardHistTitle");
+    const content = document.getElementById("adminBoardHistContent");
+    if (!modal) return;
+    modal.style.display = "flex";
+    title.innerHTML = `Audit Riwayat: <code style="color: #10b981; font-family: monospace;">${mac}</code>`;
+    content.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--app-muted);">⏳ Mengambil data riwayat audit...</div>`;
+    
+    try {
+        const res = await fetch("/api/devices/history/" + encodeURIComponent(mac));
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            content.innerHTML = `<div style="color: #ef4444; padding: 20px; text-align: center;">${data.detail || "Gagal memuat riwayat."}</div>`;
+            return;
+        }
+        
+        let html = '';
+        if (data.is_protected) {
+            html += `<div style="margin-bottom: 16px; padding: 12px 16px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 10px; font-size: 13px; color: #a5b4fc; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">🛡️</span>
+                <div>
+                    <strong>Master Protected Device:</strong> Board ID ini memiliki status terlindungi permanen di level database PostgreSQL. Tidak akan pernah dihapus oleh operasi apapun.
+                </div>
+            </div>`;
+        }
+        
+        if (!data.history || data.history.length === 0) {
+            html += `<div style="text-align: center; padding: 30px; color: var(--app-muted);">Belum ada riwayat tercatat untuk board ini.</div>`;
+        } else {
+            html += `<div style="display: flex; flex-direction: column; gap: 12px;">`;
+            data.history.forEach((h, idx) => {
+                const isActive = h.status === 'ACTIVE';
+                const statusBadge = isActive 
+                    ? `<span style="background: #10b981; color: white; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;">🟢 Sedang Tertaut (Aktif)</span>`
+                    : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600;">⚪ Terputus / Riwayat Lampau</span>`;
+                
+                html += `
+                <div style="background: var(--app-card, rgba(255,255,255,0.03)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 12px; padding: 14px 16px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="font-weight: 700; font-size: 14px; color: var(--app-text, #fff); display: flex; align-items: center; gap: 6px;">
+                            <span>👤</span>
+                            <span>${h.username || 'User ID ' + h.user_id}</span>
+                            <span style="font-size: 11.5px; color: var(--app-muted, #94a3b8); font-weight: 500;">(ID Akun: ${h.user_id})</span>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; font-size: 12px; color: var(--app-muted, #94a3b8);">
+                        <div>📅 <strong>Pernah Tertaut:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
+                        <div>⏱️ <strong>Terakhir Aktif:</strong> ${h.last_active_str || h.last_active_at || '-'}</div>
+                        <div>🔌 <strong>Terakhir Tertaut / Diputus:</strong> ${h.unlinked_at_str ? h.unlinked_at_str : '<span style="color: #10b981; font-weight: 600;">Masih aktif sampai sekarang</span>'}</div>
+                        <div>📝 <strong>Catatan / Alasan:</strong> ${h.notes || 'Normal binding'}</div>
+                    </div>
+                </div>`;
+            });
+            html += `</div>`;
+        }
+        content.innerHTML = html;
+    } catch(err) {
+        content.innerHTML = `<div style="color: #ef4444; padding: 20px; text-align: center;">Error: ${err.message}</div>`;
+    }
+}
+</script>
+
 {% endblock %}

@@ -850,7 +850,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Delete button - AJAX
     const deleteBtn = document.getElementById("deleteBtn");
     if (deleteBtn) deleteBtn.addEventListener("click", async function() {
-        if (!confirm("Hapus endpoint? Koneksi akan diputus.")) return;
+        if (!confirm("Hapus endpoint? Koneksi MCP dan tautan Board ESP32 akan diputuskan (riwayat board tetap tersimpan aman).")) return;
         mcpBusy = true;
         await ajaxMcp("/delete_mcp", {});
         mcpBusy = false;

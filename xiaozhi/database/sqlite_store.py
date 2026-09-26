@@ -45,6 +45,8 @@ from xiaozhi.database.helpers import empty_database
 
 logger = logging.getLogger("xiaozhi.sqlite")
 
+PROTECTED_DEVICE_MACS = {"E8:3D:C1:9B:B5:14"}
+
 
 class SQLiteStore:
     """SQLite-backed store with efficient indexing for production use."""
@@ -213,15 +215,37 @@ class SQLiteStore:
             -- Registered devices
             CREATE TABLE IF NOT EXISTS registered_devices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                owner_id INTEGER NOT NULL,
+                owner_id INTEGER,
                 device_id TEXT NOT NULL,
                 device_name TEXT,
                 device_type TEXT,
+                is_protected INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
+                last_active_at TEXT,
                 created_at TEXT NOT NULL,
-                FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+                FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
             );
             CREATE INDEX IF NOT EXISTS idx_device_owner ON registered_devices(owner_id);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_device_id ON registered_devices(device_id);
+
+            -- Board binding history
+            CREATE TABLE IF NOT EXISTS board_binding_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_mac TEXT NOT NULL,
+                user_id INTEGER,
+                username TEXT,
+                device_name TEXT,
+                device_type TEXT,
+                linked_at TEXT NOT NULL,
+                last_active_at TEXT NOT NULL,
+                unlinked_at TEXT,
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_board_hist_mac ON board_binding_history(device_mac);
+            CREATE INDEX IF NOT EXISTS idx_board_hist_user ON board_binding_history(user_id);
 
             -- Feature settings per user
             CREATE TABLE IF NOT EXISTS feature_settings (
@@ -843,13 +867,24 @@ class SQLiteStore:
         conn = self._get_conn()
         cursor = conn.execute("DELETE FROM xiaozhi_tokens WHERE user_id = ?", (owner_id,))
         conn.commit()
+        try:
+            self.detach_user_devices(int(owner_id), reason="MCP Xiaozhi diputus / dihapus")
+        except Exception as exc:
+            logger.warning("Gagal detach devices sqlite user %s: %s", owner_id, exc)
         return cursor.rowcount > 0
 
     def delete_xiaozhi_token_by_hash(self, token: str) -> bool:
         token_hash = xiaozhi_token_hash(token)
         conn = self._get_conn()
+        row = conn.execute("SELECT user_id FROM xiaozhi_tokens WHERE token_hash = ?", (token_hash,)).fetchone()
+        target_user = row["user_id"] if row else None
         cursor = conn.execute("DELETE FROM xiaozhi_tokens WHERE token_hash = ?", (token_hash,))
         conn.commit()
+        if target_user:
+            try:
+                self.detach_user_devices(int(target_user), reason="MCP Token dihapus by hash")
+            except Exception as exc:
+                logger.warning("Gagal detach devices sqlite user %s: %s", target_user, exc)
         return cursor.rowcount > 0
 
     def list_xiaozhi_tokens(self) -> List[Dict[str, Any]]:
@@ -1363,6 +1398,16 @@ class SQLiteStore:
     def list_devices(self, owner_id: int) -> List[Dict[str, Any]]:
         return self.list_registered_devices(owner_id)
 
+    def is_device_protected(self, device_id: str) -> bool:
+        if not device_id:
+            return False
+        norm = normalize_mac_address(device_id)
+        if norm in PROTECTED_DEVICE_MACS:
+            return True
+        conn = self._get_conn()
+        row = conn.execute("SELECT is_protected FROM registered_devices WHERE LOWER(device_id) = ?", (norm.lower(),)).fetchone()
+        return bool(row and row["is_protected"])
+
     def register_device(self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = "") -> Dict[str, Any]:
         conn = self._get_conn()
         raw_mac = device_id or mac_address
@@ -1371,29 +1416,170 @@ class SQLiteStore:
             raise ValueError("Device ID / MAC address diperlukan.")
         dev_name = (name or device_name).strip() if (name or device_name) else f"ESP32 ({normalized_id[-5:]})"
         dev_type = device_type.strip() if device_type else "esp32"
+        is_protected = 1 if (normalized_id in PROTECTED_DEVICE_MACS) else 0
+        now_str = str(utc_now())
+
+        # Ambil username
+        u_row = conn.execute("SELECT username FROM users WHERE id = ?", (int(owner_id),)).fetchone()
+        username = u_row["username"] if u_row else f"user_{owner_id}"
+
         existing = conn.execute(
-            "SELECT id, owner_id, device_name FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ?",
+            "SELECT id, owner_id, device_name, is_protected FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ?",
             (normalized_id.lower(), normalized_id.replace(":", "").replace("-", "").lower())
         ).fetchone()
+
         if existing:
+            prev_owner = existing["owner_id"]
+            if prev_owner and int(prev_owner) != int(owner_id):
+                conn.execute(
+                    "UPDATE board_binding_history SET status = 'DETACHED', unlinked_at = ?, notes = ? WHERE LOWER(device_mac) = ? AND user_id = ? AND status = 'ACTIVE'",
+                    (now_str, f"Dialihkan ke user {username} (ID: {owner_id})", normalized_id.lower(), int(prev_owner))
+                )
+            final_protected = 1 if (existing["is_protected"] or is_protected) else 0
             conn.execute(
-                "UPDATE registered_devices SET owner_id = ?, device_id = ?, device_name = ?, device_type = ? WHERE id = ?",
-                (int(owner_id), normalized_id, dev_name, dev_type, existing["id"])
+                "UPDATE registered_devices SET owner_id = ?, device_id = ?, device_name = ?, device_type = ?, is_protected = ?, status = 'ACTIVE', last_active_at = ? WHERE id = ?",
+                (int(owner_id), normalized_id, dev_name, dev_type, final_protected, now_str, existing["id"])
             )
-            conn.commit()
-            return {"id": existing["id"], "device_id": normalized_id, "name": dev_name, "updated": True}
+            dev_id = existing["id"]
+        else:
+            cursor = conn.execute(
+                "INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, is_protected, status, last_active_at, created_at) VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?)",
+                (int(owner_id), normalized_id, dev_name, dev_type, is_protected, now_str, now_str)
+            )
+            dev_id = cursor.lastrowid
+            final_protected = is_protected
+
+        # Log history
+        hist = conn.execute(
+            "SELECT id FROM board_binding_history WHERE LOWER(device_mac) = ? AND user_id = ? AND status = 'ACTIVE' ORDER BY id DESC LIMIT 1",
+            (normalized_id.lower(), int(owner_id))
+        ).fetchone()
+        if hist:
+            conn.execute(
+                "UPDATE board_binding_history SET last_active_at = ?, device_name = ?, device_type = ?, username = ? WHERE id = ?",
+                (now_str, dev_name, dev_type, username, hist["id"])
+            )
+        else:
+            conn.execute(
+                "INSERT INTO board_binding_history (device_mac, user_id, username, device_name, device_type, linked_at, last_active_at, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)",
+                (normalized_id, int(owner_id), username, dev_name, dev_type, now_str, now_str, "Tautan aktif (Device Registered)", now_str)
+            )
+        conn.commit()
+        return {"id": dev_id, "device_id": normalized_id, "name": dev_name, "is_protected": bool(final_protected)}
+
+    def detach_device(self, device_id: str, owner_id: Optional[int] = None, reason: str = "Tautan dipisahkan") -> bool:
+        normalized_id = normalize_mac_address(device_id)
+        if not normalized_id:
+            return False
+        now_str = str(utc_now())
+        conn = self._get_conn()
+        dev = conn.execute("SELECT id, owner_id FROM registered_devices WHERE LOWER(device_id) = ?", (normalized_id.lower(),)).fetchone()
+        if not dev:
+            return False
+        if owner_id is not None and dev["owner_id"] and int(dev["owner_id"]) != int(owner_id):
+            return False
+
+        conn.execute(
+            "UPDATE board_binding_history SET status = 'DETACHED', unlinked_at = ?, notes = ? WHERE LOWER(device_mac) = ? AND status = 'ACTIVE'",
+            (now_str, reason, normalized_id.lower())
+        )
         cursor = conn.execute(
-            "INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, created_at) VALUES (?, ?, ?, ?, ?)",
-            (int(owner_id), normalized_id, dev_name, dev_type, utc_now())
+            "UPDATE registered_devices SET owner_id = NULL, status = 'DETACHED', last_active_at = ? WHERE LOWER(device_id) = ?",
+            (now_str, normalized_id.lower())
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "device_id": normalized_id, "name": dev_name, "created": True}
+        return cursor.rowcount > 0
+
+    def detach_user_devices(self, user_id: int, reason: str = "MCP diputuskan") -> List[str]:
+        now_str = str(utc_now())
+        conn = self._get_conn()
+        devices = conn.execute("SELECT device_id FROM registered_devices WHERE owner_id = ?", (int(user_id),)).fetchall()
+        detached_macs = []
+        for d in devices:
+            mac = str(d["device_id"])
+            detached_macs.append(mac)
+            conn.execute(
+                "UPDATE board_binding_history SET status = 'DETACHED', unlinked_at = ?, notes = ? WHERE LOWER(device_mac) = ? AND user_id = ? AND status = 'ACTIVE'",
+                (now_str, reason, mac.lower(), int(user_id))
+            )
+        if detached_macs:
+            conn.execute(
+                "UPDATE registered_devices SET owner_id = NULL, status = 'DETACHED', last_active_at = ? WHERE owner_id = ?",
+                (now_str, int(user_id))
+            )
+        conn.commit()
+        return detached_macs
 
     def delete_device(self, owner_id: int, device_id: str) -> bool:
+        normalized_id = normalize_mac_address(device_id)
+        if not normalized_id:
+            return False
+        if normalized_id in PROTECTED_DEVICE_MACS or self.is_device_protected(normalized_id):
+            return self.detach_device(normalized_id, owner_id=owner_id, reason="Perangkat terlindungi (protected) - dipisahkan bukan dihapus")
+        now_str = str(utc_now())
         conn = self._get_conn()
-        cursor = conn.execute("DELETE FROM registered_devices WHERE device_id = ? AND owner_id = ?", (device_id, owner_id))
+        conn.execute(
+            "UPDATE board_binding_history SET status = 'DETACHED', unlinked_at = ?, notes = ? WHERE LOWER(device_mac) = ? AND status = 'ACTIVE'",
+            (now_str, "Device dihapus dari sistem", normalized_id.lower())
+        )
+        cursor = conn.execute("DELETE FROM registered_devices WHERE LOWER(device_id) = ? AND owner_id = ?", (normalized_id.lower(), owner_id))
         conn.commit()
         return cursor.rowcount > 0
+
+    def record_device_activity(self, device_id: str, owner_id: Optional[int] = None) -> None:
+        norm = normalize_mac_address(device_id)
+        if not norm:
+            return
+        now_str = str(utc_now())
+        conn = self._get_conn()
+        conn.execute("UPDATE registered_devices SET last_active_at = ? WHERE LOWER(device_id) = ?", (now_str, norm.lower()))
+        if owner_id:
+            conn.execute("UPDATE board_binding_history SET last_active_at = ? WHERE LOWER(device_mac) = ? AND user_id = ? AND status = 'ACTIVE'", (now_str, norm.lower(), int(owner_id)))
+        else:
+            conn.execute("UPDATE board_binding_history SET last_active_at = ? WHERE LOWER(device_mac) = ? AND status = 'ACTIVE'", (now_str, norm.lower()))
+        conn.commit()
+
+    def get_board_binding_history(self, device_mac: str) -> List[Dict[str, Any]]:
+        norm = normalize_mac_address(device_mac)
+        if not norm:
+            return []
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM board_binding_history WHERE LOWER(device_mac) = ? OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = ? ORDER BY id DESC",
+            (norm.lower(), norm.replace(":", "").replace("-", "").lower())
+        ).fetchall()
+        res = []
+        for r in rows:
+            item = dict(r)
+            item["linked_at_str"] = str(item.get("linked_at", ""))
+            item["last_active_str"] = str(item.get("last_active_at", ""))
+            item["unlinked_at_str"] = str(item.get("unlinked_at", "")) if item.get("unlinked_at") else None
+            item["status_label"] = "Sedang Tertaut" if item.get("status") == "ACTIVE" else "Terputus / Riwayat Lampau"
+            res.append(item)
+        return res
+
+    def get_user_board_history(self, user_id: int) -> List[Dict[str, Any]]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT bbh.*, rd.is_protected FROM board_binding_history bbh LEFT JOIN registered_devices rd ON LOWER(rd.device_id) = LOWER(bbh.device_mac) WHERE bbh.user_id = ? ORDER BY bbh.id DESC",
+            (int(user_id),)
+        ).fetchall()
+        res = []
+        for r in rows:
+            item = dict(r)
+            item["linked_at_str"] = str(item.get("linked_at", ""))
+            item["last_active_str"] = str(item.get("last_active_at", ""))
+            item["unlinked_at_str"] = str(item.get("unlinked_at", "")) if item.get("unlinked_at") else None
+            item["status_label"] = "Sedang Tertaut" if item.get("status") == "ACTIVE" else "Terputus / Riwayat Lampau"
+            res.append(item)
+        return res
+
+    def list_all_devices(self) -> List[Dict[str, Any]]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT rd.*, u.username as owner_username FROM registered_devices rd LEFT JOIN users u ON rd.owner_id = u.id ORDER BY rd.is_protected DESC, rd.created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def find_device_by_id(self, device_id: str) -> Optional[Dict[str, Any]]:
         device_id = str(device_id or "").strip()
@@ -1495,7 +1681,7 @@ class SQLiteStore:
         dev = self.find_device_by_id(device_id)
         if not dev:
             return False
-        return int(dev.get("owner_id", 0)) == int(owner_id)
+        return bool(dev.get("owner_id") is not None and int(dev.get("owner_id")) == int(owner_id))
 
     # ── Feature Settings ───────────────────────────────────────────────────
 

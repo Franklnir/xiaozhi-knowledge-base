@@ -546,53 +546,85 @@ async def stream_audio(video_id: str, br: str = "12k", start: float = 0, ...):
 
 ---
 
-## 8. Device Registry
+## 8. Device Registry & Board Binding History
 
 ### 8.1 Data Model
 
 ```
 registered_devices:
 ├── id (auto-increment)
-├── owner_id (FK → users)
-├── device_id (MAC address atau custom ID)
+├── owner_id (FK → users, NULLABLE saat detach)
+├── device_id (MAC address atau custom ID, UNIQUE)
 ├── device_name (user-defined name)
-├── device_type (ESP32, ESP8266, dll)
-├── mac_address (normalized MAC)
-├── created_at
-└── last_seen_at
+├── device_type (ESP32, ESP32-S3, dll)
+├── is_protected (BOOLEAN, TRUE untuk Master Board ID)
+├── status (ACTIVE / DETACHED)
+├── last_active_at (TIMESTAMPTZ)
+└── created_at (TIMESTAMPTZ)
+
+board_binding_history:
+├── id (auto-increment PK)
+├── device_mac (VARCHAR 32, MAC Address)
+├── user_id (FK → users, NULLABLE on delete)
+├── username (VARCHAR 50, audit snapshot)
+├── device_name (VARCHAR 100)
+├── device_type (VARCHAR 50)
+├── linked_at (TIMESTAMPTZ, waktu awal tertaut)
+├── last_active_at (TIMESTAMPTZ, interaksi terakhir)
+├── unlinked_at (TIMESTAMPTZ, waktu dipisahkan/diputus)
+├── status (ACTIVE / DETACHED)
+├── notes (TEXT, alasan/metode tautan)
+└── created_at (TIMESTAMPTZ)
 ```
 
-### 8.2 Device Resolution Flow
+### 8.2 Proteksi Permanen Board ID & Pemisahan MCP
+
+1. **Master Board ID Protected (`E8:3D:C1:9B:B5:14`):**
+   - Board ID `E8:3D:C1:9B:B5:14` (dan board dengan flag `is_protected = TRUE`) **JANGAN PERNAH DIHAPUS** dari database.
+   - Diproteksi secara native di level PostgreSQL Trigger (`trg_protect_master_board` pada tabel `registered_devices`) serta di Python Store layer. Operasi delete fisik akan ditolak atau dialihkan menjadi detach.
+2. **Pemisahan Board & User Saat Hapus/Putus MCP:**
+   - Saat pengguna menghapus endpoint MCP Xiaozhi (`/delete_mcp`, `/api/mcp/delete-by-token`, API v1, atau Admin), sistem otomatis memisahkan ID Board dari user (`owner_id = NULL`, status `DETACHED`).
+   - Riwayat penautan masa lalu tetap aman tersimpan di `board_binding_history`.
+   - Pengguna bebas menggunakan dan menautkan Board ID lain kapan saja.
+   - Board ID lama tetap ada di sistem dan dapat ditautkan kembali oleh pengguna di kemudian hari.
+3. **Audit Trail Lengkap (`board_binding_history`):**
+   - Mencatat secara rinci siapa saja pengguna yang pernah tertaut ke board ini (`user_id`, `username`).
+   - Kapan pernah tertaut pertama kali (`linked_at`).
+   - Kapan terakhir kali berinteraksi aktif (`last_active_at`).
+   - Kapan terakhir tertaut atau diputuskan (`unlinked_at`).
+   - Status penautan saat ini (`ACTIVE` atau `DETACHED`).
+
+### 8.3 Device Resolution Flow
 
 ```python
 def _resolve_owner_for_device(store, device_id):
-    """Resolve user_id dari device_id atau MAC address."""
     # 1. Exact match di registered_devices
     row = conn.execute(
-        "SELECT owner_id FROM registered_devices "
-        "WHERE LOWER(device_id) = ? OR LOWER(device_id) = ?",
+        "SELECT owner_id FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(device_id) = ?",
         (device_id, mac_with_colons)
     ).fetchone()
-    if row:
+    if row and row["owner_id"]:
         return row["owner_id"]
 
     # 2. Match by MAC di audio_queue (fallback)
     row = conn.execute(
-        "SELECT owner_id FROM audio_queue "
-        "WHERE stream_url LIKE ?",
+        "SELECT owner_id FROM audio_queue WHERE stream_url LIKE ?",
         (f"%{mac}%",)
     ).fetchone()
     return row["owner_id"] if row else None
 ```
 
-### 8.3 API Endpoints
+### 8.4 API Endpoints
 
 | Method | Endpoint | Fungsi |
 |--------|----------|--------|
-| GET | `/api/devices` | List semua device user |
-| GET | `/api/devices/check/{device_id}` | Cek device terdaftar milik siapa |
-| POST | `/api/devices/register` | Daftarkan device baru |
-| POST | `/api/devices/delete` | Hapus device |
+| GET | `/api/devices` | List semua device aktif milik user yang sedang login |
+| GET | `/api/devices/check/{device_id}` | Cek apakah device terdaftar, milik siapa, dan status proteksinya |
+| POST | `/api/devices/register` | Daftarkan/tautkan device baru (Admin) dan catat riwayat binding |
+| POST | `/api/devices/detach` | Pisahkan ID Board dari user (board & riwayat tetap aman tersimpan) |
+| POST | `/api/devices/delete` | Hapus device non-protected (Protected board otomatis hanya di-detach) |
+| GET | `/api/devices/history/{device_id}` | Lihat riwayat lengkap board: siapa pernah tertaut & kapan waktunya |
+| GET | `/api/devices/my-history` | Lihat seluruh riwayat board yang pernah tertaut ke akun user |
 
 ---
 
