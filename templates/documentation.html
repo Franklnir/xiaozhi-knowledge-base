@@ -228,6 +228,7 @@
         <button class="doc-tab" onclick="switchTab('smarthome')">Smart Home</button>
         <button class="doc-tab" onclick="switchTab('tools')">Tools MCP</button>
         <button class="doc-tab" onclick="switchTab('knowledge')">Knowledge Base</button>
+        <button class="doc-tab" onclick="switchTab('hardware')">ESP32-S3 Hardware &amp; Tombol</button>
         <button class="doc-tab" onclick="switchTab('faq')">FAQ</button>
     </div>
 
@@ -1818,6 +1819,259 @@ void ackCommand(String cmdId) {
         </div>
     </div>
 
+    <!-- ESP32-S3 Hardware & Buttons Tab -->
+    <div id="tab-hardware" class="doc-tab-content">
+        <div class="app-card">
+            <div class="doc-section">
+                <div class="doc-section-title">
+                    <span>⚡</span> Panduan Operasional ESP32-S3 N16R8 (CAM & Standar Non-CAM)
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:16px;">
+                    Firmware ini mendukung chip <strong>ESP32-S3 N16R8</strong> (16MB Flash + 8MB Octal PSRAM) baik versi dengan modul kamera (CAM) maupun board standar biasa tanpa modul kamera.
+                </div>
+
+                <div class="doc-tip">
+                    <strong>💡 Tips Kompatibilitas Board Biasa (Non-CAM):</strong><br>
+                    Firmware memiliki proteksi <em>fail-safe</em> otomatis. Jika board Anda tidak memiliki modul kamera, driver tidak akan crash atau panic, melainkan otomatis melewati inisialisasi kamera dan berjalan normal 100% untuk suara, YouTube, dan MCP tools.
+                </div>
+            </div>
+
+            <!-- Section 1: Step by Step Web Config -->
+            <div class="doc-section" style="margin-top:24px;">
+                <div class="doc-section-title">
+                    <span>🌐</span> Alur Konfigurasi Awal (Web Portal 192.168.4.1)
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Sambungkan ke Hotspot Wi-Fi Bawaan</div>
+                        <div class="doc-step-desc">
+                            Saat menyala pertama kali (LED berkedip hijau), hubungkan HP atau Laptop Anda ke hotspot Wi-Fi bernama <strong>XiaoZhi-XXXX</strong> atau <strong>Xichi-Setup</strong> (tanpa kata sandi).
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Buka Portal Konfigurasi di Browser</div>
+                        <div class="doc-step-desc">
+                            Buka browser dan kunjungi alamat <strong>http://192.168.4.1</strong> untuk membuka portal konfigurasi perangkat keras dan jaringan.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Pilih SSID Wi-Fi & Kata Sandi</div>
+                        <div class="doc-step-desc">
+                            Pada tab <strong>Jaringan Wi-Fi</strong>, pilih nama router Wi-Fi Anda (frekuensi 2.4 GHz) lalu masukkan kata sandi dengan benar.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">4</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Pengaturan Modul Layar & Rotasi</div>
+                        <div class="doc-step-desc">
+                            Pada tab <strong>Pengaturan Hardware</strong>:
+                            <ul style="margin:6px 0 0 16px; padding:0;">
+                                <li><strong>Tanpa Layar (Headless Audio Only):</strong> Pilih ini jika perangkat Anda hanya modul audio tanpa layar.</li>
+                                <li><strong>ST7789 240x280 (8-Pin SPI):</strong> Untuk modul layar IPS 1.69" / 1.54" 8-pin.</li>
+                                <li><strong>ST7789 240x240 (7-Pin SPI):</strong> Untuk modul layar 1.3" 7-pin tanpa CS.</li>
+                                <li><strong>OLED SSD1306 / SH1106:</strong> Untuk layar OLED kecil I2C.</li>
+                                <li><strong>Rotasi Layar:</strong> Pilih 0° (Normal) atau 180° (Terbalik) sesuai orientasi perakitan.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">5</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Profil Audio I2S</div>
+                        <div class="doc-step-desc">
+                            Pilih <strong>INMP441 Mic + MAX98357A Spk (Simplex I2S)</strong>. Pinout otomatis dikunci pada jalur aman (Mic: GPIO 1, 2, 42 | Speaker: GPIO 39, 40, 41) tanpa bentrok.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">6</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Modul Kamera ESP32-S3</div>
+                        <div class="doc-step-desc">
+                            • <strong>Untuk ESP32-S3 Biasa (Tanpa CAM):</strong> Pilih <strong>Kamera Nonaktif (Hemat Daya & Bebas Pin)</strong>.<br>
+                            • <strong>Untuk ESP32-S3 CAM:</strong> Pilih tipe sensor yang terpasang (misal <em>OV2640 2-Megapixel</em> atau <em>OV5640 5-Megapixel</em>).
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">7</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Simpan & Reboot Otomatis</div>
+                        <div class="doc-step-desc">
+                            Klik tombol <strong>Simpan Konfigurasi</strong>. Sistem akan menyimpan data ke NVS Flash dan me-reboot ESP32. Setelah menyala, ESP32 otomatis tersambung ke router Wi-Fi Anda.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: Detailed Button Guide -->
+            <div class="doc-section" style="margin-top:28px;">
+                <div class="doc-section-title">
+                    <span>🎮</span> Panduan Lengkap Fungsi Ke-3 Tombol Fisik
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); margin-bottom:12px;">
+                    Setiap tombol mendukung gestur <strong>Klik 1x</strong>, <strong>Klik 2x Cepat</strong>, dan <strong>Tekan Tahan (Long Press)</strong>.
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Tombol & Pin</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:20%;">Gestur</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Fungsi Utama</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Deskripsi / Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    Tombol 1: BOOT<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 0</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Bicara / Stop / Interupsi</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    • Stop lagu YouTube jika sedang diputar.<br>
+                                    • Interupsi suara AI jika sedang bicara.<br>
+                                    • Mulai mendengarkan tanpa wake-word jika standby.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Auto Play Test Music</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Langsung memutar lagu pengujian/remix santai dari YouTube.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan (>3s)</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Reset Wi-Fi Portal</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Membuka kembali hotspot Web Config (192.168.4.1) untuk ganti Wi-Fi.</td>
+                            </tr>
+
+                            <tr style="background:var(--app-surface);">
+                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    Tombol 2: VOL UP<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 14</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Volume +10% / Zoom In</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    • Naikkan volume speaker +10%.<br>
+                                    • Jika live camera aktif: Zoom In (1x → 2x → 3x).
+                                </td>
+                            </tr>
+                            <tr style="background:var(--app-surface);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Rotasi Layar 180°</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Memutar tampilan layar ST7789 180 derajat seketika tanpa restart.</td>
+                            </tr>
+                            <tr style="background:var(--app-surface);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Volume Maksimal (100%)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Mengatur volume speaker langsung ke batas tertinggi 100%.</td>
+                            </tr>
+
+                            <tr>
+                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    Tombol 3: VOL DOWN<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 46</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Volume -10% / Zoom Out</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    • Turunkan volume speaker -10%.<br>
+                                    • Jika live camera aktif: Zoom Out perkecil gambar.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#8b5cf6; font-weight:600;">Switch Mode (XiaoZhi ↔ Chronchi)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Beralih antara mode Asisten Suara AI dan mode Jam Pintar / BLE Companion.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Mute Suara (0%)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Membisukan audio seketika (Volume 0%).</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Section 3: Pinout Reference -->
+            <div class="doc-section" style="margin-top:24px;">
+                <div class="doc-section-title">
+                    <span>📌</span> Referensi Pinout Hardware ESP32-S3
+                </div>
+
+                <div class="doc-code">
+<strong>[ Microphone INMP441 (I2S Input) ]</strong>
+• SCK (Bit Clock)    : GPIO 2
+• WS  (Word Select)  : GPIO 1
+• SD  (Serial Data)  : GPIO 42
+• L/R & GND          : GND
+• VDD                : 3.3V
+
+<strong>[ Speaker MAX98357A (I2S Output) ]</strong>
+• BCLK (Bit Clock)   : GPIO 40
+• LRC  (Word Select) : GPIO 41
+• DIN  (Serial Data) : GPIO 39
+• GND                : GND
+• VIN                : 5V (Disarankan) atau 3.3V
+
+<strong>[ Layar ST7789 SPI (Opsional) ]</strong>
+• SCL / CLK  : GPIO 12        • RES / RST : GPIO 47
+• SDA / MOSI : GPIO 11        • CS        : GPIO 45 (Khusus 8-Pin)
+• DC / RS    : GPIO 48        • BL / PWM  : GPIO 38
+
+<strong>[ Tombol Fisik (Active Low - Internal Pull-up) ]</strong>
+• Tombol BOOT / AI Voice : GPIO 0
+• Tombol Volume UP       : GPIO 14
+• Tombol Volume DOWN     : GPIO 46
+                </div>
+            </div>
+
+            <!-- Section 4: MCP Tools for Hardware -->
+            <div class="doc-section" style="margin-top:24px;">
+                <div class="doc-section-title">
+                    <span>🤖</span> Perintah Suara & Tools MCP Bawaan
+                </div>
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">self.get_hardware_specs</div>
+                        <div class="doc-step-desc">
+                            Asisten AI dapat membaca spesifikasi teknis lengkap dari chip ESP32-S3, status PSRAM, Flash, tipe layar, dan pinout audio secara otomatis.<br>
+                            <em>Contoh perintah:</em> "Halo XiaoZhi, apa spesifikasi hardware kamu?"
+                        </div>
+                    </div>
+                </div>
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">self.get_buttons_guide</div>
+                        <div class="doc-step-desc">
+                            Asisten AI akan membacakan dan menjelaskan fungsi ketiga tombol fisik kepada Anda secara interaktif.<br>
+                            <em>Contoh perintah:</em> "Halo XiaoZhi, apa saja fungsi tombol di perangkat ini?"
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- FAQ Tab -->
     <div id="tab-faq" class="doc-tab-content">
         <div class="app-card">
@@ -1906,7 +2160,10 @@ void ackCommand(String cmdId) {
             </div>
         </div>
     </div>
-</div>
+
+    </div>
+
+<script>>
 
 <script>
     function switchTab(tabName) {
