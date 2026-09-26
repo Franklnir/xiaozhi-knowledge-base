@@ -232,9 +232,11 @@ async def chat_history_page(
     if not date_list and token_hash:
         date_list = store.chat_history_dates(user["id"], token_hash="")
 
-    # Default filter: Tampilkan percakapan HARI INI
+    # Default filter: Tampilkan percakapan HARI INI, atau tanggal percakapan terakhir jika hari ini belum ada obrolan
     from datetime import datetime
     today_str = datetime.now().strftime("%Y-%m-%d")
+
+    has_chats_today = any(d.get("date") == today_str for d in date_list) if date_list else False
 
     if date == "all":
         effective_date = ""
@@ -243,9 +245,14 @@ async def chat_history_page(
         effective_date = date
         active_date_val = date
     else:
-        # Default: hari ini
-        effective_date = today_str
-        active_date_val = today_str
+        # Smart Default: jika hari ini belum ada chat suara tapi ada riwayat tanggal sebelumnya,
+        # otomatis tampilkan tanggal terakhir agar halaman tidak kosong.
+        if not has_chats_today and date_list and isinstance(date_list[0], dict) and date_list[0].get("date"):
+            effective_date = date_list[0]["date"]
+            active_date_val = effective_date
+        else:
+            effective_date = today_str
+            active_date_val = today_str
 
     histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=effective_date)
     # If no results with token_hash, fallback to fetching without token_hash
