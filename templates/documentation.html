@@ -1212,15 +1212,15 @@ void ackCommand(String cmdId) {
         <div class="app-card">
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🔧</span> Daftar 38 Tools MCP Xiaozhi
+                    <span>🔧</span> Daftar 44 Tools MCP Xiaozhi
                 </div>
                 <p class="doc-step-desc">
-                    Xiaozhi terhubung dengan <strong>38 Tools MCP</strong> berstandar ilmiah, memori semantik vektor, profil persona pengguna, dan realtime. Tools ini otomatis dipanggil oleh Xiaozhi saat mendengarkan pertanyaan atau instruksi suara kamu.
+                    Xiaozhi terhubung dengan <strong>44 Tools MCP</strong> berstandar ilmiah, memori semantik vektor, profil persona pengguna, dan realtime. Tools ini otomatis dipanggil oleh Xiaozhi saat mendengarkan pertanyaan atau instruksi suara kamu.
                 </p>
 
                 <!-- Search box for tools -->
                 <div class="tool-search-wrap">
-                    <input type="search" id="toolFilterInput" oninput="filterToolsCatalog(this.value)" placeholder="🔍 Cari tool (contoh: sholat, gempa, fisika, python, cuaca, alkitab, bapa kami)..." class="tool-search-input">
+                    <input type="search" id="toolFilterInput" oninput="filterToolsCatalog(this.value)" placeholder="🔍 Cari tool (contoh: deep search, osint, reddit, sholat, gempa, fisika, python, cuaca)..." class="tool-search-input">
                 </div>
                 <div id="toolEmptyState" style="display: none; padding: 24px 16px; text-align: center; color: var(--app-muted); font-size: 14px; background: var(--app-surface-muted); border-radius: var(--app-radius); border: 1px dashed var(--app-border);">
                     Tidak ditemukan tool yang cocok dengan kata kunci pencarian.
@@ -1496,6 +1496,9 @@ void ackCommand(String cmdId) {
                         <div class="tool-desc">
                             Mengontrol relay virtual berdasarkan nomor channel (1-8) atau nama ruangan (Ruang Tamu, Kamar Tidur, Dapur, dll).
                         </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, nyalakan lampu ruang tamu."</em>
+                        </div>
                     </div>
 
                     <div class="tool-card">
@@ -1504,6 +1507,9 @@ void ackCommand(String cmdId) {
                         </div>
                         <div class="tool-desc">
                             Mengontrol perangkat pintar rumah virtual berdasarkan nama ruangan langsung.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, matikan semua lampu di kamar tidur."</em>
                         </div>
                     </div>
 
@@ -1514,14 +1520,44 @@ void ackCommand(String cmdId) {
                         <div class="tool-desc">
                             Membaca status semua saklar relay virtual (apakah sedang menyala atau mati).
                         </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, cek status relay rumah."</em>
+                        </div>
                     </div>
 
                     <div class="tool-card">
                         <div class="tool-header">
-                            <span class="tool-name">all_relays_on / all_relays_off</span>
+                            <span class="tool-name">all_relays_on</span>
                         </div>
                         <div class="tool-desc">
-                            Menyalakan atau mematikan seluruh perangkat virtual secara serentak.
+                            Menyalakan seluruh saklar relay virtual di seluruh ruangan secara serentak.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, nyalakan semua saklar rumah."</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">all_relays_off</span>
+                        </div>
+                        <div class="tool-desc">
+                            Mematikan seluruh saklar relay virtual di seluruh ruangan secara serentak.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, matikan semua saklar sekarang."</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">get_registered_devices</span>
+                        </div>
+                        <div class="tool-desc">
+                            Menampilkan daftar seluruh node mikrokontroler ESP32 dan modul relay yang terdaftar di jaringan lokal/cloud.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, perangkat ESP32 apa saja yang terdaftar?"</em>
                         </div>
                     </div>
 
@@ -1530,7 +1566,10 @@ void ackCommand(String cmdId) {
                             <span class="tool-name">control_real_relay_by_voice</span>
                         </div>
                         <div class="tool-desc">
-                            Mengontrol modul relay fisik nyata yang terhubung ke mikrokontroler ESP32 via polling HTTP token perangkat.
+                            Mengontrol modul relay fisik nyata yang terhubung ke pin GPIO mikrokontroler ESP32 via polling HTTP token perangkat.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, aktifkan relay fisik pin 2."</em>
                         </div>
                     </div>
 
@@ -1539,25 +1578,129 @@ void ackCommand(String cmdId) {
                             <span class="tool-name">get_real_relay_status</span>
                         </div>
                         <div class="tool-desc">
-                            Membaca status relay fisik ESP32 secara realtime.
+                            Membaca status real-time relay fisik pada hardware ESP32.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, bagaimana status relay fisik saat ini?"</em>
                         </div>
                     </div>
 
                     <div class="tool-card">
                         <div class="tool-header">
-                            <span class="tool-name">all_real_relays_on / off</span>
+                            <span class="tool-name">all_real_relays_on</span>
                         </div>
                         <div class="tool-desc">
-                            Menyalakan atau mematikan seluruh saluran relay nyata ESP32 secara bersamaan.
+                            Menyalakan seluruh saluran relay fisik nyata pada hardware ESP32 secara bersamaan.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, nyalakan semua relay fisik."</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">all_real_relays_off</span>
+                        </div>
+                        <div class="tool-desc">
+                            Mematikan seluruh saluran relay fisik nyata pada hardware ESP32 secara bersamaan.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, matikan semua relay fisik."</em>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 7. Multimedia & Utilitas -->
+            <!-- 7. Riset Cerdas & OSINT -->
             <div class="doc-section tool-category-section">
                 <div class="doc-section-title">
-                    <span>🎵</span> 7. Multimedia & Utilitas Tambahan
+                    <span>🌐</span> 7. Riset Cerdas, Internet & Intelijen (Web Deep, Social & OSINT)
+                </div>
+                <div class="tool-grid">
+                    <div class="tool-card" style="border-top: 3px solid var(--app-primary);">
+                        <div class="tool-header">
+                            <span class="tool-name">search_web_deep</span>
+                            <span class="badge badge-primary" style="font-size: 0.65rem;">Deep Reader AI</span>
+                        </div>
+                        <div class="tool-desc">
+                            Riset multi-sumber mendalam menggabungkan <strong>Wikipedia Ensiklopedia</strong>, <strong>Google News RSS</strong>, dan <strong>Automated Clean Article Scraper</strong> (ekstraksi hingga 1.500 karakter teks bersih per artikel). Menghasilkan analisis faktual yang kaya dan komprehensif.
+                        </div>
+                        <div style="margin-top: 8px; font-size: 11.5px; color: var(--app-muted);">
+                            <strong>Parameter:</strong> <code>query</code> (wajib), <code>max_results</code> (1-10), <code>read_content</code> (true/false)
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"XiaoZhi, lakukan riset mendalam tentang arsitektur komputer RISC-V dan rangkum intisarinya."</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card" style="border-top: 3px solid #0ea5e9;">
+                        <div class="tool-header">
+                            <span class="tool-name">search_social_media</span>
+                            <span class="badge badge-info" style="font-size: 0.65rem; background: #0ea5e9; color: #fff;">Social Mining</span>
+                        </div>
+                        <div class="tool-desc">
+                            Menelusuri opini publik, ulasan jujur komunitas, sentimen pengguna, dan topik viral di <strong>Reddit</strong>, <strong>X (Twitter)</strong>, dan <strong>YouTube</strong> secara real-time tanpa batas kuota rate-limit.
+                        </div>
+                        <div style="margin-top: 8px; font-size: 11.5px; color: var(--app-muted);">
+                            <strong>Parameter:</strong> <code>query</code> (wajib), <code>platform</code> ('all' | 'reddit' | 'x' | 'youtube'), <code>max_results</code>
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Apa kata orang di Reddit dan Twitter tentang performa ESP32-S3 vs ESP32-C3?"</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card" style="border-top: 3px solid #f59e0b;">
+                        <div class="tool-header">
+                            <span class="tool-name">osint_recon</span>
+                            <span class="badge badge-warning" style="font-size: 0.65rem; background: #f59e0b; color: #fff;">Passive OSINT</span>
+                        </div>
+                        <div class="tool-desc">
+                            Investigasi intelijen sumber terbuka pasif (100% aman & legal):
+                            <ul style="margin: 4px 0 0 16px; padding: 0; font-size: 12px; color: var(--app-muted);">
+                                <li><strong>Username:</strong> Pemindaian jejak digital paralel di 12+ platform (GitHub, Reddit, Twitter, Telegram, dll).</li>
+                                <li><strong>IP Address:</strong> Geolokasi (negara/kota), ISP, organisasi, nomor ASN, dan Reverse DNS PTR record.</li>
+                                <li><strong>Domain:</strong> Resolusi DNS A/AAAA, banner server HTTP, dan enumerasi subdomain via SSL Certificate Transparency (crt.sh).</li>
+                            </ul>
+                        </div>
+                        <div style="margin-top: 8px; font-size: 11.5px; color: var(--app-muted);">
+                            <strong>Parameter:</strong> <code>target</code> (wajib), <code>target_type</code> ('auto' | 'username' | 'ip' | 'domain')
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"XiaoZhi, telusuri jejak digital username 'franklnir' di internet."</em><br>
+                            🗣️ <em>"XiaoZhi, periksa alamat IP 8.8.8.8 siapa ISP dan lokasinya?"</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">search_web</span>
+                        </div>
+                        <div class="tool-desc">
+                            Pencarian cepat mesin web untuk verifikasi fakta singkat, informasi umum, dan definisi istilah harian.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"XiaoZhi, siapa penemu mikrokontroler pertama kali?"</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">search_news</span>
+                        </div>
+                        <div class="tool-desc">
+                            Mencari tajuk berita terkini dari berbagai portal berita tepercaya di Indonesia maupun internasional.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"XiaoZhi, ada berita terkini apa seputar teknologi hari ini?"</em>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 8. Multimedia & YouTube -->
+            <div class="doc-section tool-category-section">
+                <div class="doc-section-title">
+                    <span>🎵</span> 8. Multimedia YouTube & Streaming Musik
                 </div>
                 <div class="tool-grid">
                     <div class="tool-card">
@@ -1565,64 +1708,54 @@ void ackCommand(String cmdId) {
                             <span class="tool-name">play_youtube_song</span>
                         </div>
                         <div class="tool-desc">
-                            Mencari lagu di YouTube dan mengirim streaming audio ke speaker perangkat ESP32.
+                            Mencari lagu di YouTube dan mengirimkan audio stream langsung ke speaker perangkat keras ESP32.
                         </div>
                         <div class="tool-sample">
-                            🗣️ <em>"Xiaozhi, putar lagu Indonesia Raya di YouTube."</em>
+                            🗣️ <em>"Xiaozhi, putar lagu Laskar Pelangi di YouTube."</em>
                         </div>
                     </div>
 
                     <div class="tool-card">
                         <div class="tool-header">
-                            <span class="tool-name">search_web & search_news</span>
+                            <span class="tool-name">get_playback_status</span>
                         </div>
                         <div class="tool-desc">
-                            Mencari informasi artikel umum dan berita terkini dari media terpercaya dengan auto-deep reader.
+                            Melihat status pemutaran audio yang sedang aktif, judul lagu, dan progress durasi lagu.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, lagu apa yang sedang diputar sekarang?"</em>
                         </div>
                     </div>
 
                     <div class="tool-card">
                         <div class="tool-header">
-                            <span class="tool-name">search_web_deep</span>
+                            <span class="tool-name">stop_youtube_song</span>
                         </div>
                         <div class="tool-desc">
-                            Riset web mendalam multi-sumber (Wikipedia, berita terkini, artikel web) dan otomatis membaca isi artikel secara utuh.
+                            Menghentikan pemutaran audio musik streaming YouTube yang sedang berjalan di speaker ESP32.
                         </div>
                         <div class="tool-sample">
-                            "Halo XiaoZhi, tolong riset mendalam tentang sejarah mikrokontroler RISC-V."
+                            🗣️ <em>"Xiaozhi, hentikan musik."</em>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <div class="tool-card">
-                        <div class="tool-header">
-                            <span class="tool-name">search_social_media</span>
-                        </div>
-                        <div class="tool-desc">
-                            Mencari opini publik, review pengguna, sentimen netizen, dan topik viral di Reddit, X/Twitter, dan YouTube.
-                        </div>
-                        <div class="tool-sample">
-                            "Apa kata orang di Reddit tentang perbandingan ESP32-S3 vs ESP32-C3?"
-                        </div>
-                    </div>
-
-                    <div class="tool-card">
-                        <div class="tool-header">
-                            <span class="tool-name">osint_recon</span>
-                        </div>
-                        <div class="tool-desc">
-                            Investigasi intelijen sumber terbuka (OSINT) pasif: lacak jejak digital username di 12+ platform, geolokasi/ISP/ASN alamat IP, dan recon domain (DNS/subdomain).
-                        </div>
-                        <div class="tool-sample">
-                            "Coba investigasi jejak digital username 'franklnir' di internet."
-                        </div>
-                    </div>
-
+            <!-- 9. Utilitas & Produktivitas -->
+            <div class="doc-section tool-category-section">
+                <div class="doc-section-title">
+                    <span>⚙️</span> 9. Utilitas & Produktivitas Harian
+                </div>
+                <div class="tool-grid">
                     <div class="tool-card">
                         <div class="tool-header">
                             <span class="tool-name">calculate</span>
                         </div>
                         <div class="tool-desc">
-                            Menghitung ekspresi matematika kompleks, persentase, atau konversi satuan.
+                            Menghitung ekspresi matematika kompleks, rumus trigonometri, persentase, atau konversi satuan.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Berapa 15 persen dari 350 ribu ditambah akar 144?"</em>
                         </div>
                     </div>
 
@@ -1631,7 +1764,10 @@ void ackCommand(String cmdId) {
                             <span class="tool-name">translate_text</span>
                         </div>
                         <div class="tool-desc">
-                            Menerjemahkan kalimat ke berbagai bahasa asing dengan tata bahasa natural.
+                            Menerjemahkan teks atau percakapan antar berbagai bahasa asing dengan tata bahasa natural dan kontekstual.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Terjemahkan ke bahasa Jepang: 'Senang bertemu dengan Anda hari ini'."</em>
                         </div>
                     </div>
 
@@ -1640,16 +1776,27 @@ void ackCommand(String cmdId) {
                             <span class="tool-name">set_reminder</span>
                         </div>
                         <div class="tool-desc">
-                            Membuat pengingat alarm atau pengingat jadwal kegiatan tertentu.
+                            Membuat pengingat agenda, alarm pengingat waktu, atau instruksi jadwal kegiatan tertentu.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, ingatkan aku minum obat dalam 30 menit."</em>
                         </div>
                     </div>
+                </div>
+            </div>
 
+            <!-- 10. Memori Semantik & Persona -->
+            <div class="doc-section tool-category-section">
+                <div class="doc-section-title">
+                    <span>🧠</span> 10. Memori Semantik Percakapan & Profil Pengguna
+                </div>
+                <div class="tool-grid">
                     <div class="tool-card">
                         <div class="tool-header">
                             <span class="tool-name">save_chat_history</span>
                         </div>
                         <div class="tool-desc">
-                            Menyimpan catatan riwayat percakapan penting secara otomatis ke database dan dashboard akun.
+                            Menyimpan catatan riwayat percakapan penting secara otomatis ke database PostgreSQL dan dashboard akun.
                         </div>
                     </div>
 
@@ -1659,7 +1806,7 @@ void ackCommand(String cmdId) {
                             <span class="badge badge-success" style="font-size: 0.65rem;">Semantic Vector AI</span>
                         </div>
                         <div class="tool-desc">
-                            Mengingat kembali riwayat obrolan masa lalu (long-term memory) berbasis makna/semantik (semantic vector recall). Mampu menemukan percakapan meski menggunakan sinonim atau konsep serupa (misal: "masalah keuangan" menemukan chat tentang "biaya skripsi dan kos").
+                            Mengingat kembali riwayat obrolan masa lalu (long-term memory) berbasis makna/semantik. Mampu menemukan percakapan meski menggunakan sinonim atau konsep serupa.
                         </div>
                         <div class="tool-sample">
                             🗣️ <em>"Xiaozhi, kemarin apa masalah keuanganku?", atau "Ingat nggak kita tadi bahas apa?"</em>
@@ -1675,7 +1822,7 @@ void ackCommand(String cmdId) {
                             Mencatat dan menyimpan preferensi pribadi, hobi, makanan favorit, cita-cita, nama panggilan, atau gaya bicara yang disukai pengguna ke profil jangka panjang.
                         </div>
                         <div class="tool-sample">
-                            🗣️ <em>"Xiaozhi, panggil aku Kak Frank ya dan hobiku main catur", atau "Aku suka kopi susu aren"</em>
+                            🗣️ <em>"Xiaozhi, panggil aku Kak Frank ya dan hobiku main catur."</em>
                         </div>
                     </div>
 
@@ -1685,10 +1832,10 @@ void ackCommand(String cmdId) {
                             <span class="badge badge-primary" style="font-size: 0.65rem;">Personalized</span>
                         </div>
                         <div class="tool-desc">
-                            Mengambil profil dan preferensi pengguna yang tersimpan agar gaya bicara, pendekatan, dan jawaban Xiaozhi terasa sangat akrab, intim, dan personal layaknya asisten pribadi setia.
+                            Mengambil profil dan preferensi pengguna yang tersimpan agar gaya bicara, pendekatan, dan jawaban Xiaozhi terasa sangat akrab dan personal.
                         </div>
                         <div class="tool-sample">
-                            🗣️ <em>"Xiaozhi, sesuaikan jawaban dengan gaya favoritku"</em>
+                            🗣️ <em>"Xiaozhi, sesuaikan jawaban dengan gaya favoritku."</em>
                         </div>
                     </div>
                 </div>
