@@ -103,6 +103,14 @@ class PostgresStore:
         with self.pool.connection(timeout=timeout) as conn:
             yield conn
 
+    @staticmethod
+    def set_rls_context(cur, user_id: Optional[int] = None, user_role: Optional[str] = "user") -> None:
+        """Sets transaction-local configuration for PostgreSQL Row-Level Security."""
+        uid_str = str(user_id) if user_id is not None else ""
+        role_str = str(user_role) if user_role else "user"
+        cur.execute("SELECT set_config('app.user_id', %s, true);", (uid_str,))
+        cur.execute("SELECT set_config('app.user_role', %s, true);", (role_str,))
+
     def close(self) -> None:
         """Close connection pool cleanly."""
         if hasattr(self, "pool") and self.pool:
