@@ -1223,21 +1223,179 @@ Tersedia dokumentasi khusus untuk hardware ESP32-C3 Super Mini pada file terpisa
 
 ---
 
-## 22. Fitur Baru: Deep Web Search, Social Media Intelligence & OSINT Recon
+## 22. Panduan Lengkap Tools Riset Mendalam, Media Sosial & Passive OSINT
 
-Sistem MCP Xiaozhi telah dilengkapi dengan 3 modul riset cerdas terintegrasi:
+Sistem MCP (Model Context Protocol) Xiaozhi Indonesia telah ditingkatkan dengan **tiga modul intelijen dan riset web tingkat lanjut**. Ketiga tools ini dirancang untuk memberikan jawaban yang mendalam, kaya konteks, berbasis data fakta terkini, serta memungkinkan investigasi digital yang akurat dan aman.
 
-1. **`search_web_deep(query, max_results=5, read_content=True)`**:
-   - Menghubungkan multi-sumber: Wikipedia Ensiklopedia (ID & EN), Google News & Web RSS.
-   - **Deep Reader:** Secara otomatis membuka dan mengekstrak teks isi artikel bersih (hingga 1.500 karakter) menggunakan parsing DOM cerdas.
-   - Jawaban AI komprehensif, berbasis data nyata, bukan sekadar menebak judul.
+---
 
-2. **`search_social_media(query, platform='all', max_results=5)`**:
-   - Menelusuri diskusi, opini pengguna, review jujur, dan sentimen netizen di **Reddit**, **X (Twitter)**, dan **YouTube**.
-   - Cocok untuk menanyakan review barang, komparasi produk, atau isu teknologi yang sedang viral.
+### 22.1 `search_web_deep` (Deep Multi-Source Web Research & Content Extraction)
 
-3. **`osint_recon(target, target_type='auto')`**:
-   - **Username Reconnaissance:** Memindai 12+ platform (GitHub, Reddit, Telegram, Pinterest, Dev.to, GitLab, Medium) secara bersamaan untuk menemukan jejak akun digital.
-   - **IP Intelligence:** Mengetahui geolokasi server, ISP, nama organisasi, nomor ASN, dan reverse DNS PTR record.
-   - **Domain Reconnaissance:** Resolusi DNS IPv4, analisis HTTP security headers (WAF, HSTS, Server), dan enumerasi subdomain via *Certificate Transparency* (`crt.sh`).
-   - Sifat: **100% Passive OSINT (Legal & Bersih)** tanpa menyerang server target.
+#### A. Deskripsi & Keunggulan
+Pencarian web standar umumnya hanya mengembalikan judul artikel dan cuplikan (snippet) pendek 1-2 baris. Dengan `search_web_deep`, XiaoZhi melakukan proses riset 3 tingkat:
+1. **Wikipedia Encyclopedia API:** Mengambil data ensiklopedia resmi, definisi saintifik, dan sejarah terverifikasi.
+2. **Google News & Web RSS:** Mengambil berita teraktual dan tautan artikel terpercaya dari berbagai media.
+3. **Automated Clean Content Scraper:** Mengunjungi tautan halaman web secara otomatis menggunakan `BeautifulSoup`, membuang elemen pengganggu (skrip JS, CSS, navbar, footer, sidebar iklan), lalu mengekstraksi hingga **1.500 karakter teks artikel bersih**. Dengan demikian, AI membaca isi utuh artikel dan memberikan sintesis analisis mendalam kepada pengguna.
+
+#### B. Parameter Input
+| Parameter | Tipe Data | Wajib / Opsional | Default | Penjelasan |
+| :--- | :--- | :--- | :--- | :--- |
+| `query` | `string` | **Wajib** | - | Topik atau kata kunci yang ingin diteliti secara mendalam. |
+| `max_results` | `integer` | Opsional | `5` | Jumlah maksimal artikel / sumber yang diproses (1-10). |
+| `read_content` | `boolean` | Opsional | `True` | Jika `True`, sistem akan membuka URL dan membaca isi artikel utuh. |
+
+#### C. Format Response JSON
+```json
+{
+  "success": true,
+  "query": "arsitektur komputer riscv",
+  "total_found": 3,
+  "results": [
+    {
+      "title": "RISC-V - Wikipedia bahasa Indonesia",
+      "source": "Wikipedia",
+      "url": "https://id.wikipedia.org/wiki/RISC-V",
+      "content": "RISC-V adalah standar terbuka arsitektur set instruksi (ISA) yang didasarkan pada prinsip-prinsip RISC yang sudah mapan...",
+      "date": "2026-09-27"
+    }
+  ]
+}
+```
+
+#### D. Contoh Perintah Suara (Voice Triggers)
+- *"XiaoZhi, lakukan riset mendalam tentang perkembangan baterai solid state dan bacakan kesimpulannya."*
+- *"XiaoZhi, cari artikel lengkap tentang sejarah arsitektur RISC-V."*
+- *"XiaoZhi, telusuri berita dan analisis terbaru tentang eksplorasi planet Mars."*
+
+---
+
+### 22.2 `search_social_media` (Social Media Sentiment & Community Discussions)
+
+#### A. Deskripsi & Keunggulan
+Alat ini memindai diskusi publik, keluhan pengguna nyata, review komparasi produk, serta tren viral di platform komunitas terbesar dunia (**Reddit**, **X / Twitter**, dan **YouTube**). Menggunakan mesin query indexing real-time berstruktur khusus yang **bebas rate-limiting dan tidak memerlukan token API login** yang rentan terblokir.
+
+#### B. Parameter Input
+| Parameter | Tipe Data | Wajib / Opsional | Default | Penjelasan |
+| :--- | :--- | :--- | :--- | :--- |
+| `query` | `string` | **Wajib** | - | Topik diskusi, komparasi produk, atau nama entitas yang dicari. |
+| `platform` | `string` | Opsional | `'all'` | Pilihan target: `'all'`, `'reddit'`, `'x'`, atau `'youtube'`. |
+| `max_results` | `integer` | Opsional | `5` | Jumlah maksimal thread diskusi yang dikembalikan. |
+
+#### C. Format Response JSON
+```json
+{
+  "success": true,
+  "query": "esp32 s3 vs c3 review",
+  "platform": "all",
+  "total_found": 5,
+  "results": [
+    {
+      "platform": "Reddit",
+      "title": "ESP32-S3 vs ESP32-C3 for audio processing : r/esp32",
+      "url": "https://www.reddit.com/r/esp32/comments/...",
+      "snippet": "For audio synthesis and microphone array, S3 with PSRAM is much better due to dual-core and SIMD instructions...",
+      "date": "2 hari yang lalu"
+    }
+  ]
+}
+```
+
+#### D. Contoh Perintah Suara (Voice Triggers)
+- *"XiaoZhi, apa kata orang di Reddit tentang perbandingan laptop ThinkPad vs MacBook untuk koding?"*
+- *"XiaoZhi, cari opini dan ulasan netizen di Twitter tentang update sistem operasi terbaru."*
+- *"XiaoZhi, cari video review dan pembahasan kamera mirrorless di YouTube."*
+
+---
+
+### 22.3 `osint_recon` (Passive Open-Source Intelligence Suite)
+
+#### A. Deskripsi & Keunggulan
+Modul investigasi intelijen sumber terbuka (OSINT) pasif berstandar keamanan tinggi. Beroperasi secara **100% pasif, legal, dan non-intrusive** (tidak melakukan port scanning agresif atau injeksi payload). Sangat berguna bagi peneliti keamanan siber, analis IT, atau pengguna yang ingin memverifikasi keamanan dan jejak digital.
+
+Mendukung 3 mode deteksi otomatis:
+1. **Username Footprinting:** Memindai 12+ platform digital (GitHub, Reddit, Twitter/X, Telegram, Pinterest, Medium, Dev.to, GitLab, Kaggle, Soundcloud, TikTok, Instagram) secara multi-threading (`ThreadPoolExecutor`) untuk memetakan akun publik yang aktif.
+2. **IP Intelligence:** Menghubungkan geolokasi (negara, kota, koordinat), nama ISP, organisasi, nomor ASN (Autonomous System Number), dan Reverse DNS PTR Record.
+3. **Domain & Subdomain Recon:** Melakukan resolusi DNS IPv4/IPv6, ekstraksi banner header HTTP server, serta enumerasi subdomain otomatis melalui catatan publik *Certificate Transparency* (`crt.sh`).
+
+#### B. Parameter Input
+| Parameter | Tipe Data | Wajib / Opsional | Default | Penjelasan |
+| :--- | :--- | :--- | :--- | :--- |
+| `target` | `string` | **Wajib** | - | Target yang diinvestigasi: nama username, alamat IP (e.g. `8.8.8.8`), atau nama domain (e.g. `detik.com`). |
+| `target_type` | `string` | Opsional | `'auto'` | Pilihan tipe target: `'auto'` (otomatis mendeteksi IP/Domain/Username), `'username'`, `'ip'`, atau `'domain'`. |
+
+#### C. Format Response JSON (Contoh Mode IP)
+```json
+{
+  "success": true,
+  "mode": "ip",
+  "target": "8.8.8.8",
+  "reverse_dns": "dns.google",
+  "ip_intel": {
+    "ip": "8.8.8.8",
+    "country": "United States",
+    "region": "California",
+    "city": "Mountain View",
+    "isp": "Google LLC",
+    "org": "Google Public DNS",
+    "as": "AS15169 Google LLC"
+  }
+}
+```
+
+#### D. Contoh Perintah Suara (Voice Triggers)
+- *"XiaoZhi, tolong lacak jejak digital username 'franklnir' di internet."*
+- *"XiaoZhi, periksa alamat IP 1.1.1.1 ini milik provider mana dan di mana lokasinya?"*
+- *"XiaoZhi, lakukan analisis domain wikipedia.org, apa IP-nya dan subdomain apa saja yang terdaftar?"*
+
+---
+
+## 23. Katalog Referensi Lengkap 44 Tools MCP Xiaozhi Indonesia
+
+Seluruh ekosistem Xiaozhi terintegrasi dengan **44 Tools MCP terstandarisasi**. Berikut adalah matriks referensi lengkap seluruh tools yang aktif di server:
+
+| No | Nama Tool | Kategori | Parameter Utama | Ringkasan Fungsi |
+| :---: | :--- | :--- | :--- | :--- |
+| 1 | `search_course_materials` | Knowledge Base | `search_keyword` | Mencari materi perkuliahan, silabus, PDF, dan API realtime. |
+| 2 | `read_live_api_data` | Knowledge Base | `query` | Membaca data realtime dari endpoint API terhubung. |
+| 3 | `read_material_database` | Knowledge Base | `category` | Menampilkan katalog materi dalam database sistem. |
+| 4 | `read_material_detail` | Knowledge Base | `material_id` | Mengambil konten lengkap materi berdasarkan ID dokumen. |
+| 5 | `save_chat_history` | Memori & Persona | `role`, `content` | Menyimpan log percakapan penting ke memori jangka panjang. |
+| 6 | `recall_chat_memory` | Memori & Persona | `query` | Mengingat kembali konteks percakapan lampau pengguna. |
+| 7 | `remember_user_profile` | Memori & Persona | `key`, `value` | Mencatat preferensi, identitas, dan kebiasaan pengguna. |
+| 8 | `get_user_profile` | Memori & Persona | `key` | Mengambil data preferensi atau profil personal pengguna. |
+| 9 | `get_registered_devices` | Smart Home IoT | `none` | Menampilkan seluruh node ESP32 dan relay yang terdaftar. |
+| 10 | `control_relay` | Smart Home IoT | `channel`, `state` | Mengontrol saklar relay virtual (ON/OFF). |
+| 11 | `control_smart_home_room` | Smart Home IoT | `room`, `device`, `state` | Mengatur perangkat pintar berdasarkan nama ruangan. |
+| 12 | `get_relay_status` | Smart Home IoT | `none` | Mengecek status aktif seluruh relay virtual. |
+| 13 | `all_relays_on` | Smart Home IoT | `none` | Menyalakan seluruh relay virtual secara serentak. |
+| 14 | `all_relays_off` | Smart Home IoT | `none` | Mematikan seluruh relay virtual secara serentak. |
+| 15 | `control_real_relay_by_voice` | Smart Home IoT | `pin`, `state` | Mengontrol relay fisik pin GPIO hardware ESP32 via suara. |
+| 16 | `get_real_relay_status` | Smart Home IoT | `pin` | Memeriksa status real-time relay fisik pada hardware. |
+| 17 | `all_real_relays_on` | Smart Home IoT | `none` | Menyalakan semua relay fisik hardware ESP32 serentak. |
+| 18 | `all_real_relays_off` | Smart Home IoT | `none` | Mematikan semua relay fisik hardware ESP32 serentak. |
+| 19 | `play_youtube_song` | Multimedia Audio | `song_name` | Mencari & memutar musik streaming YouTube ke speaker ESP32. |
+| 20 | `get_playback_status` | Multimedia Audio | `none` | Mengecek status dan judul lagu audio yang sedang diputar. |
+| 21 | `stop_youtube_song` | Multimedia Audio | `none` | Menghentikan pemutaran musik YouTube yang sedang aktif. |
+| 22 | `search_web` | Riset Web | `query` | Pencarian web cepat untuk verifikasi informasi umum. |
+| 23 | `search_web_deep` | Riset Web | `query`, `read_content` | Riset multi-sumber mendalam & otomatis membaca isi artikel. |
+| 24 | `search_social_media` | Riset Web | `query`, `platform` | Analisis opini & tren netizen di Reddit, X, dan YouTube. |
+| 25 | `osint_recon` | Riset Web | `target`, `target_type` | Investigasi pasif username (12+ platform), IP, dan domain. |
+| 26 | `search_news` | Riset Web | `query` | Menelusuri tajuk berita aktual dari media terpercaya. |
+| 27 | `set_reminder` | Utilitas | `reminder_text`, `time` | Memasang pengingat jadwal, alarm, atau agenda penting. |
+| 28 | `calculate` | Utilitas | `expression` | Menghitung rumus matematika, trigonometri, dan aljabar. |
+| 29 | `translate_text` | Utilitas | `text`, `target_lang` | Menerjemahkan kalimat antar-bahasa dengan konteks alami. |
+| 30 | `solve_study_problem` | Akademik & Sains | `problem` | Solusi latihan soal ujian bertahap (Diketahui s/d Jawaban). |
+| 31 | `explain_concept` | Akademik & Sains | `concept` | Penjelasan 2 tingkat: Definisi Akademis & Analogi ELI5. |
+| 32 | `quiz_me` | Akademik & Sains | `topic` | Membuat latihan kuis interaktif dengan kunci jawaban. |
+| 33 | `lookup_formula` | Akademik & Sains | `topic` | Pencarian rumus eksak fisika, matematika, dan kimia. |
+| 34 | `academic_english_helper`| Akademik & Sains | `text` | Parafrase jurnal ilmiah dan tata bahasa Inggris akademis. |
+| 35 | `convert_currency` | Realtime Data | `amount`, `from`, `to` | Konversi nilai mata uang asing berdasarkan kurs live dunia. |
+| 36 | `lookup_kbbi` | Akademik & Sains | `kata` | Pencarian arti kata baku resmi sesuai rujukan KBBI. |
+| 37 | `search_wikipedia` | Akademik & Sains | `query` | Ringkasan cepat ensiklopedia Wikipedia terverifikasi. |
+| 38 | `get_earthquake_info` | Realtime Data | `none` | Informasi gempa bumi terkini dari BMKG & potensi tsunami. |
+| 39 | `get_weather_bmkg` | Realtime Data | `city` | Prakiraan cuaca akurat seluruh wilayah Indonesia via BMKG. |
+| 40 | `detect_logical_fallacy` | Analisis Spesialis | `argument` | Mendeteksi kesesatan logika berpikir dalam suatu argumen. |
+| 41 | `identify_cognitive_bias`| Analisis Spesialis | `scenario` | Mengidentifikasi bias kognitif psikologis manusia. |
+| 42 | `it_code_and_architecture_helper` | Analisis Spesialis | `query` | Konsultasi arsitektur cloud, IT engineering, dan debug kode. |
+| 43 | `lookup_scripture_and_verse` | Kitab Suci | `reference` | Pencarian ayat Al-Qur'an dan Alkitab secara netral & hormat. |
+| 44 | `get_prayer_and_worship_guide` | Kitab Suci | `topic` | Panduan tata cara sholat, wudhu, doa harian, & tata ibadah. |
