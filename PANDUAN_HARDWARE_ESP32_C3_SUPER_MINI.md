@@ -117,14 +117,8 @@ ightarrow$ Konfirmasi dengan *"Ya"* untuk mereset kredensial Wi-Fi secara hands-
 
 ---
 
-## 6. Konfigurasi Lanjutan: Multi-SSID Failover & Animasi Layar
+## 6. Konfigurasi Lanjutan: Multi-SSID Failover (Backup Wi-Fi Otomatis)
 
-### A. Pengaturan Multi-SSID Backup (Failover)
-Pada halaman konfigurasi Web Portal `192.168.4.1`, Anda dapat memilih antara:
-1. **Mode 1 Wi-Fi:** Menghubungkan ke 1 router utama.
-2. **Mode Multi Wi-Fi (Failover):** Menyimpan daftar Wi-Fi cadangan (Wi-Fi Utama, Hotspot HP Cadangan 1, Hotspot Cadangan 2). Jika Wi-Fi utama tidak terdeteksi, ESP32-C3 otomatis mengalihkan koneksi ke Hotspot HP tanpa terputus lama.
-
-### B. Animasi Klasik vs Dinamis pada Layar
-- **Animasi Klasik (OLED SSD1306 128x64):** Menggunakan ikon minimalis, visual bar status jaringan, dan animasi waveform audio yang sangat ringan dan hemat memori SRAM (~400KB).
-- **Animasi Dinamis:** Ekspresi wajah emotif yang berubah saat AI mendengarkan, berpikir, atau berbicara.
-- **Tema Jam Chronchi:** Pilihan tema tampilan jam digital pada mode Chronchi yang dapat diubah sesuai selera.
+Pada halaman konfigurasi Web Portal `192.168.4.1` (tab **Jaringan Wi-Fi**), Anda dapat memilih mode koneksi:
+1. **Mode 1 Wi-Fi (Utama):** Menghubungkan ke 1 router rumah/kantor tetap.
+2. **Mode Multi Wi-Fi (Failover Otomatis):** Anda dapat mendaftarkan beberapa SSID sekaligus (Wi-Fi Utama, Hotspot HP Cadangan 1, dan Cadangan 2). Jika Wi-Fi utama mati lampu atau di luar jangkauan, ESP32-C3 otomatis mengalihkan koneksi ke Hotspot HP dalam hitungan detik tanpa terputus lama.
