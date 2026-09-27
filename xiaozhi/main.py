@@ -211,6 +211,7 @@ from xiaozhi.routers import (
     search,
     smarthome,
     youtube,
+    playlist,
     marketplace_ui,
     admin_firmware_ui,
 )
@@ -229,6 +230,7 @@ app.include_router(google_auth.router)
 app.include_router(dashboard.router)
 app.include_router(admin.router)
 app.include_router(chat.router)
+app.include_router(playlist.router)
 app.include_router(smarthome.router)
 app.include_router(relay_nyata.router)
 app.include_router(mcp_endpoints.router)

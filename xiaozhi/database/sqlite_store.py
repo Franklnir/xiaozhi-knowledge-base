@@ -247,6 +247,26 @@ class SQLiteStore:
             CREATE INDEX IF NOT EXISTS idx_board_hist_mac ON board_binding_history(device_mac);
             CREATE INDEX IF NOT EXISTS idx_board_hist_user ON board_binding_history(user_id);
 
+            -- User Playlists
+            CREATE TABLE IF NOT EXISTS user_playlists (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_id INTEGER NOT NULL,
+                track_number INTEGER NOT NULL DEFAULT 1,
+                title TEXT NOT NULL,
+                youtube_url TEXT NOT NULL,
+                video_id TEXT NOT NULL,
+                artist TEXT DEFAULT '',
+                duration TEXT DEFAULT '',
+                play_count INTEGER NOT NULL DEFAULT 0,
+                last_played_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_playlists_owner ON user_playlists(owner_id, track_number);
+            CREATE INDEX IF NOT EXISTS idx_user_playlists_video ON user_playlists(video_id);
+            CREATE INDEX IF NOT EXISTS idx_user_playlists_top ON user_playlists(owner_id, play_count DESC);
+
             -- Feature settings per user
             CREATE TABLE IF NOT EXISTS feature_settings (
                 user_id INTEGER PRIMARY KEY,
@@ -2257,4 +2277,210 @@ class SQLiteStore:
             (user_id, int(last_message_id or 0), now),
         )
         conn.commit()
+
+    # ── User Playlists ─────────────────────────────────────────────────────
+
+    def add_playlist_track(
+        self, owner_id: int, title: str, youtube_url: str, video_id: str, artist: str = "", duration: str = ""
+    ) -> Dict[str, Any]:
+        conn = self._get_conn()
+        cur = conn.execute(
+            "SELECT COALESCE(MAX(track_number), 0) + 1 AS next_num FROM user_playlists WHERE owner_id = ?",
+            (int(owner_id),),
+        )
+        next_num = cur.fetchone()["next_num"]
+        now = utc_now()
+        cursor = conn.execute(
+            """
+            INSERT INTO user_playlists (owner_id, track_number, title, youtube_url, video_id, artist, duration, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                int(owner_id),
+                int(next_num),
+                clean_text(title, max_len=200, field="Judul"),
+                str(youtube_url).strip(),
+                str(video_id).strip(),
+                clean_text(artist or "", max_len=120, field="Artis"),
+                clean_text(duration or "", max_len=30, field="Durasi"),
+                now,
+                now,
+            ),
+        )
+        new_id = cursor.lastrowid
+        conn.commit()
+        row = conn.execute("SELECT * FROM user_playlists WHERE id = ?", (new_id,)).fetchone()
+        return dict(row)
+
+    def get_user_playlist(self, owner_id: int) -> List[Dict[str, Any]]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM user_playlists WHERE owner_id = ? ORDER BY track_number ASC, id ASC",
+            (int(owner_id),),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_playlist_track(self, owner_id: int, track_id: int) -> Optional[Dict[str, Any]]:
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM user_playlists WHERE id = ? AND owner_id = ?",
+            (int(track_id), int(owner_id)),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def update_playlist_track(
+        self,
+        owner_id: int,
+        track_id: int,
+        title: Optional[str] = None,
+        youtube_url: Optional[str] = None,
+        video_id: Optional[str] = None,
+        artist: Optional[str] = None,
+        track_number: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
+        updates = []
+        params = []
+        if title is not None:
+            updates.append("title = ?")
+            params.append(clean_text(title, max_len=200, field="Judul"))
+        if youtube_url is not None:
+            updates.append("youtube_url = ?")
+            params.append(str(youtube_url).strip())
+        if video_id is not None:
+            updates.append("video_id = ?")
+            params.append(str(video_id).strip())
+        if artist is not None:
+            updates.append("artist = ?")
+            params.append(clean_text(artist, max_len=120, field="Artis"))
+        if track_number is not None:
+            updates.append("track_number = ?")
+            params.append(int(track_number))
+        if not updates:
+            return self.get_playlist_track(owner_id, track_id)
+
+        updates.append("updated_at = ?")
+        params.append(utc_now())
+        params.extend([int(track_id), int(owner_id)])
+
+        conn = self._get_conn()
+        conn.execute(
+            f"UPDATE user_playlists SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
+            params,
+        )
+        conn.commit()
+        return self.get_playlist_track(owner_id, track_id)
+
+    def delete_playlist_track(self, owner_id: int, track_id: int) -> bool:
+        conn = self._get_conn()
+        cur = conn.execute(
+            "DELETE FROM user_playlists WHERE id = ? AND owner_id = ?",
+            (int(track_id), int(owner_id)),
+        )
+        deleted = cur.rowcount > 0
+        if deleted:
+            rows = conn.execute(
+                "SELECT id FROM user_playlists WHERE owner_id = ? ORDER BY track_number ASC, id ASC",
+                (int(owner_id),),
+            ).fetchall()
+            for idx, r in enumerate(rows, start=1):
+                conn.execute("UPDATE user_playlists SET track_number = ? WHERE id = ?", (idx, r["id"]))
+        conn.commit()
+        return deleted
+
+    def increment_playlist_play_count(
+        self, owner_id: int, track_id: Optional[int] = None, video_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        if not track_id and not video_id:
+            return None
+        now = utc_now()
+        conn = self._get_conn()
+        if track_id:
+            conn.execute(
+                """
+                UPDATE user_playlists
+                SET play_count = play_count + 1, last_played_at = ?, updated_at = ?
+                WHERE id = ? AND owner_id = ?
+                """,
+                (now, now, int(track_id), int(owner_id)),
+            )
+            conn.commit()
+            return self.get_playlist_track(owner_id, track_id)
+        else:
+            conn.execute(
+                """
+                UPDATE user_playlists
+                SET play_count = play_count + 1, last_played_at = ?, updated_at = ?
+                WHERE video_id = ? AND owner_id = ?
+                """,
+                (now, now, str(video_id).strip(), int(owner_id)),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM user_playlists WHERE video_id = ? AND owner_id = ? LIMIT 1",
+                (str(video_id).strip(), int(owner_id)),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_top_played_playlist(self, owner_id: int, limit: int = 5) -> List[Dict[str, Any]]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            """
+            SELECT * FROM user_playlists 
+            WHERE owner_id = ? AND play_count > 0
+            ORDER BY play_count DESC, last_played_at DESC, id ASC 
+            LIMIT ?
+            """,
+            (int(owner_id), int(limit)),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def find_playlist_track_by_query(self, owner_id: int, query: str) -> Optional[Dict[str, Any]]:
+        raw_q = (query or "").strip()
+        if not raw_q:
+            return None
+
+        import re
+        from xiaozhi.core.utils import extract_youtube_video_id
+
+        # Check track number in query: e.g. "1", "nomor 2", "track 3", "playlist 1"
+        match = re.search(r"(?:nomor|no\.?|ke-?|track|urutan|playlist)?\s*(\d+)", raw_q.lower())
+        track_num = None
+        if raw_q.isdigit():
+            track_num = int(raw_q)
+        elif match and match.group(1):
+            track_num = int(match.group(1))
+
+        conn = self._get_conn()
+        if track_num is not None:
+            row = conn.execute(
+                "SELECT * FROM user_playlists WHERE owner_id = ? AND track_number = ?",
+                (int(owner_id), track_num),
+            ).fetchone()
+            if row:
+                return dict(row)
+
+        # Check if query is YouTube URL or Video ID
+        vid = extract_youtube_video_id(raw_q)
+        if vid:
+            row = conn.execute(
+                "SELECT * FROM user_playlists WHERE owner_id = ? AND video_id = ?",
+                (int(owner_id), vid),
+            ).fetchone()
+            if row:
+                return dict(row)
+
+        # Check by title / artist similarity
+        clean_kw = re.sub(r"(?i)\b(putar|lagu|musik|dari playlist|di playlist|playlist)\b", "", raw_q).strip()
+        target_q = clean_kw if clean_kw else raw_q
+        row = conn.execute(
+            """
+            SELECT * FROM user_playlists 
+            WHERE owner_id = ? AND (LOWER(title) LIKE ? OR LOWER(artist) LIKE ?)
+            ORDER BY play_count DESC, id ASC
+            LIMIT 1
+            """,
+            (int(owner_id), f"%{target_q.lower()}%", f"%{target_q.lower()}%"),
+        ).fetchone()
+        return dict(row) if row else None
+
 

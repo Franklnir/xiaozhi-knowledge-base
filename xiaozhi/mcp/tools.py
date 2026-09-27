@@ -873,6 +873,58 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         """
         owner_id = mcp_active_owner_ctx.get()
         try:
+            # 1. Cek apakah permintaan cocok dengan lagu di Playlist pribadi user
+            if owner_id and hasattr(store, "find_playlist_track_by_query"):
+                matched_track = store.find_playlist_track_by_query(owner_id, query)
+                if matched_track:
+                    features = store.get_user_features(owner_id)
+                    if not features.get("youtube_music", True):
+                        response = {"success": False, "message": "Anda tidak diizinkan putar lagu YouTube. Fitur YouTube Music telah dinonaktifkan oleh administrator.", "results": []}
+                        record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query}, response)
+                        return response
+
+                    store.increment_playlist_play_count(owner_id, track_id=matched_track.get("id"))
+                    user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
+                    mac_param = f"&mac={user_mac}" if user_mac else ""
+                    vid = matched_track.get("video_id", "")
+                    title = matched_track.get("title", "")
+                    stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
+                    base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
+                    full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
+
+                    try:
+                        store.queue_audio_command(
+                            owner_id,
+                            title=title,
+                            stream_url=full_stream,
+                            video_url=matched_track.get("youtube_url", f"https://www.youtube.com/watch?v={vid}"),
+                            duration=matched_track.get("duration", ""),
+                            video_id=vid,
+                        )
+                    except Exception:
+                        logger.warning("Failed to queue audio for ESP32")
+
+                    cnt = int(matched_track.get("play_count", 0)) + 1
+                    track_no = matched_track.get("track_number", 1)
+                    response = {
+                        "success": True,
+                        "source": "playlist",
+                        "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}' (telah diputar {cnt} kali). Panggil tool perangkat self.audio.play_youtube.",
+                        "query": query,
+                        "now_playing": {
+                            "track_number": track_no,
+                            "title": title,
+                            "video_id": vid,
+                            "video_url": matched_track.get("youtube_url", ""),
+                            "stream_url": stream_url,
+                            "play_count": cnt,
+                        },
+                        "instructions": f"Panggil tool perangkat `self.audio.play` dengan url='{full_stream}' atau `self.audio.play_youtube` dengan video_id='{vid}' dan title='{title}' agar speaker XiaoZhi langsung memutar lagunya.",
+                    }
+                    record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query, "source": "playlist"}, response)
+                    return response
+
+            # 2. Jika tidak ada di playlist atau pencarian umum YouTube
             if not youtube_search_fn:
                 return {"success": False, "message": "YouTube search tidak tersedia.", "results": []}
             results = youtube_search_fn(query, max_results=5)
@@ -924,6 +976,151 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             response = {"success": False, "message": f"Gagal mencari lagu: {exc}", "results": []}
             record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query}, response)
             return response
+
+    @mcp_server.tool()
+    def play_playlist_song(query: str) -> dict:
+        """
+        Putar lagu dari daftar Playlist Musik YouTube pribadi pengguna berdasarkan:
+        - Nomor urut lagu (contoh: "1", "nomor 2", "track 3", "playlist 1")
+        - Judul lagu (contoh: "Bohemian Rhapsody", "Sempurna", "Lofi")
+        - Link YouTube / Video ID
+        Otomatis menambah statistik jumlah pemutaran (play count) lagu tersebut.
+
+        Args:
+            query: Nomor lagu di playlist, judul lagu, atau link YouTube. Contoh: "1", "nomor 2", "Lofi Beat"
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if not owner_id:
+            return {"success": False, "message": "Belum ada koneksi akun/perangkat aktif."}
+
+        try:
+            features = store.get_user_features(owner_id)
+            if not features.get("youtube_music", True):
+                return {"success": False, "message": "Fitur YouTube Music telah dinonaktifkan untuk akun Anda."}
+
+            matched = store.find_playlist_track_by_query(owner_id, query)
+            if not matched:
+                all_tracks = store.get_user_playlist(owner_id)
+                total = len(all_tracks)
+                return {
+                    "success": False,
+                    "message": f"Lagu '{query}' tidak ditemukan di playlist Anda. Saat ini Anda memiliki {total} lagu di playlist.",
+                    "total_tracks": total,
+                }
+
+            store.increment_playlist_play_count(owner_id, track_id=matched["id"])
+            user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
+            mac_param = f"&mac={user_mac}" if user_mac else ""
+            vid = matched.get("video_id", "")
+            title = matched.get("title", "")
+            stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
+            base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
+            full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
+
+            try:
+                store.queue_audio_command(
+                    owner_id,
+                    title=title,
+                    stream_url=full_stream,
+                    video_url=matched.get("youtube_url", f"https://www.youtube.com/watch?v={vid}"),
+                    duration=matched.get("duration", ""),
+                    video_id=vid,
+                )
+            except Exception:
+                logger.warning("Failed to queue audio for ESP32")
+
+            cnt = int(matched.get("play_count", 0)) + 1
+            track_no = matched.get("track_number", 1)
+            response = {
+                "success": True,
+                "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}' (telah diputar {cnt} kali). Panggil tool perangkat self.audio.play_youtube.",
+                "query": query,
+                "track": {
+                    "track_number": track_no,
+                    "title": title,
+                    "video_id": vid,
+                    "youtube_url": matched.get("youtube_url", ""),
+                    "artist": matched.get("artist", ""),
+                    "play_count": cnt,
+                },
+                "instructions": f"Panggil tool perangkat `self.audio.play` dengan url='{full_stream}' atau `self.audio.play_youtube` dengan video_id='{vid}' dan title='{title}' agar speaker XiaoZhi langsung memutar lagunya.",
+            }
+            record_mcp_tool_history(owner_id, "play_playlist_song", query, {"query": query}, response)
+            return response
+        except Exception as exc:
+            logger.exception("Error in play_playlist_song: %s", exc)
+            return {"success": False, "message": f"Gagal memutar lagu playlist: {exc}"}
+
+    @mcp_server.tool()
+    def list_user_playlist() -> dict:
+        """
+        Ambil seluruh daftar lagu yang tersimpan di Playlist Musik YouTube pribadi pengguna.
+        Gunakan tool ini saat user bertanya:
+        - "Apa saja lagu di playlist saya?"
+        - "Cek daftar playlist saya"
+        - "Tampilkan lagu yang tersimpan di playlist"
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if not owner_id:
+            return {"success": False, "message": "Belum ada koneksi akun/perangkat aktif.", "playlist": []}
+
+        try:
+            tracks = store.get_user_playlist(owner_id)
+            if not tracks:
+                return {
+                    "success": True,
+                    "message": "Playlist Anda masih kosong. Anda dapat menambahkan lagu melalui menu Playlist di dashboard web.",
+                    "total": 0,
+                    "playlist": [],
+                }
+            summary = [f"{t.get('track_number', i+1)}. {t.get('title')} (diputar {t.get('play_count', 0)}x)" for i, t in enumerate(tracks)]
+            response = {
+                "success": True,
+                "message": f"Ditemukan {len(tracks)} lagu di playlist Anda:\n" + "\n".join(summary[:10]),
+                "total": len(tracks),
+                "playlist": tracks,
+            }
+            record_mcp_tool_history(owner_id, "list_user_playlist", "list playlist", {}, response)
+            return response
+        except Exception as exc:
+            logger.exception("Error in list_user_playlist: %s", exc)
+            return {"success": False, "message": f"Gagal mengambil playlist: {exc}", "playlist": []}
+
+    @mcp_server.tool()
+    def get_playlist_top_played() -> dict:
+        """
+        Cek lagu-lagu di Playlist yang paling sering diputar oleh pengguna (Top Played Tracks / Lagu Terfavorit).
+        Gunakan tool ini saat user bertanya:
+        - "Lagu apa yang paling sering saya putar?"
+        - "Lagu terfavorit saya apa?"
+        - "Lagu playlist mana yang paling sering dimainkan?"
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if not owner_id:
+            return {"success": False, "message": "Belum ada koneksi akun/perangkat aktif.", "top_tracks": []}
+
+        try:
+            top_tracks = store.get_top_played_playlist(owner_id, limit=5)
+            if not top_tracks:
+                return {
+                    "success": True,
+                    "message": "Belum ada lagu di playlist yang pernah diputar.",
+                    "total": 0,
+                    "top_tracks": [],
+                }
+            summary = [f"#{t.get('track_number')}. {t.get('title')} — {t.get('play_count', 0)} kali diputar" for t in top_tracks]
+            response = {
+                "success": True,
+                "message": "Lagu playlist yang paling sering Anda putar:\n" + "\n".join(summary),
+                "total": len(top_tracks),
+                "top_tracks": top_tracks,
+            }
+            record_mcp_tool_history(owner_id, "get_playlist_top_played", "lagu terfavorit", {}, response)
+            return response
+        except Exception as exc:
+            logger.exception("Error in get_playlist_top_played: %s", exc)
+            return {"success": False, "message": f"Gagal mengambil statistik lagu: {exc}", "top_tracks": []}
+
 
     @mcp_server.tool()
     def get_playback_status() -> dict:

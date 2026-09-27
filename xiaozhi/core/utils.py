@@ -59,6 +59,24 @@ def format_size_mb(size_bytes: int) -> str:
     return f"{size_bytes / (1024 * 1024):.2f} MB"
 
 
+def extract_youtube_video_id(url_or_id: str) -> Optional[str]:
+    """Extract 11-char YouTube video ID from various URL formats or plain ID."""
+    if not url_or_id:
+        return None
+    cleaned = str(url_or_id).strip()
+    if len(cleaned) == 11 and re.match(r"^[a-zA-Z0-9_-]{11}$", cleaned):
+        return cleaned
+    patterns = [
+        r"(?:v=|\/v\/|youtu\.be\/|\/embed\/|\/live\/|\/shorts\/)([a-zA-Z0-9_-]{11})",
+        r"[?&]v=([a-zA-Z0-9_-]{11})",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, cleaned)
+        if m:
+            return m.group(1)
+    return None
+
+
 def content_size_metadata(content: str) -> Dict[str, Any]:
     size_bytes = utf8_size(content)
     return {
