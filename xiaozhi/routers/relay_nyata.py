@@ -3,7 +3,7 @@ import secrets
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from xiaozhi.config import (
     REAL_RELAY_MAX_RELAYS,
@@ -34,7 +34,9 @@ router = APIRouter()
 
 
 @router.get("/relay-nyata", response_class=HTMLResponse)
-async def relay_nyata_page(request: Request):
+async def relay_nyata_page(request: Request, mode: str = Query(default=None)):
+    if mode in ("virtual", "simulasi"):
+        return RedirectResponse("/simulasi-smarthome-virtual", status_code=303)
     user = get_current_user(request)
     if not user:
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
@@ -63,6 +65,8 @@ async def relay_nyata_page(request: Request):
             "mcp_connected": is_mcp_connected(user["id"]),
             "message": request.query_params.get("message", ""),
             "active_page": "relay_nyata",
+            "page": "relay_nyata",
+            "active_mode": "real",
         },
     )
 
