@@ -140,16 +140,20 @@ class SQLiteStore:
                 VALUES (new.id, new.title, new.content, new.keywords, new.category);
             END;
 
-            -- XiaoZhi tokens (MCP endpoints)
+            -- XiaoZhi tokens (MCP endpoints, up to 3 slots)
             CREATE TABLE IF NOT EXISTS xiaozhi_tokens (
-                user_id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                slot_number INTEGER NOT NULL DEFAULT 1,
+                device_label TEXT NOT NULL DEFAULT 'XiaoZhi 1',
                 token_ciphertext TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT,
+                PRIMARY KEY (user_id, slot_number),
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS idx_tokens_hash ON xiaozhi_tokens(token_hash);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);
 
             -- Chat history
             CREATE TABLE IF NOT EXISTS chat_history (
@@ -386,6 +390,34 @@ class SQLiteStore:
             conn.execute("ALTER TABLE users ADD COLUMN firebase_email TEXT")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid)")
+
+        # Migration check: Pastikan xiaozhi_tokens mendukung multi-slot (hingga 3 slot)
+        try:
+            token_cols = [r["name"] for r in conn.execute("PRAGMA table_info(xiaozhi_tokens)").fetchall()]
+            if token_cols and "slot_number" not in token_cols:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS xiaozhi_tokens_v2 (
+                        user_id INTEGER NOT NULL,
+                        slot_number INTEGER NOT NULL DEFAULT 1,
+                        device_label TEXT NOT NULL DEFAULT 'XiaoZhi 1',
+                        token_ciphertext TEXT NOT NULL,
+                        token_hash TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT,
+                        PRIMARY KEY (user_id, slot_number),
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    );
+                """)
+                conn.execute("""
+                    INSERT OR IGNORE INTO xiaozhi_tokens_v2 (user_id, slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at)
+                    SELECT user_id, 1, 'XiaoZhi 1', token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens;
+                """)
+                conn.execute("DROP TABLE xiaozhi_tokens;")
+                conn.execute("ALTER TABLE xiaozhi_tokens_v2 RENAME TO xiaozhi_tokens;")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_tokens_hash ON xiaozhi_tokens(token_hash);")
+                conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);")
+        except Exception as exc:
+            logger.warning("SQLite xiaozhi_tokens migration error: %s", exc)
 
         conn.commit()
 
@@ -841,56 +873,105 @@ class SQLiteStore:
             "api_label": api_url[:50] + "..." if len(api_url) > 50 else api_url,
         }
 
-    # ── XiaoZhi Tokens (MCP) ──────────────────────────────────────────────
+    # ── XiaoZhi Tokens (MCP, Maksimal 3 Slot per Akun) ─────────────────────
 
-    def set_xiaozhi_token(self, owner_id: int, token: str) -> None:
-        encrypted = encrypt_secret(token)
-        token_hash = xiaozhi_token_hash(token)
+    def set_xiaozhi_token(self, owner_id: int, token: str, slot: int = 1, device_label: str = "") -> None:
+        slot_num = int(slot or 1)
+        if slot_num < 1 or slot_num > 3:
+            raise ValueError("Slot token XiaoZhi hanya diizinkan untuk Slot 1, 2, atau 3.")
+        encrypted = encrypt_secret(token.strip())
+        token_hash = xiaozhi_token_hash(token.strip())
+        label_clean = (device_label or "").strip()[:60] or f"XiaoZhi {slot_num}"
         conn = self._get_conn()
         conn.execute("""
-            INSERT INTO xiaozhi_tokens (user_id, token_ciphertext, token_hash, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
+            INSERT INTO xiaozhi_tokens (user_id, slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, slot_number) DO UPDATE SET
+                device_label=excluded.device_label,
                 token_ciphertext=excluded.token_ciphertext,
                 token_hash=excluded.token_hash,
                 updated_at=excluded.updated_at
-        """, (owner_id, encrypted, token_hash, utc_now(), utc_now()))
+        """, (owner_id, slot_num, label_clean, encrypted, token_hash, utc_now(), utc_now()))
         conn.commit()
 
-    def get_xiaozhi_token(self, owner_id: int) -> Optional[str]:
+    def get_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> Optional[str]:
         conn = self._get_conn()
-        row = conn.execute(
-            "SELECT token_ciphertext FROM xiaozhi_tokens WHERE user_id = ?",
-            (owner_id,)
-        ).fetchone()
+        if slot is not None:
+            row = conn.execute(
+                "SELECT token_ciphertext FROM xiaozhi_tokens WHERE user_id = ? AND slot_number = ?",
+                (owner_id, int(slot))
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT token_ciphertext FROM xiaozhi_tokens WHERE user_id = ? ORDER BY slot_number ASC LIMIT 1",
+                (owner_id,)
+            ).fetchone()
         if not row:
             return None
         return decrypt_secret(row["token_ciphertext"])
 
-    def get_xiaozhi_token_info(self, owner_id: int) -> Optional[Dict[str, Any]]:
+    def get_xiaozhi_token_info(self, owner_id: int, slot: Optional[int] = None) -> Optional[Dict[str, Any]]:
         conn = self._get_conn()
-        row = conn.execute(
-            "SELECT * FROM xiaozhi_tokens WHERE user_id = ?",
-            (owner_id,)
-        ).fetchone()
+        if slot is not None:
+            row = conn.execute(
+                "SELECT * FROM xiaozhi_tokens WHERE user_id = ? AND slot_number = ?",
+                (owner_id, int(slot))
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT * FROM xiaozhi_tokens WHERE user_id = ? ORDER BY slot_number ASC LIMIT 1",
+                (owner_id,)
+            ).fetchone()
         if not row:
             return None
-        token = decrypt_secret(row["token_ciphertext"])
+        r = dict(row)
+        token = decrypt_secret(r["token_ciphertext"])
+        slot_num = int(r.get("slot_number", 1) or 1)
         return {
-            "token_hash": row["token_hash"],
-            "preview": token[:30] + "..." if token and len(token) > 30 else token,
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
+            "slot_number": slot_num,
+            "device_label": r.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+            "token_hash": r["token_hash"],
+            "preview": f"{token[:4]}...{token[-4:]}" if token and len(token) > 8 else token,
+            "created_at": r.get("created_at", ""),
+            "updated_at": r.get("updated_at", ""),
         }
 
-    def delete_xiaozhi_token(self, owner_id: int) -> bool:
+    def list_user_xiaozhi_tokens(self, owner_id: int) -> List[Dict[str, Any]]:
+        """List all active token slots (up to 3) for a specific user."""
         conn = self._get_conn()
-        cursor = conn.execute("DELETE FROM xiaozhi_tokens WHERE user_id = ?", (owner_id,))
+        rows = conn.execute(
+            "SELECT * FROM xiaozhi_tokens WHERE user_id = ? ORDER BY slot_number ASC",
+            (owner_id,)
+        ).fetchall()
+        result = []
+        for row in rows:
+            r = dict(row)
+            token = decrypt_secret(r["token_ciphertext"])
+            slot_num = int(r.get("slot_number", 1) or 1)
+            result.append({
+                "slot_number": slot_num,
+                "device_label": r.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+                "preview": f"{token[:4]}...{token[-4:]}" if token and len(token) > 8 else token,
+                "token_hash": r["token_hash"],
+                "created_at": r.get("created_at", ""),
+                "updated_at": r.get("updated_at", ""),
+            })
+        return result
+
+    def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> bool:
+        conn = self._get_conn()
+        if slot is not None:
+            cursor = conn.execute("DELETE FROM xiaozhi_tokens WHERE user_id = ? AND slot_number = ?", (owner_id, int(slot)))
+        else:
+            cursor = conn.execute("DELETE FROM xiaozhi_tokens WHERE user_id = ?", (owner_id,))
         conn.commit()
-        try:
-            self.detach_user_devices(int(owner_id), reason="MCP Xiaozhi diputus / dihapus")
-        except Exception as exc:
-            logger.warning("Gagal detach devices sqlite user %s: %s", owner_id, exc)
+        # Periksa sisa slot
+        rem = conn.execute("SELECT COUNT(*) FROM xiaozhi_tokens WHERE user_id = ?", (owner_id,)).fetchone()[0]
+        if rem == 0:
+            try:
+                self.detach_user_devices(int(owner_id), reason="Semua slot MCP Xiaozhi diputus / dihapus")
+            except Exception as exc:
+                logger.warning("Gagal detach devices sqlite user %s: %s", owner_id, exc)
         return cursor.rowcount > 0
 
     def delete_xiaozhi_token_by_hash(self, token: str) -> bool:
@@ -902,22 +983,28 @@ class SQLiteStore:
         conn.commit()
         if target_user:
             try:
-                self.detach_user_devices(int(target_user), reason="MCP Token dihapus by hash")
+                rem = conn.execute("SELECT COUNT(*) FROM xiaozhi_tokens WHERE user_id = ?", (target_user,)).fetchone()[0]
+                if rem == 0:
+                    self.detach_user_devices(int(target_user), reason="MCP Token dihapus by hash")
             except Exception as exc:
                 logger.warning("Gagal detach devices sqlite user %s: %s", target_user, exc)
         return cursor.rowcount > 0
 
     def list_xiaozhi_tokens(self) -> List[Dict[str, Any]]:
         conn = self._get_conn()
-        rows = conn.execute("SELECT * FROM xiaozhi_tokens").fetchall()
+        rows = conn.execute("SELECT * FROM xiaozhi_tokens ORDER BY user_id, slot_number").fetchall()
         result = []
         for row in rows:
-            token = decrypt_secret(row["token_ciphertext"])
+            r = dict(row)
+            token = decrypt_secret(r["token_ciphertext"])
             if token:
+                slot_num = int(r.get("slot_number", 1) or 1)
                 result.append({
-                    "user_id": row["user_id"],
+                    "user_id": r["user_id"],
+                    "slot_number": slot_num,
+                    "device_label": r.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
                     "token": token,
-                    "token_hash": row["token_hash"],
+                    "token_hash": r["token_hash"],
                 })
         return result
 
@@ -925,19 +1012,14 @@ class SQLiteStore:
         token_hash = xiaozhi_token_hash(token)
         conn = self._get_conn()
         row = conn.execute("""
-            SELECT t.user_id, t.created_at, u.username, u.role
+            SELECT t.user_id, t.slot_number, t.device_label, t.created_at, u.username, u.role
             FROM xiaozhi_tokens t
             JOIN users u ON t.user_id = u.id
             WHERE t.token_hash = ?
         """, (token_hash,)).fetchone()
         if not row:
             return None
-        return {
-            "user_id": row["user_id"],
-            "username": row["username"],
-            "role": row["role"],
-            "created_at": row["created_at"],
-        }
+        return dict(row)
 
     # ── Chat History ───────────────────────────────────────────────────────
 

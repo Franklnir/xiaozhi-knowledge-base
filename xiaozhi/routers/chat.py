@@ -216,6 +216,7 @@ async def chat_history_page(
     limit: int = Query(CHAT_HISTORY_DEFAULT_LIMIT, ge=1, le=300),
     date: str = Query("", max_length=10),
     days: int = Query(5, ge=1, le=60),
+    slot: Optional[int] = Query(None),
 ):
     user = get_current_user(request)
     if not user:
@@ -225,8 +226,15 @@ async def chat_history_page(
         return redirect_with_message("/login", "Endpoint WebSocket MCP wajib dihubungkan sebelum mengakses Riwayat Chat.")
 
     store = get_store()
-    token_info = store.get_xiaozhi_token_info(user["id"])
-    token_hash = token_info.get("token_hash", "") if token_info else ""
+    user_tokens = store.list_user_xiaozhi_tokens(user["id"]) if hasattr(store, "list_user_xiaozhi_tokens") else []
+    
+    selected_slot = None
+    token_hash = ""
+    if slot is not None and int(slot) in (1, 2, 3):
+        selected_slot = int(slot)
+        target = next((t for t in user_tokens if int(t.get("slot_number", 1)) == selected_slot), None)
+        token_hash = target.get("token_hash", "") if target else "none"
+
     # Always get full date list (all time)
     date_list = store.chat_history_dates(user["id"], token_hash=token_hash)
     if not date_list and token_hash:
@@ -245,8 +253,6 @@ async def chat_history_page(
         effective_date = date
         active_date_val = date
     else:
-        # Smart Default: jika hari ini belum ada chat suara tapi ada riwayat tanggal sebelumnya,
-        # otomatis tampilkan tanggal terakhir agar halaman tidak kosong.
         if not has_chats_today and date_list and isinstance(date_list[0], dict) and date_list[0].get("date"):
             effective_date = date_list[0]["date"]
             active_date_val = effective_date
@@ -255,23 +261,25 @@ async def chat_history_page(
             active_date_val = today_str
 
     histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=effective_date)
-    # If no results with token_hash, fallback to fetching without token_hash
-    if not histories and token_hash:
-        histories = store.list_chat_history(user["id"], q, limit, token_hash="", date=effective_date)
-
     stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=effective_date)
-    if not stats.get("total") and token_hash:
-        stats = store.chat_history_stats(user["id"], token_hash="", date=effective_date)
-
-    # Also compute all-time stats for reference
     all_stats = store.chat_history_stats(user["id"], token_hash=token_hash, date="")
 
+    token_info = store.get_xiaozhi_token_info(user["id"], slot=selected_slot or 1)
     mcp_status = mcp_status_payload(
         user["id"],
-        token_saved=bool(token_info),
+        token_saved=bool(token_info) or len(user_tokens) > 0,
         token_preview=token_info.get("preview", "") if token_info else "",
-        token_hash=token_hash,
+        token_hash=token_info.get("token_hash", "") if token_info else "",
+        slot=selected_slot or 1,
     )
+    # Map token_hash to slot info for badge rendering
+    token_slots_map = {t["token_hash"]: t for t in user_tokens if t.get("token_hash")}
+    for h in histories:
+        th = h.get("token_hash") or ""
+        if th in token_slots_map:
+            h["slot_number"] = token_slots_map[th].get("slot_number", 1)
+            h["device_label"] = token_slots_map[th].get("device_label", f"XiaoZhi {h['slot_number']}")
+
     return render(
         request,
         "chat_history.html",
@@ -287,6 +295,8 @@ async def chat_history_page(
             "today_date": today_str,
             "recent_days": days,
             "date_list": date_list,
+            "user_tokens": user_tokens,
+            "selected_slot": selected_slot,
             "message": request.query_params.get("message", ""),
             "active_page": "chat_history",
         },
@@ -297,13 +307,21 @@ async def chat_history_page(
 async def api_chat_history_stream(
     request: Request,
     date: str = Query("", max_length=10),
+    slot: Optional[int] = Query(None),
 ):
     """Real-time SSE token/chat event streaming endpoint for Chat History."""
     user = require_user(request)
+    store = get_store()
+    target_token_hash = ""
+    if slot is not None and int(slot) in (1, 2, 3):
+        user_tokens = store.list_user_xiaozhi_tokens(user["id"]) if hasattr(store, "list_user_xiaozhi_tokens") else []
+        target = next((t for t in user_tokens if int(t.get("slot_number", 1)) == int(slot)), None)
+        target_token_hash = target.get("token_hash", "") if target else "none"
+
     from xiaozhi.services.sse_service import stream_chat_history_events
     effective_date = "" if date == "all" else date
     return StreamingResponse(
-        stream_chat_history_events(user["id"], request, active_date=effective_date),
+        stream_chat_history_events(user["id"], request, active_date=effective_date, target_token_hash=target_token_hash),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -320,15 +338,18 @@ async def chat_history_api(
     q: str = Query("", max_length=120),
     limit: int = Query(CHAT_HISTORY_DEFAULT_LIMIT, ge=1, le=300),
     date: str = Query("", max_length=10),
+    slot: Optional[int] = Query(None),
 ):
     user = require_user(request)
     store = get_store()
-    token_info = store.get_xiaozhi_token_info(user["id"])
-    token_hash = token_info.get("token_hash", "") if token_info else ""
+    user_tokens = store.list_user_xiaozhi_tokens(user["id"]) if hasattr(store, "list_user_xiaozhi_tokens") else []
+    token_hash = ""
+    if slot is not None and int(slot) in (1, 2, 3):
+        target = next((t for t in user_tokens if int(t.get("slot_number", 1)) == int(slot)), None)
+        token_hash = target.get("token_hash", "") if target else "none"
+
     req_date = "" if date == "all" else date
     histories = store.list_chat_history(user["id"], q, limit, token_hash=token_hash, date=req_date)
-    if not histories and not q and token_hash:
-        histories = store.list_chat_history(user["id"], "", limit, token_hash="", date=req_date)
     if after_id:
         recent_histories = histories[:5]
         new_histories = [item for item in histories if int(item.get("id", 0)) > int(after_id)]
@@ -337,21 +358,28 @@ async def chat_history_api(
             merged_by_id[int(item.get("id", 0))] = item
         histories = sorted(merged_by_id.values(), key=lambda item: int(item.get("id", 0)), reverse=True)
     stats = store.chat_history_stats(user["id"], token_hash=token_hash, date=req_date)
-    if not stats.get("total") and token_hash:
-        stats = store.chat_history_stats(user["id"], token_hash="", date=req_date)
     date_list = store.chat_history_dates(user["id"], token_hash=token_hash)
-    if not date_list and token_hash:
-        date_list = store.chat_history_dates(user["id"], token_hash="")
+
+    token_slots_map = {t["token_hash"]: t for t in user_tokens if t.get("token_hash")}
+    for h in histories:
+        th = h.get("token_hash") or ""
+        if th in token_slots_map:
+            h["slot_number"] = token_slots_map[th].get("slot_number", 1)
+            h["device_label"] = token_slots_map[th].get("device_label", f"XiaoZhi {h['slot_number']}")
+
+    token_info = store.get_xiaozhi_token_info(user["id"], slot=slot or 1)
     return {
         "success": True,
         "items": histories,
         "stats": stats,
         "date_list": date_list,
+        "selected_slot": slot,
         "mcp_status": mcp_status_payload(
             user["id"],
-            token_saved=bool(token_info),
+            token_saved=bool(token_info) or len(user_tokens) > 0,
             token_preview=token_info.get("preview", "") if token_info else "",
-            token_hash=token_hash,
+            token_hash=token_info.get("token_hash", "") if token_info else "",
+            slot=slot or 1,
         ),
         "max_id": max((int(item.get("id", 0)) for item in histories), default=after_id),
         "server_time": utc_now(),

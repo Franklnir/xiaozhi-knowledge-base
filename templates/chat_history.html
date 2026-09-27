@@ -343,15 +343,23 @@
         <aside class="chat-sidebar">
             <div class="chat-sidebar-header">
                 <form action="/riwayat-chat" method="GET" class="grid gap-2">
+                    {% if selected_slot %}<input type="hidden" name="slot" value="{{ selected_slot }}">{% endif %}
                     <input type="search" name="q" id="chatSearchInput" value="{{ query }}" placeholder="Cari pesan atau tool..." class="app-input" style="font-size:13px;padding:8px 10px;">
                     <div class="chat-date-input">
                         <input type="date" name="date" value="{{ active_date }}">
                         <button type="submit" class="app-button app-button-primary" style="padding:6px 12px;font-size:12px;">Filter</button>
                     </div>
                 </form>
-                <div class="chat-type-tabs" style="margin-top:6px;">
-                    <a href="/riwayat-chat" class="chat-type-tab {% if active_date == today_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;">📅 Hari Ini</a>
-                    <a href="/riwayat-chat?date=all" class="chat-type-tab {% if not active_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;">🗓️ Semua Tanggal</a>
+                <!-- Multi-Device / Slot Filter (3 Slot Maksimal) -->
+                <div class="chat-type-tabs" style="margin-top:6px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);">
+                    <a href="/riwayat-chat?{% if active_date %}date={{ active_date }}&{% endif %}{% if query %}q={{ query }}&{% endif %}" class="chat-type-tab {% if not selected_slot %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:4px 3px;font-size:10px;" title="Tampilkan riwayat dari semua slot token">📟 Semua</a>
+                    <a href="/riwayat-chat?slot=1{% if active_date %}&date={{ active_date }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chat-type-tab {% if selected_slot == 1 %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:4px 3px;font-size:10px;" title="Slot 1">Slot 1</a>
+                    <a href="/riwayat-chat?slot=2{% if active_date %}&date={{ active_date }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chat-type-tab {% if selected_slot == 2 %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:4px 3px;font-size:10px;" title="Slot 2">Slot 2</a>
+                    <a href="/riwayat-chat?slot=3{% if active_date %}&date={{ active_date }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chat-type-tab {% if selected_slot == 3 %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:4px 3px;font-size:10px;" title="Slot 3">Slot 3</a>
+                </div>
+                <div class="chat-type-tabs" style="margin-top:4px;">
+                    <a href="/riwayat-chat?{% if selected_slot %}slot={{ selected_slot }}&{% endif %}" class="chat-type-tab {% if active_date == today_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;">📅 Hari Ini</a>
+                    <a href="/riwayat-chat?date=all{% if selected_slot %}&slot={{ selected_slot }}{% endif %}" class="chat-type-tab {% if not active_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;">🗓️ Semua Tanggal</a>
                 </div>
                 <div class="chat-type-tabs">
                     <button type="button" class="chat-type-tab active" data-type="all" onclick="setTypeFilter('all')">Semua</button>
@@ -359,7 +367,7 @@
                     <button type="button" class="chat-type-tab" data-type="tool" onclick="setTypeFilter('tool')">⚡ Tool MCP</button>
                 </div>
                 <div style="display:flex;gap:6px;margin-top:8px;">
-                    <a href="/riwayat-chat?date=all" class="app-button" style="flex:1;font-size:12px;padding:6px 8px;text-align:center;">Reset</a>
+                    <a href="/riwayat-chat?date=all{% if selected_slot %}&slot={{ selected_slot }}{% endif %}" class="app-button" style="flex:1;font-size:12px;padding:6px 8px;text-align:center;">Reset</a>
                     <form action="/riwayat-chat/clear" method="POST" onsubmit="return confirm('Hapus semua riwayat chat? Tindakan ini tidak dapat dibatalkan.');" style="flex:1;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="submit" class="app-button app-button-danger" style="width:100%;font-size:12px;padding:6px 8px;">Hapus Semua</button>
@@ -402,6 +410,7 @@
     var DL = {{ date_list|tojson }};
     var MQ = {{ query|tojson }};
     var AD = {{ active_date|tojson }};
+    var selectedSlot = {{ selected_slot|tojson }};
     var CSRF_TOKEN = {{ csrf_token|tojson }};
     var currentTypeFilter = 'all';
     var sel = H.length ? Number(H[0].id) : null;
@@ -504,10 +513,13 @@
                 var isSelected = (id === sel);
                 var previewTitle = i.user_message || i.xiaozhi_answer || i.tool_name || ("Pesan #" + id);
                 var isTool = isToolItem(i);
+                var slotNum = i.slot_number || 1;
+                var devLabel = i.device_label || ('Slot ' + slotNum);
                 html += '<button type="button" class="chat-item ' + (isSelected ? 'active' : '') + '" onclick="selChat(' + id + ')">';
                 html += '<span class="chat-item-title">' + E(previewTitle) + '</span>';
                 html += '<div class="chat-item-meta">';
                 html += '<span class="chat-item-badge" style="' + (isTool ? 'color:#9333ea;background:#f5d0fe;' : '') + '">' + E(kind(i)) + '</span>';
+                html += '<span class="chat-item-badge" style="background:#e0e7ff;color:#3730a3;font-weight:700;">📟 ' + E(devLabel) + '</span>';
                 html += '<span>' + E(fmtShort(i.created_at)) + '</span>';
                 html += '</div>';
                 html += '</button>';
@@ -522,6 +534,7 @@
         var url = new URL(window.location);
         url.searchParams.set("date", d);
         if (MQ) url.searchParams.set("q", MQ);
+        if (selectedSlot) url.searchParams.set("slot", selectedSlot);
         window.location = url;
     }
 
@@ -547,9 +560,11 @@
 
         if (actions) actions.style.display = "flex";
         var fullTitle = item.user_message || item.xiaozhi_answer || item.tool_name || ("Chat #" + item.id);
+        var slotNum = item.slot_number || 1;
+        var devLabel = item.device_label || ('Slot ' + slotNum);
         document.getElementById("threadTitle").textContent = fullTitle;
         document.getElementById("threadBadge").textContent = kind(item);
-        document.getElementById("threadMeta").textContent = "ID #" + item.id + " · " + fmt(item.created_at) + (item.source ? " · Sumber: " + item.source : "");
+        document.getElementById("threadMeta").textContent = "ID #" + item.id + " · " + fmt(item.created_at) + (item.source ? " · Sumber: " + item.source : "") + " · 📟 " + devLabel;
 
         var m = "";
 
@@ -558,7 +573,7 @@
             m += '<div class="chat-msg">';
             m += '<div class="chat-bubble chat-bubble-user">';
             m += '<div class="chat-bubble-head">';
-            m += '<span class="chat-bubble-role">👤 User</span>';
+            m += '<span class="chat-bubble-role">👤 User <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">📟 ' + E(devLabel) + '</span></span>';
             m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
             m += '</div>';
             m += '<div class="chat-bubble-body">' + E(item.user_message) + '</div>';
@@ -611,7 +626,7 @@
             m += '<div class="chat-msg">';
             m += '<div class="chat-bubble chat-bubble-ai">';
             m += '<div class="chat-bubble-head">';
-            m += '<span class="chat-bubble-role">' + label + '</span>';
+            m += '<span class="chat-bubble-role">' + label + ' <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">📟 ' + E(devLabel) + '</span></span>';
             m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
             m += '</div>';
             m += '<div class="chat-bubble-body">' + E(aiAnswer) + '</div>';
@@ -714,6 +729,9 @@
     async function poll() {
         try {
             var p = new URLSearchParams({after_id: String(maxId), q: MQ || "", limit: "{{ limit }}", date: AD || ""});
+            if (selectedSlot) {
+                p.set("slot", String(selectedSlot));
+            }
             var r = await fetch("/api/chat-history?" + p, {headers: {Accept: "application/json"}, credentials: "same-origin"});
             var d = await r.json().catch(function(){ return {}; });
             if (!r.ok || !d.success) return;
@@ -736,7 +754,10 @@
     // ── Real-Time SSE Chat History Listener ──
     function initSSE() {
         if (!window.EventSource) return;
-        var sseParam = AD ? "?date=" + encodeURIComponent(AD) : "";
+        var sseParams = [];
+        if (AD) sseParams.push("date=" + encodeURIComponent(AD));
+        if (selectedSlot) sseParams.push("slot=" + encodeURIComponent(selectedSlot));
+        var sseParam = sseParams.length ? "?" + sseParams.join("&") : "";
         try {
             var es = new EventSource("/api/chat-history/stream" + sseParam);
 

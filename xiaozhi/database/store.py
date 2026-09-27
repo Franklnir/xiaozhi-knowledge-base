@@ -1137,26 +1137,33 @@ class HFJsonStore:
                 self._commit(data, "Delete material")
             return changed
 
-    def set_xiaozhi_token(self, owner_id: int, token: str) -> None:
+    def set_xiaozhi_token(self, owner_id: int, token: str, slot: int = 1, device_label: str = "") -> None:
+        slot_num = int(slot or 1)
+        if slot_num < 1 or slot_num > 3:
+            raise ValueError("Slot token XiaoZhi hanya diizinkan untuk Slot 1, 2, atau 3.")
         token = clean_multiline(token, max_len=2000, min_len=10, field="Endpoint Xiaozhi")
         if not token.startswith("wss://"):
             raise ValueError("Endpoint Xiaozhi harus diawali wss://")
         encrypted = encrypt_secret(token)
         token_hash = xiaozhi_token_hash(token)
+        label_clean = (device_label or "").strip()[:60] or f"XiaoZhi {slot_num}"
         with self._lock:
             data = self._load()
             existing = next(
-                (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id)),
+                (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == slot_num),
                 None,
             )
             if existing:
                 existing["token_ciphertext"] = encrypted
                 existing["token_hash"] = token_hash
+                existing["device_label"] = label_clean
                 existing["updated_at"] = utc_now()
             else:
                 data["xiaozhi_tokens"].append(
                     {
                         "user_id": int(owner_id),
+                        "slot_number": slot_num,
+                        "device_label": label_clean,
                         "token_ciphertext": encrypted,
                         "token_hash": token_hash,
                         "created_at": utc_now(),
@@ -1165,54 +1172,96 @@ class HFJsonStore:
                 )
             self._commit(data, "Save Xiaozhi token")
 
-    def get_xiaozhi_token(self, owner_id: int) -> Optional[str]:
+    def get_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> Optional[str]:
         with self._lock:
             data = self._load()
-            existing = next(
-                (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id)),
-                None,
-            )
+            if slot is not None:
+                existing = next(
+                    (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == int(slot)),
+                    None,
+                )
+            else:
+                user_tokens = [item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id)]
+                user_tokens.sort(key=lambda x: int(x.get("slot_number", 1)))
+                existing = user_tokens[0] if user_tokens else None
             if not existing:
                 return None
             return decrypt_secret(existing.get("token_ciphertext", ""))
 
-    def get_xiaozhi_token_info(self, owner_id: int) -> Optional[Dict[str, Any]]:
+    def get_xiaozhi_token_info(self, owner_id: int, slot: Optional[int] = None) -> Optional[Dict[str, Any]]:
         with self._lock:
             data = self._load()
-            existing = next(
-                (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id)),
-                None,
-            )
+            if slot is not None:
+                existing = next(
+                    (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == int(slot)),
+                    None,
+                )
+            else:
+                user_tokens = [item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id)]
+                user_tokens.sort(key=lambda x: int(x.get("slot_number", 1)))
+                existing = user_tokens[0] if user_tokens else None
             if not existing:
                 return None
             token = decrypt_secret(existing.get("token_ciphertext", ""))
             if not token:
                 return None
             token_hash = normalize_token_hash(existing.get("token_hash", "")) or xiaozhi_token_hash(token)
+            slot_num = int(existing.get("slot_number", 1) or 1)
             return {
                 "user_id": int(owner_id),
+                "slot_number": slot_num,
+                "device_label": existing.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
                 "token": token,
                 "token_hash": token_hash,
-                "preview": mask_secret(token),
+                "preview": f"{token[:4]}...{token[-4:]}" if len(token) > 8 else token,
                 "created_at": existing.get("created_at", ""),
                 "updated_at": existing.get("updated_at", ""),
             }
 
-    def delete_xiaozhi_token(self, owner_id: int) -> bool:
+    def list_user_xiaozhi_tokens(self, owner_id: int) -> List[Dict[str, Any]]:
+        """List all active token slots (up to 3) for a specific user."""
+        with self._lock:
+            data = self._load()
+            tokens = []
+            for item in data.get("xiaozhi_tokens", []):
+                if int(item.get("user_id", 0)) == int(owner_id):
+                    token = decrypt_secret(item.get("token_ciphertext", ""))
+                    slot_num = int(item.get("slot_number", 1) or 1)
+                    token_hash = normalize_token_hash(item.get("token_hash", "")) or xiaozhi_token_hash(token)
+                    tokens.append({
+                        "slot_number": slot_num,
+                        "device_label": item.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+                        "preview": f"{token[:4]}...{token[-4:]}" if token and len(token) > 8 else token,
+                        "token_hash": token_hash,
+                        "created_at": item.get("created_at", ""),
+                        "updated_at": item.get("updated_at", ""),
+                    })
+            tokens.sort(key=lambda x: x["slot_number"])
+            return tokens
+
+    def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> bool:
         with self._lock:
             data = self._load()
             before = len(data["xiaozhi_tokens"])
-            data["xiaozhi_tokens"] = [
-                item for item in data["xiaozhi_tokens"]
-                if int(item.get("user_id", 0)) != int(owner_id)
-            ]
+            if slot is not None:
+                data["xiaozhi_tokens"] = [
+                    item for item in data["xiaozhi_tokens"]
+                    if not (int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == int(slot))
+                ]
+            else:
+                data["xiaozhi_tokens"] = [
+                    item for item in data["xiaozhi_tokens"]
+                    if int(item.get("user_id", 0)) != int(owner_id)
+                ]
             changed = len(data["xiaozhi_tokens"]) != before
             if changed:
                 self._commit(data, "Delete Xiaozhi token")
-        try:
-            self.detach_user_devices(int(owner_id), reason="MCP Xiaozhi diputus / dihapus")
-        except Exception as exc:
-            logger.warning("Gagal detach devices memory user %s: %s", owner_id, exc)
+        remaining = any(int(item.get("user_id", 0)) == int(owner_id) for item in data.get("xiaozhi_tokens", []))
+        if not remaining:
+            try:
+                self.detach_user_devices(int(owner_id), reason="Semua slot MCP Xiaozhi diputus / dihapus")
+            except Exception as exc:
+                logger.warning("Gagal detach devices memory user %s: %s", owner_id, exc)
         return changed
 
     def find_user_by_mcp_token(self, token: str) -> Optional[Dict[str, Any]]:
@@ -1234,6 +1283,8 @@ class HFJsonStore:
                     if user:
                         return {
                             "user_id": user_id,
+                            "slot_number": int(item.get("slot_number", 1) or 1),
+                            "device_label": item.get("device_label", "XiaoZhi 1"),
                             "username": user.get("username", ""),
                             "role": user.get("role", "user"),
                             "created_at": item.get("created_at", ""),
@@ -1263,11 +1314,18 @@ class HFJsonStore:
         with self._lock:
             data = self._load()
             tokens = []
-            for item in data["xiaozhi_tokens"]:
+            for item in data.get("xiaozhi_tokens", []):
                 token = decrypt_secret(item.get("token_ciphertext", ""))
                 if token:
                     token_hash = normalize_token_hash(item.get("token_hash", "")) or xiaozhi_token_hash(token)
-                    tokens.append({"user_id": int(item.get("user_id", 0)), "token": token, "token_hash": token_hash})
+                    slot_num = int(item.get("slot_number", 1) or 1)
+                    tokens.append({
+                        "user_id": int(item.get("user_id", 0)),
+                        "slot_number": slot_num,
+                        "device_label": item.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+                        "token": token,
+                        "token_hash": token_hash,
+                    })
             return tokens
 
     def add_chat_history(

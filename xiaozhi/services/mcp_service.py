@@ -8,53 +8,187 @@ from xiaozhi.core.utils import utc_now
 
 logger = logging.getLogger("xiaozhi.mcp")
 
-# ── MCP State ──────────────────────────────────────────────────────────────
+# ── MCP State (Maksimal 3 Slot per Akun) ─────────────────────────────────
 mcp_state_lock = RLock()
-mcp_connection_states: Dict[int, Dict[str, Any]] = {}
-mcp_bridge_tasks: Dict[int, asyncio.Task] = {}
+mcp_connection_states: Dict[str, Dict[str, Any]] = {}
+mcp_bridge_tasks: Dict[str, asyncio.Task] = {}
 mcp_reload_event: Optional[asyncio.Event] = None
 
 
-def clear_mcp_state(owner_id: int) -> None:
+def _slot_key(owner_id: int, slot: int = 1) -> str:
+    return f"{int(owner_id)}:{int(slot)}"
+
+
+def clear_mcp_state(owner_id: int, slot: Optional[int] = None) -> None:
     user_id = int(owner_id)
     with mcp_state_lock:
-        mcp_connection_states.pop(user_id, None)
-    logger.info("MCP state cleared for user_id=%s", user_id)
+        if slot is not None:
+            mcp_connection_states.pop(_slot_key(user_id, slot), None)
+            has_connected = any(
+                dict(mcp_connection_states.get(_slot_key(user_id, s), {})).get("connected")
+                for s in (1, 2, 3)
+            )
+            if not has_connected:
+                mcp_connection_states.pop(str(user_id), None)
+                mcp_connection_states.pop(user_id, None)  # type: ignore
+        else:
+            for s in (1, 2, 3):
+                mcp_connection_states.pop(_slot_key(user_id, s), None)
+            mcp_connection_states.pop(str(user_id), None)
+            mcp_connection_states.pop(user_id, None)  # type: ignore
+    logger.info("MCP state cleared for user_id=%s slot=%s", user_id, slot or "all")
 
 
-def set_mcp_connection_state(owner_id: int, token_hash: str, *, connected: bool, message: str = "", request_id: str = "") -> None:
+def set_mcp_connection_state(
+    owner_id: int,
+    token_hash: str,
+    *,
+    connected: bool,
+    message: str = "",
+    request_id: str = "",
+    slot: int = 1,
+    device_label: str = "",
+) -> None:
     user_id = int(owner_id)
+    slot_num = int(slot or 1)
     token_hash = normalize_token_hash(token_hash)
+    key = _slot_key(user_id, slot_num)
+    label = device_label or f"XiaoZhi {slot_num}"
     with mcp_state_lock:
-        previous = dict(mcp_connection_states.get(user_id, {}))
+        previous = dict(mcp_connection_states.get(key, {}))
         previous.update(
             {
                 "connected": bool(connected),
                 "token_hash": token_hash or previous.get("token_hash", ""),
                 "message": message,
                 "request_id": request_id or previous.get("request_id", ""),
+                "slot": slot_num,
+                "device_label": label,
                 "updated_at": utc_now(),
             }
         )
-        mcp_connection_states[user_id] = previous
+        mcp_connection_states[key] = previous
+
+        # Backward compatibility for legacy callers checking integer or string user_id
+        if slot_num == 1 or connected:
+            legacy_dict = dict(previous)
+            mcp_connection_states[user_id] = legacy_dict  # type: ignore
+            mcp_connection_states[str(user_id)] = legacy_dict
+        elif not connected:
+            # Check if any other slot is connected
+            has_other = any(
+                dict(mcp_connection_states.get(_slot_key(user_id, s), {})).get("connected")
+                for s in (1, 2, 3) if s != slot_num
+            )
+            if not has_other:
+                legacy_dict = dict(previous)
+                legacy_dict["connected"] = False
+                mcp_connection_states[user_id] = legacy_dict  # type: ignore
+                mcp_connection_states[str(user_id)] = legacy_dict
 
 
-def is_mcp_connected(owner_id: int, token_hash: str = "") -> bool:
+def is_mcp_connected(owner_id: int, token_hash: str = "", slot: Optional[int] = None) -> bool:
     token_hash = normalize_token_hash(token_hash)
+    user_id = int(owner_id)
     with mcp_state_lock:
-        state = dict(mcp_connection_states.get(int(owner_id), {}))
-    if not state.get("connected"):
+        if slot is not None:
+            state = dict(mcp_connection_states.get(_slot_key(user_id, slot), {}))
+            if not state.get("connected"):
+                return False
+            active_hash = normalize_token_hash(str(state.get("token_hash", "")))
+            return not token_hash or not active_hash or active_hash == token_hash
+
+        # If token_hash provided, check matching slot
+        if token_hash:
+            for s in (1, 2, 3):
+                state = dict(mcp_connection_states.get(_slot_key(user_id, s), {}))
+                if state.get("connected"):
+                    active_hash = normalize_token_hash(str(state.get("token_hash", "")))
+                    if not active_hash or active_hash == token_hash:
+                        return True
+            return False
+
+        # If neither slot nor hash, return True if ANY slot is connected
+        for s in (1, 2, 3):
+            state = dict(mcp_connection_states.get(_slot_key(user_id, s), {}))
+            if state.get("connected"):
+                return True
         return False
-    active_hash = normalize_token_hash(str(state.get("token_hash", "")))
-    return not token_hash or not active_hash or active_hash == token_hash
 
 
-def current_mcp_token_hash(owner_id: Optional[int]) -> str:
+def current_mcp_token_hash(owner_id: Optional[int], slot: Optional[int] = None) -> str:
     if owner_id is None:
         return ""
+    user_id = int(owner_id)
     with mcp_state_lock:
-        state = dict(mcp_connection_states.get(int(owner_id), {}))
-    return normalize_token_hash(str(state.get("token_hash", "")))
+        if slot is not None:
+            state = dict(mcp_connection_states.get(_slot_key(user_id, slot), {}))
+            return normalize_token_hash(str(state.get("token_hash", "")))
+        # Search for first connected slot
+        for s in (1, 2, 3):
+            state = dict(mcp_connection_states.get(_slot_key(user_id, s), {}))
+            if state.get("connected") and state.get("token_hash"):
+                return normalize_token_hash(str(state.get("token_hash", "")))
+        # Fallback to slot 1
+        state1 = dict(mcp_connection_states.get(_slot_key(user_id, 1), {}))
+        return normalize_token_hash(str(state1.get("token_hash", "")))
+
+
+def mcp_slots_payload(owner_id: int, store: Any) -> Dict[str, Any]:
+    """Generates a complete multi-slot status payload for Slots 1, 2, and 3."""
+    user_id = int(owner_id)
+    user_tokens = []
+    if hasattr(store, "list_user_xiaozhi_tokens"):
+        try:
+            user_tokens = store.list_user_xiaozhi_tokens(user_id)
+        except Exception:
+            pass
+
+    token_map = {int(t.get("slot_number", 1)): t for t in user_tokens}
+
+    slots_list = []
+    any_connected = False
+    total_saved = 0
+
+    with mcp_state_lock:
+        for s in (1, 2, 3):
+            t_info = token_map.get(s)
+            saved = bool(t_info)
+            if saved:
+                total_saved += 1
+            t_hash = normalize_token_hash(t_info.get("token_hash", "")) if t_info else ""
+            connected = is_mcp_connected(user_id, t_hash, slot=s)
+            if connected:
+                any_connected = True
+
+            state = dict(mcp_connection_states.get(_slot_key(user_id, s), {}))
+            label = (t_info.get("device_label") if t_info else "") or f"XiaoZhi {s}"
+
+            if connected:
+                status_text = f"Slot {s} ({label}) terhubung"
+            elif saved:
+                status_text = state.get("message") or f"Slot {s} tersimpan, menunggu bridge"
+            else:
+                status_text = f"Slot {s} belum dikonfigurasi"
+
+            slots_list.append(
+                {
+                    "slot": s,
+                    "label": label,
+                    "saved": saved,
+                    "connected": connected,
+                    "preview": t_info.get("preview", "") if t_info else "",
+                    "tokenHash": t_hash,
+                    "statusText": status_text,
+                    "updatedAt": state.get("updated_at") or (t_info.get("updated_at") if t_info else ""),
+                }
+            )
+
+    return {
+        "anyConnected": any_connected,
+        "totalSaved": total_saved,
+        "slots": slots_list,
+    }
 
 
 def mcp_status_payload(
@@ -63,21 +197,24 @@ def mcp_status_payload(
     token_saved: bool = False,
     token_preview: str = "",
     token_hash: str = "",
+    slot: int = 1,
 ) -> Dict[str, Any]:
+    user_id = int(owner_id)
     token_hash = normalize_token_hash(token_hash)
-    connected = is_mcp_connected(owner_id, token_hash)
+    connected = is_mcp_connected(user_id, token_hash, slot=slot)
     with mcp_state_lock:
-        state = dict(mcp_connection_states.get(int(owner_id), {}))
+        state = dict(mcp_connection_states.get(_slot_key(user_id, slot), {}))
     state_hash = normalize_token_hash(str(state.get("token_hash", "")))
     if token_hash and state_hash and state_hash != token_hash:
         state = {}
     if connected:
-        status_text = "Token MCP terhubung"
+        status_text = f"Token MCP Slot {slot} terhubung"
     elif token_saved:
-        status_text = state.get("message") or "Endpoint tersimpan, menunggu bridge MCP"
+        status_text = state.get("message") or f"Slot {slot} tersimpan, menunggu bridge MCP"
     else:
-        status_text = "Endpoint MCP belum tersimpan"
+        status_text = f"Slot {slot} belum tersimpan"
     return {
+        "slot": slot,
         "connected": connected,
         "tokenSaved": bool(token_saved),
         "tokenPreview": token_preview,

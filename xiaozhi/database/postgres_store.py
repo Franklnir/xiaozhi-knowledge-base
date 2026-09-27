@@ -111,8 +111,11 @@ class PostgresStore:
         """Sets transaction-local configuration for PostgreSQL Row-Level Security."""
         uid_str = str(user_id) if user_id is not None else ""
         role_str = str(user_role) if user_role else "user"
+        is_admin_str = "true" if role_str in ("admin", "system") else "false"
         cur.execute("SELECT set_config('app.user_id', %s, true);", (uid_str,))
+        cur.execute("SELECT set_config('app.current_user_id', %s, true);", (uid_str,))
         cur.execute("SELECT set_config('app.user_role', %s, true);", (role_str,))
+        cur.execute("SELECT set_config('app.is_admin', %s, true);", (is_admin_str,))
 
     def close(self) -> None:
         """Close connection pool cleanly."""
@@ -212,16 +215,72 @@ class PostgresStore:
                         CREATE INDEX IF NOT EXISTS idx_materials_title_trgm ON materials USING GIN (title gin_trgm_ops);
                     """)
 
-                    # 5. Tokens Table
+                    # 5. Tokens Table (Maksimal 3 slot per akun dengan isolasi RLS)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS xiaozhi_tokens (
-                            user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                            user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            slot_number INT NOT NULL DEFAULT 1,
+                            device_label VARCHAR(60) NOT NULL DEFAULT 'XiaoZhi 1',
                             token_ciphertext TEXT NOT NULL,
                             token_hash VARCHAR(64) UNIQUE NOT NULL,
                             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMPTZ
+                            updated_at TIMESTAMPTZ,
+                            PRIMARY KEY (user_id, slot_number),
+                            CONSTRAINT chk_xiaozhi_tokens_slot CHECK (slot_number >= 1 AND slot_number <= 3)
                         );
                         CREATE INDEX IF NOT EXISTS idx_tokens_hash ON xiaozhi_tokens(token_hash);
+                        CREATE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);
+
+                        -- Backward-compatible schema evolution untuk database eksisting
+                        ALTER TABLE xiaozhi_tokens ADD COLUMN IF NOT EXISTS slot_number INT NOT NULL DEFAULT 1;
+                        ALTER TABLE xiaozhi_tokens ADD COLUMN IF NOT EXISTS device_label VARCHAR(60) NOT NULL DEFAULT 'XiaoZhi 1';
+                        DO $$
+                        BEGIN
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.table_constraints 
+                                WHERE table_name = 'xiaozhi_tokens' AND constraint_type = 'PRIMARY KEY' AND constraint_name = 'xiaozhi_tokens_pkey'
+                            ) THEN
+                                IF NOT EXISTS (
+                                    SELECT 1 FROM information_schema.key_column_usage 
+                                    WHERE table_name = 'xiaozhi_tokens' AND constraint_name = 'xiaozhi_tokens_pkey' AND column_name = 'slot_number'
+                                ) THEN
+                                    ALTER TABLE xiaozhi_tokens DROP CONSTRAINT xiaozhi_tokens_pkey;
+                                    ALTER TABLE xiaozhi_tokens ADD CONSTRAINT xiaozhi_tokens_pkey PRIMARY KEY (user_id, slot_number);
+                                END IF;
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.check_constraints 
+                                WHERE constraint_name = 'chk_xiaozhi_tokens_slot'
+                            ) THEN
+                                ALTER TABLE xiaozhi_tokens ADD CONSTRAINT chk_xiaozhi_tokens_slot CHECK (slot_number >= 1 AND slot_number <= 3);
+                            END IF;
+                        END $$;
+
+                        -- Penegakan Row-Level Security (RLS) pada xiaozhi_tokens
+                        CREATE OR REPLACE FUNCTION app_current_user_id()
+                        RETURNS BIGINT LANGUAGE sql STABLE AS $$
+                            SELECT NULLIF(COALESCE(current_setting('app.user_id', true), current_setting('app.current_user_id', true)), '')::bigint;
+                        $$;
+
+                        CREATE OR REPLACE FUNCTION app_is_admin_or_system()
+                        RETURNS BOOLEAN LANGUAGE sql STABLE AS $$
+                            SELECT COALESCE(
+                                current_setting('app.user_role', true) IN ('admin', 'system') 
+                                OR current_setting('app.is_admin', true) = 'true', 
+                                false
+                            );
+                        $$;
+
+                        ALTER TABLE xiaozhi_tokens ENABLE ROW LEVEL SECURITY;
+                        ALTER TABLE xiaozhi_tokens FORCE ROW LEVEL SECURITY;
+
+                        DROP POLICY IF EXISTS p_xiaozhi_tokens_all ON xiaozhi_tokens;
+                        CREATE POLICY p_xiaozhi_tokens_all ON xiaozhi_tokens
+                        FOR ALL USING (
+                            user_id = app_current_user_id() OR app_is_admin_or_system()
+                        ) WITH CHECK (
+                            user_id = app_current_user_id() OR app_is_admin_or_system()
+                        );
                     """)
 
                     # 6. Chat History Table
@@ -996,63 +1055,131 @@ class PostgresStore:
             d["updated_at"] = _format_ts(d["updated_at"])
         return d
 
-    # ── XiaoZhi Tokens ─────────────────────────────────────────────────────
+    # ── XiaoZhi Tokens (Maksimal 3 Slot per Akun dengan Proteksi RLS) ───────
 
-    def set_xiaozhi_token(self, owner_id: int, token: str) -> None:
+    def set_xiaozhi_token(self, owner_id: int, token: str, slot: int = 1, device_label: str = "") -> None:
+        slot_num = int(slot or 1)
+        if slot_num < 1 or slot_num > 3:
+            raise ValueError("Slot token XiaoZhi hanya diizinkan untuk Slot 1, 2, atau 3.")
         token_clean = token.strip()
         t_hash = xiaozhi_token_hash(token_clean)
         t_cipher = encrypt_secret(token_clean)
+        label_clean = (device_label or "").strip()[:60] or f"XiaoZhi {slot_num}"
         now = utc_now()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
-                    INSERT INTO xiaozhi_tokens (user_id, token_ciphertext, token_hash, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT(user_id) DO UPDATE SET
+                    INSERT INTO xiaozhi_tokens (user_id, slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(user_id, slot_number) DO UPDATE SET
+                        device_label = EXCLUDED.device_label,
                         token_ciphertext = EXCLUDED.token_ciphertext,
                         token_hash = EXCLUDED.token_hash,
                         updated_at = EXCLUDED.updated_at
                     """,
-                    (int(owner_id), t_cipher, t_hash, now, now),
+                    (int(owner_id), slot_num, label_clean, t_cipher, t_hash, now, now),
                 )
             conn.commit()
 
-    def get_xiaozhi_token(self, owner_id: int) -> Optional[str]:
+    def get_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> Optional[str]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT token_ciphertext FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
+                self.set_rls_context(cur, owner_id)
+                if slot is not None:
+                    cur.execute(
+                        "SELECT token_ciphertext FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
+                        (int(owner_id), int(slot)),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT token_ciphertext FROM xiaozhi_tokens WHERE user_id = %s ORDER BY slot_number ASC LIMIT 1",
+                        (int(owner_id),),
+                    )
                 row = cur.fetchone()
                 if row and row.get("token_ciphertext"):
                     return decrypt_secret(row["token_ciphertext"])
         return None
 
-    def get_xiaozhi_token_info(self, owner_id: int) -> Optional[Dict[str, Any]]:
+    def get_xiaozhi_token_info(self, owner_id: int, slot: Optional[int] = None) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT token_ciphertext, token_hash, created_at FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
+                self.set_rls_context(cur, owner_id)
+                if slot is not None:
+                    cur.execute(
+                        "SELECT slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
+                        (int(owner_id), int(slot)),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s ORDER BY slot_number ASC LIMIT 1",
+                        (int(owner_id),),
+                    )
                 row = cur.fetchone()
                 if not row:
                     return None
                 token = decrypt_secret(row["token_ciphertext"])
                 preview = f"{token[:4]}...{token[-4:]}" if len(token) > 8 else token
                 return {
+                    "slot_number": row.get("slot_number", 1) or 1,
+                    "device_label": row.get("device_label", "XiaoZhi 1") or "XiaoZhi 1",
                     "preview": preview,
                     "token_hash": row["token_hash"],
-                    "created_at": row["created_at"],
+                    "created_at": _format_ts(row["created_at"]) if "created_at" in row else "",
+                    "updated_at": _format_ts(row.get("updated_at")) if "updated_at" in row else "",
                 }
 
-    def delete_xiaozhi_token(self, owner_id: int) -> bool:
+    def list_user_xiaozhi_tokens(self, owner_id: int) -> List[Dict[str, Any]]:
+        """List all active token slots (up to 3) for a specific user."""
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
+                self.set_rls_context(cur, owner_id)
+                cur.execute(
+                    """
+                    SELECT slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at
+                    FROM xiaozhi_tokens
+                    WHERE user_id = %s
+                    ORDER BY slot_number ASC
+                    """,
+                    (int(owner_id),),
+                )
+                rows = cur.fetchall()
+        result = []
+        for row in rows:
+            token = decrypt_secret(row["token_ciphertext"])
+            preview = f"{token[:4]}...{token[-4:]}" if len(token) > 8 else token
+            result.append({
+                "slot_number": row.get("slot_number", 1) or 1,
+                "device_label": row.get("device_label", f"XiaoZhi {row.get('slot_number', 1)}") or f"XiaoZhi {row.get('slot_number', 1)}",
+                "preview": preview,
+                "token_hash": row["token_hash"],
+                "created_at": _format_ts(row["created_at"]) if "created_at" in row else "",
+                "updated_at": _format_ts(row.get("updated_at")) if "updated_at" in row else "",
+            })
+        return result
+
+    def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> bool:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
+                if slot is not None:
+                    cur.execute("DELETE FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s", (int(owner_id), int(slot)))
+                else:
+                    cur.execute("DELETE FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
                 affected = cur.rowcount > 0
+                # Periksa apakah masih ada sisa slot lain
+                cur.execute("SELECT COUNT(*) as cnt FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
+                rem_row = cur.fetchone()
+                remaining = rem_row["cnt"] if rem_row else 0
             conn.commit()
-        # Otomatis pisahkan ID Board dan User saat user putus/hapus MCP Xiaozhi, riwayat board tetap aman
-        try:
-            self.detach_user_devices(int(owner_id), reason="MCP Xiaozhi diputus / dihapus")
-        except Exception as exc:
-            logger.warning("Gagal memisahkan device saat hapus token user %s: %s", owner_id, exc)
+
+        # Jika seluruh token user sudah tidak ada, pisahkan tautan device ESP32
+        if remaining == 0:
+            try:
+                self.detach_user_devices(int(owner_id), reason="Semua slot MCP Xiaozhi diputus / dihapus")
+            except Exception as exc:
+                logger.warning("Gagal memisahkan device saat hapus token user %s: %s", owner_id, exc)
         return affected
 
     def delete_xiaozhi_token_by_hash(self, token: str) -> bool:
@@ -1060,6 +1187,7 @@ class PostgresStore:
         target_user_id = None
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id=None, user_role="system")
                 cur.execute("SELECT user_id FROM xiaozhi_tokens WHERE token_hash = %s", (t_hash,))
                 row = cur.fetchone()
                 if row:
@@ -1069,7 +1197,13 @@ class PostgresStore:
             conn.commit()
         if target_user_id:
             try:
-                self.detach_user_devices(target_user_id, reason="MCP Token dihapus by hash")
+                with self._get_conn() as conn:
+                    with conn.cursor() as cur:
+                        self.set_rls_context(cur, user_id=None, user_role="system")
+                        cur.execute("SELECT COUNT(*) as cnt FROM xiaozhi_tokens WHERE user_id = %s", (int(target_user_id),))
+                        rem = cur.fetchone()
+                        if rem and rem["cnt"] == 0:
+                            self.detach_user_devices(target_user_id, reason="MCP Token dihapus by hash")
             except Exception as exc:
                 logger.warning("Gagal memisahkan device saat hapus token hash user %s: %s", target_user_id, exc)
         return affected
@@ -1077,7 +1211,8 @@ class PostgresStore:
     def list_xiaozhi_tokens(self) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT user_id, token_ciphertext, token_hash FROM xiaozhi_tokens")
+                self.set_rls_context(cur, user_id=None, user_role="system")
+                cur.execute("SELECT user_id, slot_number, device_label, token_ciphertext, token_hash FROM xiaozhi_tokens ORDER BY user_id, slot_number")
                 rows = cur.fetchall()
         result = []
         for row in rows:
@@ -1085,6 +1220,8 @@ class PostgresStore:
             if token:
                 result.append({
                     "user_id": row["user_id"],
+                    "slot_number": row.get("slot_number", 1) or 1,
+                    "device_label": row.get("device_label", "XiaoZhi 1") or "XiaoZhi 1",
                     "token": token,
                     "token_hash": row["token_hash"],
                 })
@@ -1096,9 +1233,10 @@ class PostgresStore:
         t_hash = xiaozhi_token_hash(token)
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id=None, user_role="system")
                 cur.execute(
                     """
-                    SELECT u.* FROM users u
+                    SELECT u.*, t.slot_number, t.device_label FROM users u
                     JOIN xiaozhi_tokens t ON u.id = t.user_id
                     WHERE t.token_hash = %s
                     """,
