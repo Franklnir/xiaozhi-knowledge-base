@@ -1,0 +1,570 @@
+TY  - JOUR
+AU  - Wu, S.
+AU  - Xiong, Y.
+AU  - Cui, Y.
+AU  - Wu, H.
+AU  - Chen, C.
+AU  - Yuan, Y.
+AU  - Huang, L.
+AU  - Liu, X.
+AU  - Kuo, T.-W.
+AU  - Guan, N.
+AU  - Xue, C. J.
+TI  - Retrieval-augmented generation for natural language processing: A survey
+JO  - Artificial Intelligence Review
+PY  - 2026
+VL  - 59
+SP  - 192
+DO  - 10.1007/s10462-026-11605-7
+UR  - https://doi.org/10.1007/s10462-026-11605-7
+N2  - Fokus: dasar RAG, retriever, retrieval fusion, evaluasi, deployment. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Zhao, P.
+AU  - Zhang, H.
+AU  - Yu, Q.
+AU  - Wang, Z.
+AU  - Geng, Y.
+AU  - Fu, F.
+AU  - Yang, L.
+AU  - Zhang, W.
+AU  - Jiang, J.
+AU  - Cui, B.
+TI  - Retrieval-Augmented Generation for AI-Generated Content: A Survey
+JO  - Data Science and Engineering
+PY  - 2026
+VL  - 11
+SP  - 1
+EP  - 29
+DO  - 10.1007/s41019-025-00335-5
+UR  - https://doi.org/10.1007/s41019-025-00335-5
+N2  - Fokus: arsitektur RAG, retrieval, knowledge update, robustness. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Li, Z.
+AU  - Wang, Z.
+AU  - Wang, W.
+AU  - Hung, K.
+AU  - Xie, H.
+AU  - Wang, F. L.
+TI  - Retrieval-augmented generation for educational application: A systematic survey
+JO  - Computers and Education: Artificial Intelligence
+PY  - 2025
+VL  - 8
+SP  - 100417
+DO  - 10.1016/j.caeai.2025.100417
+UR  - https://doi.org/10.1016/j.caeai.2025.100417
+N2  - Fokus: RAG pada sistem pendidikan/knowledge assistant; hallucination, freshness, computational cost. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Brown, A.
+AU  - Roman, M.
+AU  - Devereux, B.
+TI  - A Systematic Literature Review of Retrieval-Augmented Generation: Techniques, Metrics, and Challenges
+JO  - Big Data and Cognitive Computing
+PY  - 2025
+VL  - 9
+IS  - 12
+SP  - 320
+DO  - 10.3390/bdcc9120320
+UR  - https://doi.org/10.3390/bdcc9120320
+N2  - Fokus: SLR RAG, retrieval metrics, answer metrics, grounding, latency/cost, security. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Huang, J.
+AU  - Wang, M.
+AU  - Cui, Y.
+AU  - Liu, J.
+AU  - Chen, L.
+AU  - Wang, T.
+AU  - Li, H.
+AU  - Wu, J.
+TI  - Layered Query Retrieval: An Adaptive Framework for Retrieval-Augmented Generation in Complex Question Answering for Large Language Models
+JO  - Applied Sciences
+PY  - 2024
+VL  - 14
+IS  - 23
+SP  - 11014
+DO  - 10.3390/app142311014
+UR  - https://doi.org/10.3390/app142311014
+N2  - Fokus: adaptive retrieval, query complexity, retrieval accuracy/efficiency. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Wan, Y.
+AU  - Chen, Z.
+AU  - Liu, Y.
+AU  - Chen, C.
+AU  - Packianather, M.
+TI  - Empowering LLMs by hybrid retrieval-augmented generation for domain-centric Q&A in smart manufacturing
+JO  - Advanced Engineering Informatics
+PY  - 2025
+VL  - 65
+IS  - B
+SP  - 103212
+DO  - 10.1016/j.aei.2025.103212
+UR  - https://doi.org/10.1016/j.aei.2025.103212
+N2  - Fokus: hybrid RAG, vector retrieval + structured knowledge, domain-centric QA. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Fukui, Y.
+AU  - Kawata, Y.
+AU  - Kobashi, K.
+AU  - Nagatani, Y.
+AU  - Iguchi, H.
+TI  - Evaluation of a retrieval-augmented generation system using a Japanese Institutional Nuclear Medicine Manual and large language model-automated scoring
+JO  - Radiological Physics and Technology
+PY  - 2025
+VL  - 18
+SP  - 861
+EP  - 876
+DO  - 10.1007/s12194-025-00941-y
+UR  - https://doi.org/10.1007/s12194-025-00941-y
+N2  - Fokus: hybrid retrieval (dense + BM25), RAGAS, expert evaluation. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Knollmeyer, S.
+AU  - Caymazer, O.
+AU  - Koval, L.
+AU  - Akmal, M. U.
+AU  - Asif, S.
+AU  - Mathias, S. G.
+AU  - Großmann, D.
+TI  - Evaluating Retrieval Augmented Generation: A Comprehensive Review of Evaluation Dimensions, Question Types, and Application
+JO  - SN Computer Science
+PY  - 2026
+VL  - 7
+SP  - 576
+DO  - 10.1007/s42979-026-05134-x
+UR  - https://doi.org/10.1007/s42979-026-05134-x
+N2  - Fokus: evaluasi RAG, retrieval quality, answer quality, evaluation dimensions. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Asai, A.
+AU  - He, J.
+AU  - Shao, R.
+AU  - Shi, W.
+AU  - Singh, A.
+AU  - Chang, J. C.
+AU  - Lo, K.
+AU  - Soldaini, L.
+AU  - Feldman, S.
+AU  - D’Arcy, M.
+AU  - Wadden, D.
+AU  - Latzke, M.
+TI  - Synthesizing scientific literature with retrieval-augmented language models
+JO  - Nature
+PY  - 2026
+VL  - 650
+SP  - 857
+EP  - 863
+DO  - 10.1038/s41586-025-10072-4
+UR  - https://doi.org/10.1038/s41586-025-10072-4
+N2  - Fokus: citation-backed generation, retriever, data store, self-feedback loop, grounded synthesis. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Zhang, Z.
+AU  - Dai, Q.
+AU  - Bo, X.
+AU  - Ma, C.
+TI  - A Survey on the Memory Mechanism of Large Language Model-based Agents
+JO  - ACM Transactions on Information Systems
+PY  - 2025
+VL  - 43
+IS  - 6
+SP  - 155
+DO  - 10.1145/3748302
+UR  - https://doi.org/10.1145/3748302
+N2  - Fokus: short-term/long-term memory, memory retrieval/update, memory in agents. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Tiwari, A.
+AU  - Gupta, V.
+TI  - A memory fabric for conversational AI agents enabling shared and persistent multiuser memory
+JO  - Discover Artificial Intelligence
+PY  - 2026
+VL  - 6
+SP  - 239
+DO  - 10.1007/s44163-026-00992-z
+UR  - https://doi.org/10.1007/s44163-026-00992-z
+N2  - Fokus: persistent memory, short-term + long-term context, personalization, provenance. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Xu, W.
+AU  - Huang, C.
+AU  - Gao, S.
+TI  - LLM-Based Agents for Tool Learning: A Survey
+JO  - Data Science and Engineering
+PY  - 2025
+VL  - 10
+SP  - 533
+EP  - 563
+DO  - 10.1007/s41019-025-00296-9
+UR  - https://doi.org/10.1007/s41019-025-00296-9
+N2  - Fokus: tool retrieval, tool understanding, tool planning, execution, safety, benchmarks. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Wang, L.
+AU  - Ma, C.
+AU  - Feng, X.
+AU  - Zhang, Z.
+AU  - Yang, H.
+AU  - Zhang, J.
+AU  - Chen, Z.
+AU  - Tang, J.
+AU  - Chen, X.
+AU  - Lin, Y.
+AU  - Zhao, W. X.
+AU  - Wei, Z.
+AU  - Wen, J.
+TI  - A survey on large language model based autonomous agents
+JO  - Frontiers of Computer Science
+PY  - 2024
+VL  - 18
+SP  - 186345
+DO  - 10.1007/s11704-024-40231-1
+UR  - https://doi.org/10.1007/s11704-024-40231-1
+N2  - Fokus: agent architecture, reasoning, planning, memory, action. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Chowa, S. S.
+AU  - Alvi, R.
+AU  - Rahman, S. S.
+AU  - Rahman, M. A.
+AU  - Raiaan, M. A. K.
+AU  - Islam, M. R.
+AU  - Hussain, M.
+TI  - From language to action: a review of large language models as autonomous agents and tool users
+JO  - Artificial Intelligence Review
+PY  - 2026
+VL  - 59
+SP  - 71
+DO  - 10.1007/s10462-025-11471-9
+UR  - https://doi.org/10.1007/s10462-025-11471-9
+N2  - Fokus: reasoning, planning, memory, tool use, autonomous agents. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Gallo, S.
+AU  - Paternò, F.
+AU  - Malizia, A.
+TI  - A conversational agent for creating automations exploiting large language models
+JO  - Personal and Ubiquitous Computing
+PY  - 2024
+VL  - 28
+SP  - 931
+EP  - 946
+DO  - 10.1007/s00779-024-01825-5
+UR  - https://doi.org/10.1007/s00779-024-01825-5
+N2  - Fokus: conversational agent, IoT automation, verification before action, confirmation workflow. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Zhang, N.
+AU  - Mao, H.
+AU  - Zhang, S.
+AU  - Liu, X.
+AU  - Jiang, H.
+TI  - A Model Context Protocol-Based Retrieval-Augmented Generation Framework for Resource-Constrained Environments
+JO  - Neural Processing Letters
+PY  - 2026
+VL  - 58
+SP  - 51
+DO  - 10.1007/s11063-026-11857-y
+UR  - https://doi.org/10.1007/s11063-026-11857-y
+N2  - Fokus: MCP + RAG + resource-constrained/edge, retrieval fusion, low latency. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Athanasopoulou, A.
+AU  - Fotiou, N.
+AU  - Chatzopoulos, A.
+TI  - Interacting with IoT Data Spaces Using LLMs and the Model Context Protocol
+JO  - Sensors
+PY  - 2026
+VL  - 26
+IS  - 4
+SP  - 1193
+DO  - 10.3390/s26041193
+UR  - https://doi.org/10.3390/s26041193
+N2  - Fokus: LLM + MCP + IoT + natural-language interaction. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Hong, S.-H.
+AU  - Lee, H.-W.
+TI  - Quantitative Comparison of Tool-Integration Methods in Large Language Models: Tool-Calling, MCP, and RAG-MCP
+JO  - The Journal of KINGComputing
+PY  - 2026
+VL  - 22
+IS  - 1
+SP  - 97
+EP  - 103
+DO  - 10.23019/kingpc.22.1.202602.008
+UR  - https://doi.org/10.23019/kingpc.22.1.202602.008
+N2  - Fokus: perbandingan Tool-Calling vs MCP vs RAG-MCP; accuracy, prompt bloat, tool selection. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Li, H.
+AU  - Xu, Y.
+AU  - Hong, T.
+TI  - EnergyPlus-MCP: A model-context-protocol server for AI-driven building energy modeling
+JO  - SoftwareX
+PY  - 2025
+VL  - 32
+SP  - 102367
+DO  - 10.1016/j.softx.2025.102367
+UR  - https://doi.org/10.1016/j.softx.2025.102367
+N2  - Fokus: layered MCP server, multiple specialized tools, LLM conversational control, validation. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Zong, M.
+AU  - Hekmati, A.
+AU  - Guastalla, M.
+AU  - Li, Y.
+AU  - Krishnamachari, B.
+TI  - Integrating large language models with internet of things: applications
+JO  - Discover Internet of Things
+PY  - 2025
+VL  - 5
+SP  - 2
+DO  - 10.1007/s43926-024-00083-4
+UR  - https://doi.org/10.1007/s43926-024-00083-4
+N2  - Fokus: LLM + IoT, sensor data, IoT programming, natural-language interface. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - De Vito, G.
+AU  - Palomba, F.
+AU  - Ferrucci, F.
+TI  - The role of Large Language Models in addressing IoT challenges: A systematic literature review
+JO  - Future Generation Computer Systems
+PY  - 2025
+VL  - 171
+SP  - 107829
+DO  - 10.1016/j.future.2025.107829
+UR  - https://doi.org/10.1016/j.future.2025.107829
+N2  - Fokus: SLR LLM + IoT, hardware/software, security, interoperability, resource constraints. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - An, T.
+AU  - Zhou, Y.
+AU  - Zou, H.
+AU  - Yang, J.
+TI  - IoT-LLM: A framework for enhancing large language model reasoning from real-world sensor data
+JO  - Patterns
+PY  - 2026
+VL  - 7
+IS  - 1
+SP  - 101429
+DO  - 10.1016/j.patter.2025.101429
+UR  - https://doi.org/10.1016/j.patter.2025.101429
+N2  - Fokus: heterogeneous sensor data, expert knowledge retrieval, context-aware reasoning, IoT. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Jeong, D.
+AU  - Woo, H.
+TI  - On-Device Intent Reasoning for Smart Home Agents Via Ontology-Augmented sLLMs
+JO  - IEEE Access
+PY  - 2025
+VL  - 13
+SP  - 197645
+EP  - 197662
+DO  - 10.1109/ACCESS.2025.3634621
+UR  - https://doi.org/10.1109/ACCESS.2025.3634621
+N2  - Fokus: intent reasoning, user/device context, ambiguous commands, retrieval-augmented on-device agents. (Prioritas: Pendukung)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Lazzaroni, L.
+AU  - Bellotti, F.
+AU  - Berta, R.
+TI  - An embedded end-to-end voice assistant
+JO  - Engineering Applications of Artificial Intelligence
+PY  - 2024
+VL  - 136
+SP  - 108998
+DO  - 10.1016/j.engappai.2024.108998
+UR  - https://doi.org/10.1016/j.engappai.2024.108998
+N2  - Fokus: embedded voice assistant, ASR, edge processing, latency, offline voice pipeline. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 
+
+TY  - JOUR
+AU  - Yauri, R.
+AU  - Espino, R.
+TI  - Generative Language Model Technology Integrated into an IoT Device for the Development of a Voice Assistant
+JO  - WSEAS Transactions on Systems
+PY  - 2024
+VL  - 23
+SP  - 521
+EP  - 530
+DO  - 10.37394/23202.2024.23.54
+UR  - https://doi.org/10.37394/23202.2024.23.54
+N2  - Fokus: ESP32, INMP441, MAX98357, LLM, speech-to-text, text-to-speech, voice assistant. (Prioritas: Sangat kuat / inti)
+KW  - Voice AI
+KW  - IoT
+KW  - Xiaozhi
+KW  - RAG
+KW  - Tool Calling
+KW  - Contextual Memory
+ER  - 

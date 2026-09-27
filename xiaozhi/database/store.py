@@ -2840,3 +2840,169 @@ class HFJsonStore:
 
     def get_pending_relay_commands(self, owner_id: int, room_id: int) -> List[Dict[str, Any]]:
         return []
+
+    # ── User Playlists ─────────────────────────────────────────────────────
+
+    def add_playlist_track(
+        self, owner_id: int, title: str, youtube_url: str, video_id: str, artist: str = "", duration: str = ""
+    ) -> Dict[str, Any]:
+        with self._lock:
+            data = self._load()
+            playlists = data.setdefault("user_playlists", [])
+            user_tracks = [p for p in playlists if int(p.get("owner_id", 0)) == int(owner_id)]
+            next_num = max([int(p.get("track_number", 0)) for p in user_tracks], default=0) + 1
+            max_id = max([int(p.get("id", 0)) for p in playlists], default=0) + 1
+            now = utc_now()
+            new_item = {
+                "id": max_id,
+                "owner_id": int(owner_id),
+                "track_number": next_num,
+                "title": clean_text(title, max_len=200, field="Judul"),
+                "youtube_url": str(youtube_url).strip(),
+                "video_id": str(video_id).strip(),
+                "artist": clean_text(artist or "", max_len=120, field="Artis"),
+                "duration": clean_text(duration or "", max_len=30, field="Durasi"),
+                "play_count": 0,
+                "last_played_at": None,
+                "created_at": now,
+                "updated_at": now,
+            }
+            playlists.append(new_item)
+            self._commit(data, "Add playlist track")
+            return new_item
+
+    def get_user_playlist(self, owner_id: int) -> List[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            items = [p for p in data.get("user_playlists", []) if int(p.get("owner_id", 0)) == int(owner_id)]
+            items.sort(key=lambda x: (int(x.get("track_number", 0)), int(x.get("id", 0))))
+            return [dict(x) for x in items]
+
+    def get_playlist_track(self, owner_id: int, track_id: int) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            for p in data.get("user_playlists", []):
+                if int(p.get("id", 0)) == int(track_id) and int(p.get("owner_id", 0)) == int(owner_id):
+                    return dict(p)
+            return None
+
+    def update_playlist_track(
+        self,
+        owner_id: int,
+        track_id: int,
+        title: Optional[str] = None,
+        youtube_url: Optional[str] = None,
+        video_id: Optional[str] = None,
+        artist: Optional[str] = None,
+        track_number: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            target = None
+            for p in data.get("user_playlists", []):
+                if int(p.get("id", 0)) == int(track_id) and int(p.get("owner_id", 0)) == int(owner_id):
+                    target = p
+                    break
+            if not target:
+                return None
+            if title is not None:
+                target["title"] = clean_text(title, max_len=200, field="Judul")
+            if youtube_url is not None:
+                target["youtube_url"] = str(youtube_url).strip()
+            if video_id is not None:
+                target["video_id"] = str(video_id).strip()
+            if artist is not None:
+                target["artist"] = clean_text(artist, max_len=120, field="Artis")
+            if track_number is not None:
+                target["track_number"] = int(track_number)
+            target["updated_at"] = utc_now()
+            self._commit(data, "Update playlist track")
+            return dict(target)
+
+    def delete_playlist_track(self, owner_id: int, track_id: int) -> bool:
+        with self._lock:
+            data = self._load()
+            playlists = data.get("user_playlists", [])
+            before = len(playlists)
+            data["user_playlists"] = [
+                p for p in playlists
+                if not (int(p.get("id", 0)) == int(track_id) and int(p.get("owner_id", 0)) == int(owner_id))
+            ]
+            if len(data["user_playlists"]) != before:
+                # Renumber remaining
+                user_items = [p for p in data["user_playlists"] if int(p.get("owner_id", 0)) == int(owner_id)]
+                user_items.sort(key=lambda x: (int(x.get("track_number", 0)), int(x.get("id", 0))))
+                for idx, item in enumerate(user_items, start=1):
+                    item["track_number"] = idx
+                self._commit(data, "Delete playlist track")
+                return True
+            return False
+
+    def increment_playlist_play_count(
+        self, owner_id: int, track_id: Optional[int] = None, video_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        if not track_id and not video_id:
+            return None
+        with self._lock:
+            data = self._load()
+            target = None
+            for p in data.get("user_playlists", []):
+                if int(p.get("owner_id", 0)) == int(owner_id):
+                    if track_id and int(p.get("id", 0)) == int(track_id):
+                        target = p
+                        break
+                    elif video_id and str(p.get("video_id", "")).strip() == str(video_id).strip():
+                        target = p
+                        break
+            if not target:
+                return None
+            target["play_count"] = int(target.get("play_count", 0)) + 1
+            now = utc_now()
+            target["last_played_at"] = now
+            target["updated_at"] = now
+            self._commit(data, "Increment playlist play count")
+            return dict(target)
+
+    def get_top_played_playlist(self, owner_id: int, limit: int = 5) -> List[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            items = [
+                p for p in data.get("user_playlists", [])
+                if int(p.get("owner_id", 0)) == int(owner_id) and int(p.get("play_count", 0)) > 0
+            ]
+            items.sort(key=lambda x: (int(x.get("play_count", 0)), str(x.get("last_played_at") or "")), reverse=True)
+            return [dict(x) for x in items[:limit]]
+
+    def find_playlist_track_by_query(self, owner_id: int, query: str) -> Optional[Dict[str, Any]]:
+        raw_q = (query or "").strip()
+        if not raw_q:
+            return None
+        import re
+        from xiaozhi.core.utils import extract_youtube_video_id
+
+        user_tracks = self.get_user_playlist(owner_id)
+        if not user_tracks:
+            return None
+
+        # Check track number
+        match = re.search(r"(?:nomor|no\.?|ke-?|track|urutan|playlist)?\s*(\d+)", raw_q.lower())
+        track_num = int(raw_q) if raw_q.isdigit() else (int(match.group(1)) if match and match.group(1) else None)
+        if track_num is not None:
+            for t in user_tracks:
+                if int(t.get("track_number", 0)) == track_num:
+                    return t
+
+        # Check Video ID / URL
+        vid = extract_youtube_video_id(raw_q)
+        if vid:
+            for t in user_tracks:
+                if str(t.get("video_id", "")).strip() == vid:
+                    return t
+
+        # Check by title / artist
+        clean_kw = re.sub(r"(?i)\b(putar|lagu|musik|dari playlist|di playlist|playlist)\b", "", raw_q).strip().lower()
+        target_q = clean_kw if clean_kw else raw_q.lower()
+        for t in user_tracks:
+            if target_q in str(t.get("title", "")).lower() or target_q in str(t.get("artist", "")).lower():
+                return t
+        return None

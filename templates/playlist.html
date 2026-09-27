@@ -1,0 +1,964 @@
+{% extends "base.html" %}
+
+{% block title %}Playlist Musik YouTube - Xiaozhi Voice AI Assistant{% endblock %}
+
+{% block content %}
+<style>
+    .playlist-hero {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(249, 115, 22, 0.06), rgba(59, 130, 246, 0.05));
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+        padding: 24px;
+        margin-bottom: 24px;
+        position: relative;
+        overflow: hidden;
+    }
+    :root[data-theme="neo"] .playlist-hero {
+        border: 2.5px solid #111;
+        box-shadow: 4px 4px 0 #111;
+        background: #fff;
+    }
+    :root[data-theme="dark"] .playlist-hero {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(30, 41, 59, 0.7));
+    }
+
+    .firmware-warning-banner {
+        background: rgba(239, 68, 68, 0.09);
+        border: 2px dashed #ef4444;
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    :root[data-theme="neo"] .firmware-warning-banner {
+        border: 2px solid #ef4444;
+        background: #fef2f2;
+        box-shadow: 3px 3px 0 #111;
+    }
+
+    .playlist-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+    }
+    .playlist-table th {
+        padding: 14px 16px;
+        font-weight: 800;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--app-muted);
+        border-bottom: 1.5px solid var(--app-border);
+        background: var(--app-surface-muted);
+        text-align: left;
+    }
+    .playlist-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--app-border);
+        vertical-align: middle;
+    }
+    .playlist-table tr:hover td {
+        background: rgba(0, 0, 0, 0.02);
+    }
+    :root[data-theme="dark"] .playlist-table tr:hover td {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .track-num-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #111;
+        color: #fff;
+        font-weight: 900;
+        font-size: 13px;
+        box-shadow: 1.5px 1.5px 0 rgba(0,0,0,0.2);
+    }
+    :root[data-theme="neo"] .track-num-badge {
+        background: #f59e0b;
+        color: #111;
+        border: 1.5px solid #111;
+        box-shadow: 2px 2px 0 #111;
+    }
+
+    .track-thumb-box {
+        position: relative;
+        width: 72px;
+        height: 48px;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #000;
+        flex-shrink: 0;
+        border: 1px solid var(--app-border);
+    }
+    .track-thumb-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .track-thumb-play-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+    }
+    .track-thumb-box:hover .track-thumb-play-overlay {
+        opacity: 1;
+    }
+
+    .play-count-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        background: rgba(239, 68, 68, 0.12);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+    .play-count-badge.is-zero {
+        background: rgba(148, 163, 184, 0.12);
+        color: var(--app-muted);
+        border-color: var(--app-border);
+    }
+
+    .voice-cmd-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 6px;
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        font-family: monospace;
+        font-size: 12px;
+        color: var(--app-text);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .voice-cmd-chip:hover {
+        border-color: #ef4444;
+        color: #ef4444;
+        transform: translateY(-1px);
+    }
+
+    /* Modal dialog styling */
+    .app-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 99990;
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(4px);
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    .app-modal-overlay.is-active {
+        display: flex;
+    }
+    .app-modal-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong, #111);
+        border-radius: 16px;
+        box-shadow: 6px 6px 0 rgba(0,0,0,0.15);
+        max-width: 540px;
+        width: 100%;
+        overflow: hidden;
+        animation: mcpPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    :root[data-theme="neo"] .app-modal-card {
+        border: 2.5px solid #111;
+        box-shadow: 6px 6px 0 #111;
+    }
+</style>
+
+<div class="app-page">
+    <!-- Header -->
+    <header class="app-page-header">
+        <div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <span class="app-eyebrow" style="margin:0;">Audio & Asisten Suara</span>
+                <span style="font-size:10px; background:#ef4444; color:#fff; font-weight:900; padding:2px 7px; border-radius:99px; text-transform:uppercase;">YouTube Stream</span>
+            </div>
+            <h1 class="app-title" style="display:flex; align-items:center; gap:10px;">
+                <span>🎵 Playlist Musik YouTube</span>
+            </h1>
+            <p class="app-subtitle">
+                Atur daftar lagu favorit Anda. Panggil lagu berdasarkan <strong>nomor (#1, #2)</strong>, <strong>judul lagu</strong>, atau <strong>link YouTube</strong> melalui perintah suara Xiaozhi atau tombol play langsung ke ESP32.
+            </p>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; color:#fff; font-weight:800; display:inline-flex; align-items:center; gap:6px; padding:10px 18px;">
+                <span>➕</span> Tambah Lagu ke Playlist
+            </button>
+            <button type="button" onclick="document.getElementById('playlistFirmwareModal').style.display='flex'" class="app-button" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+                <span>ℹ️</span> Info Firmware
+            </button>
+        </div>
+    </header>
+
+    <!-- Prominent Firmware Warning Overlay Reminder Banner -->
+    <div class="firmware-warning-banner">
+        <div style="display:flex; align-items:center; gap:14px; flex:1 1 320px;">
+            <div style="width:40px; height:40px; border-radius:50%; background:rgba(239,68,68,0.15); border:1.5px solid #ef4444; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">
+                ⚠️
+            </div>
+            <div>
+                <strong style="color:#ef4444; font-size:14px; display:block; line-height:1.4;">
+                    menu ini berfungsi untuk firmware yang udah support putar lagu via youtube
+                </strong>
+                <span style="color:var(--app-muted); font-size:12.5px; line-height:1.4; display:block; margin-top:2px;">
+                    Pastikan perangkat keras ESP32 Anda telah ter-flash dengan firmware yang mendukung decoder audio (I2S DAC / Max98357A / PCM5102). Anda bebas mengelola playlist kapan saja.
+                </span>
+            </div>
+        </div>
+        <button type="button" onclick="document.getElementById('playlistFirmwareModal').style.display='flex'" class="app-button" style="font-size:12px; padding:6px 14px; border:1.5px solid #ef4444; color:#ef4444; background:transparent; font-weight:800;">
+            Lihat Panduan Firmware ↗
+        </button>
+    </div>
+
+    <!-- Stats Grid -->
+    <section class="app-stat-grid" style="margin-bottom:24px;">
+        <div class="app-stat-card">
+            <p class="app-stat-label">Total Lagu Playlist</p>
+            <p class="app-stat-value" id="statTotalTracks">{{ total_tracks }}</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Total Kali Diputar</p>
+            <p class="app-stat-value" id="statTotalPlays" style="color:#ef4444;">{{ total_plays }}x</p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Lagu Paling Sering Diputar</p>
+            <p class="app-stat-value" style="font-size:16px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{% if top_tracks %}{{ top_tracks[0].title }}{% else %}Belum ada lagu diputar{% endif %}">
+                {% if top_tracks %}
+                    🔥 {{ top_tracks[0].title }} ({{ top_tracks[0].play_count }}x)
+                {% else %}
+                    <span style="color:var(--app-muted); font-size:14px; font-weight:normal;">Belum ada</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="app-stat-card">
+            <p class="app-stat-label">Perintah Panggilan Voice AI</p>
+            <p class="app-stat-value" style="font-size:15px; color:#10b981;">
+                ✓ Nomor, Judul & URL
+            </p>
+        </div>
+    </section>
+
+    <!-- Two-column Section: Voice Command Guide & Top Played Leaderboard -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-bottom:24px;">
+        <!-- Left: Voice Commands Quick Guide -->
+        <div class="app-card">
+            <div class="app-card-header is-compact">
+                <div>
+                    <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                        <span>🗣️</span> Panduan Perintah Suara Xiaozhi
+                    </h2>
+                    <p class="app-section-subtitle">Ucapkan kalimat berikut ke mikrofon ESP32 Xiaozhi Anda:</p>
+                </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border);">
+                    <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:4px;">1. Panggil Berdasarkan Nomor Urut</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar lagu nomor 1')" title="Klik untuk salin">
+                            "Xiaozhi, putar lagu nomor 1" 📋
+                        </span>
+                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar playlist nomor 2')" title="Klik untuk salin">
+                            "Xiaozhi, putar playlist nomor 2" 📋
+                        </span>
+                    </div>
+                </div>
+
+                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border);">
+                    <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:4px;">2. Panggil Berdasarkan Judul Lagu</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar judul lagu dari playlist saya')" title="Klik untuk salin">
+                            "Xiaozhi, putar [judul lagu] dari playlist" 📋
+                        </span>
+                    </div>
+                </div>
+
+                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border);">
+                    <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:4px;">3. Putar Bebas Dari YouTube (Bukan Playlist)</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar lagu Denny Caknan')" title="Klik untuk salin">
+                            "Xiaozhi, putar lagu [apa saja di YouTube]" 📋
+                        </span>
+                    </div>
+                    <p style="font-size:11px; color:var(--app-muted); margin:4px 0 0;">
+                        💡 Jika lagu tidak ada di playlist, Xiaozhi otomatis mencarinya di YouTube secara langsung.
+                    </p>
+                </div>
+
+                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border);">
+                    <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:4px;">4. Cek Statistik Playlist</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, sebutkan lagu di playlist saya')" title="Klik untuk salin">
+                            "Xiaozhi, sebutkan playlist saya" 📋
+                        </span>
+                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, lagu apa yang paling sering diputar?')" title="Klik untuk salin">
+                            "Lagu apa yang paling sering diputar?" 📋
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Top 5 Played Tracks Leaderboard -->
+        <div class="app-card">
+            <div class="app-card-header is-compact">
+                <div>
+                    <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                        <span>🔥</span> Top 5 Lagu Paling Sering Diputar
+                    </h2>
+                    <p class="app-section-subtitle">Daftar lagu favorit berdasarkan frekuensi pemutaran:</p>
+                </div>
+            </div>
+            <div id="topPlayedList" style="display:flex; flex-direction:column; gap:8px;">
+                {% if top_tracks %}
+                    {% for t in top_tracks %}
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; border-radius:8px; background:var(--app-surface-muted); border:1px solid var(--app-border);">
+                        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                            <span style="font-weight:900; font-size:14px; width:22px; text-align:center; color:var(--app-muted);">
+                                {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}#{{ loop.index }}{% endif %}
+                            </span>
+                            <div class="track-thumb-box" style="width:48px; height:34px;">
+                                <img src="https://img.youtube.com/vi/{{ t.video_id }}/default.jpg" class="track-thumb-img" alt="Thumb">
+                            </div>
+                            <div style="min-width:0;">
+                                <div style="font-size:13px; font-weight:800; color:var(--app-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ t.title }}">
+                                    #{{ t.track_number }} {{ t.title }}
+                                </div>
+                                <div style="font-size:11px; color:var(--app-muted);">
+                                    {{ t.artist or 'YouTube Audio' }}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                            <span class="play-count-badge">🔥 {{ t.play_count }}x</span>
+                            <button type="button" onclick="playTrackOnEsp32({{ t.id }}, '{{ t.title|escape }}')" class="app-button" style="padding:4px 8px; font-size:11.5px;" title="Putar lagu ini di speaker ESP32">
+                                ▶️
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="text-align:center; padding:32px 16px; color:var(--app-muted); font-size:13px;">
+                        <span style="font-size:28px; display:block; margin-bottom:8px;">🎧</span>
+                        Belum ada lagu yang diputar.<br>Panggil lagu melalui Xiaozhi atau klik tombol play untuk memulai!
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Playlist Table Card -->
+    <div class="app-card">
+        <div class="app-card-header" style="flex-wrap:wrap; gap:14px;">
+            <div>
+                <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                    <span>📋</span> Daftar Lagu Playlist Anda
+                </h2>
+                <p class="app-section-subtitle">
+                    Total <strong id="tableTrackCount">{{ tracks|length }}</strong> lagu terdaftar di playlist akun Anda.
+                </p>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <input 
+                    type="text" 
+                    id="trackSearchInput" 
+                    placeholder="🔍 Cari nomor, judul, artis, URL..." 
+                    class="app-input" 
+                    style="width:260px; font-size:12.5px; padding:7px 12px;"
+                    oninput="filterPlaylistTable()"
+                >
+                <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; font-size:12.5px; padding:7px 14px;">
+                    ➕ Tambah Lagu
+                </button>
+            </div>
+        </div>
+
+        <div class="app-table-wrap" style="border:none; border-radius:0;">
+            <table class="playlist-table" id="playlistTable">
+                <thead>
+                    <tr>
+                        <th style="width:60px; text-align:center;">No</th>
+                        <th style="width:84px;">Preview</th>
+                        <th>Judul Lagu & Info</th>
+                        <th>Link YouTube / Video ID</th>
+                        <th style="width:130px; text-align:center;">Frekuensi Putar</th>
+                        <th style="width:180px; text-align:right;">Aksi (CRUD)</th>
+                    </tr>
+                </thead>
+                <tbody id="playlistTableBody">
+                    {% if tracks %}
+                        {% for track in tracks %}
+                        <tr id="track-row-{{ track.id }}" data-search="{{ track.track_number }} {{ track.title|lower }} {{ track.artist|lower }} {{ track.youtube_url|lower }} {{ track.video_id|lower }}">
+                            <td style="text-align:center;">
+                                <span class="track-num-badge" title="Panggil dengan: 'putar lagu nomor {{ track.track_number }}'">
+                                    #{{ track.track_number }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="track-thumb-box">
+                                    <img src="https://img.youtube.com/vi/{{ track.video_id }}/hqdefault.jpg" onerror="this.src='https://img.youtube.com/vi/{{ track.video_id }}/default.jpg'" class="track-thumb-img" alt="Thumbnail">
+                                    <div class="track-thumb-play-overlay" onclick="previewYouTubeModal('{{ track.video_id }}', '{{ track.title|escape }}')" title="Pratinjau Video YouTube">
+                                        ▶
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-weight:800; font-size:14px; color:var(--app-text); line-height:1.35;" id="track-title-{{ track.id }}">
+                                    {{ track.title }}
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px; margin-top:4px; font-size:12px; color:var(--app-muted);">
+                                    <span id="track-artist-{{ track.id }}">{{ track.artist or 'YouTube Audio' }}</span>
+                                    <span>•</span>
+                                    <span style="font-family:monospace; font-size:11px; background:var(--app-surface-muted); padding:1px 5px; border-radius:4px; border:1px solid var(--app-border);">
+                                        ID: {{ track.video_id }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <a href="{{ track.youtube_url }}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px; color:#ef4444; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ track.youtube_url }}">
+                                        <span>📺</span> <span id="track-url-{{ track.id }}">{{ track.youtube_url }}</span> ↗
+                                    </a>
+                                    <button type="button" onclick="navigator.clipboard.writeText('{{ track.youtube_url }}'); if(window.App&&App.toast)App.toast.success('Link YouTube disalin!'); else alert('Link disalin!');" title="Salin Link" class="app-button" style="padding:2px 6px; font-size:11px;">
+                                        📋
+                                    </button>
+                                </div>
+                            </td>
+                            <td style="text-align:center;">
+                                <span class="play-count-badge {% if not track.play_count or track.play_count == 0 %}is-zero{% endif %}" id="track-playcount-{{ track.id }}">
+                                    {% if track.play_count and track.play_count > 0 %}🔥 {{ track.play_count }}x{% else %}0x{% endif %}
+                                </span>
+                            </td>
+                            <td style="text-align:right;">
+                                <div style="display:inline-flex; align-items:center; gap:6px;">
+                                    <button type="button" onclick="playTrackOnEsp32({{ track.id }}, '{{ track.title|escape }}')" class="app-button app-button-primary" style="background:#10b981; border-color:#059669; padding:5px 10px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:4px;" title="Kirim instruksi putar lagu ini ke speaker ESP32 sekarang">
+                                        <span>▶️</span> Putar
+                                    </button>
+                                    <button type="button" onclick="openEditTrackModal({{ track.id }}, '{{ track.title|escape }}', '{{ track.youtube_url|escape }}', '{{ track.artist|escape }}')" class="app-button" style="padding:5px 9px; font-size:12px; font-weight:700;" title="Edit Judul & Link">
+                                        ✏️
+                                    </button>
+                                    <button type="button" onclick="deleteTrack({{ track.id }}, '{{ track.title|escape }}')" class="app-button app-button-danger" style="padding:5px 9px; font-size:12px; font-weight:700;" title="Hapus dari Playlist">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr id="emptyTableRow">
+                            <td colspan="6" style="text-align:center; padding:48px 16px; color:var(--app-muted);">
+                                <div style="font-size:36px; margin-bottom:12px;">🎵</div>
+                                <h3 style="font-size:16px; font-weight:800; color:var(--app-text); margin:0 0 6px;">Playlist Anda Masih Kosong</h3>
+                                <p style="font-size:13px; max-width:420px; margin:0 auto 16px;">
+                                    Tambahkan lagu favorit dengan memasukkan judul dan link YouTube agar Xiaozhi dapat memutarnya berdasarkan perintah suara Anda!
+                                </p>
+                                <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; padding:8px 16px;">
+                                    ➕ Tambah Lagu Pertama
+                                </button>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 1: TAMBAH LAGU KE PLAYLIST -->
+<!-- ========================================== -->
+<div class="app-modal-overlay" id="modalAddTrack" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
+    <div class="app-modal-card">
+        <div style="height:5px; background:linear-gradient(90deg, #ef4444, #f97316, #eab308);"></div>
+        <div style="padding:20px 24px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                <h3 id="addModalTitle" style="font-size:18px; font-weight:900; margin:0; display:flex; align-items:center; gap:8px;">
+                    <span>➕</span> Tambah Lagu ke Playlist
+                </h3>
+                <button type="button" onclick="closeAddTrackModal()" class="app-button" style="padding:4px 8px; font-size:14px; font-weight:900; border:none; background:transparent;">
+                    ✕
+                </button>
+            </div>
+
+            <form id="formAddTrack" onsubmit="submitAddTrack(event)">
+                <div style="display:flex; flex-direction:column; gap:14px;">
+                    <!-- YouTube Link / ID -->
+                    <div>
+                        <label class="app-label" for="addYoutubeUrl">
+                            Link YouTube atau Video ID <span style="color:#ef4444;">*</span>
+                        </label>
+                        <div style="display:flex; gap:8px;">
+                            <input 
+                                type="text" 
+                                id="addYoutubeUrl" 
+                                required 
+                                placeholder="https://www.youtube.com/watch?v=... atau https://youtu.be/..." 
+                                class="app-input" 
+                                style="flex:1; font-family:monospace; font-size:12.5px;"
+                                oninput="onAddUrlChanged(this.value)"
+                            >
+                            <button type="button" onclick="pasteFromClipboard('addYoutubeUrl', onAddUrlChanged)" class="app-button" style="padding:6px 12px; font-size:12px; font-weight:700;" title="Tempel dari Clipboard">
+                                📋 Tempel
+                            </button>
+                        </div>
+                        <p class="app-field-hint">Mendukung format link YouTube biasa, youtu.be, YouTube Shorts, atau ID video 11 karakter.</p>
+                    </div>
+
+                    <!-- Live Thumbnail Preview Box -->
+                    <div id="addPreviewBox" style="display:none; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px; padding:12px; align-items:center; gap:12px;">
+                        <img id="addPreviewThumb" src="" alt="Preview Thumbnail" style="width:80px; height:54px; object-fit:cover; border-radius:6px; border:1px solid var(--app-border);">
+                        <div style="min-width:0; flex:1;">
+                            <div style="font-size:11px; font-weight:800; color:#10b981; text-transform:uppercase;">✓ Video YouTube Terdeteksi</div>
+                            <div id="addPreviewId" style="font-family:monospace; font-size:12px; font-weight:700; color:var(--app-text);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Track Title -->
+                    <div>
+                        <label class="app-label" for="addTrackTitle">
+                            Judul Lagu <span style="font-size:11px; color:var(--app-muted); font-weight:normal;">(Opsional - otomatis diambil dari YouTube jika kosong)</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="addTrackTitle" 
+                            placeholder="Contoh: Rungkad - Happy Asmara" 
+                            class="app-input" 
+                            maxlength="200"
+                        >
+                    </div>
+
+                    <!-- Artist / Singer -->
+                    <div>
+                        <label class="app-label" for="addTrackArtist">
+                            Artis / Penyanyi <span style="font-size:11px; color:var(--app-muted); font-weight:normal;">(Opsional)</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="addTrackArtist" 
+                            placeholder="Contoh: Happy Asmara" 
+                            class="app-input" 
+                            maxlength="120"
+                        >
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; padding-top:14px; border-top:1px solid var(--app-border);">
+                    <button type="button" onclick="closeAddTrackModal()" class="app-button" style="padding:8px 16px;">
+                        Batal
+                    </button>
+                    <button type="submit" id="btnAddTrackSubmit" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; padding:8px 20px; font-weight:800;">
+                        💾 Simpan ke Playlist
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 2: EDIT LAGU PLAYLIST -->
+<!-- ========================================== -->
+<div class="app-modal-overlay" id="modalEditTrack" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+    <div class="app-modal-card">
+        <div style="height:5px; background:linear-gradient(90deg, #3b82f6, #06b6d4, #10b981);"></div>
+        <div style="padding:20px 24px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                <h3 id="editModalTitle" style="font-size:18px; font-weight:900; margin:0; display:flex; align-items:center; gap:8px;">
+                    <span>✏️</span> Edit Lagu Playlist
+                </h3>
+                <button type="button" onclick="closeEditTrackModal()" class="app-button" style="padding:4px 8px; font-size:14px; font-weight:900; border:none; background:transparent;">
+                    ✕
+                </button>
+            </div>
+
+            <form id="formEditTrack" onsubmit="submitEditTrack(event)">
+                <input type="hidden" id="editTrackId" value="">
+                <div style="display:flex; flex-direction:column; gap:14px;">
+                    <!-- Title -->
+                    <div>
+                        <label class="app-label" for="editTrackTitle">
+                            Judul Lagu <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="editTrackTitle" 
+                            required 
+                            class="app-input" 
+                            maxlength="200"
+                        >
+                    </div>
+
+                    <!-- YouTube Link -->
+                    <div>
+                        <label class="app-label" for="editYoutubeUrl">
+                            Link YouTube / Video ID <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="editYoutubeUrl" 
+                            required 
+                            class="app-input" 
+                            style="font-family:monospace; font-size:12.5px;"
+                        >
+                    </div>
+
+                    <!-- Artist -->
+                    <div>
+                        <label class="app-label" for="editTrackArtist">
+                            Artis / Penyanyi
+                        </label>
+                        <input 
+                            type="text" 
+                            id="editTrackArtist" 
+                            class="app-input" 
+                            maxlength="120"
+                        >
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; padding-top:14px; border-top:1px solid var(--app-border);">
+                    <button type="button" onclick="closeEditTrackModal()" class="app-button" style="padding:8px 16px;">
+                        Batal
+                    </button>
+                    <button type="submit" id="btnEditTrackSubmit" class="app-button app-button-primary" style="padding:8px 20px; font-weight:800;">
+                        💾 Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 3: PREVIEW VIDEO YOUTUBE EMBED -->
+<!-- ========================================== -->
+<div class="app-modal-overlay" id="modalPreviewVideo" role="dialog" aria-modal="true" aria-labelledby="previewVideoTitle">
+    <div class="app-modal-card" style="max-width:640px;">
+        <div style="padding:14px 18px; border-bottom:1px solid var(--app-border); display:flex; align-items:center; justify-content:space-between;">
+            <h3 id="previewVideoTitle" style="font-size:15px; font-weight:800; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:500px;">
+                Pratinjau Video YouTube
+            </h3>
+            <button type="button" onclick="closePreviewVideoModal()" class="app-button" style="padding:4px 8px; font-weight:900; border:none; background:transparent;">
+                ✕
+            </button>
+        </div>
+        <div style="position:relative; padding-bottom:56.25%; height:0; overflow:hidden; background:#000;">
+            <iframe id="previewIframe" src="" style="position:absolute; top:0; left:0; width:100%; height:100%; border:0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <div style="padding:12px 16px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; color:var(--app-muted);">Pratinjau langsung audio/video YouTube</span>
+            <button type="button" onclick="closePreviewVideoModal()" class="app-button" style="padding:6px 14px; font-size:12px;">
+                Tutup
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const csrfToken = {{ csrf_token|tojson }};
+
+    // Helper: Extract YouTube video id
+    function extractYouTubeId(url) {
+        if (!url) return null;
+        url = url.trim();
+        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+        const regExp = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/|live\/|watch\?.+&v=))([\w-]{11})/;
+        const match = url.match(regExp);
+        return match ? match[1] : null;
+    }
+
+    // Copy voice snippet to clipboard
+    function copyVoiceSnippet(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            if (window.App && App.toast) App.toast.success("Perintah suara disalin: " + text);
+            else alert("Perintah suara disalin: " + text);
+        }).catch(() => {});
+    }
+
+    // Paste from clipboard helper
+    async function pasteFromClipboard(targetInputId, callback) {
+        try {
+            if (navigator.clipboard) {
+                const text = await navigator.clipboard.readText();
+                const input = document.getElementById(targetInputId);
+                if (input && text) {
+                    input.value = text.trim();
+                    if (callback) callback(text.trim());
+                }
+            }
+        } catch (_) {}
+    }
+
+    // Add URL live preview
+    function onAddUrlChanged(val) {
+        const vid = extractYouTubeId(val);
+        const box = document.getElementById('addPreviewBox');
+        const thumb = document.getElementById('addPreviewThumb');
+        const idEl = document.getElementById('addPreviewId');
+        if (vid) {
+            thumb.src = "https://img.youtube.com/vi/" + vid + "/mqdefault.jpg";
+            idEl.textContent = "ID: " + vid + " (https://youtube.com/watch?v=" + vid + ")";
+            box.style.display = 'flex';
+        } else {
+            box.style.display = 'none';
+        }
+    }
+
+    // Modal controls: Add Track
+    function openAddTrackModal() {
+        document.getElementById('formAddTrack').reset();
+        document.getElementById('addPreviewBox').style.display = 'none';
+        document.getElementById('modalAddTrack').classList.add('is-active');
+        setTimeout(() => document.getElementById('addYoutubeUrl').focus(), 50);
+    }
+    function closeAddTrackModal() {
+        document.getElementById('modalAddTrack').classList.remove('is-active');
+    }
+
+    // Submit Add Track
+    async function submitAddTrack(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnAddTrackSubmit');
+        const rawUrl = document.getElementById('addYoutubeUrl').value.trim();
+        const title = document.getElementById('addTrackTitle').value.trim();
+        const artist = document.getElementById('addTrackArtist').value.trim();
+
+        if (!rawUrl) return;
+
+        btn.disabled = true;
+        btn.textContent = "Menyimpan...";
+
+        try {
+            const resp = await fetch('/api/v1/playlist', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({
+                    youtube_url: rawUrl,
+                    title: title,
+                    artist: artist
+                })
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                throw new Error(data.detail || data.message || "Gagal menambahkan lagu.");
+            }
+
+            if (window.App && App.toast) App.toast.success(data.message || "Lagu berhasil ditambahkan!");
+            closeAddTrackModal();
+            // Refresh to update table and numbers
+            setTimeout(() => window.location.reload(), 600);
+        } catch (err) {
+            btn.disabled = false;
+            btn.textContent = "💾 Simpan ke Playlist";
+            if (window.App && App.toast) App.toast.error(err.message);
+            else alert(err.message);
+        }
+    }
+
+    // Modal controls: Edit Track
+    function openEditTrackModal(id, title, url, artist) {
+        document.getElementById('editTrackId').value = id;
+        document.getElementById('editTrackTitle').value = title;
+        document.getElementById('editYoutubeUrl').value = url;
+        document.getElementById('editTrackArtist').value = artist || '';
+        document.getElementById('modalEditTrack').classList.add('is-active');
+    }
+    function closeEditTrackModal() {
+        document.getElementById('modalEditTrack').classList.remove('is-active');
+    }
+
+    // Submit Edit Track
+    async function submitEditTrack(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnEditTrackSubmit');
+        const trackId = document.getElementById('editTrackId').value;
+        const title = document.getElementById('editTrackTitle').value.trim();
+        const rawUrl = document.getElementById('editYoutubeUrl').value.trim();
+        const artist = document.getElementById('editTrackArtist').value.trim();
+
+        btn.disabled = true;
+        btn.textContent = "Menyimpan...";
+
+        try {
+            const resp = await fetch('/api/v1/playlist/' + trackId, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({
+                    title: title,
+                    youtube_url: rawUrl,
+                    artist: artist
+                })
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                throw new Error(data.detail || data.message || "Gagal memperbarui lagu.");
+            }
+
+            if (window.App && App.toast) App.toast.success(data.message || "Perubahan disimpan!");
+            closeEditTrackModal();
+
+            // Update DOM directly
+            const titleEl = document.getElementById('track-title-' + trackId);
+            const artistEl = document.getElementById('track-artist-' + trackId);
+            const urlEl = document.getElementById('track-url-' + trackId);
+            if (titleEl) titleEl.textContent = title;
+            if (artistEl) artistEl.textContent = artist || 'YouTube Audio';
+            if (urlEl) urlEl.textContent = data.track.youtube_url || rawUrl;
+            btn.disabled = false;
+            btn.textContent = "💾 Simpan Perubahan";
+        } catch (err) {
+            btn.disabled = false;
+            btn.textContent = "💾 Simpan Perubahan";
+            if (window.App && App.toast) App.toast.error(err.message);
+            else alert(err.message);
+        }
+    }
+
+    // Delete Track
+    async function deleteTrack(trackId, title) {
+        if (!confirm("Hapus lagu '" + title + "' dari playlist Anda?")) return;
+
+        try {
+            const resp = await fetch('/api/v1/playlist/' + trackId, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': csrfToken
+                }
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                throw new Error(data.detail || data.message || "Gagal menghapus lagu.");
+            }
+
+            if (window.App && App.toast) App.toast.success(data.message || "Lagu berhasil dihapus.");
+            const row = document.getElementById('track-row-' + trackId);
+            if (row) row.remove();
+
+            // Decrement counter
+            const totalEl = document.getElementById('statTotalTracks');
+            const tableTotalEl = document.getElementById('tableTrackCount');
+            if (totalEl) totalEl.textContent = Math.max(0, parseInt(totalEl.textContent || 0) - 1);
+            if (tableTotalEl) tableTotalEl.textContent = Math.max(0, parseInt(tableTotalEl.textContent || 0) - 1);
+        } catch (err) {
+            if (window.App && App.toast) App.toast.error(err.message);
+            else alert(err.message);
+        }
+    }
+
+    // Play Track on ESP32
+    async function playTrackOnEsp32(trackId, title) {
+        if (window.App && App.toast) {
+            App.toast.info("Mengirim perintah putar '" + title + "' ke speaker ESP32...");
+        }
+
+        try {
+            const resp = await fetch('/api/v1/playlist/' + trackId + '/play', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': csrfToken
+                }
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                throw new Error(data.detail || data.message || "Gagal mengirim perintah putar ke ESP32.");
+            }
+
+            if (window.App && App.toast) {
+                App.toast.success(data.message || "Berhasil dikirim ke ESP32!");
+            }
+
+            // Update play count live badge
+            const badge = document.getElementById('track-playcount-' + trackId);
+            if (badge && data.track && data.track.play_count !== undefined) {
+                badge.textContent = "🔥 " + data.track.play_count + "x";
+                badge.classList.remove('is-zero');
+            }
+
+            const statTotalPlays = document.getElementById('statTotalPlays');
+            if (statTotalPlays) {
+                const current = parseInt(statTotalPlays.textContent || 0);
+                statTotalPlays.textContent = (current + 1) + "x";
+            }
+        } catch (err) {
+            if (window.App && App.toast) App.toast.error(err.message);
+            else alert(err.message);
+        }
+    }
+
+    // Video preview modal
+    function previewYouTubeModal(videoId, title) {
+        const modal = document.getElementById('modalPreviewVideo');
+        const iframe = document.getElementById('previewIframe');
+        const titleEl = document.getElementById('previewVideoTitle');
+        if (modal && iframe) {
+            titleEl.textContent = "Pratinjau: " + (title || "Video YouTube");
+            iframe.src = "https://www.youtube.com/embed/" + videoId + "?autoplay=1";
+            modal.classList.add('is-active');
+        }
+    }
+    function closePreviewVideoModal() {
+        const modal = document.getElementById('modalPreviewVideo');
+        const iframe = document.getElementById('previewIframe');
+        if (modal && iframe) {
+            iframe.src = "";
+            modal.classList.remove('is-active');
+        }
+    }
+
+    // Search / Filter Table
+    function filterPlaylistTable() {
+        const query = (document.getElementById('trackSearchInput').value || '').toLowerCase().trim();
+        const rows = document.querySelectorAll('#playlistTableBody tr[data-search]');
+        let matchCount = 0;
+
+        rows.forEach(row => {
+            const data = row.getAttribute('data-search') || '';
+            if (!query || data.includes(query)) {
+                row.style.display = '';
+                matchCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // Close modals on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeAddTrackModal();
+            closeEditTrackModal();
+            closePreviewVideoModal();
+        }
+    });
+</script>
+{% endblock %}
