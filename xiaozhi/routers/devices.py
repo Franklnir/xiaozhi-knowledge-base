@@ -59,10 +59,16 @@ async def register_device(request: Request):
 @router.post("/api/devices/detach")
 async def detach_device_endpoint(request: Request):
     """
-    Memisahkan ID Board dari user saat user ingin ganti board atau putus tautan.
-    Board ID dan riwayatnya tetap tersimpan aman di database.
+    Memisahkan ID Board dari user.
+    Hanya administrator yang memiliki izin memutus manual via endpoint ini.
+    Untuk user umum, pemutusan tautan dilakukan otomatis oleh sistem saat update endpoint atau hapus koneksi MCP.
     """
     user = require_user(request)
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Akses ditolak: Pemutusan tautan board hanya dilakukan otomatis oleh sistem saat Anda memperbarui endpoint atau menghapus koneksi MCP."
+        )
     store = get_store()
     body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     device_id = str(body.get("device_id", "")).strip()
