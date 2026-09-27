@@ -167,7 +167,7 @@ def broadcast_chat_history(user_id: int, item: Dict[str, Any], event_type: str =
     chat_history_hub.emit(user_id, item, event_type)
 
 
-async def stream_chat_history_events(user_id: int, request: Request, active_date: str = "") -> AsyncGenerator[str, None]:
+async def stream_chat_history_events(user_id: int, request: Request, active_date: str = "", target_token_hash: str = "") -> AsyncGenerator[str, None]:
     """Stream real-time chat history events (new_chat, update_chat) to user via SSE."""
     q = await chat_history_hub.subscribe(user_id)
     try:
@@ -181,6 +181,9 @@ async def stream_chat_history_events(user_id: int, request: Request, active_date
                 item_date = str(item.get("created_at") or "")[:10]
                 if active_date and item_date and item_date != active_date and active_date != "all":
                     continue
+                if target_token_hash:
+                    if target_token_hash == "none" or item.get("token_hash") != target_token_hash:
+                        continue
                 yield format_sse(payload.get("type", "new_chat"), item, event_id=str(item.get("id", "")))
             except asyncio.TimeoutError:
                 yield ": ping\n\n"

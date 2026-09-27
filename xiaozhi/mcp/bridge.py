@@ -139,10 +139,12 @@ async def mcp_background_task(store, mcp_server):
                 await asyncio.sleep(30)
                 continue
 
-            # Launch bridges for users not yet connected
+            # Launch bridges for users not yet connected (mendukung hingga 3 slot per akun)
             for token_info in tokens:
                 user_id = int(token_info["user_id"])
-                if user_id in mcp_bridge_tasks and not mcp_bridge_tasks[user_id].done():
+                slot = int(token_info.get("slot_number", 1) or 1)
+                task_key = f"{user_id}:{slot}"
+                if task_key in mcp_bridge_tasks and not mcp_bridge_tasks[task_key].done():
                     continue  # Already running
 
                 # Check if user MCP is blocked by admin
@@ -152,14 +154,15 @@ async def mcp_background_task(store, mcp_server):
 
                 url = token_info["token"]
                 if not url.startswith("wss://"):
-                    logger.warning("Token bukan wss://: user_id=%s", user_id)
+                    logger.warning("Token bukan wss://: user_id=%s slot=%s", user_id, slot)
                     continue
                 from xiaozhi.core.security import normalize_token_hash, xiaozhi_token_hash
                 token_hash = normalize_token_hash(token_info.get("token_hash", "")) or xiaozhi_token_hash(url)
-                set_mcp_connection_state(user_id, token_hash, connected=False, message="Menghubungkan ke XiaoZhi...")
-                logger.info("MCP bridge mencoba: user_id=%s", user_id)
-                task = asyncio.create_task(run_mcp_bridge(store, mcp_server, user_id, url, token_hash))
-                mcp_bridge_tasks[user_id] = task
+                label = token_info.get("device_label", f"XiaoZhi {slot}") or f"XiaoZhi {slot}"
+                set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Menghubungkan {label} (Slot {slot})...", slot=slot, device_label=label)
+                logger.info("MCP bridge mencoba: user_id=%s slot=%s label=%s", user_id, slot, label)
+                task = asyncio.create_task(run_mcp_bridge(store, mcp_server, user_id, url, token_hash, slot=slot, device_label=label))
+                mcp_bridge_tasks[task_key] = task
 
             # Wait for reload signal OR timeout (check for new users every 30s)
             if mcp_reload_event:
@@ -176,8 +179,8 @@ async def mcp_background_task(store, mcp_server):
             await asyncio.sleep(10)
 
 
-async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: str):
-    """Run a single MCP WebSocket bridge for a user."""
+async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: str, slot: int = 1, device_label: str = "XiaoZhi"):
+    """Run a single MCP WebSocket bridge for a user's slot."""
     try:
         import anyio
         import websockets
@@ -190,18 +193,19 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
     from xiaozhi.core.security import normalize_token_hash, xiaozhi_token_hash
 
     token_hash = normalize_token_hash(token_hash) or xiaozhi_token_hash(url)
-    request_id = f"mcp-{user_id}-{uuid.uuid4().hex[:8]}"
+    task_key = f"{user_id}:{slot}"
+    request_id = f"mcp-{user_id}-s{slot}-{uuid.uuid4().hex[:6]}"
     masked = url[:50] + "..." if len(url) > 50 else url
-    logger.info("[%s] MCP bridge start: user_id=%s url=%s", request_id, user_id, masked)
+    logger.info("[%s] MCP bridge start: user_id=%s slot=%s url=%s", request_id, user_id, slot, masked)
     ctx_token = mcp_active_owner_ctx.set(user_id)
     req_token = mcp_request_id_ctx.set(request_id)
     try:
         async with websocket_client_server(user_id, url, token_hash) as (read_stream, write_stream):
-            set_mcp_connection_state(user_id, token_hash, connected=True, message="MCP terhubung ke XiaoZhi", request_id=request_id)
-            logger.info("[%s] MCP bridge CONNECTED: user_id=%s", request_id, user_id)
+            set_mcp_connection_state(user_id, token_hash, connected=True, message=f"{device_label} terhubung", request_id=request_id, slot=slot, device_label=device_label)
+            logger.info("[%s] MCP bridge CONNECTED: user_id=%s slot=%s", request_id, user_id, slot)
             try:
                 from xiaozhi.services.sse_service import log_admin_event
-                log_admin_event("mcp", f"WebSocket MCP Terhubung (User ID: {user_id})", {"user_id": user_id, "request_id": request_id, "status": "connected"})
+                log_admin_event("mcp", f"WebSocket MCP Terhubung (User ID: {user_id}, Slot: {slot}, {device_label})", {"user_id": user_id, "slot": slot, "request_id": request_id, "status": "connected"})
             except Exception:
                 pass
             await mcp_server._mcp_server.run(
@@ -209,28 +213,28 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
                 mcp_server._mcp_server.create_initialization_options(),
             )
     except websockets.exceptions.InvalidStatusCode as exc:
-        logger.error("[%s] MCP bridge HTTP error: user_id=%s status=%s", request_id, user_id, exc.status_code)
-        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"HTTP {exc.status_code} dari XiaoZhi", request_id=request_id)
+        logger.error("[%s] MCP bridge HTTP error: user_id=%s slot=%s status=%s", request_id, user_id, slot, exc.status_code)
+        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"HTTP {exc.status_code} dari XiaoZhi", request_id=request_id, slot=slot, device_label=device_label)
     except websockets.exceptions.ConnectionClosed as exc:
-        logger.warning("[%s] MCP bridge closed: user_id=%s code=%s reason=%s", request_id, user_id, exc.code, exc.reason)
-        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"WebSocket ditutup: {exc.code}", request_id=request_id)
+        logger.warning("[%s] MCP bridge closed: user_id=%s slot=%s code=%s reason=%s", request_id, user_id, slot, exc.code, exc.reason)
+        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"WebSocket ditutup: {exc.code}", request_id=request_id, slot=slot, device_label=device_label)
     except OSError as exc:
-        logger.error("[%s] MCP bridge network error: user_id=%s err=%s", request_id, user_id, exc)
-        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Network error: {exc}", request_id=request_id)
+        logger.error("[%s] MCP bridge network error: user_id=%s slot=%s err=%s", request_id, user_id, slot, exc)
+        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Network error: {exc}", request_id=request_id, slot=slot, device_label=device_label)
     except Exception as exc:
-        logger.exception("[%s] MCP bridge unexpected error: user_id=%s", request_id, user_id)
-        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Error: {str(exc)[:100]}", request_id=request_id)
+        logger.exception("[%s] MCP bridge unexpected error: user_id=%s slot=%s", request_id, user_id, slot)
+        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Error: {str(exc)[:100]}", request_id=request_id, slot=slot, device_label=device_label)
     finally:
         mcp_active_owner_ctx.reset(ctx_token)
         mcp_request_id_ctx.reset(req_token)
-        mcp_bridge_tasks.pop(user_id, None)
-        set_mcp_connection_state(user_id, token_hash, connected=False, message="MCP terputus (mencoba hubungkan kembali...)", request_id=request_id)
+        mcp_bridge_tasks.pop(task_key, None)
+        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"{device_label} terputus (mencoba hubungkan kembali...)", request_id=request_id, slot=slot, device_label=device_label)
         try:
             from xiaozhi.services.sse_service import log_admin_event
-            log_admin_event("mcp", f"WebSocket MCP Terputus (User ID: {user_id})", {"user_id": user_id, "request_id": request_id, "status": "disconnected"})
+            log_admin_event("mcp", f"WebSocket MCP Terputus (User ID: {user_id}, Slot: {slot})", {"user_id": user_id, "slot": slot, "request_id": request_id, "status": "disconnected"})
         except Exception:
             pass
-        logger.info("[%s] MCP bridge selesai: user_id=%s", request_id, user_id)
+        logger.info("[%s] MCP bridge selesai: user_id=%s slot=%s", request_id, user_id, slot)
 
         # Trigger background task to reconnect after 2s delay
         async def _quick_reload():

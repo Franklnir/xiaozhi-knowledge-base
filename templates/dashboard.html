@@ -204,40 +204,93 @@
                 .mcp-bar-fill.connecting { width:60%; background:linear-gradient(90deg,#0369a1,#38bdf8,#0369a1); background-size:200%; animation:mcpShimmer 1.5s linear infinite }
                 .mcp-bar-fill.connected { width:100%; background:#047857 }
                 .mcp-bar-fill.idle { width:0%; background:#b91c1c }
+                .mcp-slot-tab {
+                    border: 2px solid #000;
+                    background: #f1f5f9;
+                    cursor: pointer;
+                    font-weight: 800;
+                    box-shadow: 2px 2px 0px #000;
+                    transition: all 0.15s ease;
+                }
+                .mcp-slot-tab:hover {
+                    background: #e2e8f0;
+                    transform: translate(-1px, -1px);
+                    box-shadow: 3px 3px 0px #000;
+                }
+                .mcp-slot-tab.active {
+                    background: #ffffff !important;
+                    border: 2.5px solid #000 !important;
+                    box-shadow: 3px 3px 0px #000 !important;
+                }
+                .slot-radar-dot {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    display: inline-block;
+                }
+                .slot-radar-dot.connected {
+                    background: #10b981;
+                    box-shadow: 0 0 6px #10b981;
+                }
+                .slot-radar-dot.connecting {
+                    background: #0284c7;
+                    animation: mcpPulse 1.2s infinite;
+                }
+                .slot-radar-dot.idle {
+                    background: #94a3b8;
+                }
             </style>
             <div class="app-card" id="mcpCard">
                 <div class="app-card-header is-compact">
                     <div>
-                        <h2 class="app-section-title">Koneksi XiaoZhi</h2>
-                        <p class="app-section-subtitle">Endpoint MCP yang dipakai XiaoZhi untuk membaca materi.{% if user and user.role == 'admin' %} <span style="color:#047857; font-weight:700;">(Opsional untuk Admin)</span>{% endif %}</p>
+                        <h2 class="app-section-title">Koneksi XiaoZhi (3 Slot)</h2>
+                        <p class="app-section-subtitle">Hubungkan hingga 3 perangkat XiaoZhi secara simultan.{% if user and user.role == 'admin' %} <span style="color:#047857; font-weight:700;">(Opsional untuk Admin)</span>{% endif %}</p>
                     </div>
-                    <span id="mcpChip" class="app-chip app-chip-small {% if mcp_connected %}app-chip-success{% elif mcp_token_saved %}app-chip-info{% else %}app-chip-neutral{% endif %}">
-                        {% if mcp_connected %}Terhubung{% elif mcp_token_saved %}Menunggu{% else %}Belum aktif{% endif %}
+                    <span id="mcpChip" class="app-chip app-chip-small app-chip-neutral">
+                        Memeriksa...
                     </span>
                 </div>
-                <div id="mcpAlert" class="app-alert {% if mcp_connected %}app-alert-success{% elif mcp_token_saved %}app-alert-info{% else %}app-alert-warning{% endif %}">
-                    {% if mcp_token_saved %}{{ mcp_status.statusText }}{% else %}Endpoint belum tersimpan.{% endif %}
+
+                <!-- 3 Slot Tabs Bar -->
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <button type="button" class="mcp-slot-tab active py-1.5 px-2 rounded text-xs flex items-center justify-center gap-1.5" id="slotTab1" onclick="switchSlot(1)">
+                        <span class="slot-radar-dot idle" id="slotDot1"></span>
+                        <span id="slotTabLabel1">Slot 1</span>
+                    </button>
+                    <button type="button" class="mcp-slot-tab py-1.5 px-2 rounded text-xs flex items-center justify-center gap-1.5" id="slotTab2" onclick="switchSlot(2)">
+                        <span class="slot-radar-dot idle" id="slotDot2"></span>
+                        <span id="slotTabLabel2">Slot 2</span>
+                    </button>
+                    <button type="button" class="mcp-slot-tab py-1.5 px-2 rounded text-xs flex items-center justify-center gap-1.5" id="slotTab3" onclick="switchSlot(3)">
+                        <span class="slot-radar-dot idle" id="slotDot3"></span>
+                        <span id="slotTabLabel3">Slot 3</span>
+                    </button>
                 </div>
-                <div class="mcp-bar"><div id="mcpBar" class="mcp-bar-fill {% if mcp_connected %}connected{% elif mcp_token_saved %}connecting{% else %}idle{% endif %}"></div></div>
+
+                <div id="mcpAlert" class="app-alert app-alert-warning">
+                    Pilih slot untuk mengonfigurasi endpoint XiaoZhi.
+                </div>
+                <div class="mcp-bar"><div id="mcpBar" class="mcp-bar-fill idle"></div></div>
                 <div class="mt-4 space-y-3">
                     <input type="hidden" id="mcpCsrf" value="{{ csrf_token }}">
                     <div>
-                        <label for="mcp_token" class="app-label">Endpoint MCP</label>
-                        <input id="mcp_token" type="password" placeholder="wss://api.xiaozhi.me/mcp/?token=..." autocomplete="off" class="app-input">
-                        <p class="app-field-hint">Endpoint wss:// dari XiaoZhi disimpan terenkripsi.</p>
+                        <label for="mcp_label" class="app-label">Nama / Ruangan Perangkat</label>
+                        <input id="mcp_label" type="text" maxlength="60" placeholder="Contoh: XiaoZhi Ruang Tamu" autocomplete="off" class="app-input">
                     </div>
-                    <button id="saveMcpBtn" class="app-button app-button-primary app-button-full">{% if mcp_token_saved %}Update Endpoint{% else %}Simpan Endpoint{% endif %}</button>
+                    <div>
+                        <label for="mcp_token" class="app-label">Endpoint MCP WebSocket</label>
+                        <input id="mcp_token" type="password" placeholder="wss://api.xiaozhi.me/mcp/?token=..." autocomplete="off" class="app-input">
+                        <p class="app-field-hint" id="mcpPreviewHint">Endpoint wss:// dari XiaoZhi disimpan terenkripsi.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="saveMcpBtn" class="app-button app-button-primary flex-1">Simpan Slot Ini</button>
+                        <button id="reconnectBtn" class="app-button app-button-secondary hidden">Reconnect</button>
+                        <button id="deleteBtn" class="app-button app-button-danger hidden">Hapus</button>
+                    </div>
                 </div>
-                {% if mcp_token_saved %}
-                <div class="mt-3">
-                    <button id="reconnectBtn" class="app-button app-button-full">Reconnect XiaoZhi</button>
-                </div>
-                <div class="mt-3">
-                    <button id="deleteBtn" class="app-button app-button-danger app-button-full">Hapus Koneksi</button>
-                </div>
+
                 <a href="/riwayat-chat" class="app-button app-button-full mt-3" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Riwayat Chat')"{% endif %}>Buka Riwayat Chat{% if user and user.role != 'admin' and not mcp_connected %} 🔒{% endif %}</a>
-                <div id="mcpStatusDetail" class="mt-3 app-field-hint">Memuat status...</div>
-                {% endif %}
+                <div id="mcpStatusDetail" class="mt-3 app-field-hint text-xs">Memuat status perangkat...</div>
             </div>
 
             <div class="app-card">
@@ -802,26 +855,138 @@
 </script>
 <script>
 let mcpPoll = null, mcpBusy = false;
-function mcpUI(s) {
-    const chip = document.getElementById("mcpChip"), alert = document.getElementById("mcpAlert"), bar = document.getElementById("mcpBar"), detail = document.getElementById("mcpStatusDetail");
-    if (chip) {
-        if (s.connected) { chip.className = "app-chip app-chip-small app-chip-success"; chip.innerHTML = "Terhubung"; }
-        else if (s.tokenSaved) { chip.className = "app-chip app-chip-small app-chip-info" + (mcpBusy ? " mcp-loading" : ""); chip.innerHTML = (mcpBusy ? '<span class="mcp-spinner"></span>' : '') + "Menghubungkan..."; }
-        else { chip.className = "app-chip app-chip-small app-chip-neutral"; chip.innerHTML = "Belum aktif"; }
+let currentSlot = 1;
+let slotsData = [
+    { slot: 1, label: "XiaoZhi 1", saved: false, connected: false, preview: "", statusText: "Belum dikonfigurasi" },
+    { slot: 2, label: "XiaoZhi 2", saved: false, connected: false, preview: "", statusText: "Belum dikonfigurasi" },
+    { slot: 3, label: "XiaoZhi 3", saved: false, connected: false, preview: "", statusText: "Belum dikonfigurasi" }
+];
+
+function switchSlot(slotNum) {
+    currentSlot = Number(slotNum);
+    for (let i = 1; i <= 3; i++) {
+        const tab = document.getElementById("slotTab" + i);
+        if (tab) {
+            if (i === currentSlot) {
+                tab.classList.add("active");
+            } else {
+                tab.classList.remove("active");
+            }
+        }
     }
-    if (alert) { alert.className = "app-alert " + (s.connected ? "app-alert-success" : s.tokenSaved ? "app-alert-info" : "app-alert-warning"); alert.textContent = s.connected ? s.statusText : s.tokenSaved ? (s.statusText || "Menghubungkan...") : "Endpoint belum tersimpan."; }
-    if (bar) bar.className = "mcp-bar-fill " + (s.connected ? "connected" : s.tokenSaved ? "connecting" : "idle");
-    if (detail) { detail.textContent = s.statusText + " | " + (s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("id-ID") : "-"); detail.style.color = s.connected ? "#047857" : mcpBusy ? "#0369a1" : "#64748b"; }
-    if (s.connected) mcpBusy = false;
-    const sb = document.getElementById("saveMcpBtn"), rb = document.getElementById("reconnectBtn"), db = document.getElementById("deleteBtn");
-    if (sb) sb.disabled = mcpBusy; if (rb) rb.disabled = mcpBusy; if (db) db.disabled = mcpBusy;
+    const tokenInp = document.getElementById("mcp_token");
+    if (tokenInp) tokenInp.value = "";
+    renderActiveSlotForm();
 }
-function pollMcp() { fetch("/api/mcp/status",{credentials:"same-origin"}).then(r=>r.json()).then(d=>{if(d.success)mcpUI(d.status)}).catch(()=>{}) }
+
+function renderActiveSlotForm() {
+    const s = slotsData.find(x => x.slot === currentSlot) || { slot: currentSlot, label: "XiaoZhi " + currentSlot, saved: false, connected: false, statusText: "Belum dikonfigurasi" };
+    
+    const labelInput = document.getElementById("mcp_label");
+    const previewHint = document.getElementById("mcpPreviewHint");
+    const reconnectBtn = document.getElementById("reconnectBtn");
+    const deleteBtn = document.getElementById("deleteBtn");
+    const saveBtn = document.getElementById("saveMcpBtn");
+    const alertBox = document.getElementById("mcpAlert");
+    const bar = document.getElementById("mcpBar");
+    const detail = document.getElementById("mcpStatusDetail");
+
+    if (labelInput && !labelInput.matches(':focus')) {
+        labelInput.value = s.label || ("XiaoZhi " + currentSlot);
+    }
+    if (previewHint) {
+        if (s.saved && s.preview) {
+            previewHint.innerHTML = "Tersimpan: <code style='color:#0284c7;font-weight:700;'>" + s.preview + "</code> (Isi endpoint baru di atas jika ingin menimpa).";
+        } else {
+            previewHint.textContent = "Endpoint wss:// dari XiaoZhi disimpan terenkripsi.";
+        }
+    }
+
+    if (s.saved) {
+        if (reconnectBtn) reconnectBtn.classList.remove("hidden");
+        if (deleteBtn) deleteBtn.classList.remove("hidden");
+        if (saveBtn) saveBtn.textContent = "Perbarui Slot " + currentSlot;
+    } else {
+        if (reconnectBtn) reconnectBtn.classList.add("hidden");
+        if (deleteBtn) deleteBtn.classList.add("hidden");
+        if (saveBtn) saveBtn.textContent = "Simpan Slot " + currentSlot;
+    }
+
+    if (alertBox) {
+        alertBox.className = "app-alert " + (s.connected ? "app-alert-success" : s.saved ? "app-alert-info" : "app-alert-warning");
+        alertBox.textContent = s.connected ? (s.label + " Terhubung (" + s.statusText + ")") : s.saved ? (s.statusText || "Menghubungkan...") : ("Slot " + currentSlot + " belum tersimpan.");
+    }
+    if (bar) {
+        bar.className = "mcp-bar-fill " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
+    }
+    if (detail) {
+        detail.textContent = "Slot " + currentSlot + " (" + s.label + "): " + s.statusText + " | " + (s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("id-ID") : "-");
+        detail.style.color = s.connected ? "#047857" : mcpBusy ? "#0369a1" : "#64748b";
+    }
+
+    if (saveBtn) saveBtn.disabled = mcpBusy;
+    if (reconnectBtn) reconnectBtn.disabled = mcpBusy;
+    if (deleteBtn) deleteBtn.disabled = mcpBusy;
+}
+
+function updateSlotsUI(data) {
+    if (data.slots && Array.isArray(data.slots)) {
+        slotsData = data.slots;
+    }
+    
+    // Update tabs indicators
+    for (let i = 1; i <= 3; i++) {
+        const s = slotsData.find(x => x.slot === i);
+        const dot = document.getElementById("slotDot" + i);
+        const label = document.getElementById("slotTabLabel" + i);
+        if (dot && s) {
+            dot.className = "slot-radar-dot " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
+        }
+        if (label && s && s.label) {
+            label.textContent = s.label.length > 9 ? (s.label.substring(0, 8) + '…') : s.label;
+        }
+    }
+
+    // Global Chip
+    const chip = document.getElementById("mcpChip");
+    if (chip) {
+        if (data.anyConnected) {
+            chip.className = "app-chip app-chip-small app-chip-success";
+            chip.innerHTML = "Aktif (" + data.totalSaved + "/3 slot)";
+        } else if (data.totalSaved > 0) {
+            chip.className = "app-chip app-chip-small app-chip-info" + (mcpBusy ? " mcp-loading" : "");
+            chip.innerHTML = (mcpBusy ? '<span class="mcp-spinner"></span>' : '') + "Menghubungkan (" + data.totalSaved + " slot)...";
+        } else {
+            chip.className = "app-chip app-chip-small app-chip-neutral";
+            chip.innerHTML = "Belum aktif";
+        }
+    }
+
+    renderActiveSlotForm();
+}
+
+function pollMcp() {
+    fetch("/api/mcp/status", {credentials:"same-origin"})
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) updateSlotsUI(d);
+        })
+        .catch(() => {});
+}
+
 function startConnect() {
-    mcpBusy = true; mcpUI({connected:false,tokenSaved:true,statusText:"Menghubungkan ke XiaoZhi..."});
-    if (mcpPoll) clearInterval(mcpPoll); mcpPoll = setInterval(pollMcp, 1000);
-    setTimeout(() => { if(mcpPoll) clearInterval(mcpPoll); mcpBusy=false; mcpPoll=setInterval(pollMcp,5000); pollMcp(); }, 30000);
+    mcpBusy = true;
+    pollMcp();
+    if (mcpPoll) clearInterval(mcpPoll);
+    mcpPoll = setInterval(pollMcp, 1000);
+    setTimeout(() => {
+        if (mcpPoll) clearInterval(mcpPoll);
+        mcpBusy = false;
+        mcpPoll = setInterval(pollMcp, 5000);
+        pollMcp();
+    }, 25000);
 }
+
 async function ajaxMcp(url, body) {
     const csrf = document.getElementById("mcpCsrf").value;
     const fd = new FormData();
@@ -830,32 +995,50 @@ async function ajaxMcp(url, body) {
     const resp = await fetch(url, {method:"POST", body:fd, credentials:"same-origin", redirect:"manual"});
     return resp;
 }
+
 document.addEventListener("DOMContentLoaded", function() {
     // Save button - AJAX
     const saveBtn = document.getElementById("saveMcpBtn");
     if (saveBtn) saveBtn.addEventListener("click", async function() {
         const token = document.getElementById("mcp_token").value.trim();
-        if (!token || !token.startsWith("wss://")) { alert("Endpoint harus diawali wss://"); return; }
+        const label = document.getElementById("mcp_label").value.trim();
+        const currentSlotData = slotsData.find(x => x.slot === currentSlot);
+        if (!token && (!currentSlotData || !currentSlotData.saved)) {
+            alert("Masukkan endpoint wss:// untuk Slot " + currentSlot);
+            return;
+        }
+        if (token && !token.startsWith("wss://")) {
+            alert("Endpoint harus diawali wss://");
+            return;
+        }
         startConnect();
-        await ajaxMcp("/save_mcp", {mcp_token: token});
+        const payload = { slot: currentSlot, device_label: label };
+        if (token) payload.mcp_token = token;
+        await ajaxMcp("/save_mcp", payload);
+        document.getElementById("mcp_token").value = "";
         pollMcp();
     });
+
     // Reconnect button - AJAX
     const reconnectBtn = document.getElementById("reconnectBtn");
     if (reconnectBtn) reconnectBtn.addEventListener("click", async function() {
         startConnect();
-        await ajaxMcp("/reconnect_mcp", {});
+        await ajaxMcp("/reconnect_mcp", { slot: currentSlot });
         pollMcp();
     });
+
     // Delete button - AJAX
     const deleteBtn = document.getElementById("deleteBtn");
     if (deleteBtn) deleteBtn.addEventListener("click", async function() {
-        if (!confirm("Hapus endpoint? Koneksi MCP dan tautan Board ESP32 akan diputuskan (riwayat board tetap tersimpan aman).")) return;
+        const s = slotsData.find(x => x.slot === currentSlot);
+        const name = s ? s.label : ("Slot " + currentSlot);
+        if (!confirm("Hapus endpoint " + name + " (Slot " + currentSlot + ")? Koneksi slot ini akan diputuskan.")) return;
         mcpBusy = true;
-        await ajaxMcp("/delete_mcp", {});
+        await ajaxMcp("/delete_mcp", { slot: currentSlot });
         mcpBusy = false;
         pollMcp();
     });
+
     // Start polling immediately
     pollMcp();
     mcpPoll = setInterval(pollMcp, 5000);
