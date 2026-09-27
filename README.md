@@ -14,6 +14,7 @@ short_description: untuk xiaozhi
 🌐 **Website Resmi:** [https://xiaozhiscig.biz.id](https://xiaozhiscig.biz.id)  
 📖 **Dokumentasi Lengkap:** [https://xiaozhiscig.biz.id/dokumentasi](https://xiaozhiscig.biz.id/dokumentasi)  
 📱 **Unduh Aplikasi Mobile (Xichi / ESPBridge):** [https://xiaozhiscig.biz.id/download/app](https://xiaozhiscig.biz.id/download/app)  
+🔌 **Panduan Hardware & Pinout:** [Tabel Pinout C3 & S3](REFERENSI_PINOUT.md) | [Panduan ESP32-C3](PANDUAN_HARDWARE_ESP32_C3_SUPER_MINI.md) | [Panduan ESP32-S3](PANDUAN_HARDWARE_ESP32_S3_N16R8.md)  
 
 Platform resmi **Xiaozhi Indonesia** (`xiaozhiscig.biz.id`): ekosistem asisten suara cerdas berbasis IoT ESP32, integrasi 44 MCP tools, Smart Home, dan manajemen knowledge base materi edukasi.
 
