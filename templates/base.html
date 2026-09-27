@@ -569,6 +569,183 @@
         .auth-card { width: 480px; max-width: 100%; padding: 32px; min-height: 420px; display: flex; flex-direction: column; }
         .auth-card .app-title { font-size: 24px; }
 
+        /* ══════════════════════════════════════════════════════════════════
+           DUAL-MODE SWITCHER: RELAY NYATA & SIMULASI SMARTHOME
+           ══════════════════════════════════════════════════════════════════ */
+        .relay-mode-nav-container {
+            margin-bottom: 24px;
+            width: 100%;
+        }
+        .relay-mode-nav {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            width: 100%;
+        }
+        @media (max-width: 768px) {
+            .relay-mode-nav {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+        }
+        .relay-mode-btn {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
+            border-radius: 10px;
+            text-decoration: none !important;
+            background: #ffffff;
+            border: 2px solid #cbd5e1;
+            color: #1e293b;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+        }
+        .relay-mode-btn:hover {
+            border-color: #047857;
+            background: #f8fafc;
+            color: #047857;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        }
+        .relay-mode-btn.is-active {
+            background: #047857;
+            border-color: #047857;
+            color: #ffffff !important;
+            box-shadow: 0 4px 14px rgba(4, 120, 87, 0.35);
+        }
+        .relay-mode-btn.is-active:hover {
+            transform: none;
+        }
+        .relay-mode-icon-box {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.05);
+            flex-shrink: 0;
+            color: inherit;
+        }
+        .relay-mode-btn.is-active .relay-mode-icon-box {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+        .relay-mode-text-group {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            flex: 1;
+            min-width: 0;
+        }
+        .relay-mode-title {
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.25;
+            color: inherit;
+        }
+        .relay-mode-subtitle {
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0.82;
+            line-height: 1.35;
+            color: inherit;
+        }
+        .relay-mode-badge {
+            font-size: 11px;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.06);
+            color: inherit;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            white-space: nowrap;
+        }
+        .relay-mode-btn.is-active .relay-mode-badge.is-active-badge {
+            background: #ffffff;
+            color: #047857;
+            border-color: #ffffff;
+            font-weight: 900;
+        }
+
+        /* Dark Theme overrides for mode switcher */
+        :root[data-theme="dark"] .relay-mode-btn {
+            background: #1e293b;
+            border-color: #475569;
+            color: #f1f5f9;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+        }
+        :root[data-theme="dark"] .relay-mode-btn:hover {
+            background: #334155;
+            border-color: #10b981;
+            color: #10b981;
+        }
+        :root[data-theme="dark"] .relay-mode-btn.is-active {
+            background: #059669;
+            border-color: #10b981;
+            color: #ffffff !important;
+            box-shadow: 0 4px 16px rgba(5, 150, 105, 0.45);
+        }
+        :root[data-theme="dark"] .relay-mode-icon-box {
+            background: rgba(255, 255, 255, 0.08);
+        }
+        :root[data-theme="dark"] .relay-mode-badge {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: #cbd5e1;
+        }
+        :root[data-theme="dark"] .relay-mode-btn.is-active .relay-mode-badge.is-active-badge {
+            background: #ffffff;
+            color: #059669;
+            border-color: #ffffff;
+        }
+
+        /* Neo-Brutalism overrides for mode switcher */
+        :root[data-theme="neo"] .relay-mode-btn {
+            border: 2.5px solid #111111 !important;
+            background: #ffffff !important;
+            color: #111111 !important;
+            box-shadow: 4px 4px 0 #111111 !important;
+            border-radius: 8px !important;
+        }
+        :root[data-theme="neo"] .relay-mode-btn:hover {
+            transform: translate(-2px, -2px) !important;
+            box-shadow: 6px 6px 0 #111111 !important;
+            background: #fdf2f8 !important;
+        }
+        :root[data-theme="neo"] .relay-mode-btn:active {
+            transform: translate(2px, 2px) !important;
+            box-shadow: 1px 1px 0 #111111 !important;
+        }
+        :root[data-theme="neo"] .relay-mode-btn.is-active {
+            background: #ffe600 !important;
+            color: #111111 !important;
+            border: 2.5px solid #111111 !important;
+            box-shadow: 4.5px 4.5px 0 #111111 !important;
+        }
+        :root[data-theme="neo"] .relay-mode-btn.is-active .relay-mode-icon-box {
+            background: #111111 !important;
+            color: #ffe600 !important;
+            border: 1.5px solid #111111 !important;
+        }
+        :root[data-theme="neo"] .relay-mode-icon-box {
+            border: 1.5px solid #111111;
+            background: #f1f5f9;
+        }
+        :root[data-theme="neo"] .relay-mode-btn.is-active .relay-mode-badge.is-active-badge {
+            background: #111111 !important;
+            color: #ffffff !important;
+            border: 1.5px solid #111111 !important;
+        }
+        :root[data-theme="neo"] .relay-mode-badge {
+            border: 1.5px solid #111111;
+            background: #f1f5f9;
+            color: #111111;
+        }
+
         /* THEME OVERRIDES */
         :root[data-theme="dark"] .app-label,
         :root[data-theme="dark"] .app-table th,
