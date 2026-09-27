@@ -605,16 +605,329 @@
         :root[data-theme="dark"] .app-sidebar-link { color: var(--app-muted); }
         :root[data-theme="dark"] .app-sidebar-link:hover { color: var(--app-text); background: var(--app-soft); }
 
+        /* ══════════════════════════════════════════════════════════════════
+           NEO-BRUTALISM THEME MASTER SYSTEM (:root[data-theme="neo"])
+           ══════════════════════════════════════════════════════════════════ */
+        :root[data-theme="neo"] body {
+            background-color: #f7f5ff;
+            background-image: radial-gradient(#111111 0.85px, transparent 0.85px);
+            background-size: 22px 22px;
+        }
+
+        /* 1. Cards, Stat Cards, & Containers */
+        :root[data-theme="neo"] .app-card,
+        :root[data-theme="neo"] .app-stat-card,
+        :root[data-theme="neo"] .auth-card {
+            border: 2.5px solid #111111 !important;
+            box-shadow: 5px 5px 0 #111111 !important;
+            border-radius: 12px !important;
+            background: #ffffff !important;
+        }
+        :root[data-theme="neo"] .app-stat-card {
+            box-shadow: 4px 4px 0 #111111 !important;
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+        :root[data-theme="neo"] .app-stat-card:hover {
+            transform: translate(-1.5px, -1.5px);
+            box-shadow: 5.5px 5.5px 0 #111111 !important;
+        }
+        :root[data-theme="neo"] .app-stat-label {
+            color: #222222 !important;
+            font-weight: 800 !important;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.6px;
+        }
+        :root[data-theme="neo"] .app-stat-value {
+            font-weight: 900 !important;
+            color: #111111 !important;
+        }
+        :root[data-theme="neo"] .app-card-header {
+            border-bottom: 2px solid #111111;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        :root[data-theme="neo"] .app-section-title {
+            font-weight: 900 !important;
+            color: #111111 !important;
+            letter-spacing: -0.2px;
+        }
+
+        /* 2. Buttons: Tactile Hard-Shadow & Active Press */
+        :root[data-theme="neo"] .app-button {
+            border: 2px solid #111111 !important;
+            box-shadow: 3.5px 3.5px 0 #111111 !important;
+            border-radius: 8px !important;
+            font-weight: 800 !important;
+            background: #ffffff;
+            color: #111111 !important;
+            text-transform: none;
+            transition: transform .1s ease, box-shadow .1s ease, background-color .15s ease !important;
+        }
+        :root[data-theme="neo"] .app-button:hover {
+            transform: translate(-1.5px, -1.5px) !important;
+            box-shadow: 5px 5px 0 #111111 !important;
+            background: #fffde7 !important;
+            color: #111111 !important;
+        }
+        :root[data-theme="neo"] .app-button:active {
+            transform: translate(2.5px, 2.5px) !important;
+            box-shadow: 1px 1px 0 #111111 !important;
+        }
+        :root[data-theme="neo"] .app-button-primary {
+            background: #ffe600 !important;
+            color: #111111 !important;
+            border-color: #111111 !important;
+        }
+        :root[data-theme="neo"] .app-button-primary:hover {
+            background: #ffd600 !important;
+            color: #111111 !important;
+        }
+        :root[data-theme="neo"] .app-button-success {
+            background: #4ade80 !important;
+            color: #111111 !important;
+            border-color: #111111 !important;
+        }
+        :root[data-theme="neo"] .app-button-success:hover {
+            background: #22c55e !important;
+            color: #111111 !important;
+        }
+        :root[data-theme="neo"] .app-button-danger {
+            background: #ff4d4d !important;
+            color: #ffffff !important;
+            border-color: #111111 !important;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+        }
+        :root[data-theme="neo"] .app-button-danger:hover {
+            background: #ef233c !important;
+            color: #ffffff !important;
+        }
+        :root[data-theme="neo"] .app-button-sky {
+            background: #38bdf8 !important;
+            color: #111111 !important;
+            border-color: #111111 !important;
+        }
+        :root[data-theme="neo"] .app-button-sky:hover {
+            background: #0284c7 !important;
+            color: #ffffff !important;
+        }
+
+        /* 3. Inputs & Form Controls */
+        :root[data-theme="neo"] .app-input,
+        :root[data-theme="neo"] .app-select,
+        :root[data-theme="neo"] .app-textarea {
+            border: 2px solid #111111 !important;
+            box-shadow: 3px 3px 0 #111111 !important;
+            border-radius: 8px !important;
+            background: #ffffff !important;
+            color: #111111 !important;
+            font-weight: 650 !important;
+            transition: box-shadow .12s ease, background-color .12s ease;
+        }
+        :root[data-theme="neo"] .app-input:focus,
+        :root[data-theme="neo"] .app-select:focus,
+        :root[data-theme="neo"] .app-textarea:focus {
+            border-color: #111111 !important;
+            box-shadow: 4.5px 4.5px 0 #111111 !important;
+            background: #fffdf0 !important;
+            outline: none !important;
+        }
+        :root[data-theme="neo"] .app-label {
+            color: #111111 !important;
+            font-weight: 850 !important;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        :root[data-theme="neo"] .app-field-hint {
+            color: #444444 !important;
+            font-weight: 600;
+        }
+
+        /* 4. Alerts & Notifications */
+        :root[data-theme="neo"] .app-alert {
+            border: 2px solid #111111 !important;
+            box-shadow: 3.5px 3.5px 0 #111111 !important;
+            border-radius: 8px !important;
+            font-weight: 750 !important;
+            color: #111111 !important;
+        }
+        :root[data-theme="neo"] .app-alert-info {
+            background: #bae6fd !important;
+            color: #0c4a6e !important;
+        }
+        :root[data-theme="neo"] .app-alert-warning {
+            background: #fef08a !important;
+            color: #713f12 !important;
+        }
+        :root[data-theme="neo"] .app-alert-danger {
+            background: #fecaca !important;
+            color: #991b1b !important;
+        }
+        :root[data-theme="neo"] .app-alert-success {
+            background: #bbf7d0 !important;
+            color: #065f46 !important;
+        }
+
+        /* 5. Chips, Status Pills, Badges */
+        :root[data-theme="neo"] .app-chip,
+        :root[data-theme="neo"] .app-status-pill {
+            border: 1.5px solid #111111 !important;
+            box-shadow: 2px 2px 0 #111111 !important;
+            border-radius: 6px !important;
+            font-weight: 850 !important;
+            color: #111111 !important;
+        }
+        :root[data-theme="neo"] .app-chip-success,
+        :root[data-theme="neo"] .app-status-pill.is-online {
+            background: #86efac !important;
+            color: #065f46 !important;
+        }
+        :root[data-theme="neo"] .app-chip-info {
+            background: #7dd3fc !important;
+            color: #0c4a6e !important;
+        }
+        :root[data-theme="neo"] .app-chip-neutral {
+            background: #e2e8f0 !important;
+            color: #334155 !important;
+        }
+        :root[data-theme="neo"] .app-status-pill.is-offline {
+            background: #fca5a5 !important;
+            color: #991b1b !important;
+        }
+
+        /* 6. Tables */
+        :root[data-theme="neo"] .app-table-wrap {
+            border: 2.5px solid #111111 !important;
+            box-shadow: 4.5px 4.5px 0 #111111 !important;
+            border-radius: 10px !important;
+            background: #ffffff !important;
+            overflow: hidden;
+        }
+        :root[data-theme="neo"] .app-table thead tr {
+            background: #ffe600 !important;
+            border-bottom: 2.5px solid #111111 !important;
+        }
+        :root[data-theme="neo"] .app-table th {
+            border-bottom: 2.5px solid #111111 !important;
+            color: #111111 !important;
+            font-weight: 900 !important;
+            text-transform: uppercase;
+            font-size: 11.5px;
+            letter-spacing: 0.6px;
+            padding: 13px 14px;
+        }
+        :root[data-theme="neo"] .app-table td {
+            border-top: 1.5px solid #111111 !important;
+            color: #111111 !important;
+            padding: 13px 14px;
+        }
+        :root[data-theme="neo"] .app-table tr:hover td {
+            background: #fffde7 !important;
+        }
+
+        /* 7. Sidebar Navigation & Brand */
         :root[data-theme="neo"] .app-nav-aside {
-            border-right: 2px solid #111;
-            box-shadow: 4px 0 0 #111;
+            border-right: 2.5px solid #111111 !important;
+            box-shadow: 4px 0 0 #111111 !important;
+            background: #ffffff !important;
+        }
+        :root[data-theme="neo"] .app-sidebar-header {
+            border-bottom: 2.5px solid #111111 !important;
+            background: #fff06a !important;
+        }
+        :root[data-theme="neo"] .app-sidebar-footer {
+            border-top: 2.5px solid #111111 !important;
+            background: #fdfdfd !important;
+        }
+        :root[data-theme="neo"] .app-brand-mark {
+            border: 2px solid #111111 !important;
+            box-shadow: 2.5px 2.5px 0 #111111 !important;
+            background: #111111 !important;
+            color: #ffffff !important;
+            font-weight: 900;
+        }
+        :root[data-theme="neo"] .app-sidebar-link {
+            border: 1.5px solid transparent;
+            font-weight: 800;
+            color: #222222;
+            border-radius: 8px;
+            transition: all .12s ease;
+        }
+        :root[data-theme="neo"] .app-sidebar-link:hover {
+            background: #fff06a !important;
+            border: 1.5px solid #111111 !important;
+            box-shadow: 2.5px 2.5px 0 #111111 !important;
+            color: #111111 !important;
+            transform: translate(-1px, -1px);
         }
         :root[data-theme="neo"] .app-sidebar-link.is-active {
-            box-shadow: 3px 3px 0 #111;
+            background: #111111 !important;
+            color: #ffffff !important;
+            border: 2px solid #111111 !important;
+            box-shadow: 3px 3px 0 #111111 !important;
+            font-weight: 900;
         }
-        :root[data-theme="neo"] .app-card { box-shadow: 5px 5px 0 #111; }
-        :root[data-theme="neo"] .app-sidebar-header { border-bottom: 2px solid #111; }
-        :root[data-theme="neo"] .app-sidebar-footer { border-top: 2px solid #111; }
+
+        /* 8. Modals & Overlays */
+        :root[data-theme="neo"] .app-modal-box,
+        :root[data-theme="neo"] .mcp-blocking-box {
+            border: 3px solid #111111 !important;
+            box-shadow: 8px 8px 0 #111111 !important;
+            border-radius: 16px !important;
+            background: #ffffff !important;
+        }
+
+        /* 9. Header, Eyebrow & Typography */
+        :root[data-theme="neo"] .app-page-header {
+            border-bottom: 2.5px solid #111111 !important;
+            padding-bottom: 18px;
+        }
+        :root[data-theme="neo"] .app-eyebrow {
+            color: #111111 !important;
+            display: inline-block;
+            background: #ffe600;
+            padding: 3px 10px;
+            border: 2px solid #111111;
+            border-radius: 6px;
+            box-shadow: 2px 2px 0 #111111;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+        /* 10. Components: Relays, Documentation & Muted Panels */
+        :root[data-theme="neo"] .relay-item {
+            border: 2px solid #111111 !important;
+            box-shadow: 3.5px 3.5px 0 #111111 !important;
+            border-radius: 10px !important;
+        }
+        :root[data-theme="neo"] .relay-item.is-on {
+            background: #dcfce7 !important;
+            border-color: #111111 !important;
+        }
+        :root[data-theme="neo"] .relay-item.is-off {
+            background: #fee2e2 !important;
+            border-color: #111111 !important;
+        }
+        :root[data-theme="neo"] .doc-step {
+            border: 2px solid #111111 !important;
+            box-shadow: 3.5px 3.5px 0 #111111 !important;
+            border-radius: 10px !important;
+        }
+        :root[data-theme="neo"] .doc-step-number {
+            border: 2px solid #111111 !important;
+            box-shadow: 2px 2px 0 #111111 !important;
+            background: #ffe600 !important;
+            color: #111111 !important;
+            font-weight: 900 !important;
+        }
+        :root[data-theme="neo"] .app-muted-panel {
+            border: 2px solid #111111 !important;
+            box-shadow: 3px 3px 0 #111111 !important;
+            border-radius: 8px !important;
+            background: #fffbeb !important;
+        }
 
         /* RESPONSIVE */
         @media (max-width: 900px) {
