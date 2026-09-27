@@ -121,6 +121,8 @@ async def delete_mcp_token(request: Request):
 
     store = get_store()
     store.delete_xiaozhi_token(user["id"])
+    if hasattr(store, "detach_user_devices"):
+        store.detach_user_devices(user["id"], reason="MCP diputuskan/dihapus oleh user")
     clear_mcp_state(user["id"])
     user_task = mcp_bridge_tasks.pop(user["id"], None)
     if user_task and not user_task.done():

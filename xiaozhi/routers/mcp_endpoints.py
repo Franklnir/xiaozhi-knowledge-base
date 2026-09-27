@@ -55,6 +55,8 @@ async def delete_mcp_endpoint(request: Request, csrf_token: str = Form(...)):
     store = get_store()
     validate_csrf(request, csrf_token, user)
     deleted = store.delete_xiaozhi_token(user["id"])
+    if hasattr(store, "detach_user_devices"):
+        store.detach_user_devices(user["id"], reason="MCP diputuskan/dihapus oleh user")
     clear_mcp_state(user["id"])
     user_task = mcp_bridge_tasks.pop(user["id"], None)
     if user_task and not user_task.done():
@@ -145,6 +147,8 @@ async def delete_mcp_by_token(request: Request):
     if not owner:
         return {"success": False, "message": "Endpoint tidak ditemukan di database."}
     deleted = store.delete_xiaozhi_token_by_hash(token)
+    if hasattr(store, "detach_user_devices"):
+        store.detach_user_devices(owner["user_id"], reason="MCP diputuskan/dihapus via token")
     clear_mcp_state(owner["user_id"])
     user_task = mcp_bridge_tasks.pop(owner["user_id"], None)
     if user_task and not user_task.done():

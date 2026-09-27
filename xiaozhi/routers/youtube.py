@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSock
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from xiaozhi.dependencies import get_current_user, get_store, require_user
+from xiaozhi.services.mcp_service import is_mcp_connected
 
 logger = logging.getLogger("xiaozhi.youtube")
 router = APIRouter()
@@ -39,6 +40,21 @@ def _normalize_mac(mac: str) -> str:
     if len(cleaned) == 12:
         return ":".join(cleaned[i:i+2] for i in range(0, 12, 2))
     return mac.strip().lower()
+
+
+def _can_bind_device_to_user(user_id: Optional[int]) -> bool:
+    """
+    Validasi apakah user memiliki koneksi MCP aktif sebelum menautkan/mengikat Board ID.
+    Jika MCP tidak terhubung (is_mcp_connected == False), penautan board DITOLAK
+    sehingga board tidak sembarangan diikat ke akun yang tidak aktif/terputus MCP-nya.
+    """
+    if not user_id:
+        return False
+    try:
+        return bool(is_mcp_connected(int(user_id)))
+    except Exception as exc:
+        logger.warning("Error checking MCP connection for user %s: %s", user_id, exc)
+        return False
 
 
 def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
@@ -219,16 +235,29 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
         ).strip().lower()
 
     # Auto-register / rebind device MAC to this user in registered_devices
+    # Validasi dulu apakah MCP terhubung sebelum mengikat user ke board!
     if user and device_mac and hasattr(store, "register_device"):
         clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
         clean_mac = clean_mac.strip().upper()
         if len(clean_mac) >= 11:
             try:
+                user_id = user["id"]
                 dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                res = store.register_device(user["id"], device_id=clean_mac, name=dev_name, device_type=dev_type)
-                logger.info(f"[STREAM MAC] Device MAC {clean_mac} ({dev_type}) berhasil disimpan OK untuk user {user['id']} ({user.get('username')}) -> {res}")
+                if _can_bind_device_to_user(user_id):
+                    res = store.register_device(
+                        user_id,
+                        device_id=clean_mac,
+                        name=dev_name,
+                        device_type=dev_type,
+                        notes="Tertaut saat stream lagu ESP32 (MCP Terhubung)"
+                    )
+                    logger.info(f"[STREAM MAC] Device MAC {clean_mac} ({dev_type}) berhasil diikat ke user {user_id} ({user.get('username')}) [MCP AKTIF] -> {res}")
+                else:
+                    if hasattr(store, "record_device_activity"):
+                        store.record_device_activity(clean_mac, user_id)
+                    logger.warning(f"[STREAM MAC] Board MAC {clean_mac} TIDAK ditautkan ke user {user_id} karena MCP tidak terhubung.")
             except Exception as exc:
-                logger.error(f"[STREAM MAC ERROR] Gagal menyimpan MAC {clean_mac}: {exc}")
+                logger.error(f"[STREAM MAC ERROR] Gagal memproses MAC {clean_mac}: {exc}")
 
     return user, title, device_mac
 
@@ -516,21 +545,30 @@ async def audio_commands_for_device(device_id: str, request: Request):
     if not owner_id:
         return {"commands": []}
 
-    # Auto-register device MAC for owner_id
+    # Auto-register device MAC for owner_id only if MCP is connected
     if device_id and hasattr(store, "register_device"):
         clean_mac = device_id[6:] if device_id.lower().startswith("esp32-") else device_id
         clean_mac = clean_mac.strip().upper()
         if len(clean_mac) >= 11:
             try:
-                detected_chip = (
-                    request.query_params.get("chip", "") or
-                    request.headers.get("X-Device-Chip", "") or
-                    request.headers.get("Device-Chip", "") or
-                    request.headers.get("X-Chip", "") or
-                    request.headers.get("X-Chip-Type", "")
-                ).strip().lower()
-                dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                store.register_device(owner_id, device_id=clean_mac, name=dev_name, device_type=dev_type)
+                if _can_bind_device_to_user(owner_id):
+                    detected_chip = (
+                        request.query_params.get("chip", "") or
+                        request.headers.get("X-Device-Chip", "") or
+                        request.headers.get("Device-Chip", "") or
+                        request.headers.get("X-Chip", "") or
+                        request.headers.get("X-Chip-Type", "")
+                    ).strip().lower()
+                    dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
+                    store.register_device(
+                        owner_id,
+                        device_id=clean_mac,
+                        name=dev_name,
+                        device_type=dev_type,
+                        notes="Tertaut saat poll audio command (MCP Terhubung)"
+                    )
+                elif hasattr(store, "record_device_activity"):
+                    store.record_device_activity(clean_mac, owner_id)
             except Exception:
                 pass
 
@@ -576,21 +614,30 @@ async def audio_ack_for_device(command_id: str, request: Request):
             clean_mac = clean_mac.strip().upper()
             if len(clean_mac) >= 11:
                 try:
-                    detected_chip = ""
-                    try:
-                        if isinstance(body, dict):
-                            detected_chip = str(body.get("chip", "")).strip().lower()
-                    except Exception:
-                        pass
-                    if not detected_chip:
-                        detected_chip = (
-                            request.headers.get("X-Device-Chip", "") or
-                            request.headers.get("Device-Chip", "") or
-                            request.headers.get("X-Chip", "") or
-                            request.headers.get("X-Chip-Type", "")
-                        ).strip().lower()
-                    dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                    store.register_device(owner_id, device_id=clean_mac, name=dev_name, device_type=dev_type)
+                    if _can_bind_device_to_user(owner_id):
+                        detected_chip = ""
+                        try:
+                            if isinstance(body, dict):
+                                detected_chip = str(body.get("chip", "")).strip().lower()
+                        except Exception:
+                            pass
+                        if not detected_chip:
+                            detected_chip = (
+                                request.headers.get("X-Device-Chip", "") or
+                                request.headers.get("Device-Chip", "") or
+                                request.headers.get("X-Chip", "") or
+                                request.headers.get("X-Chip-Type", "")
+                            ).strip().lower()
+                        dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
+                        store.register_device(
+                            owner_id,
+                            device_id=clean_mac,
+                            name=dev_name,
+                            device_type=dev_type,
+                            notes="Tertaut saat ACK audio playback (MCP Terhubung)"
+                        )
+                    elif hasattr(store, "record_device_activity"):
+                        store.record_device_activity(clean_mac, owner_id)
                 except Exception:
                     pass
     return {"success": True}
@@ -721,19 +768,29 @@ async def audio_play_direct(
 
         base_url = str(request.base_url).rstrip("/")
         if resolved_owner_id:
-            # Auto-register device MAC
+            # Auto-register device MAC only if MCP is connected
             if clean_mac and len(clean_mac) >= 11 and hasattr(store, "register_device"):
                 try:
-                    detected_chip = (
-                        request.query_params.get("chip", "") or
-                        request.headers.get("X-Device-Chip", "") or
-                        request.headers.get("Device-Chip", "") or
-                        request.headers.get("X-Chip", "") or
-                        request.headers.get("X-Chip-Type", "")
-                    ).strip().lower()
-                    dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                    store.register_device(resolved_owner_id, device_id=clean_mac, name=dev_name, device_type=dev_type)
-                    logger.info(f"[PLAY DIRECT MAC] Device {clean_mac} ({dev_type}) auto-registered to user {resolved_owner_id}")
+                    if _can_bind_device_to_user(resolved_owner_id):
+                        detected_chip = (
+                            request.query_params.get("chip", "") or
+                            request.headers.get("X-Device-Chip", "") or
+                            request.headers.get("Device-Chip", "") or
+                            request.headers.get("X-Chip", "") or
+                            request.headers.get("X-Chip-Type", "")
+                        ).strip().lower()
+                        dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
+                        store.register_device(
+                            resolved_owner_id,
+                            device_id=clean_mac,
+                            name=dev_name,
+                            device_type=dev_type,
+                            notes="Tertaut saat play direct audio (MCP Terhubung)"
+                        )
+                        logger.info(f"[PLAY DIRECT MAC] Device {clean_mac} ({dev_type}) diikat ke user {resolved_owner_id} [MCP AKTIF]")
+                    elif hasattr(store, "record_device_activity"):
+                        store.record_device_activity(clean_mac, resolved_owner_id)
+                        logger.warning(f"[PLAY DIRECT MAC] Board {clean_mac} TIDAK diikat ke user {resolved_owner_id} karena MCP tidak terhubung")
                 except Exception as exc:
                     logger.error(f"[PLAY DIRECT MAC ERROR] {exc}")
 
@@ -813,7 +870,7 @@ async def device_audio_commands(
     if not owner_id:
         return {"success": True, "commands": []}
 
-    # Auto-register / update device MAC for this user
+    # Auto-register / update device MAC for this user only if MCP is connected
     device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "") or request.headers.get("X-MAC-Address", "")
     mac_saved_ok = False
     if owner_id and device_mac and hasattr(store, "register_device"):
@@ -821,17 +878,23 @@ async def device_audio_commands(
         clean_mac = clean_mac.strip().upper()
         if len(clean_mac) >= 11:
             try:
-                dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                store.register_device(
-                    owner_id,
-                    device_id=clean_mac,
-                    name=dev_name,
-                    device_type=dev_type
-                )
-                mac_saved_ok = True
-                logger.info(f"[COMMAND POLL] Device MAC {clean_mac} ({dev_type}) berhasil disimpan OK untuk owner {owner_id}")
+                if _can_bind_device_to_user(owner_id):
+                    dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
+                    store.register_device(
+                        owner_id,
+                        device_id=clean_mac,
+                        name=dev_name,
+                        device_type=dev_type,
+                        notes="Tertaut saat polling audio command (MCP Terhubung)"
+                    )
+                    mac_saved_ok = True
+                    logger.info(f"[COMMAND POLL] Device MAC {clean_mac} ({dev_type}) berhasil diikat ke owner {owner_id} [MCP AKTIF]")
+                else:
+                    if hasattr(store, "record_device_activity"):
+                        store.record_device_activity(clean_mac, owner_id)
+                    logger.warning(f"[COMMAND POLL] Board MAC {clean_mac} TIDAK diikat ke owner {owner_id} karena MCP tidak terhubung")
             except Exception as exc:
-                logger.error(f"[COMMAND POLL ERROR] Gagal menyimpan MAC {clean_mac}: {exc}")
+                logger.error(f"[COMMAND POLL ERROR] Gagal memproses MAC {clean_mac}: {exc}")
 
     commands = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else store.get_audio_commands(owner_id)
     if commands:
@@ -906,18 +969,28 @@ async def device_audio_ack(request: Request):
         clean_mac = clean_mac.strip().upper()
         if len(clean_mac) >= 11:
             try:
-                detected_chip = (
-                    request.headers.get("X-Device-Chip", "") or
-                    request.headers.get("Device-Chip", "") or
-                    request.headers.get("X-Chip", "") or
-                    request.headers.get("X-Chip-Type", "")
-                ).strip().lower()
-                dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                store.register_device(owner_id, device_id=clean_mac, name=dev_name, device_type=dev_type)
-                mac_saved_ok = True
-                logger.info(f"[ACK] Device MAC {clean_mac} ({dev_type}) berhasil disimpan OK untuk owner {owner_id}")
+                if _can_bind_device_to_user(owner_id):
+                    detected_chip = (
+                        request.headers.get("X-Device-Chip", "") or
+                        request.headers.get("Device-Chip", "") or
+                        request.headers.get("X-Chip", "") or
+                        request.headers.get("X-Chip-Type", "")
+                    ).strip().lower()
+                    dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
+                    store.register_device(
+                        owner_id,
+                        device_id=clean_mac,
+                        name=dev_name,
+                        device_type=dev_type,
+                        notes="Tertaut saat ACK audio command (MCP Terhubung)"
+                    )
+                    mac_saved_ok = True
+                    logger.info(f"[ACK] Device MAC {clean_mac} ({dev_type}) berhasil diikat ke owner {owner_id} [MCP AKTIF]")
+                else:
+                    if hasattr(store, "record_device_activity"):
+                        store.record_device_activity(clean_mac, owner_id)
             except Exception as exc:
-                logger.error(f"[ACK ERROR] Gagal menyimpan MAC {clean_mac}: {exc}")
+                logger.error(f"[ACK ERROR] Gagal memproses MAC {clean_mac}: {exc}")
 
     if owner_id and command_id:
         store.ack_audio_command(owner_id, command_id)
@@ -987,7 +1060,7 @@ async def device_audio_status(request: Request):
     if not owner_id and device_mac:
         owner_id = _resolve_owner_for_device(store, device_mac)
 
-    # CRITICAL: Auto-register / rebind device MAC to this user in registered_devices
+    # CRITICAL: Auto-register / rebind device MAC to this user in registered_devices only if MCP is connected
     mac_saved_ok = False
     clean_mac = ""
     if device_mac:
@@ -995,16 +1068,27 @@ async def device_audio_status(request: Request):
         clean_mac = clean_mac.strip().upper()
         if owner_id and len(clean_mac) >= 11 and hasattr(store, "register_device"):
             try:
-                detected_chip = (
-                    request.headers.get("X-Device-Chip", "") or
-                    request.headers.get("Device-Chip", "") or
-                    request.headers.get("X-Chip", "") or
-                    request.headers.get("X-Chip-Type", "")
-                ).strip().lower()
-                dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                store.register_device(owner_id, device_id=clean_mac, name=dev_name, device_type=dev_type)
-                mac_saved_ok = True
-                logger.info(f"[STATUS MAC] Device MAC {clean_mac} ({dev_type}) auto-registered to user {owner_id}")
+                if _can_bind_device_to_user(owner_id):
+                    detected_chip = (
+                        request.headers.get("X-Device-Chip", "") or
+                        request.headers.get("Device-Chip", "") or
+                        request.headers.get("X-Chip", "") or
+                        request.headers.get("X-Chip-Type", "")
+                    ).strip().lower()
+                    dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
+                    store.register_device(
+                        owner_id,
+                        device_id=clean_mac,
+                        name=dev_name,
+                        device_type=dev_type,
+                        notes="Tertaut saat update status perangkat (MCP Terhubung)"
+                    )
+                    mac_saved_ok = True
+                    logger.info(f"[STATUS MAC] Device MAC {clean_mac} ({dev_type}) diikat ke user {owner_id} [MCP AKTIF]")
+                else:
+                    if hasattr(store, "record_device_activity"):
+                        store.record_device_activity(clean_mac, owner_id)
+                    logger.warning(f"[STATUS MAC] Board MAC {clean_mac} TIDAK diikat ke user {owner_id} karena MCP tidak terhubung")
             except Exception as exc:
                 logger.error(f"[STATUS MAC ERROR] Failed to save MAC {clean_mac}: {exc}")
 
@@ -1065,15 +1149,24 @@ async def ws_device_audio_channel(websocket: WebSocket, device_id: str):
         clean_mac = clean_mac.strip().upper()
         if len(clean_mac) >= 11:
             try:
-                detected_chip = (
-                    websocket.query_params.get("chip", "") or
-                    websocket.headers.get("X-Device-Chip", "") or
-                    websocket.headers.get("Device-Chip", "") or
-                    websocket.headers.get("X-Chip", "") or
-                    websocket.headers.get("X-Chip-Type", "")
-                ).strip().lower()
-                dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                store.register_device(owner_id, device_id=clean_mac, name=dev_name, device_type=dev_type)
+                if _can_bind_device_to_user(owner_id):
+                    detected_chip = (
+                        websocket.query_params.get("chip", "") or
+                        websocket.headers.get("X-Device-Chip", "") or
+                        websocket.headers.get("Device-Chip", "") or
+                        websocket.headers.get("X-Chip", "") or
+                        websocket.headers.get("X-Chip-Type", "")
+                    ).strip().lower()
+                    dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
+                    store.register_device(
+                        owner_id,
+                        device_id=clean_mac,
+                        name=dev_name,
+                        device_type=dev_type,
+                        notes="Tertaut saat WebSocket audio channel aktif (MCP Terhubung)"
+                    )
+                elif hasattr(store, "record_device_activity"):
+                    store.record_device_activity(clean_mac, owner_id)
             except Exception:
                 pass
     user = _fetch_user(store, owner_id)

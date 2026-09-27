@@ -2082,7 +2082,7 @@ class HFJsonStore:
                     return bool(d.get("is_protected"))
         return False
 
-    def register_device(self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = "") -> Dict[str, Any]:
+    def register_device(self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = "", notes: str = "") -> Dict[str, Any]:
         raw_mac = device_id or mac_address
         normalized_id = normalize_mac_address(raw_mac)
         if not normalized_id:
@@ -2091,6 +2091,7 @@ class HFJsonStore:
         dev_type = str(device_type or "esp32").strip()
         is_protected = (normalized_id in PROTECTED_DEVICE_MACS)
         now = utc_now()
+        hist_notes = (notes or "").strip() or "Tautan aktif (Device Registered)"
 
         with self._lock:
             data = self._load()
@@ -2159,6 +2160,8 @@ class HFJsonStore:
                     h["device_name"] = dev_name
                     h["device_type"] = dev_type
                     h["username"] = username
+                    if (notes or "").strip():
+                        h["notes"] = (notes or "").strip()
                     hist_found = True
                     break
 
@@ -2174,7 +2177,7 @@ class HFJsonStore:
                     "last_active_at": now,
                     "unlinked_at": None,
                     "status": "ACTIVE",
-                    "notes": "Tautan aktif (Device Registered)",
+                    "notes": hist_notes,
                     "created_at": now,
                 })
 
