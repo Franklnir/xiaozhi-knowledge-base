@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Query, Request, Form
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from xiaozhi.dependencies import (
     get_current_user,
@@ -22,7 +22,9 @@ router = APIRouter()
 
 
 @router.get("/simulasi-smarthome-virtual", response_class=HTMLResponse)
-async def smarthome_page(request: Request):
+async def smarthome_page(request: Request, mode: str = Query(default=None)):
+    if mode in ("real", "nyata", "fisik"):
+        return RedirectResponse("/relay-nyata", status_code=303)
     user = get_current_user(request)
     if not user:
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
@@ -73,7 +75,10 @@ async def smarthome_page(request: Request):
             "mcp_status": mcp_status,
             "initial_state": initial_state,
             "message": request.query_params.get("message", ""),
-            "active_page": "smarthome",
+            "active_page": "relay_nyata",
+            "page": "relay_nyata",
+            "active_mode": "virtual",
+            "virtual_smarthome_enabled": virtual_enabled,
         },
     )
 
