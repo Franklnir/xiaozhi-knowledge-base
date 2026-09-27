@@ -166,6 +166,20 @@ async def admin_delete_claim_code_action(request: Request, code_id: str):
     return redirect_with_message("/admin/firmware/approvals", "Kode tidak ditemukan atau sudah pernah diklaim.")
 
 
+@router.get("/catalog-approvals", response_class=HTMLResponse)
+@router.get("/katalog-approvals", response_class=HTMLResponse)
+async def admin_catalog_approvals_page(request: Request):
+    user = require_admin(request)
+    service = get_approval_service()
+    approvals = service.get_pending_approvals()
+    return render(request, "admin/catalog_approvals.html", {
+        "user": user,
+        "page": "admin_catalog_approvals",
+        "approvals": approvals,
+        "message": request.query_params.get("message", ""),
+    })
+
+
 @router.post("/approvals/{approval_id}/approve")
 async def admin_approve_action(request: Request, approval_id: str):
     user = require_admin(request)
@@ -173,23 +187,29 @@ async def admin_approve_action(request: Request, approval_id: str):
     try:
         success = service.approve_product(approval_id, int(user["id"]))
         if success:
-            return redirect_with_message("/admin/firmware/approvals", "Produk firmware berhasil disetujui dan dipublikasikan.")
-        return redirect_with_message("/admin/firmware/approvals", "Gagal: Approval tidak ditemukan atau sudah diproses.")
+            return redirect_with_message("/admin/firmware/catalog-approvals", "Produk firmware berhasil disetujui dan dipublikasikan.")
+        return redirect_with_message("/admin/firmware/catalog-approvals", "Gagal: Approval tidak ditemukan atau sudah diproses.")
     except Exception as exc:
-        return redirect_with_message("/admin/firmware/approvals", f"Terjadi kesalahan: {str(exc)}")
+        return redirect_with_message("/admin/firmware/catalog-approvals", f"Terjadi kesalahan: {str(exc)}")
 
 
 @router.post("/approvals/{approval_id}/reject")
-async def admin_reject_action(request: Request, approval_id: str, reason: str = Form(...)):
+async def admin_reject_action(
+    request: Request,
+    approval_id: str,
+    reason: Optional[str] = Form(None),
+    rejection_reason: Optional[str] = Form(None),
+):
     user = require_admin(request)
     service = get_approval_service()
+    final_reason = (reason or rejection_reason or "").strip() or "Tidak memenuhi standar katalog."
     try:
-        success = service.reject_product(approval_id, int(user["id"]), reason)
+        success = service.reject_product(approval_id, int(user["id"]), final_reason)
         if success:
-            return redirect_with_message("/admin/firmware/approvals", "Produk firmware ditolak dan alasan dikirim ke seller.")
-        return redirect_with_message("/admin/firmware/approvals", "Gagal: Approval tidak ditemukan atau sudah diproses.")
+            return redirect_with_message("/admin/firmware/catalog-approvals", "Produk firmware ditolak dan alasan dikirim ke seller.")
+        return redirect_with_message("/admin/firmware/catalog-approvals", "Gagal: Approval tidak ditemukan atau sudah diproses.")
     except Exception as exc:
-        return redirect_with_message("/admin/firmware/approvals", f"Gagal menolak: {str(exc)}")
+        return redirect_with_message("/admin/firmware/catalog-approvals", f"Gagal menolak: {str(exc)}")
 
 
 @router.get("/finance", response_class=HTMLResponse)
