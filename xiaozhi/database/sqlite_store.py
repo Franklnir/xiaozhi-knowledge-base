@@ -1408,7 +1408,7 @@ class SQLiteStore:
         row = conn.execute("SELECT is_protected FROM registered_devices WHERE LOWER(device_id) = ?", (norm.lower(),)).fetchone()
         return bool(row and row["is_protected"])
 
-    def register_device(self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = "") -> Dict[str, Any]:
+    def register_device(self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = "", notes: str = "") -> Dict[str, Any]:
         conn = self._get_conn()
         raw_mac = device_id or mac_address
         normalized_id = normalize_mac_address(raw_mac)
@@ -1418,6 +1418,7 @@ class SQLiteStore:
         dev_type = device_type.strip() if device_type else "esp32"
         is_protected = 1 if (normalized_id in PROTECTED_DEVICE_MACS) else 0
         now_str = str(utc_now())
+        hist_notes = (notes or "").strip() or "Tautan aktif (Device Registered)"
 
         # Ambil username
         u_row = conn.execute("SELECT username FROM users WHERE id = ?", (int(owner_id),)).fetchone()
@@ -1456,13 +1457,16 @@ class SQLiteStore:
         ).fetchone()
         if hist:
             conn.execute(
-                "UPDATE board_binding_history SET last_active_at = ?, device_name = ?, device_type = ?, username = ? WHERE id = ?",
-                (now_str, dev_name, dev_type, username, hist["id"])
+                """UPDATE board_binding_history 
+                SET last_active_at = ?, device_name = ?, device_type = ?, username = ?,
+                    notes = CASE WHEN ? != '' THEN ? ELSE notes END 
+                WHERE id = ?""",
+                (now_str, dev_name, dev_type, username, (notes or "").strip(), (notes or "").strip(), hist["id"])
             )
         else:
             conn.execute(
                 "INSERT INTO board_binding_history (device_mac, user_id, username, device_name, device_type, linked_at, last_active_at, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)",
-                (normalized_id, int(owner_id), username, dev_name, dev_type, now_str, now_str, "Tautan aktif (Device Registered)", now_str)
+                (normalized_id, int(owner_id), username, dev_name, dev_type, now_str, now_str, hist_notes, now_str)
             )
         conn.commit()
         return {"id": dev_id, "device_id": normalized_id, "name": dev_name, "is_protected": bool(final_protected)}

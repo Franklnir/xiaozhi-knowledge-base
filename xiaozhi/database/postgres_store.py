@@ -1684,7 +1684,7 @@ class PostgresStore:
                 return bool(row and row.get("is_protected"))
 
     def register_device(
-        self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = ""
+        self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = "", notes: str = ""
     ) -> Dict[str, Any]:
         raw_mac = device_id or mac_address
         normalized_id = normalize_mac_address(raw_mac)
@@ -1694,6 +1694,7 @@ class PostgresStore:
         dev_type = device_type.strip() if device_type else "esp32"
         is_protected = (normalized_id in PROTECTED_DEVICE_MACS)
         now = utc_now()
+        hist_notes = notes.strip() if notes else "Tautan aktif (Device Registered)"
 
         with self._get_conn() as conn:
             with conn.cursor() as cur:
@@ -1752,10 +1753,11 @@ class PostgresStore:
                     cur.execute(
                         """
                         UPDATE board_binding_history 
-                        SET last_active_at = %s, device_name = %s, device_type = %s, username = %s
+                        SET last_active_at = %s, device_name = %s, device_type = %s, username = %s,
+                            notes = CASE WHEN %s != '' THEN %s ELSE notes END
                         WHERE id = %s
                         """,
-                        (now, dev_name, dev_type, username, hist_row["id"]),
+                        (now, dev_name, dev_type, username, (notes or "").strip(), (notes or "").strip(), hist_row["id"]),
                     )
                 else:
                     cur.execute(
@@ -1764,7 +1766,7 @@ class PostgresStore:
                         (device_mac, user_id, username, device_name, device_type, linked_at, last_active_at, status, notes)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, 'ACTIVE', %s)
                         """,
-                        (normalized_id, int(owner_id), username, dev_name, dev_type, now, now, "Tautan aktif (Device Registered)"),
+                        (normalized_id, int(owner_id), username, dev_name, dev_type, now, now, hist_notes),
                     )
             conn.commit()
         return {"id": dev_db_id, "device_id": normalized_id, "name": dev_name, "is_protected": final_is_protected}
