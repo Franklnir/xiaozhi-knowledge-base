@@ -231,9 +231,33 @@ class PostgresStore:
                         -- Backward-compatible schema evolution untuk database eksisting
                         ALTER TABLE xiaozhi_tokens ADD COLUMN IF NOT EXISTS slot_number INT NOT NULL DEFAULT 1;
                         ALTER TABLE xiaozhi_tokens ADD COLUMN IF NOT EXISTS device_label VARCHAR(60) NOT NULL DEFAULT 'XiaoZhi 1';
+                        ALTER TABLE xiaozhi_tokens ADD COLUMN IF NOT EXISTS board_mac VARCHAR(32) NOT NULL DEFAULT '';
 
                         CREATE INDEX IF NOT EXISTS idx_tokens_hash ON xiaozhi_tokens(token_hash);
                         CREATE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);
+                        CREATE INDEX IF NOT EXISTS idx_tokens_board_mac ON xiaozhi_tokens(board_mac);
+
+                        -- Auto-backfill MAC eksisting ke Slot 1 user jika slot 1 belum memiliki board_mac
+                        UPDATE xiaozhi_tokens t
+                        SET board_mac = UPPER(d.device_id)
+                        FROM (
+                            SELECT owner_id, device_id
+                            FROM registered_devices
+                            WHERE device_id IS NOT NULL AND device_id != ''
+                            ORDER BY id ASC
+                        ) d
+                        WHERE t.user_id = d.owner_id
+                          AND t.slot_number = 1
+                          AND (t.board_mac = '' OR t.board_mac IS NULL);
+
+                        -- Fallback label otomatis menjadi [username] - Slot 1 jika masih default XiaoZhi 1
+                        UPDATE xiaozhi_tokens t
+                        SET device_label = u.username || ' - Slot 1'
+                        FROM users u
+                        WHERE t.user_id = u.id
+                          AND t.slot_number = 1
+                          AND (t.device_label = 'XiaoZhi 1' OR t.device_label = '' OR t.device_label IS NULL);
+
                         DO $$
                         BEGIN
                             IF EXISTS (
@@ -297,9 +321,14 @@ class PostgresStore:
                             response_payload JSONB,
                             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                         );
+                        ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS slot_number INT NOT NULL DEFAULT 1;
+                        ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS device_mac VARCHAR(32) NOT NULL DEFAULT '';
+                        ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS request_id VARCHAR(64) NOT NULL DEFAULT '';
                         CREATE INDEX IF NOT EXISTS idx_chat_owner ON chat_history(owner_id, id DESC);
                         CREATE INDEX IF NOT EXISTS idx_chat_token ON chat_history(token_hash);
                         CREATE INDEX IF NOT EXISTS idx_chat_tool ON chat_history(tool_name);
+                        CREATE INDEX IF NOT EXISTS idx_chat_slot ON chat_history(owner_id, slot_number);
+                        CREATE INDEX IF NOT EXISTS idx_chat_mac ON chat_history(device_mac);
                     """)
 
                     # 7. Relay Rooms & Devices
@@ -381,9 +410,12 @@ class PostgresStore:
                             notes TEXT,
                             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                         );
+                        ALTER TABLE board_binding_history ADD COLUMN IF NOT EXISTS slot_number INT NOT NULL DEFAULT 1;
+                        ALTER TABLE board_binding_history ADD COLUMN IF NOT EXISTS request_id VARCHAR(64) NOT NULL DEFAULT '';
                         CREATE INDEX IF NOT EXISTS idx_board_hist_mac ON board_binding_history(device_mac);
                         CREATE INDEX IF NOT EXISTS idx_board_hist_user ON board_binding_history(user_id);
                         CREATE INDEX IF NOT EXISTS idx_board_hist_status ON board_binding_history(status);
+                        CREATE INDEX IF NOT EXISTS idx_board_hist_slot ON board_binding_history(user_id, slot_number);
                     """)
 
                     # 10. Settings & Limits
@@ -1055,33 +1087,183 @@ class PostgresStore:
             d["updated_at"] = _format_ts(d["updated_at"])
         return d
 
-    # ── XiaoZhi Tokens (Maksimal 3 Slot per Akun dengan Proteksi RLS) ───────
+    # ── XiaoZhi Tokens (Maksimal 3 Slot per Akun dengan Proteksi RLS & Board MAC Lock) ──
 
-    def set_xiaozhi_token(self, owner_id: int, token: str, slot: int = 1, device_label: str = "") -> None:
+    def set_xiaozhi_token(self, owner_id: int, token: str, slot: int = 1, device_label: str = "", request_id: str = "") -> None:
         slot_num = int(slot or 1)
         if slot_num < 1 or slot_num > 3:
             raise ValueError("Slot token XiaoZhi hanya diizinkan untuk Slot 1, 2, atau 3.")
         token_clean = token.strip()
         t_hash = xiaozhi_token_hash(token_clean)
         t_cipher = encrypt_secret(token_clean)
-        label_clean = (device_label or "").strip()[:60] or f"XiaoZhi {slot_num}"
+        now = utc_now()
+        
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
+                # Dapatkan data eksisting di slot ini
+                cur.execute(
+                    "SELECT token_hash, board_mac, device_label FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
+                    (int(owner_id), slot_num),
+                )
+                existing = cur.fetchone()
+                
+                # Resolusi label default
+                cur.execute("SELECT username FROM users WHERE id = %s", (int(owner_id),))
+                u_row = cur.fetchone()
+                username = u_row["username"] if u_row else f"user_{owner_id}"
+                
+                default_label = f"{username} - Slot 1" if slot_num == 1 else f"XiaoZhi {slot_num}"
+                label_clean = (device_label or "").strip()[:60] or (existing.get("device_label") if existing else "") or default_label
+
+                new_board_mac = ""
+                if existing:
+                    old_hash = existing.get("token_hash", "")
+                    old_mac = existing.get("board_mac", "")
+                    if old_hash == t_hash:
+                        # Token sama: pertahankan board_mac yang sudah terkunci
+                        new_board_mac = old_mac
+                    else:
+                        # Token baru: board_mac dilepas otomatis karena endpoint baru
+                        new_board_mac = ""
+                        if old_mac:
+                            cur.execute(
+                                """
+                                UPDATE board_binding_history
+                                SET unlinked_at = %s, status = 'UNLINKED',
+                                    notes = notes || ' | Token diperbarui [Req: ' || %s || ']'
+                                WHERE user_id = %s AND device_mac = %s AND status = 'ACTIVE'
+                                """,
+                                (now, request_id or "renew", int(owner_id), old_mac),
+                            )
+                else:
+                    new_board_mac = ""
+
+                cur.execute(
+                    """
+                    INSERT INTO xiaozhi_tokens (user_id, slot_number, device_label, board_mac, token_ciphertext, token_hash, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(user_id, slot_number) DO UPDATE SET
+                        device_label = EXCLUDED.device_label,
+                        board_mac = EXCLUDED.board_mac,
+                        token_ciphertext = EXCLUDED.token_ciphertext,
+                        token_hash = EXCLUDED.token_hash,
+                        updated_at = EXCLUDED.updated_at
+                    """,
+                    (int(owner_id), slot_num, label_clean, new_board_mac, t_cipher, t_hash, now, now),
+                )
+            conn.commit()
+
+    def bind_board_to_slot(self, owner_id: int, slot: int = 1, device_mac: str = "", request_id: str = "") -> Dict[str, Any]:
+        """Kunci board hardware MAC ke slot tertentu secara read-only (anti-spoofing)."""
+        norm_mac = normalize_mac_address(device_mac)
+        if not norm_mac:
+            return {"success": False, "detail": "Format MAC address tidak valid."}
+        slot_num = int(slot or 1)
+        now = utc_now()
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
+                cur.execute(
+                    "SELECT board_mac, device_label FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
+                    (int(owner_id), slot_num),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return {"success": False, "detail": f"Slot {slot_num} belum tersimpan endpoint MCP."}
+
+                current_mac = (row.get("board_mac") or "").strip().upper()
+                label = row.get("device_label") or f"Slot {slot_num}"
+                if current_mac and current_mac != norm_mac:
+                    # Slot sudah terkunci ke MAC lain -> dilarang override manual
+                    return {
+                        "success": False,
+                        "detail": f"Slot {slot_num} ({label}) telah terkunci ke board MAC {current_mac}. Lepaskan board terlebih dahulu.",
+                        "current_mac": current_mac,
+                        "is_locked": True,
+                    }
+
+                # Kunci MAC ke slot
+                cur.execute(
+                    """
+                    UPDATE xiaozhi_tokens
+                    SET board_mac = %s, updated_at = %s
+                    WHERE user_id = %s AND slot_number = %s
+                    """,
+                    (norm_mac, now, int(owner_id), slot_num),
+                )
+
+                # Dapatkan username untuk audit log
+                cur.execute("SELECT username FROM users WHERE id = %s", (int(owner_id),))
+                u_row = cur.fetchone()
+                username = u_row["username"] if u_row else f"user_{owner_id}"
+
+                # Rekam ke audit history
+                cur.execute(
+                    """
+                    INSERT INTO board_binding_history 
+                    (device_mac, user_id, username, device_name, device_type, slot_number, request_id, linked_at, last_active_at, status, notes)
+                    VALUES (%s, %s, %s, %s, 'ESP32_SLOT', %s, %s, %s, %s, 'ACTIVE', %s)
+                    """,
+                    (norm_mac, int(owner_id), username, label, slot_num, request_id or "", now, now, f"Terkunci ke Slot {slot_num} ({label})"),
+                )
+            conn.commit()
+        return {"success": True, "slot": slot_num, "board_mac": norm_mac, "label": label, "is_locked": True, "request_id": request_id}
+
+    def detach_board_from_slot(self, owner_id: int, slot: int = 1, request_id: str = "") -> Dict[str, Any]:
+        """Lepaskan board MAC dari slot (memungkinkan board baru ditautkan)."""
+        slot_num = int(slot or 1)
+        now = utc_now()
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
+                cur.execute(
+                    "SELECT board_mac, device_label FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
+                    (int(owner_id), slot_num),
+                )
+                row = cur.fetchone()
+                if not row or not row.get("board_mac"):
+                    return {"success": False, "detail": f"Tidak ada board yang tertaut pada Slot {slot_num}."}
+                old_mac = row["board_mac"]
+                cur.execute(
+                    """
+                    UPDATE xiaozhi_tokens
+                    SET board_mac = '', updated_at = %s
+                    WHERE user_id = %s AND slot_number = %s
+                    """,
+                    (now, int(owner_id), slot_num),
+                )
+                cur.execute(
+                    """
+                    UPDATE board_binding_history
+                    SET unlinked_at = %s, status = 'DETACHED', action = 'detach',
+                        notes = notes || ' | Dilepas dari Slot ' || %s || ' [Req: ' || %s || ']'
+                    WHERE user_id = %s AND LOWER(device_mac) = LOWER(%s) AND status = 'ACTIVE'
+                    """,
+                    (now, str(slot_num), request_id or "manual", int(owner_id), old_mac),
+                )
+            conn.commit()
+        return {"success": True, "slot": slot_num, "detached": True, "device_mac": old_mac, "request_id": request_id}
+
+    def update_slot_label(self, owner_id: int, slot: int = 1, device_label: str = "", request_id: str = "") -> bool:
+        """Perbarui nama/ruangan slot tanpa mereset token atau melepas MAC yang terkunci."""
+        slot_num = int(slot or 1)
+        label_clean = (device_label or "").strip()[:60] or f"Slot {slot_num}"
         now = utc_now()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
-                    INSERT INTO xiaozhi_tokens (user_id, slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT(user_id, slot_number) DO UPDATE SET
-                        device_label = EXCLUDED.device_label,
-                        token_ciphertext = EXCLUDED.token_ciphertext,
-                        token_hash = EXCLUDED.token_hash,
-                        updated_at = EXCLUDED.updated_at
+                    UPDATE xiaozhi_tokens
+                    SET device_label = %s, updated_at = %s
+                    WHERE user_id = %s AND slot_number = %s
                     """,
-                    (int(owner_id), slot_num, label_clean, t_cipher, t_hash, now, now),
+                    (label_clean, now, int(owner_id), slot_num),
                 )
+                affected = cur.rowcount > 0
             conn.commit()
+        return affected
 
     def get_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> Optional[str]:
         with self._get_conn() as conn:
@@ -1108,12 +1290,12 @@ class PostgresStore:
                 self.set_rls_context(cur, owner_id)
                 if slot is not None:
                     cur.execute(
-                        "SELECT slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
+                        "SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
                         (int(owner_id), int(slot)),
                     )
                 else:
                     cur.execute(
-                        "SELECT slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s ORDER BY slot_number ASC LIMIT 1",
+                        "SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s ORDER BY slot_number ASC LIMIT 1",
                         (int(owner_id),),
                     )
                 row = cur.fetchone()
@@ -1121,9 +1303,12 @@ class PostgresStore:
                     return None
                 token = decrypt_secret(row["token_ciphertext"])
                 preview = f"{token[:4]}...{token[-4:]}" if len(token) > 8 else token
+                board_mac = (row.get("board_mac") or "").strip().upper()
                 return {
                     "slot_number": row.get("slot_number", 1) or 1,
                     "device_label": row.get("device_label", "XiaoZhi 1") or "XiaoZhi 1",
+                    "board_mac": board_mac,
+                    "is_locked": bool(board_mac),
                     "preview": preview,
                     "token_hash": row["token_hash"],
                     "created_at": _format_ts(row["created_at"]) if "created_at" in row else "",
@@ -1131,13 +1316,13 @@ class PostgresStore:
                 }
 
     def list_user_xiaozhi_tokens(self, owner_id: int) -> List[Dict[str, Any]]:
-        """List all active token slots (up to 3) for a specific user."""
+        """List all active token slots (up to 3) for a specific user with board MAC lock status."""
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
-                    SELECT slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at
+                    SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, created_at, updated_at
                     FROM xiaozhi_tokens
                     WHERE user_id = %s
                     ORDER BY slot_number ASC
@@ -1149,9 +1334,12 @@ class PostgresStore:
         for row in rows:
             token = decrypt_secret(row["token_ciphertext"])
             preview = f"{token[:4]}...{token[-4:]}" if len(token) > 8 else token
+            board_mac = (row.get("board_mac") or "").strip().upper()
             result.append({
                 "slot_number": row.get("slot_number", 1) or 1,
                 "device_label": row.get("device_label", f"XiaoZhi {row.get('slot_number', 1)}") or f"XiaoZhi {row.get('slot_number', 1)}",
+                "board_mac": board_mac,
+                "is_locked": bool(board_mac),
                 "preview": preview,
                 "token_hash": row["token_hash"],
                 "created_at": _format_ts(row["created_at"]) if "created_at" in row else "",
@@ -1159,22 +1347,47 @@ class PostgresStore:
             })
         return result
 
-    def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> bool:
+    def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None, request_id: str = "") -> bool:
+        now = utc_now()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 self.set_rls_context(cur, owner_id)
+                # Dapatkan board_mac yang terhubung sebelum dihapus
                 if slot is not None:
+                    cur.execute("SELECT board_mac FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s", (int(owner_id), int(slot)))
+                    row = cur.fetchone()
+                    if row and row.get("board_mac"):
+                        cur.execute(
+                            """
+                            UPDATE board_binding_history
+                            SET unlinked_at = %s, status = 'UNLINKED',
+                                notes = notes || ' | Slot dihapus [Req: ' || %s || ']'
+                            WHERE user_id = %s AND device_mac = %s AND status = 'ACTIVE'
+                            """,
+                            (now, request_id or "delete_slot", int(owner_id), row["board_mac"]),
+                        )
                     cur.execute("DELETE FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s", (int(owner_id), int(slot)))
                 else:
+                    cur.execute("SELECT board_mac FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
+                    rows = cur.fetchall()
+                    for r in rows:
+                        if r.get("board_mac"):
+                            cur.execute(
+                                """
+                                UPDATE board_binding_history
+                                SET unlinked_at = %s, status = 'UNLINKED',
+                                    notes = notes || ' | Semua slot dihapus [Req: ' || %s || ']'
+                                WHERE user_id = %s AND device_mac = %s AND status = 'ACTIVE'
+                                """,
+                                (now, request_id or "delete_all", int(owner_id), r["board_mac"]),
+                            )
                     cur.execute("DELETE FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
                 affected = cur.rowcount > 0
-                # Periksa apakah masih ada sisa slot lain
                 cur.execute("SELECT COUNT(*) as cnt FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
                 rem_row = cur.fetchone()
                 remaining = rem_row["cnt"] if rem_row else 0
             conn.commit()
 
-        # Jika seluruh token user sudah tidak ada, pisahkan tautan device ESP32
         if remaining == 0:
             try:
                 self.detach_user_devices(int(owner_id), reason="Semua slot MCP Xiaozhi diputus / dihapus")
@@ -1257,10 +1470,16 @@ class PostgresStore:
         request_payload: Any = None,
         response_payload: Any = None,
         token_hash: str = "",
+        slot_number: int = 1,
+        device_mac: str = "",
+        request_id: str = "",
     ) -> Dict[str, Any]:
         """Log chat/tool execution with scoped asynchronous commit for maximum throughput."""
         req_json = json.dumps(request_payload) if request_payload is not None else None
         res_json = json.dumps(response_payload) if response_payload is not None else None
+        slot_num = int(slot_number or 1)
+        clean_mac = (device_mac or "").strip().upper()
+        clean_req_id = (request_id or "").strip()
         now = utc_now()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
@@ -1270,9 +1489,9 @@ class PostgresStore:
                     """
                     INSERT INTO chat_history (
                         owner_id, token_hash, source, tool_name, user_message,
-                        xiaozhi_answer, request_payload, response_payload, created_at
+                        xiaozhi_answer, request_payload, response_payload, slot_number, device_mac, request_id, created_at
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id, created_at
                     """,
                     (
@@ -1284,6 +1503,9 @@ class PostgresStore:
                         xiaozhi_answer,
                         req_json,
                         res_json,
+                        slot_num,
+                        clean_mac,
+                        clean_req_id,
                         now,
                     ),
                 )
@@ -1302,6 +1524,9 @@ class PostgresStore:
             "xiaozhi_answer": xiaozhi_answer,
             "request_payload": req_json,
             "response_payload": res_json,
+            "slot_number": slot_num,
+            "device_mac": clean_mac,
+            "request_id": clean_req_id,
             "created_at": ts_val,
         }
         try:
@@ -1321,11 +1546,17 @@ class PostgresStore:
         payload: Any = None,
         response_payload: Any = None,
         token_hash: str = "",
+        slot_number: int = 1,
+        device_mac: str = "",
+        request_id: str = "",
     ) -> Dict[str, Any]:
         user_message = str(user_message or "").strip()
         xiaozhi_answer = str(xiaozhi_answer or "").strip()
         res_json = json.dumps(response_payload) if response_payload is not None else None
         req_json = json.dumps(payload) if payload is not None else None
+        slot_num = int(slot_number or 1)
+        clean_mac = (device_mac or "").strip().upper()
+        clean_req_id = (request_id or "").strip()
 
         # If we have an answer but no user_message, attempt to merge with the latest pending message without answer
         if xiaozhi_answer and not user_message:
@@ -1349,11 +1580,14 @@ class PostgresStore:
                             SET xiaozhi_answer = %s,
                                 response_payload = COALESCE(%s, response_payload),
                                 tool_name = CASE WHEN tool_name LIKE '%%inbound%%' THEN %s ELSE tool_name END,
-                                token_hash = COALESCE(%s, token_hash)
+                                token_hash = COALESCE(%s, token_hash),
+                                slot_number = COALESCE(NULLIF(%s, 1), slot_number),
+                                device_mac = CASE WHEN %s != '' THEN %s ELSE device_mac END,
+                                request_id = CASE WHEN %s != '' THEN %s ELSE request_id END
                             WHERE id = %s
-                            RETURNING id, owner_id, token_hash, source, tool_name, user_message, xiaozhi_answer, request_payload, response_payload, created_at
+                            RETURNING id, owner_id, token_hash, source, tool_name, user_message, xiaozhi_answer, request_payload, response_payload, slot_number, device_mac, request_id, created_at
                             """,
-                            (xiaozhi_answer, res_json, tool_name, token_hash or None, p_id)
+                            (xiaozhi_answer, res_json, tool_name, token_hash or None, slot_num, clean_mac, clean_mac, clean_req_id, clean_req_id, p_id)
                         )
                         row = cur.fetchone()
                         conn.commit()
@@ -1378,6 +1612,9 @@ class PostgresStore:
             request_payload=payload,
             response_payload=response_payload,
             token_hash=token_hash,
+            slot_number=slot_num,
+            device_mac=clean_mac,
+            request_id=clean_req_id,
         )
 
     def list_chat_history(
@@ -1390,6 +1627,8 @@ class PostgresStore:
         date: str = "",
         offset: int = 0,
         tool_name: str = "",
+        slot_number: Optional[int] = None,
+        device_mac: str = "",
     ) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
@@ -1404,6 +1643,12 @@ class PostgresStore:
                 if tool_name:
                     sql += " AND tool_name = %s"
                     params.append(tool_name)
+                if slot_number is not None:
+                    sql += " AND slot_number = %s"
+                    params.append(int(slot_number))
+                if device_mac:
+                    sql += " AND UPPER(device_mac) = %s"
+                    params.append(device_mac.strip().upper())
 
                 # Semantic search support
                 if semantic and query.strip():
@@ -2054,53 +2299,22 @@ class PostgresStore:
                     )
             conn.commit()
 
-    def get_board_binding_history(self, device_mac: str) -> List[Dict[str, Any]]:
-        norm = normalize_mac_address(device_mac)
-        if not norm:
-            return []
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT 
-                        bbh.id,
-                        bbh.device_mac,
-                        bbh.user_id,
-                        bbh.username,
-                        bbh.device_name,
-                        bbh.device_type,
-                        bbh.linked_at,
-                        bbh.last_active_at,
-                        bbh.unlinked_at,
-                        bbh.status,
-                        bbh.notes,
-                        bbh.created_at,
-                        CASE 
-                            WHEN bbh.status = 'ACTIVE' THEN 'Sedang Tertaut' 
-                            ELSE 'Terputus / Riwayat Lampau' 
-                        END as status_label
-                    FROM board_binding_history bbh
-                    WHERE LOWER(bbh.device_mac) = %s 
-                       OR LOWER(REPLACE(REPLACE(bbh.device_mac, ':', ''), '-', '')) = %s
-                    ORDER BY bbh.linked_at DESC, bbh.id DESC
-                    """,
-                    (norm.lower(), norm.replace(":", "").replace("-", "").lower()),
-                )
-                rows = cur.fetchall()
-                res = []
-                for r in rows:
-                    item = dict(r)
-                    item["linked_at_str"] = _format_ts(item.get("linked_at"))
-                    item["last_active_str"] = _format_ts(item.get("last_active_at"))
-                    item["unlinked_at_str"] = _format_ts(item.get("unlinked_at"))
-                    res.append(item)
-                return res
+    def get_board_binding_history(
+        self,
+        device_mac: str = "",
+        user_id: Optional[int] = None,
+        slot: Optional[int] = None,
+        slot_number: Optional[int] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        if isinstance(device_mac, int):
+            user_id = device_mac
+            device_mac = ""
+        target_slot = slot_number if slot_number is not None else slot
 
-    def get_user_board_history(self, user_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
+                sql = """
                     SELECT 
                         bbh.id,
                         bbh.device_mac,
@@ -2108,6 +2322,8 @@ class PostgresStore:
                         bbh.username,
                         bbh.device_name,
                         bbh.device_type,
+                        bbh.slot_number,
+                        bbh.request_id,
                         bbh.linked_at,
                         bbh.last_active_at,
                         bbh.unlinked_at,
@@ -2121,11 +2337,23 @@ class PostgresStore:
                         END as status_label
                     FROM board_binding_history bbh
                     LEFT JOIN registered_devices rd ON LOWER(rd.device_id) = LOWER(bbh.device_mac)
-                    WHERE bbh.user_id = %s
-                    ORDER BY bbh.linked_at DESC, bbh.id DESC
-                    """,
-                    (int(user_id),),
-                )
+                    WHERE 1=1
+                """
+                params: List[Any] = []
+                if user_id is not None:
+                    sql += " AND bbh.user_id = %s"
+                    params.append(int(user_id))
+                if target_slot is not None:
+                    sql += " AND bbh.slot_number = %s"
+                    params.append(int(target_slot))
+                if device_mac:
+                    norm = normalize_mac_address(device_mac) or str(device_mac).strip()
+                    clean = norm.replace(":", "").replace("-", "").lower()
+                    sql += " AND (LOWER(bbh.device_mac) = %s OR LOWER(REPLACE(REPLACE(bbh.device_mac, ':', ''), '-', '')) = %s)"
+                    params.extend([norm.lower(), clean])
+                sql += " ORDER BY bbh.id DESC LIMIT %s"
+                params.append(int(limit or 50))
+                cur.execute(sql, params)
                 rows = cur.fetchall()
                 res = []
                 for r in rows:
@@ -2135,6 +2363,9 @@ class PostgresStore:
                     item["unlinked_at_str"] = _format_ts(item.get("unlinked_at"))
                     res.append(item)
                 return res
+
+    def get_user_board_history(self, user_id: int) -> List[Dict[str, Any]]:
+        return self.get_board_binding_history(user_id=int(user_id))
 
     def list_all_devices(self) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
@@ -2435,9 +2666,9 @@ class PostgresStore:
 
         # Get all MCP connection states
         try:
-            from xiaozhi.services.mcp_service import mcp_connection_states, mcp_state_lock, mcp_bridge_tasks
+            from xiaozhi.services.mcp_service import mcp_connection_states, mcp_state_lock
             with mcp_state_lock:
-                all_mcp_states = {int(uid): dict(state) for uid, state in mcp_connection_states.items()}
+                all_mcp_states = {str(k): dict(state) for k, state in mcp_connection_states.items()}
         except ImportError:
             all_mcp_states = {}
 
@@ -2471,6 +2702,37 @@ class PostgresStore:
                     device_mac = str(dev_row["device_id"]).upper() if dev_row and dev_row.get("device_id") else ""
                     device_name = dev_row["device_name"] if dev_row and dev_row.get("device_name") else ""
 
+                    # Detail 3 slot XiaoZhi tokens
+                    cur.execute(
+                        "SELECT slot_number, device_label, board_mac, token_hash FROM xiaozhi_tokens WHERE user_id = %s ORDER BY slot_number ASC",
+                        (user_id,),
+                    )
+                    tok_rows = cur.fetchall()
+                    user_slots = []
+                    for tr in tok_rows:
+                        s_num = int(tr.get("slot_number", 1) or 1)
+                        s_mac = (tr.get("board_mac") or "").strip().upper()
+                        s_label = tr.get("device_label") or f"Slot {s_num}"
+                        s_hash = tr.get("token_hash", "")
+                        s_state = all_mcp_states.get(f"{user_id}:{s_num}", {})
+                        s_connected = bool(s_state.get("connected", False))
+                        user_slots.append({
+                            "slot_number": s_num,
+                            "device_label": s_label,
+                            "board_mac": s_mac,
+                            "is_locked": bool(s_mac),
+                            "connected": s_connected,
+                            "message": s_state.get("message", ""),
+                            "token_hash": s_hash,
+                        })
+
+                    # Fallback MAC address dari slot jika belum ada di registered_devices
+                    if not device_mac and user_slots:
+                        for s_item in user_slots:
+                            if s_item["board_mac"]:
+                                device_mac = s_item["board_mac"]
+                                break
+
                     # Active music session
                     active_session = None
                     try:
@@ -2484,10 +2746,9 @@ class PostgresStore:
                     current_track = active_session.title if active_session else ""
 
                     # MCP status
-                    mcp_state = all_mcp_states.get(user_id, {})
-                    cur.execute("SELECT COUNT(*) as cnt FROM xiaozhi_tokens WHERE user_id = %s", (user_id,))
-                    has_token = cur.fetchone()["cnt"] > 0
-                    is_connected = mcp_state.get("connected", False)
+                    mcp_state = all_mcp_states.get(str(user_id), {}) or all_mcp_states.get(f"{user_id}:1", {})
+                    has_token = len(user_slots) > 0
+                    is_connected = any(s["connected"] for s in user_slots) if user_slots else mcp_state.get("connected", False)
 
                     result.append({
                         "id": user_id,
@@ -2499,6 +2760,7 @@ class PostgresStore:
                         "features": self.get_user_features(user_id),
                         "device_mac": device_mac,
                         "device_name": device_name,
+                        "slots": user_slots,
                         "is_playing": is_playing,
                         "current_track": current_track,
                         "mcp_status": {

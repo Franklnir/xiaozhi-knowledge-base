@@ -252,6 +252,25 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
                         notes="Tertaut saat stream lagu ESP32 (MCP Terhubung)"
                     )
                     logger.info(f"[STREAM MAC] Device MAC {clean_mac} ({dev_type}) berhasil diikat ke user {user_id} ({user.get('username')}) [MCP AKTIF] -> {res}")
+                    
+                    # Auto-lock board MAC ke slot MCP pengguna (Slot 1..3)
+                    if hasattr(store, "list_user_xiaozhi_tokens") and hasattr(store, "bind_board_to_slot"):
+                        try:
+                            user_tokens = store.list_user_xiaozhi_tokens(user_id)
+                            target_slot = None
+                            for t in user_tokens:
+                                if t.get("board_mac") == clean_mac:
+                                    target_slot = t["slot_number"]
+                                    break
+                            if not target_slot:
+                                for t in user_tokens:
+                                    if not t.get("board_mac"):
+                                        target_slot = t["slot_number"]
+                                        break
+                            if target_slot:
+                                store.bind_board_to_slot(user_id, slot=target_slot, device_mac=clean_mac, request_id="stream_audio")
+                        except Exception as b_exc:
+                            logger.warning(f"Gagal auto-lock slot MAC stream: {b_exc}")
                 else:
                     if hasattr(store, "record_device_activity"):
                         store.record_device_activity(clean_mac, user_id)
@@ -1085,6 +1104,25 @@ async def device_audio_status(request: Request):
                     )
                     mac_saved_ok = True
                     logger.info(f"[STATUS MAC] Device MAC {clean_mac} ({dev_type}) diikat ke user {owner_id} [MCP AKTIF]")
+
+                    # Auto-lock board MAC ke slot MCP pengguna (Slot 1..3)
+                    if hasattr(store, "list_user_xiaozhi_tokens") and hasattr(store, "bind_board_to_slot"):
+                        try:
+                            user_tokens = store.list_user_xiaozhi_tokens(owner_id)
+                            target_slot = None
+                            for t in user_tokens:
+                                if t.get("board_mac") == clean_mac:
+                                    target_slot = t["slot_number"]
+                                    break
+                            if not target_slot:
+                                for t in user_tokens:
+                                    if not t.get("board_mac"):
+                                        target_slot = t["slot_number"]
+                                        break
+                            if target_slot:
+                                store.bind_board_to_slot(owner_id, slot=target_slot, device_mac=clean_mac, request_id="device_status")
+                        except Exception as b_exc:
+                            logger.warning(f"Gagal auto-lock slot MAC status: {b_exc}")
                 else:
                     if hasattr(store, "record_device_activity"):
                         store.record_device_activity(clean_mac, owner_id)

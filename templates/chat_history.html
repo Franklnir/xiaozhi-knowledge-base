@@ -515,11 +515,12 @@
                 var isTool = isToolItem(i);
                 var slotNum = i.slot_number || 1;
                 var devLabel = i.device_label || ('Slot ' + slotNum);
+                var macShort = i.device_mac ? (' · ' + i.device_mac) : '';
                 html += '<button type="button" class="chat-item ' + (isSelected ? 'active' : '') + '" onclick="selChat(' + id + ')">';
                 html += '<span class="chat-item-title">' + E(previewTitle) + '</span>';
                 html += '<div class="chat-item-meta">';
                 html += '<span class="chat-item-badge" style="' + (isTool ? 'color:#9333ea;background:#f5d0fe;' : '') + '">' + E(kind(i)) + '</span>';
-                html += '<span class="chat-item-badge" style="background:#e0e7ff;color:#3730a3;font-weight:700;">📟 ' + E(devLabel) + '</span>';
+                html += '<span class="chat-item-badge" style="background:#e0e7ff;color:#3730a3;font-weight:700;" title="' + E(devLabel + (i.device_mac ? ' (MAC: ' + i.device_mac + ')' : '')) + '">📟 ' + E(devLabel) + E(macShort) + '</span>';
                 html += '<span>' + E(fmtShort(i.created_at)) + '</span>';
                 html += '</div>';
                 html += '</button>';
@@ -562,9 +563,11 @@
         var fullTitle = item.user_message || item.xiaozhi_answer || item.tool_name || ("Chat #" + item.id);
         var slotNum = item.slot_number || 1;
         var devLabel = item.device_label || ('Slot ' + slotNum);
+        var macMeta = item.device_mac ? (" · 🔒 MAC: " + item.device_mac) : "";
+        var reqMeta = item.request_id ? (" · Req ID: " + item.request_id) : "";
         document.getElementById("threadTitle").textContent = fullTitle;
         document.getElementById("threadBadge").textContent = kind(item);
-        document.getElementById("threadMeta").textContent = "ID #" + item.id + " · " + fmt(item.created_at) + (item.source ? " · Sumber: " + item.source : "") + " · 📟 " + devLabel;
+        document.getElementById("threadMeta").textContent = "ID #" + item.id + " · " + fmt(item.created_at) + (item.source ? " · Sumber: " + item.source : "") + " · 📟 " + devLabel + macMeta + reqMeta;
 
         var m = "";
 
@@ -573,7 +576,7 @@
             m += '<div class="chat-msg">';
             m += '<div class="chat-bubble chat-bubble-user">';
             m += '<div class="chat-bubble-head">';
-            m += '<span class="chat-bubble-role">👤 User <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">📟 ' + E(devLabel) + '</span></span>';
+            m += '<span class="chat-bubble-role">👤 User <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">📟 ' + E(devLabel) + (item.device_mac ? ' (' + E(item.device_mac) + ')' : '') + '</span></span>';
             m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
             m += '</div>';
             m += '<div class="chat-bubble-body">' + E(item.user_message) + '</div>';

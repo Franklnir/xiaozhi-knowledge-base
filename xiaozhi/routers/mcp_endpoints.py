@@ -1,25 +1,35 @@
-from fastapi import APIRouter, HTTPException, Request, Form
-from fastapi.responses import JSONResponse
+import uuid
 from typing import Optional
+from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from xiaozhi.core.security import mask_secret, normalize_token_hash, xiaozhi_token_hash
 from xiaozhi.dependencies import (
     get_current_user,
     get_store,
-    validate_csrf,
     redirect_with_message,
+    validate_csrf,
 )
 from xiaozhi.services.mcp_service import (
     clear_mcp_state,
     is_mcp_connected,
     mcp_bridge_tasks,
-    mcp_status_payload,
     mcp_slots_payload,
+    mcp_status_payload,
     set_mcp_connection_state,
     signal_mcp_reload,
 )
 
 router = APIRouter()
+
+
+def _get_req_id(request: Request) -> str:
+    """Helper untuk mengekstrak atau mengenerate request_id unik."""
+    return (
+        getattr(getattr(request, "state", None), "request_id", None)
+        or request.headers.get("X-Request-ID")
+        or f"req-{uuid.uuid4().hex[:10]}"
+    )
 
 
 @router.post("/save_mcp")
@@ -30,24 +40,28 @@ async def save_mcp(
     slot: int = Form(1),
     device_label: str = Form(""),
 ):
+    req_id = _get_req_id(request)
     user = get_current_user(request)
     if not user:
-        return JSONResponse({"success": False, "detail": "Login required"}, status_code=401)
+        return JSONResponse({"success": False, "request_id": req_id, "detail": "Login required"}, status_code=401)
     store = get_store()
     validate_csrf(request, csrf_token, user)
     slot_num = int(slot or 1)
     if slot_num < 1 or slot_num > 3:
-        return JSONResponse({"success": False, "detail": "Slot token hanya diizinkan antara 1 sampai 3."}, status_code=400)
-    label_clean = (device_label or "").strip()[:60] or f"XiaoZhi {slot_num}"
+        return JSONResponse({"success": False, "request_id": req_id, "detail": "Slot token hanya diizinkan antara 1 sampai 3."}, status_code=400)
+    
+    label_clean = (device_label or "").strip()[:60] or (f"{user.get('username')} - Slot 1" if slot_num == 1 else f"XiaoZhi {slot_num}")
     try:
-        store.set_xiaozhi_token(user["id"], mcp_token, slot=slot_num, device_label=label_clean)
+        store.set_xiaozhi_token(user["id"], mcp_token, slot=slot_num, device_label=label_clean, request_id=req_id)
         token_info = store.get_xiaozhi_token_info(user["id"], slot=slot_num)
         token_hash = token_info.get("token_hash", "") if token_info else ""
+        board_mac = token_info.get("board_mac", "") if token_info else ""
         set_mcp_connection_state(
             user["id"],
             token_hash,
             connected=False,
             message=f"Menghubungkan Slot {slot_num} ({label_clean})...",
+            request_id=req_id,
             slot=slot_num,
             device_label=label_clean,
         )
@@ -61,13 +75,17 @@ async def save_mcp(
         signal_mcp_reload()
         return JSONResponse({
             "success": True,
+            "request_id": req_id,
             "slot": slot_num,
+            "device_label": label_clean,
+            "board_mac": board_mac,
+            "is_locked": bool(board_mac),
             "message": f"Endpoint Slot {slot_num} ({label_clean}) berhasil disimpan. Menghubungkan ke XiaoZhi...",
         })
     except ValueError as exc:
-        return JSONResponse({"success": False, "detail": str(exc)}, status_code=400)
+        return JSONResponse({"success": False, "request_id": req_id, "detail": str(exc)}, status_code=400)
     except Exception as exc:
-        return JSONResponse({"success": False, "detail": f"Gagal menyimpan endpoint: {exc}"}, status_code=500)
+        return JSONResponse({"success": False, "request_id": req_id, "detail": f"Gagal menyimpan endpoint: {exc}"}, status_code=500)
 
 
 @router.post("/delete_mcp")
@@ -76,15 +94,16 @@ async def delete_mcp_endpoint(
     csrf_token: str = Form(...),
     slot: Optional[int] = Form(None),
 ):
+    req_id = _get_req_id(request)
     user = get_current_user(request)
     if not user:
-        return JSONResponse({"success": False, "detail": "Login required"}, status_code=401)
+        return JSONResponse({"success": False, "request_id": req_id, "detail": "Login required"}, status_code=401)
     store = get_store()
     validate_csrf(request, csrf_token, user)
     
     if slot is not None:
         slot_num = int(slot)
-        deleted = store.delete_xiaozhi_token(user["id"], slot=slot_num)
+        deleted = store.delete_xiaozhi_token(user["id"], slot=slot_num, request_id=req_id)
         clear_mcp_state(user["id"], slot=slot_num)
         task_key = f"{user['id']}:{slot_num}"
         user_task = mcp_bridge_tasks.pop(task_key, None)
@@ -93,12 +112,13 @@ async def delete_mcp_endpoint(
         signal_mcp_reload()
         return JSONResponse({
             "success": True,
+            "request_id": req_id,
             "deleted": deleted,
             "slot": slot_num,
-            "message": f"Endpoint Slot {slot_num} berhasil dihapus.",
+            "message": f"Endpoint Slot {slot_num} berhasil dihapus. Board yang terkunci pada slot ini telah dilepaskan.",
         })
     else:
-        deleted = store.delete_xiaozhi_token(user["id"])
+        deleted = store.delete_xiaozhi_token(user["id"], request_id=req_id)
         clear_mcp_state(user["id"])
         for s in (1, 2, 3):
             t = mcp_bridge_tasks.pop(f"{user['id']}:{s}", None)
@@ -110,8 +130,9 @@ async def delete_mcp_endpoint(
         signal_mcp_reload()
         return JSONResponse({
             "success": True,
+            "request_id": req_id,
             "deleted": deleted,
-            "message": "Semua endpoint MCP berhasil dihapus. Tautan Board ESP32 telah dipisahkan.",
+            "message": "Semua endpoint MCP berhasil dihapus. Semua tautan Board ESP32 telah dipisahkan.",
         })
 
 
@@ -121,14 +142,15 @@ async def reconnect_mcp(
     csrf_token: str = Form(...),
     slot: int = Form(1),
 ):
+    req_id = _get_req_id(request)
     user = get_current_user(request)
     if not user:
-        return JSONResponse({"success": False, "detail": "Login required"}, status_code=401)
+        return JSONResponse({"success": False, "request_id": req_id, "detail": "Login required"}, status_code=401)
     store = get_store()
     validate_csrf(request, csrf_token, user)
     slot_num = int(slot or 1)
     if not store.get_xiaozhi_token(user["id"], slot=slot_num):
-        return JSONResponse({"success": False, "detail": f"Endpoint Slot {slot_num} belum tersimpan."}, status_code=400)
+        return JSONResponse({"success": False, "request_id": req_id, "detail": f"Endpoint Slot {slot_num} belum tersimpan."}, status_code=400)
     token_info = store.get_xiaozhi_token_info(user["id"], slot=slot_num)
     token_hash = token_info.get("token_hash", "") if token_info else ""
     label = token_info.get("device_label", f"XiaoZhi {slot_num}") if token_info else f"XiaoZhi {slot_num}"
@@ -137,6 +159,7 @@ async def reconnect_mcp(
         token_hash,
         connected=False,
         message=f"Memaksa reconnect Slot {slot_num}...",
+        request_id=req_id,
         slot=slot_num,
         device_label=label,
     )
@@ -145,11 +168,128 @@ async def reconnect_mcp(
     if user_task and not user_task.done():
         user_task.cancel()
     signal_mcp_reload()
-    return JSONResponse({"success": True, "slot": slot_num, "message": f"Koneksi Slot {slot_num} ({label}) sedang di-refresh."})
+    return JSONResponse({
+        "success": True,
+        "request_id": req_id,
+        "slot": slot_num,
+        "message": f"Koneksi Slot {slot_num} ({label}) sedang di-refresh.",
+    })
+
+
+# ── Endpoint Terstruktur & Non-Generik untuk Manajemen Slot ──────────────────
+
+@router.post("/api/mcp/slots/update-label")
+async def update_mcp_slot_label(
+    request: Request,
+    slot: int = Form(1),
+    device_label: str = Form(...),
+    csrf_token: str = Form(...),
+):
+    """Memperbarui nama ruangan slot perangkat tanpa mereset token atau melepas MAC yang terkunci."""
+    req_id = _get_req_id(request)
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Login required")
+    store = get_store()
+    validate_csrf(request, csrf_token, user)
+    slot_num = int(slot or 1)
+    if slot_num < 1 or slot_num > 3:
+        raise HTTPException(status_code=400, detail="Slot harus antara 1 sampai 3.")
+
+    label_clean = (device_label or "").strip()[:60]
+    if not label_clean:
+        raise HTTPException(status_code=400, detail="Nama ruangan tidak boleh kosong.")
+
+    updated = store.update_slot_label(user["id"], slot=slot_num, device_label=label_clean, request_id=req_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Slot {slot_num} belum tersimpan endpoint MCP.")
+
+    # Refresh label di in-memory state
+    token_info = store.get_xiaozhi_token_info(user["id"], slot=slot_num)
+    token_hash = token_info.get("token_hash", "") if token_info else ""
+    board_mac = token_info.get("board_mac", "") if token_info else ""
+    set_mcp_connection_state(
+        user["id"],
+        token_hash,
+        connected=is_mcp_connected(user["id"], token_hash, slot=slot_num),
+        slot=slot_num,
+        device_label=label_clean,
+    )
+
+    return {
+        "success": True,
+        "request_id": req_id,
+        "slot": slot_num,
+        "device_label": label_clean,
+        "board_mac": board_mac,
+        "is_locked": bool(board_mac),
+        "message": f"Nama ruangan Slot {slot_num} berhasil diperbarui menjadi '{label_clean}'.",
+    }
+
+
+@router.post("/api/mcp/slots/detach-board")
+async def detach_mcp_slot_board(
+    request: Request,
+    slot: int = Form(1),
+    csrf_token: str = Form(...),
+):
+    """Melepaskan kunci hardware MAC dari slot MCP agar board baru bisa dihubungkan."""
+    req_id = _get_req_id(request)
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Login required")
+    store = get_store()
+    validate_csrf(request, csrf_token, user)
+    slot_num = int(slot or 1)
+    if slot_num < 1 or slot_num > 3:
+        raise HTTPException(status_code=400, detail="Slot harus antara 1 sampai 3.")
+
+    detached = store.detach_board_from_slot(user["id"], slot=slot_num, request_id=req_id)
+    if not detached:
+        return {
+            "success": False,
+            "request_id": req_id,
+            "slot": slot_num,
+            "message": f"Slot {slot_num} tidak memiliki board hardware MAC yang terkunci.",
+        }
+
+    return {
+        "success": True,
+        "request_id": req_id,
+        "slot": slot_num,
+        "message": f"Kunci Board Hardware MAC pada Slot {slot_num} berhasil dilepas. Board baru dapat dihubungkan ke slot ini.",
+    }
+
+
+@router.get("/api/mcp/slots/history")
+async def get_mcp_slot_history(
+    request: Request,
+    slot: Optional[int] = None,
+):
+    """Membaca riwayat audit binding board hardware MAC pada setiap slot."""
+    req_id = _get_req_id(request)
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Login required")
+    store = get_store()
+    slot_num = int(slot) if slot is not None else None
+    
+    if hasattr(store, "get_board_binding_history"):
+        history = store.get_board_binding_history(user_id=user["id"], slot=slot_num, limit=50)
+    else:
+        history = []
+
+    return {
+        "success": True,
+        "request_id": req_id,
+        "slot": slot_num,
+        "history": history,
+    }
 
 
 @router.post("/api/mcp/check")
 async def check_mcp_endpoint(request: Request):
+    req_id = _get_req_id(request)
     body = await request.json()
     token = str(body.get("token", "")).strip()
     if not token or not token.startswith("wss://"):
@@ -162,6 +302,7 @@ async def check_mcp_endpoint(request: Request):
         slot_label = f" (Slot {owner.get('slot_number', 1)}: {owner.get('device_label', 'XiaoZhi')})" if owner.get('slot_number') else ""
         return {
             "success": True,
+            "request_id": req_id,
             "found": True,
             "owner": {
                 "user_id": owner["user_id"],
@@ -170,11 +311,11 @@ async def check_mcp_endpoint(request: Request):
                 "created_at": owner.get("created_at"),
                 "slot_number": owner.get("slot_number", 1),
                 "device_label": owner.get("device_label", "XiaoZhi"),
+                "board_mac": owner.get("board_mac", ""),
             },
             "message": f"Endpoint ini milik user: {owner['username']} (ID: {owner['user_id']}){slot_label}",
         }
 
-    # If not found, check all stored tokens for partial match (for debugging)
     all_tokens = store.list_xiaozhi_tokens()
     token_base = token.split("?")[0] if "?" in token else token
 
@@ -192,6 +333,7 @@ async def check_mcp_endpoint(request: Request):
     if similar_tokens:
         return {
             "success": True,
+            "request_id": req_id,
             "found": False,
             "similar": similar_tokens,
             "message": "Endpoint tidak cocok persis, tapi ditemukan token mirip. Pastikan URL lengkap benar.",
@@ -199,6 +341,7 @@ async def check_mcp_endpoint(request: Request):
 
     return {
         "success": True,
+        "request_id": req_id,
         "found": False,
         "total_endpoints": len(all_tokens),
         "message": "Endpoint ini belum terdaftar di user manapun.",
@@ -207,6 +350,7 @@ async def check_mcp_endpoint(request: Request):
 
 @router.post("/api/mcp/delete-by-token")
 async def delete_mcp_by_token(request: Request):
+    req_id = _get_req_id(request)
     body = await request.json()
     token = str(body.get("token", "")).strip()
     if not token or not token.startswith("wss://"):
@@ -214,7 +358,7 @@ async def delete_mcp_by_token(request: Request):
     store = get_store()
     owner = store.find_user_by_mcp_token(token)
     if not owner:
-        return {"success": False, "message": "Endpoint tidak ditemukan di database."}
+        return {"success": False, "request_id": req_id, "message": "Endpoint tidak ditemukan di database."}
     slot_num = owner.get("slot_number", 1)
     deleted = store.delete_xiaozhi_token_by_hash(token)
     clear_mcp_state(owner["user_id"], slot=slot_num)
@@ -225,6 +369,7 @@ async def delete_mcp_by_token(request: Request):
     signal_mcp_reload()
     return {
         "success": True,
+        "request_id": req_id,
         "deleted": deleted,
         "message": f"Endpoint Slot {slot_num} milik {owner['username']} berhasil dihapus.",
     }
@@ -232,6 +377,7 @@ async def delete_mcp_by_token(request: Request):
 
 @router.get("/api/mcp/status")
 async def mcp_status_api(request: Request):
+    req_id = _get_req_id(request)
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Login required")
@@ -253,6 +399,7 @@ async def mcp_status_api(request: Request):
 
     return {
         "success": True,
+        "request_id": req_id,
         "anyConnected": multi_payload["anyConnected"],
         "totalSaved": multi_payload["totalSaved"],
         "slots": multi_payload["slots"],

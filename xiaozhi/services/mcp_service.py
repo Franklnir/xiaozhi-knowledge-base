@@ -171,12 +171,17 @@ def mcp_slots_payload(owner_id: int, store: Any) -> Dict[str, Any]:
             else:
                 status_text = f"Slot {s} belum dikonfigurasi"
 
+            board_mac = (t_info.get("board_mac") or "").strip().upper() if t_info else ""
+            is_locked = bool(board_mac)
+
             slots_list.append(
                 {
                     "slot": s,
                     "label": label,
                     "saved": saved,
                     "connected": connected,
+                    "board_mac": board_mac,
+                    "is_locked": is_locked,
                     "preview": t_info.get("preview", "") if t_info else "",
                     "tokenHash": t_hash,
                     "statusText": status_text,
