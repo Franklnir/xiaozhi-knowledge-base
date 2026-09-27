@@ -228,12 +228,12 @@ class PostgresStore:
                             PRIMARY KEY (user_id, slot_number),
                             CONSTRAINT chk_xiaozhi_tokens_slot CHECK (slot_number >= 1 AND slot_number <= 3)
                         );
-                        CREATE INDEX IF NOT EXISTS idx_tokens_hash ON xiaozhi_tokens(token_hash);
-                        CREATE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);
-
                         -- Backward-compatible schema evolution untuk database eksisting
                         ALTER TABLE xiaozhi_tokens ADD COLUMN IF NOT EXISTS slot_number INT NOT NULL DEFAULT 1;
                         ALTER TABLE xiaozhi_tokens ADD COLUMN IF NOT EXISTS device_label VARCHAR(60) NOT NULL DEFAULT 'XiaoZhi 1';
+
+                        CREATE INDEX IF NOT EXISTS idx_tokens_hash ON xiaozhi_tokens(token_hash);
+                        CREATE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);
                         DO $$
                         BEGIN
                             IF EXISTS (
