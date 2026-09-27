@@ -274,9 +274,27 @@
                 <div class="mt-4 space-y-3">
                     <input type="hidden" id="mcpCsrf" value="{{ csrf_token }}">
                     <div>
-                        <label for="mcp_label" class="app-label">Nama / Ruangan Perangkat</label>
-                        <input id="mcp_label" type="text" maxlength="60" placeholder="Contoh: XiaoZhi Ruang Tamu" autocomplete="off" class="app-input">
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="mcp_label" class="app-label !mb-0">Nama / Ruangan Perangkat</label>
+                            <button type="button" id="quickSaveLabelBtn" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline hidden" title="Simpan nama slot tanpa reset token">Perbarui Nama</button>
+                        </div>
+                        <input id="mcp_label" type="text" maxlength="60" placeholder="Contoh: XiaoZhi Ruang Kerja" autocomplete="off" class="app-input">
                     </div>
+
+                    <!-- Hardware Board MAC Status (Read-Only Anti-Spoofing Box) -->
+                    <div id="mcpBoardLockBox" class="p-3 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 border-slate-200">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span id="mcpLockIcon" class="text-base select-none">⚪</span>
+                            <div class="min-w-0">
+                                <span class="font-bold text-slate-800 block" id="mcpBoardMacTitle">Hardware Board MAC (Terkunci Otomatis)</span>
+                                <span class="font-mono text-slate-600 block truncate" id="mcpBoardMacValue">Belum ada board terhubung</span>
+                            </div>
+                        </div>
+                        <div id="mcpBoardActionArea" class="flex-shrink-0">
+                            <!-- Dynamic detach board button -->
+                        </div>
+                    </div>
+
                     <div>
                         <label for="mcp_token" class="app-label">Endpoint MCP WebSocket</label>
                         <input id="mcp_token" type="password" placeholder="wss://api.xiaozhi.me/mcp/?token=..." autocomplete="off" class="app-input">
@@ -857,10 +875,11 @@
 let mcpPoll = null, mcpBusy = false;
 let currentSlot = 1;
 let slotsData = [
-    { slot: 1, label: "XiaoZhi 1", saved: false, connected: false, preview: "", statusText: "Belum dikonfigurasi" },
-    { slot: 2, label: "XiaoZhi 2", saved: false, connected: false, preview: "", statusText: "Belum dikonfigurasi" },
-    { slot: 3, label: "XiaoZhi 3", saved: false, connected: false, preview: "", statusText: "Belum dikonfigurasi" }
+    { slot: 1, label: "XiaoZhi 1", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" },
+    { slot: 2, label: "XiaoZhi 2", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" },
+    { slot: 3, label: "XiaoZhi 3", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" }
 ];
+let latestRequestId = "";
 
 function switchSlot(slotNum) {
     currentSlot = Number(slotNum);
@@ -880,7 +899,7 @@ function switchSlot(slotNum) {
 }
 
 function renderActiveSlotForm() {
-    const s = slotsData.find(x => x.slot === currentSlot) || { slot: currentSlot, label: "XiaoZhi " + currentSlot, saved: false, connected: false, statusText: "Belum dikonfigurasi" };
+    const s = slotsData.find(x => x.slot === currentSlot) || { slot: currentSlot, label: "XiaoZhi " + currentSlot, saved: false, connected: false, board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" };
     
     const labelInput = document.getElementById("mcp_label");
     const previewHint = document.getElementById("mcpPreviewHint");
@@ -891,12 +910,45 @@ function renderActiveSlotForm() {
     const bar = document.getElementById("mcpBar");
     const detail = document.getElementById("mcpStatusDetail");
 
+    // Board MAC lock elements
+    const lockIcon = document.getElementById("mcpLockIcon");
+    const boardMacTitle = document.getElementById("mcpBoardMacTitle");
+    const boardMacValue = document.getElementById("mcpBoardMacValue");
+    const boardActionArea = document.getElementById("mcpBoardActionArea");
+    const quickSaveLabelBtn = document.getElementById("quickSaveLabelBtn");
+    const boardLockBox = document.getElementById("mcpBoardLockBox");
+
     if (labelInput && !labelInput.matches(':focus')) {
         labelInput.value = s.label || ("XiaoZhi " + currentSlot);
     }
+
+    if (quickSaveLabelBtn) {
+        if (s.saved) {
+            quickSaveLabelBtn.classList.remove("hidden");
+        } else {
+            quickSaveLabelBtn.classList.add("hidden");
+        }
+    }
+
+    if (boardMacTitle && boardMacValue && boardActionArea) {
+        if (s.is_locked && s.board_mac) {
+            if (lockIcon) lockIcon.textContent = "🔒";
+            if (boardLockBox) boardLockBox.className = "p-3 rounded-lg border text-xs flex items-center justify-between gap-3 bg-emerald-50 border-emerald-300";
+            boardMacTitle.innerHTML = "Hardware MAC Terkunci <span class='text-emerald-700 font-bold'>(Anti-Spoofing Aktif)</span>";
+            boardMacValue.innerHTML = `<strong class="text-emerald-800 font-mono tracking-wider">${s.board_mac}</strong> <span class="text-slate-500 font-normal">→ ${s.label || ('Slot ' + currentSlot)}</span>`;
+            boardActionArea.innerHTML = `<button type="button" class="app-button app-button-small app-button-secondary text-xs !py-1 !px-2 text-red-600 border-red-200 hover:bg-red-50" onclick="detachBoard(${currentSlot})" title="Lepas board hardware dari slot ini">✂️ Lepas Board</button>`;
+        } else {
+            if (lockIcon) lockIcon.textContent = "⚪";
+            if (boardLockBox) boardLockBox.className = "p-3 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 border-slate-200";
+            boardMacTitle.textContent = "Hardware Board MAC (Terkunci Otomatis)";
+            boardMacValue.innerHTML = `<span class="text-slate-500 italic">Belum ada board terhubung (ESP32 mengunci otomatis saat online)</span>`;
+            boardActionArea.innerHTML = "";
+        }
+    }
+
     if (previewHint) {
         if (s.saved && s.preview) {
-            previewHint.innerHTML = "Tersimpan: <code style='color:#0284c7;font-weight:700;'>" + s.preview + "</code> (Isi endpoint baru di atas jika ingin menimpa).";
+            previewHint.innerHTML = "Tersimpan: <code style='color:#0284c7;font-weight:700;'>" + s.preview + "</code> (Isi endpoint baru di atas jika ingin menimpa/mengganti token).";
         } else {
             previewHint.textContent = "Endpoint wss:// dari XiaoZhi disimpan terenkripsi.";
         }
@@ -920,7 +972,8 @@ function renderActiveSlotForm() {
         bar.className = "mcp-bar-fill " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
     }
     if (detail) {
-        detail.textContent = "Slot " + currentSlot + " (" + s.label + "): " + s.statusText + " | " + (s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("id-ID") : "-");
+        const reqStr = latestRequestId ? ` | ID: ${latestRequestId}` : "";
+        detail.textContent = "Slot " + currentSlot + " (" + s.label + "): " + s.statusText + " | " + (s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("id-ID") : "-") + reqStr;
         detail.style.color = s.connected ? "#047857" : mcpBusy ? "#0369a1" : "#64748b";
     }
 
@@ -929,7 +982,64 @@ function renderActiveSlotForm() {
     if (deleteBtn) deleteBtn.disabled = mcpBusy;
 }
 
+async function detachBoard(slot) {
+    const s = slotsData.find(x => x.slot === slot);
+    const mac = s ? (s.board_mac || "board") : "board";
+    const label = s ? (s.label || "Slot " + slot) : "Slot " + slot;
+    if (!confirm(`Lepaskan hardware board (${mac}) dari ${label}? Perangkat fisik ESP32 baru akan dapat menautkan slot ini saat online berikutnya.`)) {
+        return;
+    }
+    mcpBusy = true;
+    renderActiveSlotForm();
+    try {
+        const resp = await ajaxMcp("/api/mcp/slots/detach-board", { slot: slot });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok && data.success) {
+            latestRequestId = data.request_id || "";
+            const detail = document.getElementById("mcpStatusDetail");
+            if (detail) detail.textContent = `Board MAC berhasil dilepas dari Slot ${slot} [Req: ${latestRequestId}]`;
+        } else {
+            alert(`Gagal melepas board: ${data.detail || 'Terjadi kesalahan'}`);
+        }
+    } catch (err) {
+        alert("Gagal menghubungi server: " + err.message);
+    } finally {
+        mcpBusy = false;
+        pollMcp();
+    }
+}
+
+async function quickSaveLabel() {
+    const labelInput = document.getElementById("mcp_label");
+    const label = labelInput ? labelInput.value.trim() : "";
+    if (!label) {
+        alert("Nama ruangan / label perangkat tidak boleh kosong.");
+        return;
+    }
+    mcpBusy = true;
+    renderActiveSlotForm();
+    try {
+        const resp = await ajaxMcp("/api/mcp/slots/update-label", { slot: currentSlot, device_label: label });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok && data.success) {
+            latestRequestId = data.request_id || "";
+            const detail = document.getElementById("mcpStatusDetail");
+            if (detail) detail.textContent = `Nama ruangan Slot ${currentSlot} diubah menjadi "${label}" [Req: ${latestRequestId}]`;
+        } else {
+            alert(`Gagal memperbarui nama: ${data.detail || 'Terjadi kesalahan'}`);
+        }
+    } catch (err) {
+        alert("Gagal menghubungi server: " + err.message);
+    } finally {
+        mcpBusy = false;
+        pollMcp();
+    }
+}
+
 function updateSlotsUI(data) {
+    if (data.request_id) {
+        latestRequestId = data.request_id;
+    }
     if (data.slots && Array.isArray(data.slots)) {
         slotsData = data.slots;
     }
@@ -991,12 +1101,20 @@ async function ajaxMcp(url, body) {
     const csrf = document.getElementById("mcpCsrf").value;
     const fd = new FormData();
     fd.append("csrf_token", csrf);
-    for (const k in body) fd.append(k, body[k]);
+    for (const k in body) {
+        if (body[k] !== undefined && body[k] !== null) fd.append(k, body[k]);
+    }
     const resp = await fetch(url, {method:"POST", body:fd, credentials:"same-origin", redirect:"manual"});
     return resp;
 }
 
 document.addEventListener("DOMContentLoaded", function() {
+    // Quick save label button - AJAX
+    const quickLabelBtn = document.getElementById("quickSaveLabelBtn");
+    if (quickLabelBtn) {
+        quickLabelBtn.addEventListener("click", quickSaveLabel);
+    }
+
     // Save button - AJAX
     const saveBtn = document.getElementById("saveMcpBtn");
     if (saveBtn) saveBtn.addEventListener("click", async function() {
@@ -1014,7 +1132,11 @@ document.addEventListener("DOMContentLoaded", function() {
         startConnect();
         const payload = { slot: currentSlot, device_label: label };
         if (token) payload.mcp_token = token;
-        await ajaxMcp("/save_mcp", payload);
+        try {
+            const resp = await ajaxMcp("/save_mcp", payload);
+            const resJson = await resp.json().catch(() => ({}));
+            if (resJson.request_id) latestRequestId = resJson.request_id;
+        } catch (e) {}
         document.getElementById("mcp_token").value = "";
         pollMcp();
     });
@@ -1023,7 +1145,11 @@ document.addEventListener("DOMContentLoaded", function() {
     const reconnectBtn = document.getElementById("reconnectBtn");
     if (reconnectBtn) reconnectBtn.addEventListener("click", async function() {
         startConnect();
-        await ajaxMcp("/reconnect_mcp", { slot: currentSlot });
+        try {
+            const resp = await ajaxMcp("/reconnect_mcp", { slot: currentSlot });
+            const resJson = await resp.json().catch(() => ({}));
+            if (resJson.request_id) latestRequestId = resJson.request_id;
+        } catch (e) {}
         pollMcp();
     });
 
@@ -1032,9 +1158,13 @@ document.addEventListener("DOMContentLoaded", function() {
     if (deleteBtn) deleteBtn.addEventListener("click", async function() {
         const s = slotsData.find(x => x.slot === currentSlot);
         const name = s ? s.label : ("Slot " + currentSlot);
-        if (!confirm("Hapus endpoint " + name + " (Slot " + currentSlot + ")? Koneksi slot ini akan diputuskan.")) return;
+        if (!confirm("Hapus endpoint " + name + " (Slot " + currentSlot + ")? Koneksi slot ini dan MAC hardware yang terkunci akan dilepas.")) return;
         mcpBusy = true;
-        await ajaxMcp("/delete_mcp", { slot: currentSlot });
+        try {
+            const resp = await ajaxMcp("/delete_mcp", { slot: currentSlot });
+            const resJson = await resp.json().catch(() => ({}));
+            if (resJson.request_id) latestRequestId = resJson.request_id;
+        } catch (e) {}
         mcpBusy = false;
         pollMcp();
     });

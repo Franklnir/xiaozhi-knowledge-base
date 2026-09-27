@@ -1153,7 +1153,15 @@ class HFJsonStore:
                 (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == slot_num),
                 None,
             )
+            u_row = next((u for u in data.get("users", []) if int(u.get("id", 0)) == int(owner_id)), None)
+            username = u_row["username"] if u_row else f"user_{owner_id}"
+            default_label = f"{username} - Slot 1" if slot_num == 1 else f"XiaoZhi {slot_num}"
+            label_clean = (device_label or "").strip()[:60] or (existing.get("device_label") if existing else "") or default_label
+
             if existing:
+                if existing.get("token_hash") != token_hash:
+                    # Token berubah -> lepas board_mac
+                    existing["board_mac"] = ""
                 existing["token_ciphertext"] = encrypted
                 existing["token_hash"] = token_hash
                 existing["device_label"] = label_clean
@@ -1164,6 +1172,7 @@ class HFJsonStore:
                         "user_id": int(owner_id),
                         "slot_number": slot_num,
                         "device_label": label_clean,
+                        "board_mac": "",
                         "token_ciphertext": encrypted,
                         "token_hash": token_hash,
                         "created_at": utc_now(),
@@ -1171,6 +1180,67 @@ class HFJsonStore:
                     }
                 )
             self._commit(data, "Save Xiaozhi token")
+
+    def bind_board_to_slot(self, owner_id: int, slot: int = 1, device_mac: str = "", request_id: str = "") -> Dict[str, Any]:
+        """Kunci board hardware MAC ke slot tertentu secara read-only (anti-spoofing)."""
+        norm_mac = normalize_mac_address(device_mac)
+        if not norm_mac:
+            return {"success": False, "detail": "Format MAC address tidak valid."}
+        slot_num = int(slot or 1)
+        with self._lock:
+            data = self._load()
+            existing = next(
+                (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == slot_num),
+                None,
+            )
+            if not existing:
+                return {"success": False, "detail": f"Slot {slot_num} belum tersimpan endpoint MCP."}
+
+            current_mac = (existing.get("board_mac") or "").strip().upper()
+            label = existing.get("device_label") or f"Slot {slot_num}"
+            if current_mac and current_mac != norm_mac:
+                return {
+                    "success": False,
+                    "detail": f"Slot {slot_num} ({label}) telah terkunci ke board MAC {current_mac}. Lepaskan board terlebih dahulu.",
+                    "current_mac": current_mac,
+                    "is_locked": True,
+                }
+
+            existing["board_mac"] = norm_mac
+            existing["updated_at"] = utc_now()
+            self._commit(data, f"Bind board {norm_mac} to slot {slot_num}")
+        return {"success": True, "slot": slot_num, "board_mac": norm_mac, "label": label, "is_locked": True}
+
+    def detach_board_from_slot(self, owner_id: int, slot: int = 1, request_id: str = "") -> bool:
+        slot_num = int(slot or 1)
+        with self._lock:
+            data = self._load()
+            existing = next(
+                (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == slot_num),
+                None,
+            )
+            if not existing or not existing.get("board_mac"):
+                return False
+            existing["board_mac"] = ""
+            existing["updated_at"] = utc_now()
+            self._commit(data, f"Detach board from slot {slot_num}")
+        return True
+
+    def update_slot_label(self, owner_id: int, slot: int = 1, device_label: str = "", request_id: str = "") -> bool:
+        slot_num = int(slot or 1)
+        label_clean = (device_label or "").strip()[:60] or f"Slot {slot_num}"
+        with self._lock:
+            data = self._load()
+            existing = next(
+                (item for item in data["xiaozhi_tokens"] if int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == slot_num),
+                None,
+            )
+            if not existing:
+                return False
+            existing["device_label"] = label_clean
+            existing["updated_at"] = utc_now()
+            self._commit(data, f"Update slot {slot_num} label")
+        return True
 
     def get_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> Optional[str]:
         with self._lock:
@@ -1207,10 +1277,13 @@ class HFJsonStore:
                 return None
             token_hash = normalize_token_hash(existing.get("token_hash", "")) or xiaozhi_token_hash(token)
             slot_num = int(existing.get("slot_number", 1) or 1)
+            board_mac = (existing.get("board_mac") or "").strip().upper()
             return {
                 "user_id": int(owner_id),
                 "slot_number": slot_num,
                 "device_label": existing.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+                "board_mac": board_mac,
+                "is_locked": bool(board_mac),
                 "token": token,
                 "token_hash": token_hash,
                 "preview": f"{token[:4]}...{token[-4:]}" if len(token) > 8 else token,
@@ -1228,9 +1301,12 @@ class HFJsonStore:
                     token = decrypt_secret(item.get("token_ciphertext", ""))
                     slot_num = int(item.get("slot_number", 1) or 1)
                     token_hash = normalize_token_hash(item.get("token_hash", "")) or xiaozhi_token_hash(token)
+                    board_mac = (item.get("board_mac") or "").strip().upper()
                     tokens.append({
                         "slot_number": slot_num,
                         "device_label": item.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+                        "board_mac": board_mac,
+                        "is_locked": bool(board_mac),
                         "preview": f"{token[:4]}...{token[-4:]}" if token and len(token) > 8 else token,
                         "token_hash": token_hash,
                         "created_at": item.get("created_at", ""),
@@ -1239,7 +1315,7 @@ class HFJsonStore:
             tokens.sort(key=lambda x: x["slot_number"])
             return tokens
 
-    def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> bool:
+    def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None, request_id: str = "") -> bool:
         with self._lock:
             data = self._load()
             before = len(data["xiaozhi_tokens"])
@@ -1256,6 +1332,13 @@ class HFJsonStore:
             changed = len(data["xiaozhi_tokens"]) != before
             if changed:
                 self._commit(data, "Delete Xiaozhi token")
+        remaining = any(int(item.get("user_id", 0)) == int(owner_id) for item in data.get("xiaozhi_tokens", []))
+        if not remaining:
+            try:
+                self.detach_user_devices(int(owner_id), reason="Semua slot MCP Xiaozhi diputus / dihapus")
+            except Exception as exc:
+                logger.warning("Gagal detach devices memory user %s: %s", owner_id, exc)
+        return changed
         remaining = any(int(item.get("user_id", 0)) == int(owner_id) for item in data.get("xiaozhi_tokens", []))
         if not remaining:
             try:
@@ -2314,38 +2397,47 @@ class HFJsonStore:
                         h["last_active_at"] = now
             self._commit(data, "Record device activity")
 
-    def get_board_binding_history(self, device_mac: str) -> List[Dict[str, Any]]:
-        norm = normalize_mac_address(device_mac)
-        if not norm:
-            return []
+    def get_board_binding_history(
+        self,
+        device_mac: str = "",
+        user_id: Optional[int] = None,
+        slot: Optional[int] = None,
+        slot_number: Optional[int] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        if isinstance(device_mac, int):
+            user_id = device_mac
+            device_mac = ""
+        target_slot = slot_number if slot_number is not None else slot
+
         with self._lock:
             data = self._load()
-            rows = [
-                dict(h) for h in data.get("board_binding_history", [])
-                if normalize_mac_address(h.get("device_mac", "")).lower() == norm.lower()
-            ]
+            rows = []
+            norm_filter = normalize_mac_address(device_mac).lower() if device_mac else ""
+            clean_filter = device_mac.replace(":", "").replace("-", "").strip().lower() if device_mac else ""
+
+            for h in data.get("board_binding_history", []):
+                if user_id is not None and int(h.get("user_id", 0)) != int(user_id):
+                    continue
+                if target_slot is not None and int(h.get("slot_number", 1)) != int(target_slot):
+                    continue
+                if device_mac:
+                    hmac = str(h.get("device_mac", "")).strip().lower()
+                    hclean = hmac.replace(":", "").replace("-", "")
+                    if hmac != norm_filter and hclean != clean_filter and hmac != device_mac.strip().lower():
+                        continue
+                rows.append(dict(h))
             rows.sort(key=lambda x: (str(x.get("linked_at", "")), int(x.get("id", 0))), reverse=True)
-            for r in rows:
+            res = rows[:limit]
+            for r in res:
                 r["linked_at_str"] = str(r.get("linked_at", ""))
                 r["last_active_str"] = str(r.get("last_active_at", ""))
                 r["unlinked_at_str"] = str(r.get("unlinked_at", "")) if r.get("unlinked_at") else None
                 r["status_label"] = "Sedang Tertaut" if r.get("status") == "ACTIVE" else "Terputus / Riwayat Lampau"
-            return rows
+            return res
 
     def get_user_board_history(self, user_id: int) -> List[Dict[str, Any]]:
-        with self._lock:
-            data = self._load()
-            rows = [
-                dict(h) for h in data.get("board_binding_history", [])
-                if int(h.get("user_id", 0)) == int(user_id)
-            ]
-            rows.sort(key=lambda x: (str(x.get("linked_at", "")), int(x.get("id", 0))), reverse=True)
-            for r in rows:
-                r["linked_at_str"] = str(r.get("linked_at", ""))
-                r["last_active_str"] = str(r.get("last_active_at", ""))
-                r["unlinked_at_str"] = str(r.get("unlinked_at", "")) if r.get("unlinked_at") else None
-                r["status_label"] = "Sedang Tertaut" if r.get("status") == "ACTIVE" else "Terputus / Riwayat Lampau"
-            return rows
+        return self.get_board_binding_history(user_id=int(user_id))
 
     def list_all_devices(self) -> List[Dict[str, Any]]:
         with self._lock:

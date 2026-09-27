@@ -145,6 +145,7 @@ class SQLiteStore:
                 user_id INTEGER NOT NULL,
                 slot_number INTEGER NOT NULL DEFAULT 1,
                 device_label TEXT NOT NULL DEFAULT 'XiaoZhi 1',
+                board_mac TEXT NOT NULL DEFAULT '',
                 token_ciphertext TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
                 created_at TEXT NOT NULL,
@@ -162,6 +163,9 @@ class SQLiteStore:
                 token_hash TEXT,
                 source TEXT NOT NULL DEFAULT 'mcp_tool',
                 tool_name TEXT NOT NULL,
+                slot_number INTEGER NOT NULL DEFAULT 1,
+                device_mac TEXT NOT NULL DEFAULT '',
+                request_id TEXT NOT NULL DEFAULT '',
                 user_message TEXT,
                 xiaozhi_answer TEXT,
                 request_payload TEXT,
@@ -240,6 +244,9 @@ class SQLiteStore:
                 username TEXT,
                 device_name TEXT,
                 device_type TEXT,
+                slot_number INTEGER NOT NULL DEFAULT 1,
+                request_id TEXT,
+                action TEXT NOT NULL DEFAULT 'bind',
                 linked_at TEXT NOT NULL,
                 last_active_at TEXT NOT NULL,
                 unlinked_at TEXT,
@@ -250,6 +257,7 @@ class SQLiteStore:
             );
             CREATE INDEX IF NOT EXISTS idx_board_hist_mac ON board_binding_history(device_mac);
             CREATE INDEX IF NOT EXISTS idx_board_hist_user ON board_binding_history(user_id);
+            CREATE INDEX IF NOT EXISTS idx_board_hist_slot ON board_binding_history(slot_number);
 
             -- User Playlists
             CREATE TABLE IF NOT EXISTS user_playlists (
@@ -391,7 +399,7 @@ class SQLiteStore:
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid)")
 
-        # Migration check: Pastikan xiaozhi_tokens mendukung multi-slot (hingga 3 slot)
+        # Migration check: Pastikan xiaozhi_tokens mendukung multi-slot dan board_mac
         try:
             token_cols = [r["name"] for r in conn.execute("PRAGMA table_info(xiaozhi_tokens)").fetchall()]
             if token_cols and "slot_number" not in token_cols:
@@ -400,6 +408,7 @@ class SQLiteStore:
                         user_id INTEGER NOT NULL,
                         slot_number INTEGER NOT NULL DEFAULT 1,
                         device_label TEXT NOT NULL DEFAULT 'XiaoZhi 1',
+                        board_mac TEXT NOT NULL DEFAULT '',
                         token_ciphertext TEXT NOT NULL,
                         token_hash TEXT NOT NULL,
                         created_at TEXT NOT NULL,
@@ -409,13 +418,35 @@ class SQLiteStore:
                     );
                 """)
                 conn.execute("""
-                    INSERT OR IGNORE INTO xiaozhi_tokens_v2 (user_id, slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at)
-                    SELECT user_id, 1, 'XiaoZhi 1', token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens;
+                    INSERT OR IGNORE INTO xiaozhi_tokens_v2 (user_id, slot_number, device_label, board_mac, token_ciphertext, token_hash, created_at, updated_at)
+                    SELECT user_id, 1, 'XiaoZhi 1', '', token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens;
                 """)
                 conn.execute("DROP TABLE xiaozhi_tokens;")
                 conn.execute("ALTER TABLE xiaozhi_tokens_v2 RENAME TO xiaozhi_tokens;")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_tokens_hash ON xiaozhi_tokens(token_hash);")
                 conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);")
+            elif token_cols and "board_mac" not in token_cols:
+                conn.execute("ALTER TABLE xiaozhi_tokens ADD COLUMN board_mac TEXT NOT NULL DEFAULT '';")
+
+            # Migration check chat_history
+            chat_cols = [r["name"] for r in conn.execute("PRAGMA table_info(chat_history)").fetchall()]
+            if chat_cols:
+                if "slot_number" not in chat_cols:
+                    conn.execute("ALTER TABLE chat_history ADD COLUMN slot_number INTEGER NOT NULL DEFAULT 1;")
+                if "device_mac" not in chat_cols:
+                    conn.execute("ALTER TABLE chat_history ADD COLUMN device_mac TEXT NOT NULL DEFAULT '';")
+                if "request_id" not in chat_cols:
+                    conn.execute("ALTER TABLE chat_history ADD COLUMN request_id TEXT NOT NULL DEFAULT '';")
+
+            # Migration check board_binding_history
+            bbh_cols = [r["name"] for r in conn.execute("PRAGMA table_info(board_binding_history)").fetchall()]
+            if bbh_cols:
+                if "slot_number" not in bbh_cols:
+                    conn.execute("ALTER TABLE board_binding_history ADD COLUMN slot_number INTEGER NOT NULL DEFAULT 1;")
+                if "request_id" not in bbh_cols:
+                    conn.execute("ALTER TABLE board_binding_history ADD COLUMN request_id TEXT;")
+                if "action" not in bbh_cols:
+                    conn.execute("ALTER TABLE board_binding_history ADD COLUMN action TEXT NOT NULL DEFAULT 'bind';")
         except Exception as exc:
             logger.warning("SQLite xiaozhi_tokens migration error: %s", exc)
 
@@ -875,24 +906,125 @@ class SQLiteStore:
 
     # ── XiaoZhi Tokens (MCP, Maksimal 3 Slot per Akun) ─────────────────────
 
-    def set_xiaozhi_token(self, owner_id: int, token: str, slot: int = 1, device_label: str = "") -> None:
+    def set_xiaozhi_token(self, owner_id: int, token: str, slot: int = 1, device_label: str = "", request_id: str = "") -> None:
         slot_num = int(slot or 1)
         if slot_num < 1 or slot_num > 3:
             raise ValueError("Slot token XiaoZhi hanya diizinkan untuk Slot 1, 2, atau 3.")
         encrypted = encrypt_secret(token.strip())
         token_hash = xiaozhi_token_hash(token.strip())
-        label_clean = (device_label or "").strip()[:60] or f"XiaoZhi {slot_num}"
+        now = utc_now()
         conn = self._get_conn()
+        existing = conn.execute(
+            "SELECT token_hash, board_mac, device_label FROM xiaozhi_tokens WHERE user_id = ? AND slot_number = ?",
+            (owner_id, slot_num)
+        ).fetchone()
+
+        u_row = conn.execute("SELECT username FROM users WHERE id = ?", (owner_id,)).fetchone()
+        username = u_row["username"] if u_row else f"user_{owner_id}"
+        default_label = f"{username} - Slot 1" if slot_num == 1 else f"XiaoZhi {slot_num}"
+        label_clean = (device_label or "").strip()[:60] or (existing["device_label"] if existing else "") or default_label
+
+        new_board_mac = ""
+        if existing:
+            if existing["token_hash"] == token_hash:
+                new_board_mac = existing["board_mac"] or ""
+            else:
+                new_board_mac = ""
+        else:
+            new_board_mac = ""
+
         conn.execute("""
-            INSERT INTO xiaozhi_tokens (user_id, slot_number, device_label, token_ciphertext, token_hash, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO xiaozhi_tokens (user_id, slot_number, device_label, board_mac, token_ciphertext, token_hash, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, slot_number) DO UPDATE SET
                 device_label=excluded.device_label,
+                board_mac=excluded.board_mac,
                 token_ciphertext=excluded.token_ciphertext,
                 token_hash=excluded.token_hash,
                 updated_at=excluded.updated_at
-        """, (owner_id, slot_num, label_clean, encrypted, token_hash, utc_now(), utc_now()))
+        """, (owner_id, slot_num, label_clean, new_board_mac, encrypted, token_hash, now, now))
         conn.commit()
+
+    def bind_board_to_slot(self, owner_id: int, slot: int = 1, device_mac: str = "", request_id: str = "") -> Dict[str, Any]:
+        """Kunci board hardware MAC ke slot tertentu secara read-only (anti-spoofing)."""
+        norm_mac = normalize_mac_address(device_mac)
+        if not norm_mac:
+            return {"success": False, "detail": "Format MAC address tidak valid."}
+        slot_num = int(slot or 1)
+        now = utc_now()
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT board_mac, device_label FROM xiaozhi_tokens WHERE user_id = ? AND slot_number = ?",
+            (owner_id, slot_num)
+        ).fetchone()
+        if not row:
+            return {"success": False, "detail": f"Slot {slot_num} belum tersimpan endpoint MCP."}
+
+        current_mac = (row["board_mac"] or "").strip().upper()
+        label = row["device_label"] or f"Slot {slot_num}"
+        if current_mac and current_mac != norm_mac:
+            return {
+                "success": False,
+                "detail": f"Slot {slot_num} ({label}) telah terkunci ke board MAC {current_mac}. Lepaskan board terlebih dahulu.",
+                "current_mac": current_mac,
+                "is_locked": True,
+            }
+
+        conn.execute(
+            "UPDATE xiaozhi_tokens SET board_mac = ?, updated_at = ? WHERE user_id = ? AND slot_number = ?",
+            (norm_mac, now, owner_id, slot_num)
+        )
+        u_row = conn.execute("SELECT username FROM users WHERE id = ?", (int(owner_id),)).fetchone()
+        username = u_row["username"] if u_row else f"user_{owner_id}"
+        conn.execute(
+            """
+            INSERT INTO board_binding_history 
+            (device_mac, user_id, username, device_name, device_type, slot_number, request_id, action, linked_at, last_active_at, status, notes, created_at)
+            VALUES (?, ?, ?, ?, 'ESP32_SLOT', ?, ?, 'bind', ?, ?, 'ACTIVE', ?, ?)
+            """,
+            (norm_mac, int(owner_id), username, label, slot_num, request_id or "", now, now, f"Terkunci ke Slot {slot_num} ({label})", now)
+        )
+        conn.commit()
+        return {"success": True, "slot": slot_num, "board_mac": norm_mac, "label": label, "is_locked": True, "request_id": request_id}
+
+    def detach_board_from_slot(self, owner_id: int, slot: int = 1, request_id: str = "") -> Dict[str, Any]:
+        slot_num = int(slot or 1)
+        now = utc_now()
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT board_mac, device_label FROM xiaozhi_tokens WHERE user_id = ? AND slot_number = ?",
+            (owner_id, slot_num)
+        ).fetchone()
+        if not row or not row["board_mac"]:
+            return {"success": False, "detail": f"Tidak ada board yang tertaut pada Slot {slot_num}."}
+        old_mac = row["board_mac"]
+        conn.execute(
+            "UPDATE xiaozhi_tokens SET board_mac = '', updated_at = ? WHERE user_id = ? AND slot_number = ?",
+            (now, owner_id, slot_num)
+        )
+        conn.execute(
+            """
+            UPDATE board_binding_history
+            SET unlinked_at = ?, status = 'DETACHED', action = 'detach',
+                notes = notes || ' | Dilepas dari Slot ' || ? || ' [Req: ' || ? || ']'
+            WHERE user_id = ? AND LOWER(device_mac) = LOWER(?) AND status = 'ACTIVE'
+            """,
+            (now, str(slot_num), request_id or "manual", int(owner_id), old_mac)
+        )
+        conn.commit()
+        return {"success": True, "slot": slot_num, "detached": True, "device_mac": old_mac, "request_id": request_id}
+
+    def update_slot_label(self, owner_id: int, slot: int = 1, device_label: str = "", request_id: str = "") -> bool:
+        slot_num = int(slot or 1)
+        label_clean = (device_label or "").strip()[:60] or f"Slot {slot_num}"
+        now = utc_now()
+        conn = self._get_conn()
+        cur = conn.execute(
+            "UPDATE xiaozhi_tokens SET device_label = ?, updated_at = ? WHERE user_id = ? AND slot_number = ?",
+            (label_clean, now, owner_id, slot_num)
+        )
+        conn.commit()
+        return cur.rowcount > 0
 
     def get_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> Optional[str]:
         conn = self._get_conn()
@@ -927,9 +1059,12 @@ class SQLiteStore:
         r = dict(row)
         token = decrypt_secret(r["token_ciphertext"])
         slot_num = int(r.get("slot_number", 1) or 1)
+        board_mac = (r.get("board_mac") or "").strip().upper()
         return {
             "slot_number": slot_num,
             "device_label": r.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+            "board_mac": board_mac,
+            "is_locked": bool(board_mac),
             "token_hash": r["token_hash"],
             "preview": f"{token[:4]}...{token[-4:]}" if token and len(token) > 8 else token,
             "created_at": r.get("created_at", ""),
@@ -948,9 +1083,12 @@ class SQLiteStore:
             r = dict(row)
             token = decrypt_secret(r["token_ciphertext"])
             slot_num = int(r.get("slot_number", 1) or 1)
+            board_mac = (r.get("board_mac") or "").strip().upper()
             result.append({
                 "slot_number": slot_num,
                 "device_label": r.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+                "board_mac": board_mac,
+                "is_locked": bool(board_mac),
                 "preview": f"{token[:4]}...{token[-4:]}" if token and len(token) > 8 else token,
                 "token_hash": r["token_hash"],
                 "created_at": r.get("created_at", ""),
@@ -958,7 +1096,7 @@ class SQLiteStore:
             })
         return result
 
-    def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> bool:
+    def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None, request_id: str = "") -> bool:
         conn = self._get_conn()
         if slot is not None:
             cursor = conn.execute("DELETE FROM xiaozhi_tokens WHERE user_id = ? AND slot_number = ?", (owner_id, int(slot)))
@@ -1023,16 +1161,33 @@ class SQLiteStore:
 
     # ── Chat History ───────────────────────────────────────────────────────
 
-    def add_chat_history(self, owner_id: int, *, source: str, tool_name: str, user_message: str = "", xiaozhi_answer: str = "", request_payload=None, response_payload=None, token_hash: str = "") -> Dict[str, Any]:
+    def add_chat_history(
+        self,
+        owner_id: int,
+        *,
+        source: str = "mcp_tool",
+        tool_name: str,
+        user_message: str = "",
+        xiaozhi_answer: str = "",
+        request_payload: Any = None,
+        response_payload: Any = None,
+        token_hash: str = "",
+        slot_number: int = 1,
+        device_mac: str = "",
+        request_id: str = "",
+    ) -> Dict[str, Any]:
         conn = self._get_conn()
         req_json = json.dumps(request_payload, default=str) if request_payload is not None else None
         res_json = json.dumps(response_payload, default=str) if response_payload is not None else None
+        slot_num = int(slot_number or 1)
+        clean_mac = (device_mac or "").strip().upper()
+        clean_req_id = (request_id or "").strip()
         now = utc_now()
         cur = conn.execute(
-            """INSERT INTO chat_history (owner_id, token_hash, source, tool_name, user_message, xiaozhi_answer, request_payload, response_payload, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO chat_history (owner_id, token_hash, source, tool_name, user_message, xiaozhi_answer, request_payload, response_payload, slot_number, device_mac, request_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (owner_id, token_hash or None, source, tool_name, user_message, xiaozhi_answer,
-             req_json, res_json, now)
+             req_json, res_json, slot_num, clean_mac, clean_req_id, now)
         )
         conn.commit()
         inserted_id = cur.lastrowid or 0
@@ -1046,6 +1201,9 @@ class SQLiteStore:
             "xiaozhi_answer": xiaozhi_answer,
             "request_payload": req_json,
             "response_payload": res_json,
+            "slot_number": slot_num,
+            "device_mac": clean_mac,
+            "request_id": clean_req_id,
             "created_at": now,
         }
         try:
@@ -1065,11 +1223,17 @@ class SQLiteStore:
         payload: Any = None,
         response_payload: Any = None,
         token_hash: str = "",
+        slot_number: int = 1,
+        device_mac: str = "",
+        request_id: str = "",
     ) -> Dict[str, Any]:
         user_message = str(user_message or "").strip()
         xiaozhi_answer = str(xiaozhi_answer or "").strip()
         res_json = json.dumps(response_payload, default=str) if response_payload is not None else None
         req_json = json.dumps(payload, default=str) if payload is not None else None
+        slot_num = int(slot_number or 1)
+        clean_mac = (device_mac or "").strip().upper()
+        clean_req_id = (request_id or "").strip()
 
         if xiaozhi_answer and not user_message:
             conn = self._get_conn()
@@ -1086,9 +1250,12 @@ class SQLiteStore:
                     """UPDATE chat_history
                        SET xiaozhi_answer = ?,
                            response_payload = COALESCE(?, response_payload),
-                           token_hash = COALESCE(?, token_hash)
+                           token_hash = COALESCE(?, token_hash),
+                           slot_number = COALESCE(NULLIF(?, 1), slot_number),
+                           device_mac = CASE WHEN ? != '' THEN ? ELSE device_mac END,
+                           request_id = CASE WHEN ? != '' THEN ? ELSE request_id END
                        WHERE id = ?""",
-                    (xiaozhi_answer, res_json, token_hash or None, p_id)
+                    (xiaozhi_answer, res_json, token_hash or None, slot_num, clean_mac, clean_mac, clean_req_id, clean_req_id, p_id)
                 )
                 conn.commit()
                 updated_row = conn.execute("SELECT * FROM chat_history WHERE id = ?", (p_id,)).fetchone()
@@ -1110,6 +1277,9 @@ class SQLiteStore:
             request_payload=payload,
             response_payload=response_payload,
             token_hash=token_hash,
+            slot_number=slot_num,
+            device_mac=clean_mac,
+            request_id=clean_req_id,
         )
 
     def list_chat_history(
@@ -1122,6 +1292,8 @@ class SQLiteStore:
         date: str = "",
         offset: int = 0,
         tool_name: str = "",
+        slot_number: Optional[int] = None,
+        device_mac: str = "",
     ) -> List[Dict[str, Any]]:
         conn = self._get_conn()
         sql = "SELECT * FROM chat_history WHERE owner_id = ?"
@@ -1138,6 +1310,14 @@ class SQLiteStore:
         if tool_name:
             sql += " AND tool_name = ?"
             params.append(tool_name)
+
+        if slot_number is not None:
+            sql += " AND slot_number = ?"
+            params.append(int(slot_number))
+
+        if device_mac:
+            sql += " AND UPPER(device_mac) = ?"
+            params.append(device_mac.strip().upper())
 
         # If semantic search is requested and query is provided, fetch a broader window and rank semantically
         if semantic and query.strip():
@@ -1645,15 +1825,36 @@ class SQLiteStore:
             conn.execute("UPDATE board_binding_history SET last_active_at = ? WHERE LOWER(device_mac) = ? AND status = 'ACTIVE'", (now_str, norm.lower()))
         conn.commit()
 
-    def get_board_binding_history(self, device_mac: str) -> List[Dict[str, Any]]:
-        norm = normalize_mac_address(device_mac)
-        if not norm:
-            return []
+    def get_board_binding_history(
+        self,
+        device_mac: str = "",
+        user_id: Optional[int] = None,
+        slot: Optional[int] = None,
+        slot_number: Optional[int] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        if isinstance(device_mac, int):
+            user_id = device_mac
+            device_mac = ""
+        target_slot = slot_number if slot_number is not None else slot
+
         conn = self._get_conn()
-        rows = conn.execute(
-            "SELECT * FROM board_binding_history WHERE LOWER(device_mac) = ? OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = ? ORDER BY id DESC",
-            (norm.lower(), norm.replace(":", "").replace("-", "").lower())
-        ).fetchall()
+        sql = "SELECT bbh.*, rd.is_protected FROM board_binding_history bbh LEFT JOIN registered_devices rd ON LOWER(rd.device_id) = LOWER(bbh.device_mac) WHERE 1=1"
+        params: List[Any] = []
+        if user_id is not None:
+            sql += " AND bbh.user_id = ?"
+            params.append(int(user_id))
+        if target_slot is not None:
+            sql += " AND bbh.slot_number = ?"
+            params.append(int(target_slot))
+        if device_mac:
+            norm = normalize_mac_address(device_mac) or str(device_mac).strip()
+            clean = norm.replace(":", "").replace("-", "").lower()
+            sql += " AND (LOWER(bbh.device_mac) = ? OR LOWER(REPLACE(REPLACE(bbh.device_mac, ':', ''), '-', '')) = ?)"
+            params.extend([norm.lower(), clean])
+        sql += " ORDER BY bbh.id DESC LIMIT ?"
+        params.append(int(limit or 50))
+        rows = conn.execute(sql, params).fetchall()
         res = []
         for r in rows:
             item = dict(r)
@@ -1665,20 +1866,7 @@ class SQLiteStore:
         return res
 
     def get_user_board_history(self, user_id: int) -> List[Dict[str, Any]]:
-        conn = self._get_conn()
-        rows = conn.execute(
-            "SELECT bbh.*, rd.is_protected FROM board_binding_history bbh LEFT JOIN registered_devices rd ON LOWER(rd.device_id) = LOWER(bbh.device_mac) WHERE bbh.user_id = ? ORDER BY bbh.id DESC",
-            (int(user_id),)
-        ).fetchall()
-        res = []
-        for r in rows:
-            item = dict(r)
-            item["linked_at_str"] = str(item.get("linked_at", ""))
-            item["last_active_str"] = str(item.get("last_active_at", ""))
-            item["unlinked_at_str"] = str(item.get("unlinked_at", "")) if item.get("unlinked_at") else None
-            item["status_label"] = "Sedang Tertaut" if item.get("status") == "ACTIVE" else "Terputus / Riwayat Lampau"
-            res.append(item)
-        return res
+        return self.get_board_binding_history(user_id=int(user_id))
 
     def list_all_devices(self) -> List[Dict[str, Any]]:
         conn = self._get_conn()
@@ -1901,9 +2089,9 @@ class SQLiteStore:
 
         # Get all MCP connection states (import here to avoid circular import)
         try:
-            from xiaozhi.services.mcp_service import mcp_connection_states, mcp_state_lock, mcp_bridge_tasks
+            from xiaozhi.services.mcp_service import mcp_connection_states, mcp_state_lock
             with mcp_state_lock:
-                all_mcp_states = {int(uid): dict(state) for uid, state in mcp_connection_states.items()}
+                all_mcp_states = {str(k): dict(state) for k, state in mcp_connection_states.items()}
         except ImportError:
             all_mcp_states = {}
 
@@ -1927,6 +2115,35 @@ class SQLiteStore:
             ).fetchone()
             device_mac = str(dev_row["device_id"]).upper() if dev_row and dev_row["device_id"] else ""
             device_name = dev_row["device_name"] if dev_row and dev_row["device_name"] else ""
+
+            # Detail 3 slot XiaoZhi tokens
+            tok_rows = conn.execute(
+                "SELECT slot_number, device_label, board_mac, token_hash FROM xiaozhi_tokens WHERE user_id = ? ORDER BY slot_number ASC",
+                (user_id,)
+            ).fetchall()
+            user_slots = []
+            for tr in tok_rows:
+                s_num = int(tr["slot_number"] or 1)
+                s_mac = (tr["board_mac"] or "").strip().upper()
+                s_label = tr["device_label"] or f"Slot {s_num}"
+                s_hash = tr["token_hash"] or ""
+                s_state = all_mcp_states.get(f"{user_id}:{s_num}", {})
+                s_connected = bool(s_state.get("connected", False))
+                user_slots.append({
+                    "slot_number": s_num,
+                    "device_label": s_label,
+                    "board_mac": s_mac,
+                    "is_locked": bool(s_mac),
+                    "connected": s_connected,
+                    "message": s_state.get("message", ""),
+                    "token_hash": s_hash,
+                })
+
+            if not device_mac and user_slots:
+                for s_item in user_slots:
+                    if s_item["board_mac"]:
+                        device_mac = s_item["board_mac"]
+                        break
 
             # Check if user is currently playing music in playback_tracker
             active_session = None
@@ -1970,11 +2187,9 @@ class SQLiteStore:
                     pass
 
             # Check MCP status from real-time connection states
-            mcp_state = all_mcp_states.get(user_id, {})
-            has_token = conn.execute("SELECT COUNT(*) FROM xiaozhi_tokens WHERE user_id = ?", (user_id,)).fetchone()[0] > 0
-            is_connected = mcp_state.get("connected", False)
-            bridge_task = mcp_bridge_tasks.get(user_id) if 'mcp_bridge_tasks' in dir() else None
-            bridge_running = bridge_task is not None and not bridge_task.done() if bridge_task else False
+            mcp_state = all_mcp_states.get(str(user_id), {}) or all_mcp_states.get(f"{user_id}:1", {})
+            has_token = len(user_slots) > 0
+            is_connected = any(s["connected"] for s in user_slots) if user_slots else mcp_state.get("connected", False)
 
             result.append({
                 "id": user_id,
@@ -1986,11 +2201,12 @@ class SQLiteStore:
                 "features": self.get_user_features(user_id),
                 "device_mac": device_mac,
                 "device_name": device_name,
+                "slots": user_slots,
                 "is_playing": is_playing,
                 "current_track": current_track,
                 "mcp_status": {
                     "has_token": has_token,
-                    "connected": is_connected or bridge_running,
+                    "connected": is_connected,
                     "message": mcp_state.get("message", ""),
                     "updated_at": mcp_state.get("updated_at", ""),
                 },
