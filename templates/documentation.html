@@ -2215,31 +2215,170 @@ void ackCommand(String cmdId) {
                 <div class="doc-section-title">
                     <span>📌</span> Referensi Pinout Hardware ESP32-S3
                 </div>
+                <div class="doc-step-desc" style="margin-bottom:14px;">
+                    Tabel pemetaan pin GPIO hardware untuk ESP32-S3 N16R8 (Simplex Dual I2S Bus, Layar ST7789 SPI, dan Tombol Kendali):
+                </div>
 
-                <div class="doc-code">
-<strong>[ Microphone INMP441 (I2S Input) ]</strong>
-• SCK (Bit Clock)    : GPIO 2
-• WS  (Word Select)  : GPIO 1
-• SD  (Serial Data)  : GPIO 42
-• L/R & GND          : GND
-• VDD                : 3.3V
+                <!-- Sub-tabel 1: Audio I2S (Mic & Speaker) -->
+                <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:14px 0 8px; display:flex; align-items:center; gap:6px;">
+                    <span>🎙️ &amp; 🔊</span> Audio I2S (INMP441 Microphone &amp; MAX98357A Speaker Amplifier)
+                </div>
+                <div style="overflow-x:auto; margin-bottom:16px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Modul</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:20%;">Pin Modul</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:25%;">Pin ESP32-S3</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Keterangan &amp; Catu Daya</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="5" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    Microphone<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">INMP441 (I2S Input)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>VDD</code> / <code>GND</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>3.3V</strong> / <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Catu daya stabil 3.3V &amp; Ground bersama</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>L/R</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Wajib ke Ground (Mono channel kiri)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SCK</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 2</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Serial Bit Clock (I2S Input)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>WS</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 1</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Word Select / Left-Right Clock</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SD</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 42</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Serial Data Masuk dari Mic</td>
+                            </tr>
 
-<strong>[ Speaker MAX98357A (I2S Output) ]</strong>
-• BCLK (Bit Clock)   : GPIO 40
-• LRC  (Word Select) : GPIO 41
-• DIN  (Serial Data) : GPIO 39
-• GND                : GND
-• VIN                : 5V (Disarankan) atau 3.3V
+                            <tr style="background:var(--app-surface-muted);">
+                                <td rowspan="5" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    Speaker Amplifier<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">MAX98357A (I2S Output)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>VIN</code> / <code>GND</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>5V</strong> / <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Disarankan 5V (atau 3.3V) &amp; Ground bersama</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>BCLK</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 40</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Bit Clock Speaker (I2S Output)</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>LRC</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 41</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Left / Right Clock (WS) Speaker</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>DIN</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 39</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Serial Data Keluar ke Amplifier</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>GAIN</code> / <code>SD_MODE</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><em>Opsional</em></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Gain default 9dB (GND) atau 12dB (lepas)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-<strong>[ Layar ST7789 SPI (Opsional) ]</strong>
-• SCL / CLK  : GPIO 12        • RES / RST : GPIO 47
-• SDA / MOSI : GPIO 11        • CS        : GPIO 45 (Khusus 8-Pin)
-• DC / RS    : GPIO 48        • BL / PWM  : GPIO 38
+                <!-- Sub-tabel 2: Layar LCD ST7789 SPI -->
+                <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:16px 0 8px; display:flex; align-items:center; gap:6px;">
+                    <span>🖥️</span> Layar LCD IPS ST7789 SPI (Opsional)
+                </div>
+                <div style="overflow-x:auto; margin-bottom:16px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin Modul ST7789</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin ESP32-S3</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Keterangan &amp; Fungsi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>VCC</code> / <code>GND</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>3.3V</strong> / <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Catu daya layar 3.3V &amp; Ground</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SCL</code> / <code>CLK</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 12</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">SPI Bus Clock</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SDA</code> / <code>MOSI</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 11</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">SPI Master Out Data</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>RES</code> / <code>RST</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 47</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Hardware Reset Layar</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>DC</code> / <code>RS</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 48</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Data / Command Control</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>CS</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 45</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Chip Select (Khusus varian 8-Pin; modul 7-Pin tanpa pin CS)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>BLK</code> / <code>BL</code> / <code>PWM</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 38</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Kontrol Backlight PWM Dimming</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-<strong>[ Tombol Fisik (Active Low - Internal Pull-up) ]</strong>
-• Tombol BOOT / AI Voice : GPIO 0
-• Tombol Volume UP       : GPIO 14
-• Tombol Volume DOWN     : GPIO 46
+                <!-- Sub-tabel 3: Tombol Fisik -->
+                <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:16px 0 8px; display:flex; align-items:center; gap:6px;">
+                    <span>🔘</span> Tombol Fisik (Active Low - Internal Pull-Up)
+                </div>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Tombol</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin ESP32-S3</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Wiring &amp; Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol BOOT / AI Voice</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 0</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Hubungkan pin tombol ke GPIO 0 dan kaki lainnya ke <strong>GND</strong></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Volume UP</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 14</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Hubungkan pin tombol ke GPIO 14 dan kaki lainnya ke <strong>GND</strong></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Volume DOWN</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 46</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Hubungkan pin tombol ke GPIO 46 dan kaki lainnya ke <strong>GND</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -2412,28 +2551,145 @@ void ackCommand(String cmdId) {
                 <div class="doc-section-title">
                     <span>📌</span> Referensi Pinout Hardware ESP32-C3 Mini
                 </div>
+                <div class="doc-step-desc" style="margin-bottom:14px;">
+                    Tabel pemetaan pin GPIO hardware untuk ESP32-C3 Super Mini (I2S Shared-Clock Audio, Layar OLED I2C, Tombol, dan Sensor Baterai):
+                </div>
 
-                <div class="doc-code">
-<strong>[ I2S Audio Bus (Shared Clock Full Duplex) ]</strong>
-• BCLK / SCK (Bit Clock Bersama) : GPIO 5  ──> Hubungkan ke SCK (INMP441) & BCLK (MAX98357A)
-• WS / LRC (Word Select Bersama) : GPIO 6  ──> Hubungkan ke WS (INMP441) & LRC (MAX98357A)
-• Data Mic Masuk (SD INMP441)    : GPIO 4
-• Data Speaker Keluar (DIN MAX)  : GPIO 7
-• Catu Daya Speaker (VIN)        : 5V (Wajib 5V dari USB/VBUS untuk suara jernih & kencang)
-• Catu Daya Mic (VDD)            : 3.3V
-• GND Mic L/R                    : GND (Wajib terhubung ke Ground untuk mono channel kiri)
+                <!-- Sub-tabel 1: I2S Audio Shared Clock -->
+                <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:14px 0 8px; display:flex; align-items:center; gap:6px;">
+                    <span>🎙️ &amp; 🔊</span> Audio I2S Bus (Shared Clock Full Duplex: INMP441 + MAX98357A)
+                </div>
+                <div style="overflow-x:auto; margin-bottom:16px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Modul</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:20%;">Pin Modul</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:25%;">Pin ESP32-C3</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Keterangan &amp; Catu Daya</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="5" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    Microphone<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">INMP441 (I2S Mic)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>VDD</code> / <code>GND</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>3.3V</strong> / <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Catu daya 3.3V stabil &amp; Ground bersama</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>L/R</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Wajib ke GND (mono channel kiri)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SCK</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 5</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Bit Clock bersama (Paralel ke BCLK MAX98357A)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>WS</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 6</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Word Select bersama (Paralel ke LRC MAX98357A)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SD</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 4</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Serial Data Masuk dari Mic</td>
+                            </tr>
 
-<strong>[ Layar OLED SSD1306 128x64 (I2C) ]</strong>
-• SDA Data   : GPIO 0
-• SCL Clock  : GPIO 10
-• Daya       : 3.3V & GND
+                            <tr style="background:var(--app-surface-muted);">
+                                <td rowspan="4" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    Amplifier Speaker<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">MAX98357A</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>VIN</code> / <code>GND</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>5V (USB/VBUS)</strong> / <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);"><strong>Wajib 5V</strong> untuk suara jernih &amp; kencang</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>BCLK</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 5</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Bit Clock bersama (Paralel dari SCK INMP441)</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>LRC</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 6</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Word Select bersama (Paralel dari WS INMP441)</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>DIN</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 7</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Serial Data Keluar ke Amplifier</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-<strong>[ Tombol Fisik (Active Low - Terhubung ke GND saat ditekan) ]</strong>
-• Tombol Utama (Bicara / Klik 2x Chronchi / Tahan 5s Setup Wi-Fi) : GPIO 3
-• Tombol Sekunder (Toggle Hands-free / Reset SSID)                 : GPIO 2
+                <!-- Sub-tabel 2: Layar OLED SSD1306 -->
+                <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:16px 0 8px; display:flex; align-items:center; gap:6px;">
+                    <span>📺</span> Layar OLED SSD1306 128x64 (I2C)
+                </div>
+                <div style="overflow-x:auto; margin-bottom:16px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin Modul OLED</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin ESP32-C3</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Keterangan &amp; Fungsi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>VCC</code> / <code>GND</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>3.3V</strong> / <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Catu daya layar 3.3V &amp; Ground</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SDA</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 0</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">I2C Serial Data</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SCL</code></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 10</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">I2C Serial Clock</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-<strong>[ Sensor Pembagi Tegangan Baterai 1S (Opsional) ]</strong>
-• ADC1_CH1 : GPIO 1 (Menggunakan resistor pembagi tegangan 100kΩ / 100kΩ dari BAT+)
+                <!-- Sub-tabel 3: Tombol Fisik & Sensor Baterai -->
+                <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:16px 0 8px; display:flex; align-items:center; gap:6px;">
+                    <span>🔘 &amp; 🔋</span> Tombol Fisik &amp; Sensor Baterai 1S
+                </div>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Komponen / Fitur</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin ESP32-C3</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Wiring &amp; Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Utama</strong> (Bicara / Wi-Fi)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 3</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);"><em>Active Low</em>: Hubungkan kaki tombol ke GPIO 3 &amp; kaki lainnya ke <strong>GND</strong></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Sekunder</strong> (Hands-free / Reset)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 2</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);"><em>Active Low</em>: Hubungkan kaki tombol ke GPIO 2 &amp; kaki lainnya ke <strong>GND</strong></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Sensor Pembagi Tegangan Baterai 1S</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 1</strong> (<code>ADC1_CH1</code>)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Titik tengah resistor pembagi tegangan 100kΩ / 100kΩ dari <strong>BAT+</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
