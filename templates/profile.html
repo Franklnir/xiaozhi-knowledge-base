@@ -896,8 +896,8 @@
                     <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
                 </div>
                 <button type="button" onclick="viewBoardHistory('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #3b82f6; font-weight: 700; cursor: pointer;">📜 Riwayat Tautan Board</button>
-                <button type="button" onclick="unlinkMyBoard('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-weight: 700; cursor: pointer;" title="Pisahkan board ini dari akun Anda agar bisa menautkan board lain">✂️ Putus Tautan</button>
                 {% if user.role == 'admin' %}
+                <button type="button" onclick="unlinkMyBoard('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-weight: 700; cursor: pointer;" title="Pisahkan board ini (Hanya Admin)">✂️ Putus Tautan (Admin)</button>
                 <button type="button" onclick="promptSaveMac('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">✏️ Ganti MAC</button>
                 {% endif %}
                 {% elif mcp_status.connected %}

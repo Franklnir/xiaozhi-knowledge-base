@@ -89,6 +89,8 @@ async def save_mcp_token(body: SaveMcpRequest, request: Request):
 
     store = get_store()
     try:
+        if hasattr(store, "detach_user_devices"):
+            store.detach_user_devices(user["id"], reason="MCP endpoint diperbarui oleh user")
         store.set_xiaozhi_token(user["id"], token)
         token_info = store.get_xiaozhi_token_info(user["id"])
         token_hash = token_info.get("token_hash", "") if token_info else ""
