@@ -150,29 +150,32 @@ async def mcp_background_task(store, mcp_server):
 
             # Launch bridges for users not yet connected (mendukung hingga 3 slot per akun)
             for token_info in tokens:
-                user_id = int(token_info["user_id"])
-                slot = int(token_info.get("slot_number", 1) or 1)
-                task_key = f"{user_id}:{slot}"
-                if task_key in mcp_bridge_tasks and not mcp_bridge_tasks[task_key].done():
-                    continue  # Already running
+                try:
+                    user_id = int(token_info["user_id"])
+                    slot = int(token_info.get("slot_number", 1) or 1)
+                    task_key = f"{user_id}:{slot}"
+                    if task_key in mcp_bridge_tasks and not mcp_bridge_tasks[task_key].done():
+                        continue  # Already running
 
-                # Check if user MCP is blocked by admin
-                if store.is_mcp_blocked(user_id):
-                    logger.info("MCP blocked for user_id=%s, skipping", user_id)
-                    continue
+                    # Check if user MCP is blocked by admin
+                    if store.is_mcp_blocked(user_id):
+                        logger.info("MCP blocked for user_id=%s, skipping", user_id)
+                        continue
 
-                url = token_info["token"]
-                if not url.startswith("wss://"):
-                    logger.warning("Token bukan wss://: user_id=%s slot=%s", user_id, slot)
-                    continue
-                from xiaozhi.core.security import normalize_token_hash, xiaozhi_token_hash
-                token_hash = normalize_token_hash(token_info.get("token_hash", "")) or xiaozhi_token_hash(url)
-                label = token_info.get("device_label", f"XiaoZhi {slot}") or f"XiaoZhi {slot}"
-                board_mac = token_info.get("board_mac", "") or ""
-                set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Menghubungkan {label} (Slot {slot})...", slot=slot, device_label=label, board_mac=board_mac)
-                logger.info("MCP bridge mencoba: user_id=%s slot=%s label=%s mac=%s", user_id, slot, label, board_mac)
-                task = asyncio.create_task(run_mcp_bridge(store, mcp_server, user_id, url, token_hash, slot=slot, device_label=label, board_mac=board_mac))
-                mcp_bridge_tasks[task_key] = task
+                    url = token_info["token"]
+                    if not url.startswith("wss://"):
+                        logger.warning("Token bukan wss://: user_id=%s slot=%s", user_id, slot)
+                        continue
+                    from xiaozhi.core.security import normalize_token_hash, xiaozhi_token_hash
+                    token_hash = normalize_token_hash(token_info.get("token_hash", "")) or xiaozhi_token_hash(url)
+                    label = token_info.get("device_label", f"XiaoZhi {slot}") or f"XiaoZhi {slot}"
+                    board_mac = token_info.get("board_mac", "") or ""
+                    set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Menghubungkan {label} (Slot {slot})...", slot=slot, device_label=label, board_mac=board_mac)
+                    logger.info("MCP bridge mencoba: user_id=%s slot=%s label=%s mac=%s", user_id, slot, label, board_mac)
+                    task = asyncio.create_task(run_mcp_bridge(store, mcp_server, user_id, url, token_hash, slot=slot, device_label=label, board_mac=board_mac))
+                    mcp_bridge_tasks[task_key] = task
+                except Exception as item_err:
+                    logger.exception("Gagal memproses token MCP per-user: user_id=%s slot=%s err=%s", token_info.get("user_id"), token_info.get("slot_number"), item_err)
 
             # Wait for reload signal OR timeout (check for new users every 30s)
             if mcp_reload_event:
