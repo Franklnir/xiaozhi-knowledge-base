@@ -3134,9 +3134,15 @@ class HFJsonStore:
         if not user_tracks:
             return None
 
-        # Check track number
-        match = re.search(r"(?:nomor|no\.?|ke-?|track|urutan|playlist)?\s*(\d+)", raw_q.lower())
-        track_num = int(raw_q) if raw_q.isdigit() else (int(match.group(1)) if match and match.group(1) else None)
+        # Check track number: ONLY if query is literally a number or has explicit keyword ("nomor 2", "track 3", "playlist 1")
+        track_num = None
+        if raw_q.isdigit():
+            track_num = int(raw_q)
+        else:
+            explicit_track_match = re.search(r"\b(?:nomor|no\.?|ke-?|track|urutan|playlist)\s*(\d+)\b", raw_q.lower())
+            if explicit_track_match:
+                track_num = int(explicit_track_match.group(1))
+
         if track_num is not None:
             for t in user_tracks:
                 if int(t.get("track_number", 0)) == track_num:

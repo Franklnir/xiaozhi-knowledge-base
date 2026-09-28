@@ -2740,13 +2740,14 @@ class SQLiteStore:
         import re
         from xiaozhi.core.utils import extract_youtube_video_id
 
-        # Check track number in query: e.g. "1", "nomor 2", "track 3", "playlist 1"
-        match = re.search(r"(?:nomor|no\.?|ke-?|track|urutan|playlist)?\s*(\d+)", raw_q.lower())
+        # Check track number in query: ONLY if query is literally a number (e.g. "1") or has explicit keyword ("nomor 2", "track 3", "playlist 1")
         track_num = None
         if raw_q.isdigit():
             track_num = int(raw_q)
-        elif match and match.group(1):
-            track_num = int(match.group(1))
+        else:
+            explicit_track_match = re.search(r"\b(?:nomor|no\.?|ke-?|track|urutan|playlist)\s*(\d+)\b", raw_q.lower())
+            if explicit_track_match:
+                track_num = int(explicit_track_match.group(1))
 
         conn = self._get_conn()
         if track_num is not None:
@@ -2774,10 +2775,10 @@ class SQLiteStore:
             """
             SELECT * FROM user_playlists 
             WHERE owner_id = ? AND (LOWER(title) LIKE ? OR LOWER(artist) LIKE ?)
-            ORDER BY play_count DESC, id ASC
+            ORDER BY (LOWER(title) = ?) DESC, play_count DESC, id ASC
             LIMIT 1
             """,
-            (int(owner_id), f"%{target_q.lower()}%", f"%{target_q.lower()}%"),
+            (int(owner_id), f"%{target_q.lower()}%", f"%{target_q.lower()}%", target_q.lower()),
         ).fetchone()
         return dict(row) if row else None
 

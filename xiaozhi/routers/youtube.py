@@ -104,6 +104,80 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
 def youtube_search(query: str, max_results: int = 5) -> list:
     if not yt_dlp:
         raise ValueError("yt_dlp tidak tersedia.")
+    raw_q = (query or "").strip()
+    if not raw_q:
+        return []
+
+    from xiaozhi.core.utils import extract_youtube_video_id
+
+    # 1. Direct YouTube Video URL or 11-character Video ID
+    direct_vid = extract_youtube_video_id(raw_q)
+    if direct_vid:
+        try:
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={direct_vid}", download=False)
+                if info:
+                    v_title = info.get("title", "") or f"YouTube Video ({direct_vid})"
+                    v_dur = info.get("duration_string", "")
+                    thumbs = info.get("thumbnails", [])
+                    v_thumb = thumbs[-1].get("url", "") if thumbs else ""
+                    return [{
+                        "title": v_title,
+                        "video_id": direct_vid,
+                        "video_url": f"https://www.youtube.com/watch?v={direct_vid}",
+                        "duration": v_dur,
+                        "thumbnail": v_thumb,
+                        "stream_url": f"/api/audio/stream/{direct_vid}",
+                    }]
+        except Exception as exc:
+            logger.warning("Direct video extraction for %s failed (%s), fallback to search", direct_vid, exc)
+
+    # 2. YouTube Playlist URL
+    m_list = re.search(r"[?&]list=([a-zA-Z0-9_-]+)", raw_q)
+    if m_list:
+        playlist_id = m_list.group(1)
+        try:
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": True,
+                "max_downloads": max_results,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                res = ydl.extract_info(f"https://www.youtube.com/playlist?list={playlist_id}", download=False)
+                entries = res.get("entries", [])
+                items = []
+                for entry in entries[:max_results]:
+                    entry_id = entry.get("id", "")
+                    if entry_id:
+                        thumbs = entry.get("thumbnails", [])
+                        items.append({
+                            "title": entry.get("title", ""),
+                            "video_id": entry_id,
+                            "video_url": f"https://www.youtube.com/watch?v={entry_id}",
+                            "duration": entry.get("duration_string", ""),
+                            "thumbnail": thumbs[-1].get("url", "") if thumbs else "",
+                            "stream_url": f"/api/audio/stream/{entry_id}",
+                        })
+                if items:
+                    return items
+        except Exception as exc:
+            logger.warning("Playlist extraction for %s failed (%s), fallback to search", playlist_id, exc)
+
+    # 3. Clean search keywords: strip conversational prefixes & suffixes
+    clean_q = re.sub(
+        r"(?i)^(?:tolong\s+)?(?:putar(?:kan)?|setel(?:kan)?|mainkan|cari(?:kan)?|dengarkan|play)\s+(?:lagu|musik|video)?\s*",
+        "",
+        raw_q,
+    ).strip()
+    clean_q = re.sub(r"(?i)\s+(?:di\s+)?youtube(?:\s+music)?$", "", clean_q).strip()
+    target_q = clean_q if clean_q else raw_q
+
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
@@ -112,7 +186,7 @@ def youtube_search(query: str, max_results: int = 5) -> list:
         "max_downloads": max_results,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        result = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
+        result = ydl.extract_info(f"ytsearch{max_results}:{target_q}", download=False)
         entries = result.get("entries", [])
         items = []
         for entry in entries[:max_results]:
