@@ -204,40 +204,152 @@
                 .mcp-bar-fill.connecting { width:60%; background:linear-gradient(90deg,#0369a1,#38bdf8,#0369a1); background-size:200%; animation:mcpShimmer 1.5s linear infinite }
                 .mcp-bar-fill.connected { width:100%; background:#047857 }
                 .mcp-bar-fill.idle { width:0%; background:#b91c1c }
+                /* 3 Slots MCP Grid Layout */
+                .mcp-slots-grid {
+                    display: grid !important;
+                    grid-template-columns: repeat(3, 1fr) !important;
+                    gap: 12px !important;
+                    margin-bottom: 18px !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                }
+                @media (max-width: 680px) {
+                    .mcp-slots-grid {
+                        grid-template-columns: 1fr !important;
+                        gap: 10px !important;
+                    }
+                }
                 .mcp-slot-tab {
-                    border: 2px solid #000;
-                    background: #f1f5f9;
-                    cursor: pointer;
-                    font-weight: 800;
-                    box-shadow: 2px 2px 0px #000;
-                    transition: all 0.15s ease;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    align-items: flex-start !important;
+                    justify-content: space-between !important;
+                    padding: 12px 14px !important;
+                    min-height: 68px !important;
+                    background: #f8fafc !important;
+                    border: 2px solid #0f172a !important;
+                    border-radius: 10px !important;
+                    cursor: pointer !important;
+                    box-shadow: 3px 3px 0px #0f172a !important;
+                    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                    text-align: left !important;
+                    position: relative !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    user-select: none !important;
                 }
                 .mcp-slot-tab:hover {
-                    background: #e2e8f0;
-                    transform: translate(-1px, -1px);
-                    box-shadow: 3px 3px 0px #000;
+                    background: #ffffff !important;
+                    transform: translate(-2px, -2px) !important;
+                    box-shadow: 5px 5px 0px #0f172a !important;
+                }
+                .mcp-slot-tab:active {
+                    transform: translate(1px, 1px) !important;
+                    box-shadow: 2px 2px 0px #0f172a !important;
                 }
                 .mcp-slot-tab.active {
                     background: #ffffff !important;
-                    border: 2.5px solid #000 !important;
-                    box-shadow: 3px 3px 0px #000 !important;
+                    border: 2.5px solid #047857 !important;
+                    box-shadow: 4px 4px 0px #047857 !important;
+                    outline: 2px solid rgba(4, 120, 87, 0.25) !important;
+                }
+                .slot-tab-header {
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: space-between !important;
+                    width: 100% !important;
+                    margin-bottom: 6px !important;
+                }
+                .slot-badge-tag {
+                    font-size: 11px !important;
+                    font-weight: 900 !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.05em !important;
+                    color: #475569 !important;
+                    background: #e2e8f0 !important;
+                    padding: 2px 7px !important;
+                    border-radius: 5px !important;
+                    border: 1px solid #cbd5e1 !important;
+                    line-height: 1.2 !important;
+                }
+                .mcp-slot-tab.active .slot-badge-tag {
+                    color: #047857 !important;
+                    background: #ecfdf5 !important;
+                    border-color: #a7f3d0 !important;
+                }
+                .slot-status-wrap {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    gap: 6px !important;
                 }
                 .slot-radar-dot {
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    display: inline-block;
+                    width: 9px !important;
+                    height: 9px !important;
+                    border-radius: 50% !important;
+                    display: inline-block !important;
+                    flex-shrink: 0 !important;
                 }
                 .slot-radar-dot.connected {
-                    background: #10b981;
-                    box-shadow: 0 0 6px #10b981;
+                    background: #10b981 !important;
+                    box-shadow: 0 0 8px #10b981 !important;
                 }
                 .slot-radar-dot.connecting {
-                    background: #0284c7;
-                    animation: mcpPulse 1.2s infinite;
+                    background: #0284c7 !important;
+                    animation: mcpPulse 1.2s infinite !important;
                 }
                 .slot-radar-dot.idle {
-                    background: #94a3b8;
+                    background: #94a3b8 !important;
+                }
+                .slot-status-text {
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    color: #64748b !important;
+                }
+                .slot-main-label {
+                    font-size: 14px !important;
+                    font-weight: 800 !important;
+                    color: #0f172a !important;
+                    line-height: 1.3 !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    max-width: 100% !important;
+                    display: block !important;
+                }
+                .mcp-slot-tab.active .slot-main-label {
+                    color: #047857 !important;
+                }
+                :root[data-theme="dark"] .mcp-slot-tab {
+                    background: #1e293b !important;
+                    border-color: #475569 !important;
+                    box-shadow: 3px 3px 0px #000 !important;
+                }
+                :root[data-theme="dark"] .mcp-slot-tab:hover {
+                    background: #273549 !important;
+                    border-color: #64748b !important;
+                    box-shadow: 5px 5px 0px #000 !important;
+                }
+                :root[data-theme="dark"] .mcp-slot-tab.active {
+                    background: #0f172a !important;
+                    border-color: #10b981 !important;
+                    box-shadow: 4px 4px 0px #10b981 !important;
+                    outline: 2px solid rgba(16, 185, 129, 0.25) !important;
+                }
+                :root[data-theme="dark"] .slot-badge-tag {
+                    color: #cbd5e1 !important;
+                    background: #334155 !important;
+                    border-color: #475569 !important;
+                }
+                :root[data-theme="dark"] .mcp-slot-tab.active .slot-badge-tag {
+                    color: #34d399 !important;
+                    background: #064e3b !important;
+                    border-color: #059669 !important;
+                }
+                :root[data-theme="dark"] .slot-main-label {
+                    color: #f8fafc !important;
+                }
+                :root[data-theme="dark"] .mcp-slot-tab.active .slot-main-label {
+                    color: #34d399 !important;
                 }
             </style>
             <div class="app-card" id="mcpCard">
@@ -251,19 +363,37 @@
                     </span>
                 </div>
 
-                <!-- 3 Slot Tabs Bar -->
-                <div class="grid grid-cols-3 gap-2 mb-3">
-                    <button type="button" class="mcp-slot-tab active py-1.5 px-2 rounded text-xs flex items-center justify-center gap-1.5" id="slotTab1" onclick="switchSlot(1)">
-                        <span class="slot-radar-dot idle" id="slotDot1"></span>
-                        <span id="slotTabLabel1">Slot 1</span>
+                <!-- 3 Slot Tabs Bar (Prominent Control Grid) -->
+                <div class="mcp-slots-grid">
+                    <button type="button" class="mcp-slot-tab active" id="slotTab1" onclick="switchSlot(1)" title="Slot 1: XiaoZhi 1">
+                        <div class="slot-tab-header">
+                            <span class="slot-badge-tag">SLOT 1</span>
+                            <div class="slot-status-wrap">
+                                <span class="slot-radar-dot idle" id="slotDot1"></span>
+                                <span class="slot-status-text" id="slotStatusText1">Kosong</span>
+                            </div>
+                        </div>
+                        <div class="slot-main-label" id="slotTabLabel1">XiaoZhi 1</div>
                     </button>
-                    <button type="button" class="mcp-slot-tab py-1.5 px-2 rounded text-xs flex items-center justify-center gap-1.5" id="slotTab2" onclick="switchSlot(2)">
-                        <span class="slot-radar-dot idle" id="slotDot2"></span>
-                        <span id="slotTabLabel2">Slot 2</span>
+                    <button type="button" class="mcp-slot-tab" id="slotTab2" onclick="switchSlot(2)" title="Slot 2: XiaoZhi 2">
+                        <div class="slot-tab-header">
+                            <span class="slot-badge-tag">SLOT 2</span>
+                            <div class="slot-status-wrap">
+                                <span class="slot-radar-dot idle" id="slotDot2"></span>
+                                <span class="slot-status-text" id="slotStatusText2">Kosong</span>
+                            </div>
+                        </div>
+                        <div class="slot-main-label" id="slotTabLabel2">XiaoZhi 2</div>
                     </button>
-                    <button type="button" class="mcp-slot-tab py-1.5 px-2 rounded text-xs flex items-center justify-center gap-1.5" id="slotTab3" onclick="switchSlot(3)">
-                        <span class="slot-radar-dot idle" id="slotDot3"></span>
-                        <span id="slotTabLabel3">Slot 3</span>
+                    <button type="button" class="mcp-slot-tab" id="slotTab3" onclick="switchSlot(3)" title="Slot 3: XiaoZhi 3">
+                        <div class="slot-tab-header">
+                            <span class="slot-badge-tag">SLOT 3</span>
+                            <div class="slot-status-wrap">
+                                <span class="slot-radar-dot idle" id="slotDot3"></span>
+                                <span class="slot-status-text" id="slotStatusText3">Kosong</span>
+                            </div>
+                        </div>
+                        <div class="slot-main-label" id="slotTabLabel3">XiaoZhi 3</div>
                     </button>
                 </div>
 
@@ -1025,6 +1155,10 @@ async function quickSaveLabel() {
             latestRequestId = data.request_id || "";
             const detail = document.getElementById("mcpStatusDetail");
             if (detail) detail.textContent = `Nama ruangan Slot ${currentSlot} diubah menjadi "${label}" [Req: ${latestRequestId}]`;
+            const cur = slotsData.find(x => x.slot === currentSlot);
+            if (cur) cur.label = label;
+            const tabLbl = document.getElementById("slotTabLabel" + currentSlot);
+            if (tabLbl) tabLbl.textContent = label;
         } else {
             alert(`Gagal memperbarui nama: ${data.detail || 'Terjadi kesalahan'}`);
         }
@@ -1049,11 +1183,22 @@ function updateSlotsUI(data) {
         const s = slotsData.find(x => x.slot === i);
         const dot = document.getElementById("slotDot" + i);
         const label = document.getElementById("slotTabLabel" + i);
+        const statusText = document.getElementById("slotStatusText" + i);
+        const tabBtn = document.getElementById("slotTab" + i);
+
         if (dot && s) {
             dot.className = "slot-radar-dot " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
         }
-        if (label && s && s.label) {
-            label.textContent = s.label.length > 9 ? (s.label.substring(0, 8) + '…') : s.label;
+        if (statusText && s) {
+            statusText.textContent = s.connected ? "Online" : s.saved ? "Tersimpan" : "Kosong";
+            statusText.style.color = s.connected ? "#059669" : s.saved ? "#0284c7" : "#94a3b8";
+        }
+        if (label && s) {
+            const displayLabel = s.label || ("XiaoZhi " + i);
+            label.textContent = displayLabel;
+            if (tabBtn) {
+                tabBtn.title = `Slot ${i}: ${displayLabel} (${s.connected ? 'Online' : s.saved ? 'Tersimpan' : 'Kosong'})`;
+            }
         }
     }
 
