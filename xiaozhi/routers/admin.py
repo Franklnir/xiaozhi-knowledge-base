@@ -731,3 +731,78 @@ async def admin_api_logs_stream(request: Request):
     )
 
 
+
+
+# ── Announcement Management (Notifikasi Overlay) ──────────────────────────
+
+@router.get("/admin/announcement", response_class=HTMLResponse)
+async def admin_announcement_page(request: Request):
+    """Admin page to view, edit, update, or delete system announcement overlay."""
+    admin = require_admin(request)
+    from xiaozhi.services.announcement_service import get_announcement
+    announcement_data = get_announcement()
+    return render(
+        request,
+        "admin/announcement.html",
+        {
+            "user": admin,
+            "announcement": announcement_data,
+            "csrf_token": make_csrf_token(admin),
+            "message": request.query_params.get("message", ""),
+            "active_page": "admin_announcement",
+            "page": "admin_announcement",
+        },
+    )
+
+
+@router.post("/admin/announcement/save")
+async def admin_announcement_save(
+    request: Request,
+    title: str = Form(""),
+    content: str = Form(""),
+    category: str = Form("info"),
+    is_active: Optional[str] = Form(None),
+    csrf_token: str = Form(...),
+):
+    """Save or update system announcement."""
+    admin = require_admin(request)
+    validate_csrf(request, csrf_token, admin)
+
+    from xiaozhi.services.announcement_service import save_announcement
+
+    active_bool = bool(is_active and str(is_active).lower() in ("true", "1", "on", "yes"))
+    if not title.strip() and not content.strip() and active_bool:
+        return redirect_with_message("/admin/announcement", "Judul atau isi pengumuman tidak boleh kosong jika diaktifkan.")
+
+    save_announcement(
+        title=title,
+        content=content,
+        category=category,
+        is_active=active_bool,
+        updated_by=admin.get("username", "admin"),
+    )
+    return redirect_with_message("/admin/announcement", "Pengumuman berhasil diperbarui dan disimpan.")
+
+
+@router.post("/admin/announcement/delete")
+async def admin_announcement_delete(
+    request: Request,
+    csrf_token: str = Form(...),
+):
+    """Clear announcement content and set active to False."""
+    admin = require_admin(request)
+    validate_csrf(request, csrf_token, admin)
+
+    from xiaozhi.services.announcement_service import delete_announcement
+    delete_announcement(updated_by=admin.get("username", "admin"))
+    return redirect_with_message("/admin/announcement", "Pengumuman berhasil dihapus dan dinonaktifkan.")
+
+
+@router.get("/api/v1/announcement/active")
+async def api_get_active_announcement():
+    """Public/Client API to check active announcement."""
+    from xiaozhi.services.announcement_service import get_active_announcement
+    ann = get_active_announcement()
+    if ann:
+        return {"success": True, "active": True, "data": ann}
+    return {"success": True, "active": False, "data": None}
