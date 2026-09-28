@@ -2078,13 +2078,9 @@
                 </div>
 
                 <!-- Footer options -->
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:22px; padding-top:14px; border-top:1px solid var(--app-border); flex-wrap:wrap; gap:10px;">
-                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--app-muted); cursor:pointer; user-select:none;">
-                        <input type="checkbox" id="dontShowMobilePopupToday" style="accent-color:#047857;">
-                        Jangan ingatkan lagi selama 24 jam
-                    </label>
+                <div style="display:flex; justify-content:flex-end; margin-top:22px; padding-top:14px; border-top:1px solid var(--app-border);">
                     <button type="button" onclick="window.closeMobileAppModal()" class="app-button" style="padding:6px 14px; font-size:12px; font-weight:800; border:1.5px solid #111; background:var(--app-surface);">
-                        Nanti Saja
+                        Tutup
                     </button>
                 </div>
             </div>
@@ -2102,34 +2098,7 @@
         window.closeMobileAppModal = function() {
             const overlay = document.getElementById('mobileAppOverlay');
             if (overlay) overlay.style.display = 'none';
-            const checkbox = document.getElementById('dontShowMobilePopupToday');
-            if (checkbox && checkbox.checked) {
-                const tomorrow = Date.now() + 24 * 60 * 60 * 1000;
-                localStorage.setItem('xiaozhi_mobile_promo_dismissed_until', tomorrow.toString());
-            } else {
-                // If user just closed without checking, snooze for 6 hours so it doesn't annoy on every single refresh
-                const snooze = Date.now() + 6 * 60 * 60 * 1000;
-                localStorage.setItem('xiaozhi_mobile_promo_dismissed_until', snooze.toString());
-            }
         };
-
-        (function() {
-            // Auto popup on fresh visit or fresh login
-            try {
-                const dismissedUntil = localStorage.getItem('xiaozhi_mobile_promo_dismissed_until');
-                const now = Date.now();
-                if (!dismissedUntil || now > parseInt(dismissedUntil, 10)) {
-                    // Delay slightly (1.5s) to allow main page content to finish rendering smoothly
-                    setTimeout(function() {
-                        // Don't pop up on auth pages to avoid obstructing login/register form
-                        const path = window.location.pathname;
-                        if (!path.startsWith('/login') && !path.startsWith('/register')) {
-                            window.openMobileAppModal();
-                        }
-                    }, 1500);
-                }
-            } catch (e) {}
-        })();
     </script>
 </body>
 </html>
