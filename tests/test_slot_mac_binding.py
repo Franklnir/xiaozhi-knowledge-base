@@ -69,3 +69,29 @@ def test_sqlite_slot_mac_binding():
     assert len(test_user_entry["slots"]) >= 1
     assert test_user_entry["slots"][0]["slot_number"] == 1
     assert test_user_entry["slots"][0]["device_label"] == "Ruang Kerja Baru"
+
+
+def test_set_mcp_connection_state_with_board_mac():
+    from xiaozhi.services.mcp_service import set_mcp_connection_state, is_mcp_connected, mcp_connection_states, _slot_key
+
+    # Test setting connection state with board_mac and arbitrary kwargs
+    set_mcp_connection_state(
+        owner_id=999,
+        token_hash="fakehash123",
+        connected=True,
+        message="Terhubung",
+        request_id="req-999",
+        slot=2,
+        device_label="Ruang Tidur",
+        board_mac="AA:BB:CC:11:22:33",
+        extra_arbitrary_param="should_not_crash",
+    )
+
+    state = mcp_connection_states.get(_slot_key(999, 2))
+    assert state is not None
+    assert state["connected"] is True
+    assert state["slot"] == 2
+    assert state["device_label"] == "Ruang Tidur"
+    assert state["board_mac"] == "AA:BB:CC:11:22:33"
+    assert is_mcp_connected(999, "fakehash123", slot=2) is True
+

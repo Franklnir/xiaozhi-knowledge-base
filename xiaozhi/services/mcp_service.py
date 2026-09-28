@@ -48,12 +48,15 @@ def set_mcp_connection_state(
     request_id: str = "",
     slot: int = 1,
     device_label: str = "",
+    board_mac: str = "",
+    **kwargs: Any,
 ) -> None:
     user_id = int(owner_id)
     slot_num = int(slot or 1)
     token_hash = normalize_token_hash(token_hash)
     key = _slot_key(user_id, slot_num)
     label = device_label or f"XiaoZhi {slot_num}"
+    mac_val = (board_mac or "").strip()
     with mcp_state_lock:
         previous = dict(mcp_connection_states.get(key, {}))
         previous.update(
@@ -64,6 +67,7 @@ def set_mcp_connection_state(
                 "request_id": request_id or previous.get("request_id", ""),
                 "slot": slot_num,
                 "device_label": label,
+                "board_mac": mac_val or previous.get("board_mac", ""),
                 "updated_at": utc_now(),
             }
         )
