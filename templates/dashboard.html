@@ -204,6 +204,12 @@
                 .mcp-bar-fill.connecting { width:60%; background:linear-gradient(90deg,#0369a1,#38bdf8,#0369a1); background-size:200%; animation:mcpShimmer 1.5s linear infinite }
                 .mcp-bar-fill.connected { width:100%; background:#047857 }
                 .mcp-bar-fill.idle { width:0%; background:#b91c1c }
+                /* 50:50 Desktop Balance: Seimbangkan Database Materi & Koneksi XiaoZhi */
+                @media (min-width: 1024px) {
+                    .app-content-grid {
+                        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+                    }
+                }
                 /* 3 Slots MCP Grid Layout */
                 .mcp-slots-grid {
                     display: grid !important;
@@ -271,6 +277,8 @@
                     border-radius: 5px !important;
                     border: 1px solid #cbd5e1 !important;
                     line-height: 1.2 !important;
+                    white-space: nowrap !important;
+                    flex-shrink: 0 !important;
                 }
                 .mcp-slot-tab.active .slot-badge-tag {
                     color: #047857 !important;
@@ -281,6 +289,8 @@
                     display: inline-flex !important;
                     align-items: center !important;
                     gap: 6px !important;
+                    white-space: nowrap !important;
+                    flex-shrink: 0 !important;
                 }
                 .slot-radar-dot {
                     width: 9px !important;
@@ -1066,7 +1076,7 @@ function renderActiveSlotForm() {
             if (boardLockBox) boardLockBox.className = "p-3 rounded-lg border text-xs flex items-center justify-between gap-3 bg-emerald-50 border-emerald-300";
             boardMacTitle.innerHTML = "Hardware MAC Terkunci <span class='text-emerald-700 font-bold'>(Anti-Spoofing Aktif)</span>";
             boardMacValue.innerHTML = `<strong class="text-emerald-800 font-mono tracking-wider">${s.board_mac}</strong> <span class="text-slate-500 font-normal">→ ${s.label || ('Slot ' + currentSlot)}</span>`;
-            boardActionArea.innerHTML = `<button type="button" class="app-button app-button-small app-button-secondary text-xs !py-1 !px-2 text-red-600 border-red-200 hover:bg-red-50" onclick="detachBoard(${currentSlot})" title="Lepas board hardware dari slot ini">✂️ Lepas Board</button>`;
+            boardActionArea.innerHTML = `<span class="inline-flex items-center gap-1 font-mono text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300 font-bold text-[11px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>Terikat</span>`;
         } else {
             if (lockIcon) lockIcon.textContent = "⚪";
             if (boardLockBox) boardLockBox.className = "p-3 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 border-slate-200";
@@ -1110,33 +1120,6 @@ function renderActiveSlotForm() {
     if (saveBtn) saveBtn.disabled = mcpBusy;
     if (reconnectBtn) reconnectBtn.disabled = mcpBusy;
     if (deleteBtn) deleteBtn.disabled = mcpBusy;
-}
-
-async function detachBoard(slot) {
-    const s = slotsData.find(x => x.slot === slot);
-    const mac = s ? (s.board_mac || "board") : "board";
-    const label = s ? (s.label || "Slot " + slot) : "Slot " + slot;
-    if (!confirm(`Lepaskan hardware board (${mac}) dari ${label}? Perangkat fisik ESP32 baru akan dapat menautkan slot ini saat online berikutnya.`)) {
-        return;
-    }
-    mcpBusy = true;
-    renderActiveSlotForm();
-    try {
-        const resp = await ajaxMcp("/api/mcp/slots/detach-board", { slot: slot });
-        const data = await resp.json().catch(() => ({}));
-        if (resp.ok && data.success) {
-            latestRequestId = data.request_id || "";
-            const detail = document.getElementById("mcpStatusDetail");
-            if (detail) detail.textContent = `Board MAC berhasil dilepas dari Slot ${slot} [Req: ${latestRequestId}]`;
-        } else {
-            alert(`Gagal melepas board: ${data.detail || 'Terjadi kesalahan'}`);
-        }
-    } catch (err) {
-        alert("Gagal menghubungi server: " + err.message);
-    } finally {
-        mcpBusy = false;
-        pollMcp();
-    }
 }
 
 async function quickSaveLabel() {

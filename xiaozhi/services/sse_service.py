@@ -167,11 +167,17 @@ def broadcast_chat_history(user_id: int, item: Dict[str, Any], event_type: str =
     chat_history_hub.emit(user_id, item, event_type)
 
 
-async def stream_chat_history_events(user_id: int, request: Request, active_date: str = "", target_token_hash: str = "") -> AsyncGenerator[str, None]:
-    """Stream real-time chat history events (new_chat, update_chat) to user via SSE."""
+async def stream_chat_history_events(
+    user_id: int,
+    request: Request,
+    active_date: str = "",
+    target_token_hash: str = "",
+    slot_number: Optional[int] = None,
+) -> AsyncGenerator[str, None]:
+    """Stream real-time chat history events (new_chat, update_chat) to user via SSE with slot isolation."""
     q = await chat_history_hub.subscribe(user_id)
     try:
-        yield format_sse("connected", {"status": "ok", "user_id": user_id, "active_date": active_date, "message": "Live Chat History SSE connected."})
+        yield format_sse("connected", {"status": "ok", "user_id": user_id, "active_date": active_date, "slot": slot_number, "message": "Live Chat History SSE connected."})
         while True:
             if await request.is_disconnected():
                 break
@@ -181,7 +187,15 @@ async def stream_chat_history_events(user_id: int, request: Request, active_date
                 item_date = str(item.get("created_at") or "")[:10]
                 if active_date and item_date and item_date != active_date and active_date != "all":
                     continue
-                if target_token_hash:
+                if slot_number is not None:
+                    item_slot = int(item.get("slot_number", 1) or 1)
+                    if int(slot_number) == 1:
+                        if item_slot not in (0, 1):
+                            continue
+                    else:
+                        if item_slot != int(slot_number):
+                            continue
+                elif target_token_hash:
                     if target_token_hash == "none" or item.get("token_hash") != target_token_hash:
                         continue
                 yield format_sse(payload.get("type", "new_chat"), item, event_id=str(item.get("id", "")))

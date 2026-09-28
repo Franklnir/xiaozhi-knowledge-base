@@ -1562,15 +1562,26 @@ class PostgresStore:
         if xiaozhi_answer and not user_message:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        SELECT id, user_message, request_payload, created_at
-                        FROM chat_history
-                        WHERE owner_id = %s AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
-                        ORDER BY id DESC LIMIT 1
-                        """,
-                        (int(owner_id),)
-                    )
+                    if slot_num == 1:
+                        cur.execute(
+                            """
+                            SELECT id, user_message, request_payload, created_at
+                            FROM chat_history
+                            WHERE owner_id = %s AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0) AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
+                            ORDER BY id DESC LIMIT 1
+                            """,
+                            (int(owner_id),)
+                        )
+                    else:
+                        cur.execute(
+                            """
+                            SELECT id, user_message, request_payload, created_at
+                            FROM chat_history
+                            WHERE owner_id = %s AND slot_number = %s AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
+                            ORDER BY id DESC LIMIT 1
+                            """,
+                            (int(owner_id), slot_num)
+                        )
                     pending = cur.fetchone()
                     if pending:
                         p_id = pending["id"]
@@ -1581,7 +1592,7 @@ class PostgresStore:
                                 response_payload = COALESCE(%s, response_payload),
                                 tool_name = CASE WHEN tool_name LIKE '%%inbound%%' THEN %s ELSE tool_name END,
                                 token_hash = COALESCE(%s, token_hash),
-                                slot_number = COALESCE(NULLIF(%s, 1), slot_number),
+                                slot_number = %s,
                                 device_mac = CASE WHEN %s != '' THEN %s ELSE device_mac END,
                                 request_id = CASE WHEN %s != '' THEN %s ELSE request_id END
                             WHERE id = %s
@@ -1637,15 +1648,18 @@ class PostgresStore:
                 if date:
                     sql += " AND TO_CHAR(created_at, 'YYYY-MM-DD') = %s"
                     params.append(date)
-                if token_hash:
+                if slot_number is not None:
+                    if int(slot_number) == 1:
+                        sql += " AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0)"
+                    else:
+                        sql += " AND slot_number = %s"
+                        params.append(int(slot_number))
+                elif token_hash:
                     sql += " AND (token_hash = %s OR token_hash = '' OR token_hash IS NULL)"
                     params.append(token_hash)
                 if tool_name:
                     sql += " AND tool_name = %s"
                     params.append(tool_name)
-                if slot_number is not None:
-                    sql += " AND slot_number = %s"
-                    params.append(int(slot_number))
                 if device_mac:
                     sql += " AND UPPER(device_mac) = %s"
                     params.append(device_mac.strip().upper())
@@ -1678,7 +1692,7 @@ class PostgresStore:
                         r["created_at"] = _format_ts(r["created_at"]) or ""
                 return rows
 
-    def chat_history_dates(self, owner_id: int, token_hash: str = "") -> List[Dict[str, Any]]:
+    def chat_history_dates(self, owner_id: int, token_hash: str = "", slot_number: Optional[int] = None) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 sql = """
@@ -1687,14 +1701,20 @@ class PostgresStore:
                     WHERE owner_id = %s
                 """
                 params: List[Any] = [int(owner_id)]
-                if token_hash:
+                if slot_number is not None:
+                    if int(slot_number) == 1:
+                        sql += " AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0)"
+                    else:
+                        sql += " AND slot_number = %s"
+                        params.append(int(slot_number))
+                elif token_hash:
                     sql += " AND (token_hash = %s OR token_hash = '' OR token_hash IS NULL)"
                     params.append(token_hash)
                 sql += " GROUP BY date ORDER BY date DESC LIMIT 60"
                 cur.execute(sql, params)
                 return [dict(r) for r in cur.fetchall()]
 
-    def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "") -> Dict[str, Any]:
+    def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "", slot_number: Optional[int] = None) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 sql = "SELECT COUNT(*) as total FROM chat_history WHERE owner_id = %s"
@@ -1702,7 +1722,13 @@ class PostgresStore:
                 if date:
                     sql += " AND TO_CHAR(created_at, 'YYYY-MM-DD') = %s"
                     params.append(date)
-                if token_hash:
+                if slot_number is not None:
+                    if int(slot_number) == 1:
+                        sql += " AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0)"
+                    else:
+                        sql += " AND slot_number = %s"
+                        params.append(int(slot_number))
+                elif token_hash:
                     sql += " AND (token_hash = %s OR token_hash = '' OR token_hash IS NULL)"
                     params.append(token_hash)
                 cur.execute(sql, params)

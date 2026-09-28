@@ -1237,13 +1237,22 @@ class SQLiteStore:
 
         if xiaozhi_answer and not user_message:
             conn = self._get_conn()
-            pending = conn.execute(
-                """SELECT id, user_message, request_payload, created_at
-                   FROM chat_history
-                   WHERE owner_id = ? AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
-                   ORDER BY id DESC LIMIT 1""",
-                (owner_id,)
-            ).fetchone()
+            if slot_num == 1:
+                pending = conn.execute(
+                    """SELECT id, user_message, request_payload, created_at
+                       FROM chat_history
+                       WHERE owner_id = ? AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0) AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
+                       ORDER BY id DESC LIMIT 1""",
+                    (owner_id,)
+                ).fetchone()
+            else:
+                pending = conn.execute(
+                    """SELECT id, user_message, request_payload, created_at
+                       FROM chat_history
+                       WHERE owner_id = ? AND slot_number = ? AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
+                       ORDER BY id DESC LIMIT 1""",
+                    (owner_id, slot_num)
+                ).fetchone()
             if pending:
                 p_id = pending["id"]
                 conn.execute(
@@ -1251,7 +1260,7 @@ class SQLiteStore:
                        SET xiaozhi_answer = ?,
                            response_payload = COALESCE(?, response_payload),
                            token_hash = COALESCE(?, token_hash),
-                           slot_number = COALESCE(NULLIF(?, 1), slot_number),
+                           slot_number = ?,
                            device_mac = CASE WHEN ? != '' THEN ? ELSE device_mac END,
                            request_id = CASE WHEN ? != '' THEN ? ELSE request_id END
                        WHERE id = ?""",
@@ -1303,17 +1312,19 @@ class SQLiteStore:
             sql += " AND DATE(created_at) = ?"
             params.append(date)
 
-        if token_hash:
+        if slot_number is not None:
+            if int(slot_number) == 1:
+                sql += " AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0)"
+            else:
+                sql += " AND slot_number = ?"
+                params.append(int(slot_number))
+        elif token_hash:
             sql += " AND (token_hash = ? OR token_hash = '' OR token_hash IS NULL)"
             params.append(token_hash)
 
         if tool_name:
             sql += " AND tool_name = ?"
             params.append(tool_name)
-
-        if slot_number is not None:
-            sql += " AND slot_number = ?"
-            params.append(int(slot_number))
 
         if device_mac:
             sql += " AND UPPER(device_mac) = ?"
@@ -1339,26 +1350,38 @@ class SQLiteStore:
         rows = conn.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
-    def chat_history_dates(self, owner_id: int, token_hash: str = "") -> List[Dict[str, Any]]:
+    def chat_history_dates(self, owner_id: int, token_hash: str = "", slot_number: Optional[int] = None) -> List[Dict[str, Any]]:
         """Ambil daftar tanggal yang punya chat, dengan jumlah per hari."""
         conn = self._get_conn()
         sql = "SELECT DATE(created_at) as date, COUNT(*) as count FROM chat_history WHERE owner_id = ?"
         params: List[Any] = [owner_id]
-        if token_hash:
+        if slot_number is not None:
+            if int(slot_number) == 1:
+                sql += " AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0)"
+            else:
+                sql += " AND slot_number = ?"
+                params.append(int(slot_number))
+        elif token_hash:
             sql += " AND (token_hash = ? OR token_hash = '' OR token_hash IS NULL)"
             params.append(token_hash)
         sql += " GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC LIMIT 60"
         rows = conn.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
-    def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "") -> Dict[str, Any]:
+    def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "", slot_number: Optional[int] = None) -> Dict[str, Any]:
         conn = self._get_conn()
         sql = "SELECT COUNT(*) as total FROM chat_history WHERE owner_id = ?"
         params: List[Any] = [owner_id]
         if date:
             sql += " AND DATE(created_at) = ?"
             params.append(date)
-        if token_hash:
+        if slot_number is not None:
+            if int(slot_number) == 1:
+                sql += " AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0)"
+            else:
+                sql += " AND slot_number = ?"
+                params.append(int(slot_number))
+        elif token_hash:
             sql += " AND (token_hash = ? OR token_hash = '' OR token_hash IS NULL)"
             params.append(token_hash)
         row = conn.execute(sql, params).fetchone()

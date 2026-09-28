@@ -1415,13 +1415,17 @@ class HFJsonStore:
         self,
         owner_id: int,
         *,
-        source: str,
+        source: str = "mcp_tool",
         tool_name: str,
         user_message: str = "",
         xiaozhi_answer: str = "",
         request_payload: Any = None,
         response_payload: Any = None,
         token_hash: str = "",
+        slot_number: int = 1,
+        device_mac: str = "",
+        request_id: str = "",
+        **kwargs,
     ) -> None:
         user_message = clamp_text_bytes(user_message) if user_message else ""
         xiaozhi_answer = clamp_text_bytes(xiaozhi_answer) if xiaozhi_answer else ""
@@ -1435,6 +1439,9 @@ class HFJsonStore:
             "xiaozhi_answer": xiaozhi_answer,
             "request_payload": serialize_history_value(request_payload),
             "response_payload": serialize_history_value(response_payload),
+            "slot_number": int(slot_number or 1),
+            "device_mac": (device_mac or "").strip().upper(),
+            "request_id": (request_id or "").strip(),
             "created_at": utc_now(),
         }
         with self._lock:
@@ -1453,24 +1460,38 @@ class HFJsonStore:
         payload: Any = None,
         response_payload: Any = None,
         token_hash: str = "",
+        slot_number: int = 1,
+        device_mac: str = "",
+        request_id: str = "",
+        **kwargs,
     ) -> None:
         user_message = clamp_text_bytes(user_message) if user_message else ""
         xiaozhi_answer = clamp_text_bytes(xiaozhi_answer) if xiaozhi_answer else ""
         token_hash = normalize_token_hash(token_hash)
+        slot_num = int(slot_number or 1)
+        clean_mac = (device_mac or "").strip().upper()
+        clean_req_id = (request_id or "").strip()
         with self._lock:
             data = self._load()
             if xiaozhi_answer and not user_message:
                 for item in reversed(data["chat_history"]):
+                    item_slot = int(item.get("slot_number", 1) or 1)
+                    slot_matches = (item_slot in (0, 1)) if slot_num == 1 else (item_slot == slot_num)
                     if (
                         int(item.get("owner_id", 0)) == int(owner_id)
                         and item.get("source") == "chat_transcript"
-                        and history_matches_token(item, token_hash)
+                        and slot_matches
                         and item.get("user_message")
                         and not item.get("xiaozhi_answer")
                     ):
                         item["xiaozhi_answer"] = xiaozhi_answer
                         if token_hash:
                             item["token_hash"] = token_hash
+                        item["slot_number"] = slot_num
+                        if clean_mac:
+                            item["device_mac"] = clean_mac
+                        if clean_req_id:
+                            item["request_id"] = clean_req_id
                         item["response_payload"] = serialize_history_value(response_payload if response_payload is not None else payload)
                         self._commit(data, "Update Xiaozhi chat transcript")
                         return
@@ -1484,6 +1505,9 @@ class HFJsonStore:
                 "xiaozhi_answer": xiaozhi_answer,
                 "request_payload": serialize_history_value(payload if user_message else {}),
                 "response_payload": serialize_history_value(response_payload if response_payload is not None else (payload if xiaozhi_answer else {})),
+                "slot_number": slot_num,
+                "device_mac": clean_mac,
+                "request_id": clean_req_id,
                 "created_at": utc_now(),
             }
             data["chat_history"].append(row)
@@ -1497,18 +1521,34 @@ class HFJsonStore:
         token_hash: str = "",
         semantic: bool = False,
         date: str = "",
+        slot_number: Optional[int] = None,
+        device_mac: str = "",
+        **kwargs,
     ) -> List[Dict[str, Any]]:
         query = clean_text(query, max_len=120, field="Pencarian riwayat") if query else ""
         limit = max(1, min(int(limit or CHAT_HISTORY_DEFAULT_LIMIT), 300))
         token_hash = normalize_token_hash(token_hash)
+        clean_mac = (device_mac or "").strip().upper()
         with self._lock:
             data = self._load()
-            rows = [
-                dict(item)
-                for item in data.get("chat_history", [])
-                if int(item.get("owner_id", 0)) == int(owner_id)
-                and history_matches_token(item, token_hash)
-            ]
+            rows = []
+            for item in data.get("chat_history", []):
+                if int(item.get("owner_id", 0)) != int(owner_id):
+                    continue
+                if slot_number is not None:
+                    item_slot = int(item.get("slot_number", 1) or 1)
+                    if int(slot_number) == 1:
+                        if item_slot not in (0, 1):
+                            continue
+                    else:
+                        if item_slot != int(slot_number):
+                            continue
+                elif token_hash:
+                    if not history_matches_token(item, token_hash):
+                        continue
+                if clean_mac and item.get("device_mac", "").upper() != clean_mac:
+                    continue
+                rows.append(dict(item))
 
         if date:
             rows = [
@@ -1552,17 +1592,27 @@ class HFJsonStore:
             item["response_size_label"] = format_size_mb(utf8_size(item.get("response_payload", "")))
         return rows
 
-    def chat_history_dates(self, owner_id: int, token_hash: str = "") -> List[Dict[str, Any]]:
+    def chat_history_dates(self, owner_id: int, token_hash: str = "", slot_number: Optional[int] = None, **kwargs) -> List[Dict[str, Any]]:
         """Ambil daftar tanggal yang punya chat, dengan jumlah per hari."""
         token_hash = normalize_token_hash(token_hash)
         with self._lock:
             data = self._load()
-            rows = [
-                item
-                for item in data.get("chat_history", [])
-                if int(item.get("owner_id", 0)) == int(owner_id)
-                and history_matches_token(item, token_hash)
-            ]
+            rows = []
+            for item in data.get("chat_history", []):
+                if int(item.get("owner_id", 0)) != int(owner_id):
+                    continue
+                if slot_number is not None:
+                    item_slot = int(item.get("slot_number", 1) or 1)
+                    if int(slot_number) == 1:
+                        if item_slot not in (0, 1):
+                            continue
+                    else:
+                        if item_slot != int(slot_number):
+                            continue
+                elif token_hash:
+                    if not history_matches_token(item, token_hash):
+                        continue
+                rows.append(item)
         date_counts: Dict[str, int] = {}
         for item in rows:
             d = (item.get("created_at", "") or "")[:10]
@@ -1574,16 +1624,26 @@ class HFJsonStore:
             reverse=True,
         )[:60]
 
-    def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "") -> Dict[str, int]:
+    def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "", slot_number: Optional[int] = None, **kwargs) -> Dict[str, int]:
         token_hash = normalize_token_hash(token_hash)
         with self._lock:
             data = self._load()
-            rows = [
-                item
-                for item in data.get("chat_history", [])
-                if int(item.get("owner_id", 0)) == int(owner_id)
-                and history_matches_token(item, token_hash)
-            ]
+            rows = []
+            for item in data.get("chat_history", []):
+                if int(item.get("owner_id", 0)) != int(owner_id):
+                    continue
+                if slot_number is not None:
+                    item_slot = int(item.get("slot_number", 1) or 1)
+                    if int(slot_number) == 1:
+                        if item_slot not in (0, 1):
+                            continue
+                    else:
+                        if item_slot != int(slot_number):
+                            continue
+                elif token_hash:
+                    if not history_matches_token(item, token_hash):
+                        continue
+                rows.append(item)
         if date:
             rows = [item for item in rows if (item.get("created_at", "") or "")[:10] == date]
         return {
