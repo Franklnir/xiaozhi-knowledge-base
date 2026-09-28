@@ -257,8 +257,11 @@ def record_mcp_tool_history_to_store(
     xiaozhi_answer: str = "",
     source: str = "mcp_tool",
     token_hash: str = "",
+    slot_number: Optional[int] = None,
+    device_mac: str = "",
+    request_id: str = "",
 ) -> None:
-    """Record MCP tool invocation to chat history with full Raw JSON Response."""
+    """Record MCP tool invocation to chat history with full Raw JSON Response and strict slot isolation."""
     if _store_ref is None:
         return
     if owner_id is None:
@@ -267,14 +270,40 @@ def record_mcp_tool_history_to_store(
         ans = xiaozhi_answer
         if not ans and isinstance(response, dict):
             ans = str(response.get("message") or response.get("result") or response.get("text") or "")
+        
+        # Retrieve context from current async bridge context if available
+        slot_val = slot_number
+        mac_val = device_mac
+        req_val = request_id
         th = token_hash
+
+        try:
+            from xiaozhi.mcp.context import (
+                mcp_active_slot_ctx,
+                mcp_active_token_hash_ctx,
+                mcp_active_mac_ctx,
+                mcp_request_id_ctx,
+            )
+            if slot_val is None:
+                slot_val = mcp_active_slot_ctx.get()
+            if not th:
+                th = mcp_active_token_hash_ctx.get()
+            if not mac_val:
+                mac_val = mcp_active_mac_ctx.get()
+            if not req_val:
+                req_val = mcp_request_id_ctx.get()
+        except Exception:
+            pass
+
+        slot_num = int(slot_val or 1)
         if not th and hasattr(_store_ref, "get_xiaozhi_token_info"):
             try:
-                t_info = _store_ref.get_xiaozhi_token_info(owner_id)
+                t_info = _store_ref.get_xiaozhi_token_info(owner_id, slot=slot_num)
                 if t_info:
                     th = t_info.get("token_hash", "")
             except Exception:
                 pass
+
         _store_ref.add_chat_history(
             owner_id,
             source=source,
@@ -283,7 +312,11 @@ def record_mcp_tool_history_to_store(
             xiaozhi_answer=ans or str(response),
             request_payload=arguments,
             response_payload=response,
-            token_hash=th,
+            token_hash=th or "",
+            slot_number=slot_num,
+            device_mac=mac_val or "",
+            request_id=req_val or "",
         )
     except Exception:
-        logger.warning("Failed to record MCP tool history")
+        logger.warning("Failed to record MCP tool history", exc_info=True)
+

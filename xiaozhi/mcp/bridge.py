@@ -4,7 +4,13 @@ import uuid
 from contextlib import asynccontextmanager, suppress
 from typing import Any, Dict, Optional
 
-from xiaozhi.mcp.context import mcp_active_owner_ctx, mcp_request_id_ctx
+from xiaozhi.mcp.context import (
+    mcp_active_owner_ctx,
+    mcp_request_id_ctx,
+    mcp_active_slot_ctx,
+    mcp_active_token_hash_ctx,
+    mcp_active_mac_ctx,
+)
 from xiaozhi.services.mcp_service import (
     mcp_bridge_tasks,
     mcp_reload_event,
@@ -212,6 +218,9 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
     logger.info("[%s] MCP bridge start: user_id=%s slot=%s mac=%s url=%s", request_id, user_id, slot, board_mac, masked)
     ctx_token = mcp_active_owner_ctx.set(user_id)
     req_token = mcp_request_id_ctx.set(request_id)
+    slot_token = mcp_active_slot_ctx.set(int(slot or 1))
+    hash_token = mcp_active_token_hash_ctx.set(token_hash or "")
+    mac_token = mcp_active_mac_ctx.set(board_mac or "")
     try:
         async with websocket_client_server(user_id, url, token_hash, slot=slot, device_mac=board_mac, request_id=request_id) as (read_stream, write_stream):
             set_mcp_connection_state(user_id, token_hash, connected=True, message=f"{device_label} terhubung", request_id=request_id, slot=slot, device_label=device_label, board_mac=board_mac)
@@ -240,6 +249,9 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
     finally:
         mcp_active_owner_ctx.reset(ctx_token)
         mcp_request_id_ctx.reset(req_token)
+        mcp_active_slot_ctx.reset(slot_token)
+        mcp_active_token_hash_ctx.reset(hash_token)
+        mcp_active_mac_ctx.reset(mac_token)
         mcp_bridge_tasks.pop(task_key, None)
         set_mcp_connection_state(user_id, token_hash, connected=False, message=f"{device_label} terputus (mencoba hubungkan kembali...)", request_id=request_id, slot=slot, device_label=device_label, board_mac=board_mac)
         try:
