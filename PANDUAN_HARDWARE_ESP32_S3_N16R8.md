@@ -37,10 +37,11 @@ Saat pertama kali dinyalakan atau setelah reset Wi-Fi, perangkat akan masuk ke m
    - **Password:** Masukkan kata sandi Wi-Fi Anda.
 4. **Tab 2: Konfigurasi Hardware:**
    - **Pilihan Modul Layar:**
-     - `Tanpa Layar (Headless Audio Only)`: Jika board Anda tidak memakai layar.
-     - `ST7789 240x280 (8-Pin SPI, CS=GPIO 45)`: Untuk layar LCD IPS 1.69" / 1.54" 8-pin.
-     - `ST7789 240x240 (7-Pin SPI, Tanpa CS)`: Untuk layar LCD IPS 1.3" 7-pin.
-     - `OLED SSD1306 / SH1106 128x64`: Untuk layar OLED kecil berbasis I2C (SDA=GPIO 20, SCL=GPIO 19).
+     - `ST7789 240x280 1.69" (8-Pin SPI, CS=GPIO 45)` (`st7789_240x280_8p`): Modul 1.69" resolusi 240x280 yang memiliki pin CS (offset Y=20).
+     - `ST7789 240x240 1.54" (8-Pin SPI, CS=GPIO 45)` (`st7789_240x240_8p`): Modul 1.54" resolusi 240x240 8-Pin dengan jalur CS ke GPIO 45.
+     - `OLED SSD1306 128x64 0.96" (I2C)` (`oled_128x64`): Layar OLED monokrom 0.96 inch I2C.
+     - `OLED SH1106 128x64 0.96" / 1.3" (I2C)` (`oled_sh1106_128x64`): Layar OLED monokrom 1.3 inch chip driver SH1106 I2C.
+     - `Tanpa Layar (Headless Audio Only)` (`headless`): Mode audio saja tanpa layar (hemat daya & membebaskan pin).
    - **Rotasi Layar:** Pilih `0° (Normal)` atau `180° (Terbalik)` sesuai orientasi perakitan casing Anda.
    - **Profil Hardware Audio:**
      - Pilih `INMP441 Mic + MAX98357A Spk (Simplex I2S)` untuk modul mic dan speaker standar.
@@ -54,6 +55,16 @@ Saat pertama kali dinyalakan atau setelah reset Wi-Fi, perangkat akan masuk ke m
    - Klik **Simpan Konfigurasi**.
    - Sistem akan memvalidasi agar tidak ada pin yang bentrok, menyimpan konfigurasi ke memory NVS Flash, dan melakukan reboot otomatis.
    - Perangkat akan langsung tersambung ke jaringan Wi-Fi Anda dan siap diajak bicara.
+
+### Tabel Pilihan Modul Layar & Wiring NVS
+
+| Pilihan Modul Layar | Value NVS | Deskripsi & Wiring Sambungan |
+| :--- | :--- | :--- |
+| **ST7789 240x280 1.69" (8-Pin SPI, CS=GPIO 45)** | `st7789_240x280_8p` | **Untuk:** Modul layar ST7789 1.69" resolusi 240x280 yang memiliki pin CS (offset Y=20).<br>**Wiring:** SCL=19, SDA=20, DC=47, RST=21, CS=45, BLK=38. |
+| **ST7789 240x240 1.54" (8-Pin SPI, CS=GPIO 45)** | `st7789_240x240_8p` | **Untuk:** Modul layar ST7789 1.54" resolusi 240x240 8-Pin dengan jalur CS ke GPIO 45.<br>**Wiring:** SCL=19, SDA=20, DC=47, RST=21, CS=45, BLK=38. |
+| **OLED SSD1306 128x64 0.96" (I2C)** | `oled_128x64` | **Untuk:** Layar OLED monokrom 0.96 inch I2C.<br>**Wiring:** SDA=GPIO 20, SCL=GPIO 19, VCC=3.3V, GND=GND. |
+| **OLED SH1106 128x64 0.96" / 1.3" (I2C)** | `oled_sh1106_128x64` | **Untuk:** Layar OLED monokrom 1.3 inch dengan chip driver SH1106 (I2C).<br>**Wiring:** SDA=GPIO 20, SCL=GPIO 19, VCC=3.3V, GND=GND. |
+| **Tanpa Layar (Headless Audio Only)** | `headless` | **Untuk:** Mode audio saja tanpa layar (hemat daya & membebaskan pin). |
 
 ---
 
@@ -83,7 +94,7 @@ Saat pertama kali dinyalakan atau setelah reset Wi-Fi, perangkat akan masuk ke m
 | `SDA / MOSI` | **GPIO 11** | SPI Bus Master Out |
 | `RES / RST` | **GPIO 47** | Hardware Reset Layar |
 | `DC / RS` | **GPIO 48** | Data / Command Control |
-| `CS` | **GPIO 45** | Chip Select *(Hanya untuk varian 8-pin; 7-pin tanpa CS)* |
+| `CS` | **GPIO 45** | Chip Select *(Khusus varian 8-Pin SPI)* |
 | `BLK / BL` | **GPIO 38** | Kontrol Backlight PWM |
 | `VCC` | **3.3V** | Catu Daya Layar |
 | `GND` | **GND** | Ground Layar |
