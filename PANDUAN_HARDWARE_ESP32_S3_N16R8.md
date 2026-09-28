@@ -36,12 +36,33 @@ Saat pertama kali dinyalakan atau setelah reset Wi-Fi, perangkat akan masuk ke m
    - **Pilih SSID:** Pilih nama Wi-Fi rumah/kantor Anda (frekuensi 2.4 GHz).
    - **Password:** Masukkan kata sandi Wi-Fi Anda.
 4. **Tab 2: Konfigurasi Hardware:**
-   - **Pilihan Modul Layar:**
-     - `Tanpa Layar (Headless Audio Only)`: Jika board Anda tidak memakai layar.
-     - `ST7789 240x280 (8-Pin SPI, CS=GPIO 45)`: Untuk layar LCD IPS 1.69" / 1.54" 8-pin.
-     - `ST7789 240x240 (7-Pin SPI, Tanpa CS)`: Untuk layar LCD IPS 1.3" 7-pin.
-     - `OLED SSD1306 / SH1106 128x64`: Untuk layar OLED kecil berbasis I2C (SDA=GPIO 20, SCL=GPIO 19).
-   - **Rotasi Layar:** Pilih `0° (Normal)` atau `180° (Terbalik)` sesuai orientasi perakitan casing Anda.
+   - **Pilihan Modul Layar (display_preset):**
+     - **ST7789 240x280 1.69" (8-Pin SPI, CS=GPIO 45)**
+       - Value: `st7789_240x280_8p`
+       - Untuk: Modul layar ST7789 1.69 inch resolusi 240x280 yang memiliki pin CS (offset Y=20).
+       - Wiring: SCL=GPIO 19, SDA=GPIO 20, DC=GPIO 47, RST=GPIO 21, CS=GPIO 45, BLK=GPIO 38.
+     - **ST7789 240x240 1.54" (8-Pin SPI, CS=GPIO 45)**
+       - Value: `st7789_240x240_8p`
+       - Untuk: Modul layar ST7789 1.54 inch resolusi 240x240 8-Pin dengan jalur CS ke GPIO 45.
+       - Wiring: SCL=GPIO 19, SDA=GPIO 20, DC=GPIO 47, RST=GPIO 21, CS=GPIO 45, BLK=GPIO 38.
+     - **ST7789 240x240 1.3" / 1.7" (7-Pin SPI, Tanpa CS) ⭐ [Default Firmware]**
+       - Value: `st7789_240x240_7p`
+       - Untuk: Modul layar ST7789 240x240 7-Pin SPI tanpa pin CS (CS internal GND).
+       - Wiring: SCL=GPIO 19, SDA=GPIO 20, DC=GPIO 47, RST=GPIO 21, BLK=GPIO 38, CS=NC.
+     - **OLED SSD1306 128x64 0.96" (I2C)**
+       - Value: `oled_128x64`
+       - Untuk: Layar OLED monokrom 0.96 inch I2C.
+       - Wiring: SDA=GPIO 20, SCL=GPIO 19.
+     - **OLED SH1106 128x64 0.96" / 1.3" (I2C)**
+       - Value: `oled_sh1106_128x64`
+       - Untuk: Layar OLED monokrom 1.3 inch dengan chip driver SH1106 (I2C).
+       - Wiring: SDA=GPIO 20, SCL=GPIO 19.
+     - **Tanpa Layar (Headless Audio Only)**
+       - Value: `headless`
+       - Untuk: Mode audio saja tanpa layar (hemat daya / no display).
+   - **Rotasi Layar (Khusus ST7789):**
+     - `0° (Normal / Standar)`: Posisi normal perakitan.
+     - `180° (Terbalik / Inverted)`: Putar 180 derajat jika modul dipasang terbalik pada casing.
    - **Profil Hardware Audio:**
      - Pilih `INMP441 Mic + MAX98357A Spk (Simplex I2S)` untuk modul mic dan speaker standar.
      - Atau `WeAct ES8311 Codec Terintegrasi (Duplex I2S)` jika menggunakan board WeAct Studio.
