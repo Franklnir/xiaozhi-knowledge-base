@@ -121,7 +121,7 @@
         font-weight: 800;
         border-radius: var(--app-radius);
         border: 1.5px solid var(--app-border);
-        background: var(--app-surface-muted);
+        background: var(--app-surface);
         color: var(--app-muted);
         cursor: pointer;
         transition: all 0.2s ease;
@@ -130,15 +130,43 @@
         justify-content: center;
         gap: 6px;
     }
-    .source-tab-btn.active {
-        background: var(--app-surface);
-        border-color: var(--app-accent, #059669);
+    .source-tab-btn:hover {
+        background: var(--app-surface-soft, #f8fafc);
         color: var(--app-text);
-        box-shadow: var(--app-shadow);
+    }
+    .source-tab-btn.active {
+        background: #ffe600;
+        border-color: #111111;
+        color: #111111;
+        font-weight: 900;
+        box-shadow: 2px 2px 0 #111;
+    }
+    :root[data-theme="neo"] .source-tab-btn {
+        background: #ffffff !important;
+        color: #222222 !important;
+        border: 2px solid #111111 !important;
+        box-shadow: none !important;
+    }
+    :root[data-theme="neo"] .source-tab-btn:hover {
+        background: #fffde7 !important;
     }
     :root[data-theme="neo"] .source-tab-btn.active {
-        border: 2px solid #111;
-        box-shadow: 2px 2px 0 #111;
+        background: #ffe600 !important;
+        color: #111111 !important;
+        border: 2.5px solid #111111 !important;
+        box-shadow: 3.5px 3.5px 0 #111111 !important;
+        font-weight: 900 !important;
+    }
+    :root[data-theme="dark"] .source-tab-btn {
+        background: var(--app-surface) !important;
+        color: var(--app-muted) !important;
+        border-color: var(--app-border) !important;
+    }
+    :root[data-theme="dark"] .source-tab-btn.active {
+        background: #facc15 !important;
+        color: #111111 !important;
+        border-color: #facc15 !important;
+        box-shadow: 0 0 12px rgba(250, 204, 21, 0.25) !important;
     }
     /* Pin Mapping Box */
     .pin-row {
@@ -350,15 +378,7 @@
                                 </span>
                             </div>
                         </div>
-
-                        <!-- TOMBOL BUKU PANDUAN & DATASET PIN (KHUSUS PRESET ID: esp32s3_cam) -->
-                        <div id="boxGuideButton" style="{% if not preset_status or not preset_status.preset or preset_status.preset.id != 'esp32s3_cam' %}display:none;{% endif %} margin-bottom:12px;">
-                            <button type="button" onclick="openGuideModal()" class="app-button app-button-ghost app-button-small" style="font-size:11.5px; font-weight:750; width:100%; justify-content:center; border:1px solid var(--app-border-strong); background:var(--app-surface);">
-                                📖 Buka Buku Panduan &amp; Skema PIN GPIO (Khusus ID: esp32s3_cam)
-                            </button>
-                        </div>
-
-                        <!-- Status & Action Box: DUA KONDISI (GEMBOK TERBUKA vs GEMBOK TERKUNCI) -->
+<!-- Status & Action Box: DUA KONDISI (GEMBOK TERBUKA vs GEMBOK TERKUNCI) -->
                         <div style="padding-top:10px; border-top:1px solid var(--app-border);">
                             <!-- KONDISI 1: GEMBOK TERBUKA 🔓 -->
                             <div id="boxPresetUnlocked" style="{% if not preset_status or not preset_status.authorized %}display:none;{% endif %}">
@@ -929,13 +949,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         } catch (e) {
             console.error('Error fetching preset status:', e);
         }
-
-        // Tampilkan tombol panduan HANYA untuk preset 'esp32s3_cam'
-        const guideBtnBox = document.getElementById('boxGuideButton');
-        if (guideBtnBox) {
-            guideBtnBox.style.display = (presetId === 'esp32s3_cam') ? 'block' : 'none';
-        }
-    };
+};
 
     // Guide Modal & Subtabs (Khusus ID: esp32s3_cam)
     window.openGuideModal = function() {
