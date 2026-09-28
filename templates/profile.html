@@ -1208,14 +1208,14 @@
         </div>
     </div>
 
-    <!-- Active Tools (All 39 Tools Catalog) -->
+    <!-- Active Tools (All 47 Tools Catalog) -->
     <div class="profile-section">
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
             <div>
                 <div class="profile-section-title" style="margin-bottom: 4px;">
                     <span>🔧</span> Tools Cerdas Aktif
                     <span class="app-chip app-chip-small app-chip-success" style="margin-left: 6px;">
-                        <span id="activeToolCountDisplay">{{ total_tools if total_tools else 39 }}</span> Tools Terpasang
+                        <span id="activeToolCountDisplay">{{ total_tools if total_tools else 47 }}</span> Tools Terpasang
                     </span>
                 </div>
                 <p style="font-size: 13px; color: var(--app-muted); margin: 0;">
@@ -1229,8 +1229,8 @@
 
         <!-- Filter Categories -->
         <div class="profile-tool-filter-bar" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
-            <button type="button" class="tool-filter-btn active" onclick="filterToolCategory('all', this)">Semua ({{ total_tools if total_tools else 39 }})</button>
-            <button type="button" class="tool-filter-btn" style="color: #10b981; border-color: rgba(16, 185, 129, 0.3);" onclick="filterToolCategory('active', this)">✓ Aktif ({{ total_active if total_active is not none else 39 }})</button>
+            <button type="button" class="tool-filter-btn active" onclick="filterToolCategory('all', this)">Semua ({{ total_tools if total_tools else 47 }})</button>
+            <button type="button" class="tool-filter-btn" style="color: #10b981; border-color: rgba(16, 185, 129, 0.3);" onclick="filterToolCategory('active', this)">✓ Aktif ({{ total_active if total_active is not none else 47 }})</button>
             <button type="button" class="tool-filter-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" onclick="filterToolCategory('disabled', this)">🚫 Dinonaktifkan ({{ total_disabled if total_disabled is not none else 0 }})</button>
             <button type="button" class="tool-filter-btn" onclick="filterToolCategory('knowledge', this)">Knowledge & Memori</button>
             <button type="button" class="tool-filter-btn" onclick="filterToolCategory('iot', this)">Smart Home & IoT</button>

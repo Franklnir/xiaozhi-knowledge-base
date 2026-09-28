@@ -1226,10 +1226,10 @@ void ackCommand(String cmdId) {
         <div class="app-card">
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🔧</span> Daftar 44 Tools MCP Xiaozhi
+                    <span>🔧</span> Daftar 47 Tools MCP Xiaozhi
                 </div>
                 <p class="doc-step-desc">
-                    Xiaozhi terhubung dengan <strong>44 Tools MCP</strong> berstandar ilmiah, memori semantik vektor, profil persona pengguna, dan realtime. Tools ini otomatis dipanggil oleh Xiaozhi saat mendengarkan pertanyaan atau instruksi suara kamu.
+                    Xiaozhi terhubung dengan <strong>47 Tools MCP</strong> berstandar ilmiah, memori semantik vektor, profil persona pengguna, dan realtime. Tools ini otomatis dipanggil oleh Xiaozhi saat mendengarkan pertanyaan atau instruksi suara kamu.
                 </p>
 
                 <!-- Search box for tools -->
@@ -1417,7 +1417,8 @@ void ackCommand(String cmdId) {
                 <div class="tool-grid">
                     <div class="tool-card">
                         <div class="tool-header">
-                            <span class="tool-name">get_weather</span>
+                            <span class="tool-name">get_weather_bmkg</span>
+                            <span class="badge badge-info" style="font-size: 0.65rem; background: #0ea5e9; color: #fff;">BMKG Realtime</span>
                         </div>
                         <div class="tool-desc">
                             Mengecek kondisi cuaca, suhu (°C), kelembapan, dan prakiraan cuaca realtime untuk kota/kabupaten di seluruh Indonesia.
@@ -1726,6 +1727,45 @@ void ackCommand(String cmdId) {
                         </div>
                         <div class="tool-sample">
                             🗣️ <em>"Xiaozhi, putar lagu Laskar Pelangi di YouTube."</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">play_playlist_song</span>
+                            <span class="badge badge-primary" style="font-size: 0.65rem;">Playlist</span>
+                        </div>
+                        <div class="tool-desc">
+                            Memutar lagu dari daftar Playlist Musik YouTube pribadi pengguna berdasarkan nomor urut lagu (contoh: "1", "nomor 2") atau judul lagu.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, putar playlist nomor 1."</em> atau <em>"Putar lagu Bohemian Rhapsody dari playlist."</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">list_user_playlist</span>
+                            <span class="badge badge-info" style="font-size: 0.65rem; background: #0ea5e9; color: #fff;">Playlist</span>
+                        </div>
+                        <div class="tool-desc">
+                            Menampilkan seluruh daftar lagu yang tersimpan di Playlist Musik YouTube akun pengguna dari menu Playlist dashboard.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, apa saja lagu yang tersimpan di playlist saya?"</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">get_playlist_top_played</span>
+                            <span class="badge badge-warning" style="font-size: 0.65rem; background: #f59e0b; color: #fff;">Top Tracks</span>
+                        </div>
+                        <div class="tool-desc">
+                            Mengecek daftar lagu di Playlist pengguna yang paling sering diputar (Top Played Tracks / Lagu Terfavorit).
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, lagu apa yang paling sering saya putar?"</em>
                         </div>
                     </div>
 
