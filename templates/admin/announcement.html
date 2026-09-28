@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .ann-form-group {
+        margin-bottom: 18px;
+    }
+    .ann-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--app-text);
+        margin-bottom: 6px;
+    }
+    .ann-help {
+        font-size: 11.5px;
+        color: var(--app-muted);
+        margin-top: 4px;
+        line-height: 1.4;
+    }
+    .ann-status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11.5px;
+        font-weight: 850;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1.5px solid #111;
+        box-shadow: 1.5px 1.5px 0 #111;
+    }
+    .ann-preview-box {
+        background: var(--app-surface);
+        border: 3px solid #111;
+        border-radius: 16px;
+        box-shadow: 6px 6px 0 #111;
+        padding: 20px;
+        position: relative;
+    }
+</style>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:22px;">
+    <div>
+        <div style="font-size:12px; font-weight:800; color:var(--app-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">
+            Admin &bull; Sistem Notifikasi
+        </div>
+        <h1 style="font-size:24px; font-weight:900; margin:0 0 6px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+            <span>📢</span> Manajemen Pengumuman (Notifikasi Overlay)
+        </h1>
+        <p style="font-size:13px; color:var(--app-muted); margin:0; line-height:1.5;">
+            Atur pengumuman sistem yang otomatis muncul sebagai notifikasi popup overlay untuk setiap user yang login.
+        </p>
+    </div>
+    <div>
+        <a href="/admin" class="app-button" style="font-weight:800; font-size:12.5px; padding:8px 14px; text-decoration:none; border:2px solid #111; background:var(--app-surface); box-shadow:2px 2px 0 #111;">
+            &larr; Kembali ke Manajemen User
+        </a>
+    </div>
+</div>
+
+{% if message %}
+<div class="app-alert app-alert-success" style="margin-bottom:20px; padding:12px 16px; border:2px solid #111; box-shadow:3px 3px 0 #111; border-radius:10px; font-weight:750; font-size:13px; display:flex; align-items:center; gap:8px;">
+    <span>✓</span> {{ message }}
+</div>
+{% endif %}
+
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:22px; align-items:start;">
+    <!-- LEFT COLUMN: EDIT / SAVE FORM -->
+    <div class="app-card" style="border:2.5px solid #111; box-shadow:5px 5px 0 #111; border-radius:14px; background:var(--app-surface); padding:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid var(--app-border);">
+            <h2 style="font-size:16px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                <span>⚙️</span> Edit Teks Pengumuman
+            </h2>
+            {% if announcement.is_active and announcement.content %}
+            <span class="ann-status-pill" style="background:#86efac; color:#065f46;">
+                <span style="width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block;"></span> AKTIF KE USER
+            </span>
+            {% else %}
+            <span class="ann-status-pill" style="background:#f1f5f9; color:#475569;">
+                <span style="width:8px; height:8px; border-radius:50%; background:#94a3b8; display:inline-block;"></span> NONAKTIF
+            </span>
+            {% endif %}
+        </div>
+
+        <form action="/admin/announcement/save" method="POST" id="announcementForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <!-- Checkbox Aktifkan -->
+            <div class="ann-form-group" style="background:var(--app-surface-soft, #f8fafc); border:1.5px solid #111; border-radius:10px; padding:12px 14px;">
+                <label style="display:flex; align-items:center; gap:10px; font-size:13px; font-weight:850; color:var(--app-text); cursor:pointer; user-select:none;">
+                    <input type="checkbox" name="is_active" id="inputIsActive" {% if announcement.is_active %}checked{% endif %} style="width:18px; height:18px; accent-color:#059669; cursor:pointer;" onchange="updateLivePreview()">
+                    <span>Aktifkan Notifikasi Overlay Ini</span>
+                </label>
+                <div class="ann-help" style="margin-left:28px;">
+                    Jika dicentang, popup overlay akan otomatis muncul di layar setiap user yang login.
+                </div>
+            </div>
+
+            <!-- Kategori -->
+            <div class="ann-form-group">
+                <label class="ann-label" for="inputCategory">Kategori / Badge Tipe:</label>
+                <select name="category" id="inputCategory" class="app-input" style="width:100%; border:2px solid #111; border-radius:8px; padding:9px 12px; font-size:13px; font-weight:750; background:var(--app-surface);" onchange="updateLivePreview()">
+                    <option value="info" {% if announcement.category == 'info' %}selected{% endif %}>📢 Informasi Umum (Biru Muda)</option>
+                    <option value="warning" {% if announcement.category == 'warning' %}selected{% endif %}>⚠️ Pengumuman Penting / Perhatian (Kuning)</option>
+                    <option value="update" {% if announcement.category == 'update' %}selected{% endif %}>🚀 Pembaruan Sistem / Fitur Baru (Hijau)</option>
+                    <option value="maintenance" {% if announcement.category == 'maintenance' %}selected{% endif %}>🔧 Jadwal Pemeliharaan Server (Merah Muda)</option>
+                </select>
+            </div>
+
+            <!-- Judul -->
+            <div class="ann-form-group">
+                <label class="ann-label" for="inputTitle">Judul Pengumuman:</label>
+                <input type="text" name="title" id="inputTitle" class="app-input" value="{{ announcement.title or '' }}" placeholder="Contoh: Pembaruan Firmware v1.4.6 & Info Server" required style="width:100%; border:2px solid #111; border-radius:8px; padding:10px 12px; font-size:13.5px; font-weight:750; background:var(--app-surface);" oninput="updateLivePreview()">
+                <div class="ann-help">Judul singkat dan menarik yang diletakkan di bagian atas modal.</div>
+            </div>
+
+            <!-- Isi Pesan -->
+            <div class="ann-form-group">
+                <label class="ann-label" for="inputContent">Isi Teks / Pesan Pengumuman:</label>
+                <textarea name="content" id="inputContent" rows="6" class="app-input" placeholder="Tuliskan isi pengumuman atau instruksi di sini... Mendukung baris baru / enter." required style="width:100%; border:2px solid #111; border-radius:8px; padding:10px 12px; font-size:13px; line-height:1.55; font-family:inherit; background:var(--app-surface);" oninput="updateLivePreview()">{{ announcement.content or '' }}</textarea>
+                <div class="ann-help">Mendukung teks multi-baris (enter), emoji, dan pesan detail.</div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; padding-top:14px; border-top:1.5px solid var(--app-border);">
+                <button type="submit" class="app-button app-button-primary" style="background:#ffe600; color:#111; font-weight:900; font-size:13px; padding:10px 20px; border:2px solid #111; box-shadow:3px 3px 0 #111; border-radius:8px; cursor:pointer; flex:1;">
+                    💾 Simpan &amp; Terbitkan Pengumuman
+                </button>
+                <button type="button" onclick="testOpenOverlay()" class="app-button" style="font-weight:800; font-size:12.5px; padding:10px 14px; border:2px solid #111; background:var(--app-surface); box-shadow:2px 2px 0 #111; cursor:pointer;">
+                    👁️ Uji Popup
+                </button>
+            </div>
+        </form>
+
+        <!-- Form Hapus / Nonaktifkan -->
+        <div style="margin-top:24px; padding-top:16px; border-top:1px dashed var(--app-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <span style="font-size:12px; font-weight:800; color:#dc2626;">Hapus / Reset Pengumuman</span>
+                <div style="font-size:11px; color:var(--app-muted);">Membersihkan teks dan menonaktifkan notifikasi.</div>
+            </div>
+            <form action="/admin/announcement/delete" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus dan menonaktifkan pengumuman ini?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="app-button" style="background:#fee2e2; color:#b91c1c; border:1.5px solid #b91c1c; font-size:12px; font-weight:850; padding:6px 12px; border-radius:6px; cursor:pointer;">
+                    🗑️ Hapus Pengumuman
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- RIGHT COLUMN: LIVE REAL-TIME PREVIEW -->
+    <div>
+        <div class="app-card" style="border:2.5px solid #111; box-shadow:5px 5px 0 #111; border-radius:14px; background:var(--app-surface); padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding-bottom:10px; border-bottom:2px solid var(--app-border);">
+                <h3 style="font-size:15px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                    <span>📱</span> Pratinjau Tampilan Pengguna
+                </h3>
+                <span style="font-size:11px; color:var(--app-muted); font-weight:700;">Live Interactive Preview</span>
+            </div>
+            <p style="font-size:11.5px; color:var(--app-muted); margin:0 0 16px; line-height:1.4;">
+                Ini adalah gambaran persis bagaimana popup overlay akan muncul di layar pengguna saat mereka membuka website setelah login:
+            </p>
+
+            <!-- Preview Card Container -->
+            <div class="ann-preview-box" id="previewContainer">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:8px;">
+                    <span id="previewBadge" class="ann-status-pill" style="background:#bae6fd; color:#0369a1;">
+                        📢 INFORMASI PENGUMUMAN
+                    </span>
+                    <button type="button" style="background:#fff; border:1.5px solid #111; border-radius:6px; width:26px; height:26px; font-size:14px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:1.5px 1.5px 0 #111; cursor:default;">
+                        &times;
+                    </button>
+                </div>
+
+                <h4 id="previewTitle" style="font-size:17px; font-weight:900; color:var(--app-text); margin:0 0 10px; line-height:1.35;">
+                    {{ announcement.title or 'Judul Pengumuman Disini' }}
+                </h4>
+
+                <div id="previewContent" style="background:var(--app-surface-soft, #f8fafc); border:1.5px solid #111; border-radius:10px; padding:12px 14px; font-size:12.5px; line-height:1.6; color:var(--app-text); white-space:pre-wrap; max-height:220px; overflow-y:auto; margin-bottom:16px; font-weight:550;">
+{{ announcement.content or 'Isi teks pengumuman yang ditulis oleh admin akan ditampilkan di kotak ini...' }}</div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span id="previewActiveNotice" style="font-size:11px; font-weight:800; color:{% if announcement.is_active %}#059669{% else %}#dc2626{% endif %};">
+                        {% if announcement.is_active %}● Siap Tampil ke User{% else %}○ Status Nonaktif{% endif %}
+                    </span>
+                    <button type="button" class="app-button" style="background:#ffe600; color:#111; font-weight:900; font-size:12px; padding:8px 18px; border:2px solid #111; box-shadow:2px 2px 0 #111; border-radius:8px; cursor:default;">
+                        ✓ Saya Mengerti
+                    </button>
+                </div>
+            </div>
+
+            <!-- Metadata info -->
+            <div style="margin-top:16px; background:var(--app-surface-soft, #f8fafc); border:1px solid var(--app-border); border-radius:8px; padding:10px 12px; font-size:11.5px; color:var(--app-muted); line-height:1.5;">
+                <div>ID Revisi: <code style="font-weight:700; color:var(--app-text);">{{ announcement.id or '-' }}</code></div>
+                <div>Terakhir diubah: <strong>{{ announcement.updated_at[:19] if announcement.updated_at else 'Belum pernah' }}</strong></div>
+                <div>Oleh: <strong>{{ announcement.updated_by or 'Admin' }}</strong></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function updateLivePreview() {
+        const titleVal = document.getElementById('inputTitle').value || 'Judul Pengumuman Disini';
+        const contentVal = document.getElementById('inputContent').value || 'Isi teks pengumuman yang ditulis oleh admin akan ditampilkan di kotak ini...';
+        const catVal = document.getElementById('inputCategory').value;
+        const isActive = document.getElementById('inputIsActive').checked;
+
+        document.getElementById('previewTitle').textContent = titleVal;
+        document.getElementById('previewContent').textContent = contentVal;
+
+        const badge = document.getElementById('previewBadge');
+        if (catVal === 'warning') {
+            badge.textContent = '⚠️ PENGUMUMAN PENTING';
+            badge.style.background = '#fef08a';
+            badge.style.color = '#854d0e';
+        } else if (catVal === 'update') {
+            badge.textContent = '🚀 PEMBARUAN SISTEM';
+            badge.style.background = '#86efac';
+            badge.style.color = '#14532d';
+        } else if (catVal === 'maintenance') {
+            badge.textContent = '🔧 PEMELIHARAAN SERVER';
+            badge.style.background = '#fecdd3';
+            badge.style.color = '#9f1239';
+        } else {
+            badge.textContent = '📢 INFORMASI PENGUMUMAN';
+            badge.style.background = '#bae6fd';
+            badge.style.color = '#0369a1';
+        }
+
+        const notice = document.getElementById('previewActiveNotice');
+        if (isActive) {
+            notice.textContent = '● Siap Tampil ke User';
+            notice.style.color = '#059669';
+        } else {
+            notice.textContent = '○ Status Nonaktif';
+            notice.style.color = '#dc2626';
+        }
+    }
+
+    function testOpenOverlay() {
+        const overlay = document.getElementById('announcementOverlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+        } else {
+            alert('Notifikasi overlay preview: Silakan simpan pengumuman terlebih dahulu agar terdaftar di sistem.');
+        }
+    }
+</script>
+{% endblock %}

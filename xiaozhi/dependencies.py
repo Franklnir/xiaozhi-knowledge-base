@@ -131,11 +131,20 @@ def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None
     role = str(user.get("role") or "user").lower() if user and isinstance(user, dict) else ""
     mcp_required = (role != "admin") if user else False
 
+    active_announcement = None
+    if user:
+        try:
+            from xiaozhi.services.announcement_service import get_active_announcement
+            active_announcement = get_active_announcement()
+        except Exception:
+            active_announcement = None
+
     merged = {
         "user": user,
         "csrf_token": make_csrf_token(user),
         "mcp_connected": mcp_connected,
         "mcp_required": mcp_required,
+        "active_announcement": active_announcement,
     }
     if context:
         merged.update(context)
@@ -143,6 +152,8 @@ def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None
             merged["mcp_connected"] = mcp_connected
         if "mcp_required" not in context:
             merged["mcp_required"] = mcp_required
+        if "active_announcement" not in context:
+            merged["active_announcement"] = active_announcement
     return templates.TemplateResponse(
         request=request,
         name=name,
