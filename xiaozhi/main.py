@@ -337,6 +337,7 @@ async def robots_txt():
         "User-agent: *\n"
         "Allow: /\n"
         "Allow: /dokumentasi\n"
+        "Allow: /web-flasher\n"
         "Allow: /login\n"
         "Allow: /register\n"
         "Disallow: /admin\n"
@@ -372,6 +373,12 @@ async def sitemap_xml():
     </url>
     <url>
         <loc>https://xiaozhiscig.biz.id/dokumentasi</loc>
+        <lastmod>{today}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+    <url>
+        <loc>https://xiaozhiscig.biz.id/web-flasher</loc>
         <lastmod>{today}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.9</priority>
