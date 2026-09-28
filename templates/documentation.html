@@ -1,8 +1,63 @@
 {% extends "base.html" %}
 
-{% block title %}Panduan & 35 Tools MCP Xiaozhi Indonesia - Dokumentasi Resmi{% endblock %}
+{% block title %}Dokumentasi 47 Tools MCP, Skema Hardware & Panduan Xiaozhi Indonesia{% endblock %}
+{% block meta_title %}Dokumentasi 47 Tools MCP, Skema Hardware & Panduan Xiaozhi Indonesia{% endblock %}
+{% block meta_desc %}Panduan resmi Xiaozhi Indonesia: spesifikasi hardware ESP32, skema wiring mic INMP441 & amplifier MAX98357A, serta katalog lengkap 47 Tools FastMCP cerdas.{% endblock %}
+{% block og_title %}Dokumentasi 47 Tools MCP, Skema Hardware & Panduan Xiaozhi Indonesia{% endblock %}
+{% block og_desc %}Panduan resmi Xiaozhi: skema wiring ESP32, setup koneksi token, dan dokumentasi lengkap 47 Tools MCP realtime.{% endblock %}
+{% block tw_title %}Dokumentasi 47 Tools MCP & Panduan Hardware Xiaozhi Indonesia{% endblock %}
+{% block tw_desc %}Panduan resmi Xiaozhi: skema wiring ESP32, setup koneksi token, dan dokumentasi lengkap 47 Tools MCP realtime.{% endblock %}
 
 {% block content %}
+<!-- Schema.org FAQPage for Google Rich Snippets -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Apa itu Xiaozhi Indonesia (xiaozhiscig)?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Xiaozhi Indonesia adalah platform asisten suara cerdas berbasis mikrokontroler IoT ESP32 yang terhubung dengan kecerdasan buatan (AI), protokol FastMCP dengan 47 tools ilmiah, pemutar musik YouTube streaming, dan kontrol perangkat Smart Home."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Hardware apa saja yang dibutuhkan untuk membuat Xiaozhi?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Anda membutuhkan modul ESP32 (ESP32-C3 atau ESP32-S3), mikrofon I2S digital (seperti INMP441), modul audio amplifier I2S (seperti MAX98357A), speaker 4-8 Ohm, dan layar opsional (OLED 0.96 inci SSD1306 atau LCD ST7789)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Bagaimana cara menghubungkan ESP32 ke server Xiaozhi Indonesia?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Setelah firmware di-flash, hubungkan ESP32 ke Wi-Fi. Tekan tombol untuk mendapatkan kode verifikasi suara, lalu masukkan kode token tersebut di dashboard xiaozhiscig.biz.id untuk mengaktifkan koneksi server."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Apa itu 47 Tools FastMCP di Xiaozhi?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "47 Tools FastMCP adalah serangkaian alat cerdas yang otomatis dipanggil oleh asisten suara saat Anda berbicara, mencakup kalkulator, pemecah soal, kamus KBBI, cuaca BMKG, info gempa, pencarian web mendalam, pemutar musik YouTube, kontrol relay smart home, hingga memori percakapan jangka panjang."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Apakah bisa melakukan flash firmware ESP32 langsung dari browser?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Ya, Anda dapat menggunakan fitur Web Serial Flasher di xiaozhiscig.biz.id/web-flasher langsung melalui peramban Google Chrome atau Edge, baik di PC desktop maupun di ponsel Android via kabel USB OTG tanpa instal driver."
+      }
+    }
+  ]
+}
+</script>
 <style>
     .doc-section {
         margin-bottom: 24px;
