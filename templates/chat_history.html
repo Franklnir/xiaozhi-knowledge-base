@@ -366,7 +366,6 @@
                 </div>
                 <div class="chat-type-tabs">
                     <button type="button" class="chat-type-tab active" data-type="all" onclick="setTypeFilter('all')">Semua</button>
-                    <button type="button" class="chat-type-tab" data-type="chat" onclick="setTypeFilter('chat')">💬 Chat AI</button>
                     <button type="button" class="chat-type-tab" data-type="tool" onclick="setTypeFilter('tool')">⚡ Tool MCP</button>
                 </div>
                 <div style="display:flex;gap:6px;margin-top:8px;">
@@ -467,7 +466,7 @@
         if (isToolItem(i)) return "Tool MCP";
         if (i.source === "chat_transcript") return "Transcript Suara";
         if (String(i.tool_name || "").startsWith("xiaozhi_ws")) return "WebSocket MCP";
-        return "Chat AI";
+        return "Percakapan";
     }
 
     function setTypeFilter(t) {
