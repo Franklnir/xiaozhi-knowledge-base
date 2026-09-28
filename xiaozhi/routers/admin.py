@@ -506,7 +506,7 @@ async def admin_api_mcp_tool_toggle(
 
     is_enabled = enabled.lower() in {"true", "1", "on"}
     store.set_mcp_tool_toggle(target_user_id, tool_name, is_enabled)
-    if tool_name == "play_youtube_song" and not is_enabled:
+    if tool_name in {"play_youtube_song", "play_playlist_song"} and not is_enabled:
         playback_tracker.stop_user_playback(target_user_id)
     await broadcast_admin_users_update()
     signal_mcp_reload()

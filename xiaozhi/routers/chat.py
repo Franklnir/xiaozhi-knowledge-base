@@ -624,7 +624,7 @@ async def profile_page(request: Request, mode: Optional[str] = "profile", sub: O
     for tool_info in ALL_MCP_TOOLS_CATALOG:
         tool_name = tool_info["name"]
         is_enabled = toggles.get(tool_name, True)
-        if tool_name == "play_youtube_song" and not features.get("youtube_music", True):
+        if tool_name in {"play_youtube_song", "play_playlist_song", "list_user_playlist", "get_playlist_top_played"} and not features.get("youtube_music", True):
             is_enabled = False
         if is_enabled:
             total_active += 1
