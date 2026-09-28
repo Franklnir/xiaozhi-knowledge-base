@@ -3320,13 +3320,14 @@ class PostgresStore:
         import re
         from xiaozhi.core.utils import extract_youtube_video_id
 
-        # Check track number in query: e.g. "1", "nomor 2", "track 3", "playlist 1"
-        match = re.search(r"(?:nomor|no\.?|ke-?|track|urutan|playlist)?\s*(\d+)", raw_q.lower())
+        # Check track number in query: ONLY if query is literally a number (e.g. "1") or has explicit keyword ("nomor 2", "track 3", "playlist 1")
         track_num = None
         if raw_q.isdigit():
             track_num = int(raw_q)
-        elif match and match.group(1):
-            track_num = int(match.group(1))
+        else:
+            explicit_track_match = re.search(r"\b(?:nomor|no\.?|ke-?|track|urutan|playlist)\s*(\d+)\b", raw_q.lower())
+            if explicit_track_match:
+                track_num = int(explicit_track_match.group(1))
 
         with self._get_conn() as conn:
             with conn.cursor() as cur:
@@ -3357,10 +3358,10 @@ class PostgresStore:
                     """
                     SELECT * FROM user_playlists 
                     WHERE owner_id = %s AND (title ILIKE %s OR artist ILIKE %s)
-                    ORDER BY (title ILIKE %s) DESC, play_count DESC, id ASC
+                    ORDER BY (LOWER(title) = LOWER(%s)) DESC, (title ILIKE %s) DESC, play_count DESC, id ASC
                     LIMIT 1
                     """,
-                    (int(owner_id), f"%{target_q}%", f"%{target_q}%", f"{target_q}%"),
+                    (int(owner_id), f"%{target_q}%", f"%{target_q}%", target_q, f"{target_q}%"),
                 )
                 row = cur.fetchone()
                 return dict(row) if row else None

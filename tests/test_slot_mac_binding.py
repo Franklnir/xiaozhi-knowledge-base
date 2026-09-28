@@ -95,3 +95,32 @@ def test_set_mcp_connection_state_with_board_mac():
     assert state["board_mac"] == "AA:BB:CC:11:22:33"
     assert is_mcp_connected(999, "fakehash123", slot=2) is True
 
+
+def test_playlist_matching_accuracy():
+    from xiaozhi.database.sqlite_store import SQLiteStore
+    store = SQLiteStore(db_path=":memory:")
+    user = store.create_user("musicfan", "password123")
+    uid = user["id"]
+
+    # Add 5 tracks with different names
+    store.add_playlist_track(uid, title="Track One", youtube_url="https://www.youtube.com/watch?v=11111111111", video_id="11111111111")
+    store.add_playlist_track(uid, title="Track Two", youtube_url="https://www.youtube.com/watch?v=22222222222", video_id="22222222222")
+    store.add_playlist_track(uid, title="Track Three", youtube_url="https://www.youtube.com/watch?v=33333333333", video_id="33333333333")
+    store.add_playlist_track(uid, title="Track Four", youtube_url="https://www.youtube.com/watch?v=44444444444", video_id="44444444444")
+    store.add_playlist_track(uid, title="Track Five (Didi Kempot)", youtube_url="https://www.youtube.com/watch?v=55555555555", video_id="55555555555")
+
+    # 1. Search for a title containing number: "Maroon 5" should NOT match track #5
+    matched = store.find_playlist_track_by_query(uid, "Maroon 5")
+    assert matched is None or matched["title"] != "Track Five (Didi Kempot)"
+
+    # 2. Explicit track number: "2" or "nomor 2" MUST match track #2
+    t2 = store.find_playlist_track_by_query(uid, "2")
+    assert t2 is not None and t2["track_number"] == 2
+    t2_explicit = store.find_playlist_track_by_query(uid, "nomor 2")
+    assert t2_explicit is not None and t2_explicit["track_number"] == 2
+
+    # 3. Direct URL / ID
+    t3 = store.find_playlist_track_by_query(uid, "https://www.youtube.com/watch?v=33333333333")
+    assert t3 is not None and t3["video_id"] == "33333333333"
+
+
