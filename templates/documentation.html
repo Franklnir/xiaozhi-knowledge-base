@@ -2075,13 +2075,14 @@ void ackCommand(String cmdId) {
                     <div class="doc-step-content">
                         <div class="doc-step-title">Pengaturan Modul Layar & Rotasi</div>
                         <div class="doc-step-desc">
-                            Pada tab <strong>Pengaturan Hardware</strong>:
+                            Pada tab <strong>Pengaturan Hardware</strong>, pilih tipe modul layar yang sesuai:
                             <ul style="margin:6px 0 0 16px; padding:0;">
-                                <li><strong>Tanpa Layar (Headless Audio Only):</strong> Pilih ini jika perangkat Anda hanya modul audio tanpa layar.</li>
-                                <li><strong>ST7789 240x280 (8-Pin SPI):</strong> Untuk modul layar IPS 1.69" / 1.54" 8-pin.</li>
-                                <li><strong>ST7789 240x240 (7-Pin SPI):</strong> Untuk modul layar 1.3" 7-pin tanpa CS.</li>
-                                <li><strong>OLED SSD1306 / SH1106:</strong> Untuk layar OLED kecil I2C.</li>
-                                <li><strong>Rotasi Layar:</strong> Pilih 0° (Normal) atau 180° (Terbalik) sesuai orientasi perakitan.</li>
+                                <li><strong>ST7789 240x280 1.69" (8-Pin SPI, CS=GPIO 45):</strong> Modul layar IPS 1.69" resolusi 240x280.</li>
+                                <li><strong>ST7789 240x240 1.54" (8-Pin SPI, CS=GPIO 45):</strong> Modul layar IPS 1.54" resolusi 240x240.</li>
+                                <li><strong>OLED SSD1306 128x64 0.96" (I2C):</strong> Layar OLED monokrom 0.96 inch I2C.</li>
+                                <li><strong>OLED SH1106 128x64 0.96" / 1.3" (I2C):</strong> Layar OLED monokrom 1.3 inch chip driver SH1106 I2C.</li>
+                                <li><strong>Tanpa Layar (Headless Audio Only):</strong> Mode audio saja tanpa layar (hemat daya &amp; membebaskan pin).</li>
+                                <li><strong>Rotasi Layar:</strong> Pilih 0° (Normal) atau 180° (Terbalik) sesuai orientasi perakitan casing.</li>
                             </ul>
                         </div>
                     </div>
@@ -2119,7 +2120,94 @@ void ackCommand(String cmdId) {
                 </div>
             </div>
 
-            <!-- Section 2: Detailed Button Guide -->
+            <!-- Section 2: Pilihan Modul Layar & Wiring NVS -->
+            <div class="doc-section" style="margin-top:28px;">
+                <div class="doc-section-title">
+                    <span>📺</span> Pilihan Modul Layar pada Konfigurasi Web Portal (192.168.4.1)
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); margin-bottom:14px;">
+                    Daftar tipe modul layar yang didukung pada firmware ESP32-S3 N16R8, nilai NVS internal, dan konfigurasi sambungan kabel (wiring):
+                </div>
+
+                <div style="overflow-x:auto; margin-bottom:16px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pilihan Modul Layar</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Value NVS</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Deskripsi &amp; Wiring Sambungan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    ST7789 240x280 1.69"<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(8-Pin SPI, CS=GPIO 45)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; font-family:monospace; color:var(--app-sky);">
+                                    <code>st7789_240x280_8p</code>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-text);">
+                                    <strong>Untuk:</strong> Modul layar ST7789 1.69" resolusi 240x280 yang memiliki pin CS (offset Y=20).<br>
+                                    <span style="color:var(--app-muted); display:inline-block; margin-top:4px;"><strong>Wiring:</strong> SCL=19, SDA=20, DC=47, RST=21, CS=45, BLK=38.</span>
+                                </td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    ST7789 240x240 1.54"<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(8-Pin SPI, CS=GPIO 45)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; font-family:monospace; color:var(--app-sky);">
+                                    <code>st7789_240x240_8p</code>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-text);">
+                                    <strong>Untuk:</strong> Modul layar ST7789 1.54" resolusi 240x240 8-Pin dengan jalur CS ke GPIO 45.<br>
+                                    <span style="color:var(--app-muted); display:inline-block; margin-top:4px;"><strong>Wiring:</strong> SCL=19, SDA=20, DC=47, RST=21, CS=45, BLK=38.</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    OLED SSD1306 128x64 0.96"<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(I2C)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; font-family:monospace; color:var(--app-sky);">
+                                    <code>oled_128x64</code>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-text);">
+                                    <strong>Untuk:</strong> Layar OLED monokrom 0.96 inch I2C.<br>
+                                    <span style="color:var(--app-muted); display:inline-block; margin-top:4px;"><strong>Wiring:</strong> SDA=GPIO 20, SCL=GPIO 19, VCC=3.3V, GND=GND.</span>
+                                </td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    OLED SH1106 128x64 0.96" / 1.3"<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(I2C)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; font-family:monospace; color:var(--app-sky);">
+                                    <code>oled_sh1106_128x64</code>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-text);">
+                                    <strong>Untuk:</strong> Layar OLED monokrom 1.3 inch dengan chip driver SH1106 (I2C).<br>
+                                    <span style="color:var(--app-muted); display:inline-block; margin-top:4px;"><strong>Wiring:</strong> SDA=GPIO 20, SCL=GPIO 19, VCC=3.3V, GND=GND.</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    Tanpa Layar<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(Headless Audio Only)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; font-family:monospace; color:var(--app-sky);">
+                                    <code>headless</code>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-text);">
+                                    <strong>Untuk:</strong> Mode audio saja tanpa layar (hemat daya &amp; membebaskan pin I/O).
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="doc-tip" style="margin-top:12px;">
+                    <strong>💡 Tips Rotasi Layar:</strong> Di Web Portal Wi-Fi (192.168.4.1), Anda juga dapat mengatur rotasi tampilan antara <code>0° (Normal)</code> atau <code>180° (Terbalik)</code> sesuai orientasi fisik pemasangan modul layar di dalam enclosure casing Anda.
+                </div>
+            </div>
+
+            <!-- Section 3: Detailed Button Guide -->
             <div class="doc-section" style="margin-top:28px;">
                 <div class="doc-section-title">
                     <span>🎮</span> Panduan Lengkap Fungsi Ke-3 Tombol Fisik
@@ -2210,7 +2298,7 @@ void ackCommand(String cmdId) {
                 </div>
             </div>
 
-            <!-- Section 3: Pinout Reference -->
+            <!-- Section 4: Pinout Reference -->
             <div class="doc-section" style="margin-top:24px;">
                 <div class="doc-section-title">
                     <span>📌</span> Referensi Pinout Hardware ESP32-S3
@@ -2337,7 +2425,7 @@ void ackCommand(String cmdId) {
                             <tr>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>CS</code></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 45</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Chip Select (Khusus varian 8-Pin; modul 7-Pin tanpa pin CS)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Chip Select (Khusus varian 8-Pin SPI)</td>
                             </tr>
                             <tr>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>BLK</code> / <code>BL</code> / <code>PWM</code></td>

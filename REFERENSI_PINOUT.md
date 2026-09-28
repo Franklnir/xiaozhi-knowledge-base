@@ -87,7 +87,7 @@ Pada ESP32-S3, periferal I2S dapat berjalan terpisah (*Simplex Dual-Bus*) untuk 
 | `SDA / MOSI` | **GPIO 11** | SPI Master Out / Data |
 | `RES / RST` | **GPIO 47** | Hardware Reset |
 | `DC / RS` | **GPIO 48** | Data / Command Control |
-| `CS` | **GPIO 45** | Chip Select *(Hanya untuk layar 8-Pin; 7-Pin tanpa CS)* |
+| `CS` | **GPIO 45** | Chip Select *(Khusus varian 8-Pin SPI)* |
 | `BLK / BL / PWM` | **GPIO 38** | Backlight Control / PWM Dimming |
 
 ---
