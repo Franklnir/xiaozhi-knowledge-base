@@ -2399,7 +2399,7 @@ void ackCommand(String cmdId) {
                     <span>📌</span> Referensi Pinout Hardware ESP32-S3
                 </div>
                 <div class="doc-step-desc" style="margin-bottom:14px;">
-                    Tabel pemetaan pin GPIO hardware untuk ESP32-S3 N16R8 (Simplex Dual I2S Bus, Layar ST7789 SPI, dan Tombol Kendali):
+                    Tabel pemetaan pin GPIO hardware untuk ESP32-S3 N16R8 (Simplex Dual I2S Bus dan Tombol Kendali):
                 </div>
 
                 <!-- Sub-tabel 1: Audio I2S (Mic & Speaker) -->
@@ -2478,60 +2478,7 @@ void ackCommand(String cmdId) {
                     </table>
                 </div>
 
-                <!-- Sub-tabel 2: Layar LCD ST7789 SPI -->
-                <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:16px 0 8px; display:flex; align-items:center; gap:6px;">
-                    <span>🖥️</span> Layar LCD IPS ST7789 SPI (Opsional)
-                </div>
-                <div style="overflow-x:auto; margin-bottom:16px;">
-                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
-                        <thead>
-                            <tr style="background:var(--app-surface-muted); text-align:left;">
-                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin Modul ST7789</th>
-                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin ESP32-S3</th>
-                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Keterangan &amp; Fungsi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>VCC</code> / <code>GND</code></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>3.3V</strong> / <strong>GND</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Catu daya layar 3.3V &amp; Ground</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SCL</code> / <code>CLK</code></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 12</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">SPI Bus Clock</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>SDA</code> / <code>MOSI</code></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 11</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">SPI Master Out Data</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>RES</code> / <code>RST</code></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 47</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Hardware Reset Layar</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>DC</code> / <code>RS</code></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 48</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Data / Command Control</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>CS</code></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 45</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Chip Select (Khusus varian 8-Pin SPI)</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>BLK</code> / <code>BL</code> / <code>PWM</code></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 38</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Kontrol Backlight PWM Dimming</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Sub-tabel 3: Tombol Fisik -->
+                <!-- Sub-tabel 2: Tombol Fisik -->
                 <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:16px 0 8px; display:flex; align-items:center; gap:6px;">
                     <span>🔘</span> Tombol Fisik (Active Low - Internal Pull-Up)
                 </div>
