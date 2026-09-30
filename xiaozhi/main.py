@@ -338,6 +338,7 @@ async def robots_txt():
         "Allow: /\n"
         "Allow: /dokumentasi\n"
         "Allow: /web-flasher\n"
+        "Allow: /marketplace\n"
         "Allow: /login\n"
         "Allow: /register\n"
         "Disallow: /admin\n"
@@ -363,6 +364,26 @@ async def nginx_diag():
 async def sitemap_xml():
     from datetime import date
     today = date.today().isoformat()
+
+    product_urls = []
+    try:
+        from xiaozhi.routers.marketplace_ui import get_product_service
+        service = get_product_service()
+        products = service.get_marketplace_list(limit=50)
+        for p in products:
+            slug = p.get("slug") or p.get("id")
+            if slug:
+                product_urls.append(f"""    <url>
+        <loc>https://xiaozhiscig.biz.id/marketplace/{slug}</loc>
+        <lastmod>{today}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>""")
+    except Exception:
+        pass
+
+    products_xml_str = ("\n" + "\n".join(product_urls)) if product_urls else ""
+
     xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
@@ -383,6 +404,12 @@ async def sitemap_xml():
         <changefreq>weekly</changefreq>
         <priority>0.9</priority>
     </url>
+    <url>
+        <loc>https://xiaozhiscig.biz.id/marketplace</loc>
+        <lastmod>{today}</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>0.85</priority>
+    </url>{products_xml_str}
     <url>
         <loc>https://xiaozhiscig.biz.id/login</loc>
         <lastmod>{today}</lastmod>

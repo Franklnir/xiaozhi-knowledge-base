@@ -1,6 +1,42 @@
 {% extends "base.html" %}
 
+{% block title %}{{ product.title }} - Marketplace Firmware Xiaozhi Indonesia | xiaozhiscig{% endblock %}
+{% block meta_title %}{{ product.title }} - Marketplace Firmware Xiaozhi Indonesia | xiaozhiscig{% endblock %}
+{% block meta_desc %}{{ product.short_description | truncate(160, True, '...') if product.short_description else 'Dapatkan firmware ' ~ product.title ~ ' untuk ESP32 di Marketplace Resmi Xiaozhi Indonesia.' }}{% endblock %}
+{% block og_title %}{{ product.title }} - Xiaozhi Indonesia{% endblock %}
+{% block og_desc %}{{ product.short_description | truncate(200, True, '...') if product.short_description else 'Katalog firmware resmi Xiaozhi ESP32.' }}{% endblock %}
+{% block tw_title %}{{ product.title }} - Xiaozhi Indonesia{% endblock %}
+{% block tw_desc %}{{ product.short_description | truncate(200, True, '...') if product.short_description else 'Katalog firmware resmi Xiaozhi ESP32.' }}{% endblock %}
+
 {% block content %}
+<!-- Schema.org Product for Google Rich Snippets -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "Product",
+  "name": {{ product.title | tojson }},
+  "description": {{ (product.short_description or product.title) | tojson }},
+  "sku": {{ product.id | tojson }},
+  {% if product.images and product.images|length > 0 %}
+  "image": [
+    {% for img in product.images %}
+    "https://xiaozhiscig.biz.id{{ img.url }}"{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ],
+  {% endif %}
+  "offers": {
+    "@type": "Offer",
+    "url": "https://xiaozhiscig.biz.id/marketplace/{{ product.slug or product.id }}",
+    "priceCurrency": "IDR",
+    "price": "{{ product.price_amount or 0 }}",
+    "availability": "https://schema.org/InStock",
+    "seller": {
+      "@type": "Person",
+      "name": {{ (product.seller_username or "Xiaozhi Creator") | tojson }}
+    }
+  }
+}
+</script>
 <style>
     .fw-detail-layout {
         display: grid;
