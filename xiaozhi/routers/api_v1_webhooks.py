@@ -6,13 +6,24 @@ from xiaozhi.marketplace.payments.xendit import XenditPaymentProvider
 from xiaozhi.marketplace.payments.midtrans import MidtransPaymentProvider
 from xiaozhi.marketplace.payments.simulator import SimulatorPaymentProvider
 from xiaozhi.marketplace.deps import get_marketplace_repo
+from xiaozhi.config import (
+    ALLOW_SIMULATOR_PAYMENTS,
+    MARKETPLACE_PAYMENT_PROVIDER,
+    PAYMENTS_ENABLED,
+)
 
 logger = logging.getLogger("xiaozhi.marketplace.webhooks")
 router = APIRouter(prefix="/api/v1/webhooks", tags=["Marketplace Webhooks"])
 
 
+def _require_provider(name: str) -> None:
+    if not PAYMENTS_ENABLED or MARKETPLACE_PAYMENT_PROVIDER != name:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+
 @router.post("/xendit")
 async def xendit_webhook(request: Request):
+    _require_provider("xendit")
     headers = dict(request.headers)
     raw_body = await request.body()
     provider = XenditPaymentProvider()
@@ -34,6 +45,7 @@ async def xendit_webhook(request: Request):
             provider_event_id=event.event_id,
             provider_reference=event.order_number,
             payload=event.raw_payload,
+            paid_amount=event.amount,
         )
         if not success:
             logger.warning("Failed to finalize Xendit order %s", event.order_number)
@@ -43,6 +55,7 @@ async def xendit_webhook(request: Request):
 
 @router.post("/midtrans")
 async def midtrans_webhook(request: Request):
+    _require_provider("midtrans")
     headers = dict(request.headers)
     raw_body = await request.body()
     provider = MidtransPaymentProvider()
@@ -64,6 +77,7 @@ async def midtrans_webhook(request: Request):
             provider_event_id=event.event_id,
             provider_reference=event.order_number,
             payload=event.raw_payload,
+            paid_amount=event.amount,
         )
         if not success:
             logger.warning("Failed to finalize Midtrans order %s", event.order_number)
@@ -73,6 +87,9 @@ async def midtrans_webhook(request: Request):
 
 @router.post("/simulator")
 async def simulator_webhook(request: Request):
+    if not ALLOW_SIMULATOR_PAYMENTS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    _require_provider("simulator")
     headers = dict(request.headers)
     raw_body = await request.body()
     provider = SimulatorPaymentProvider()
@@ -90,6 +107,7 @@ async def simulator_webhook(request: Request):
             provider_event_id=event.event_id,
             provider_reference=event.order_number,
             payload=event.raw_payload,
+            paid_amount=event.amount,
         )
 
     return JSONResponse(status_code=200, content={"received": True, "provider": "simulator"})

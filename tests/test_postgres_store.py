@@ -94,6 +94,7 @@ class TestPostgresStore(unittest.TestCase):
         # Direct SQL inspection: verify search_vector is populated by trigger!
         with self.store._get_conn() as conn:
             with conn.cursor() as cur:
+                self.store.set_rls_context(cur, uid)
                 cur.execute("SELECT search_vector FROM materials WHERE id = %s", (mat_id,))
                 row = cur.fetchone()
                 self.assertIsNotNone(row["search_vector"], "Trigger must automatically populate search_vector!")

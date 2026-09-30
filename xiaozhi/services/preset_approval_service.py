@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from xiaozhi.config import FIRMWARE_PRESET_SECRET
 from xiaozhi.marketplace.storage import storage_service
 
 logger = logging.getLogger("xiaozhi.preset_approval")
@@ -60,8 +61,7 @@ def _get_data_file() -> Path:
 
 
 def _get_aesgcm() -> AESGCM:
-    secret = os.getenv("FIRMWARE_PRESET_SECRET", "xiaozhi-esp32-preset-secure-token-2026-v1")
-    key = hashlib.sha256(secret.encode()).digest()
+    key = hashlib.sha256(FIRMWARE_PRESET_SECRET.encode()).digest()
     return AESGCM(key)
 
 

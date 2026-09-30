@@ -1150,7 +1150,7 @@ class SQLiteStore:
         token_hash = xiaozhi_token_hash(token)
         conn = self._get_conn()
         row = conn.execute("""
-            SELECT t.user_id, t.slot_number, t.device_label, t.created_at, u.username, u.role
+            SELECT t.user_id, t.slot_number, t.device_label, t.board_mac, t.created_at, u.username, u.role
             FROM xiaozhi_tokens t
             JOIN users u ON t.user_id = u.id
             WHERE t.token_hash = ?

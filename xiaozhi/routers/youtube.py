@@ -13,6 +13,8 @@ from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSock
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from xiaozhi.dependencies import get_current_user, get_store, require_user
+from xiaozhi.core.security import extract_bearer_token
+from xiaozhi.config import IS_PRODUCTION
 from xiaozhi.services.mcp_service import is_mcp_connected
 
 logger = logging.getLogger("xiaozhi.youtube")
@@ -99,6 +101,45 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
         logger.debug("Audio queue lookup by MAC failed: %s", e)
 
     return None
+
+
+def _device_mac_from_request(request, claimed_mac: str = "") -> str:
+    return (
+        claimed_mac
+        or request.headers.get("Device-Id", "")
+        or request.headers.get("X-Device-Mac", "")
+        or request.headers.get("X-MAC-Address", "")
+        or request.headers.get("X-Device-Id", "")
+    ).strip()
+
+
+def _require_device_auth(store, request, claimed_mac: str = "") -> tuple[int, str]:
+    token = (request.headers.get("X-Device-Token", "") or "").strip()
+    if not token:
+        token = extract_bearer_token(request.headers.get("Authorization")) or ""
+    if not token:
+        raise HTTPException(status_code=401, detail="X-Device-Token diperlukan.")
+
+    owner = store.find_user_by_mcp_token(token)
+    if not owner:
+        raise HTTPException(status_code=401, detail="Kredensial perangkat tidak valid.")
+
+    owner_id = owner.get("user_id") or owner.get("id")
+    bound_mac = str(owner.get("board_mac") or "").strip()
+    request_mac = _device_mac_from_request(request, claimed_mac)
+    if not owner_id or not bound_mac:
+        raise HTTPException(status_code=403, detail="Kredensial belum terikat ke perangkat.")
+    if not request_mac or _normalize_mac(bound_mac) != _normalize_mac(request_mac):
+        raise HTTPException(status_code=403, detail="Kredensial tidak cocok dengan perangkat.")
+    return int(owner_id), request_mac
+
+
+def _absolute_base_url(request) -> str:
+    proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+    host = request.headers.get("x-forwarded-host", "").split(",", 1)[0].strip()
+    if proto and host:
+        return f"{proto}://{host}"
+    return str(request.base_url).rstrip("/")
 
 
 def youtube_search(query: str, max_results: int = 5) -> list:
@@ -216,145 +257,25 @@ def _fetch_user(store, user_id: Optional[int]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_id: Optional[int] = None, mac: Optional[str] = None, token: Optional[str] = None):
-    user = None
+def _resolve_stream_user_and_info(store, video_id: str, request):
+    """Resolve identity only from an authenticated web session or device credential."""
+    user = get_current_user(request)
     title = ""
-    device_mac = (mac or "").strip()
-    if not device_mac and hasattr(request, "headers"):
-        device_mac = (
-            request.headers.get("Device-Id", "") or
-            request.headers.get("X-Device-Mac", "") or
-            request.headers.get("X-MAC-Address", "") or
-            request.headers.get("X-Device-Id", "") or
-            request.headers.get("device_id", "") or
-            request.headers.get("mac", "")
-        ).strip()
-    if not device_mac and hasattr(request, "query_params"):
-        device_mac = (
-            request.query_params.get("mac", "") or
-            request.query_params.get("device_id", "")
-        ).strip()
-
-    # 1. Highest priority: explicit owner_id from query parameter
-    if owner_id:
+    device_mac = _device_mac_from_request(request)
+    if not user:
+        owner_id, device_mac = _require_device_auth(store, request, device_mac)
         user = _fetch_user(store, owner_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="Autentikasi diperlukan.")
 
-    # 2. Check recent audio_queue for this video_id (created in last 20 minutes)
-    # This directly identifies the user who just asked XiaoZhi to play this song!
-    if not user and hasattr(store, "find_recent_audio_command_by_video_id"):
+    if hasattr(store, "find_recent_audio_command_by_video_id"):
         try:
             cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=20)
-            if cmd and cmd.get("owner_id"):
-                user = _fetch_user(store, cmd["owner_id"])
-                if cmd.get("title") and not title:
-                    title = cmd["title"]
-        except Exception as e:
-            logger.debug("Error resolving user from audio_queue: %s", e)
-
-    # 3. If still not resolved, check MCP token
-    if not user and token:
-        try:
-            owner = store.find_user_by_mcp_token(token)
-            if owner and owner.get("user_id"):
-                user = _fetch_user(store, owner["user_id"])
+            if cmd and int(cmd.get("owner_id") or 0) == int(user["id"]):
+                title = str(cmd.get("title") or "")
         except Exception:
             pass
-
-    # 4. If still not resolved, lookup user by device_mac in registered_devices
-    if not user and device_mac:
-        try:
-            resolved_id = _resolve_owner_for_device(store, device_mac)
-            if resolved_id:
-                user = _fetch_user(store, resolved_id)
-        except Exception:
-            pass
-
-    # 5. Check active session user (web browser session)
-    if not user:
-        try:
-            session_user = get_current_user(request)
-            if session_user:
-                user = session_user
-        except Exception:
-            pass
-
-    # 6. Fallback: recent audio_queue record within 45 minutes
-    if not user and hasattr(store, "find_recent_audio_command_by_video_id"):
-        try:
-            cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=45)
-            if cmd and cmd.get("owner_id"):
-                user = _fetch_user(store, cmd["owner_id"])
-                if cmd.get("title") and not title:
-                    title = cmd["title"]
-        except Exception:
-            pass
-
-    # If user known but device_mac not provided in request, check if user already has registered MAC
-    if user and not device_mac and hasattr(store, "get_user_mac_address"):
-        try:
-            device_mac = store.get_user_mac_address(user["id"]) or ""
-        except Exception:
-            pass
-
-    # Extract detected_chip
-    detected_chip = ""
-    if hasattr(request, "query_params") and request.query_params.get("chip"):
-        detected_chip = request.query_params.get("chip", "").strip().lower()
-    if not detected_chip and hasattr(request, "headers"):
-        detected_chip = (
-            request.headers.get("X-Device-Chip", "") or
-            request.headers.get("Device-Chip", "") or
-            request.headers.get("X-Chip", "") or
-            request.headers.get("X-Chip-Type", "")
-        ).strip().lower()
-
-    # Auto-register / rebind device MAC to this user in registered_devices
-    # Validasi dulu apakah MCP terhubung sebelum mengikat user ke board!
-    if user and device_mac and hasattr(store, "register_device"):
-        clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
-        clean_mac = clean_mac.strip().upper()
-        if len(clean_mac) >= 11:
-            try:
-                user_id = user["id"]
-                dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                if _can_bind_device_to_user(user_id):
-                    res = store.register_device(
-                        user_id,
-                        device_id=clean_mac,
-                        name=dev_name,
-                        device_type=dev_type,
-                        notes="Tertaut saat stream lagu ESP32 (MCP Terhubung)"
-                    )
-                    logger.info(f"[STREAM MAC] Device MAC {clean_mac} ({dev_type}) berhasil diikat ke user {user_id} ({user.get('username')}) [MCP AKTIF] -> {res}")
-                    
-                    # Auto-lock board MAC ke slot MCP pengguna (Slot 1..3)
-                    if hasattr(store, "list_user_xiaozhi_tokens") and hasattr(store, "bind_board_to_slot"):
-                        try:
-                            user_tokens = store.list_user_xiaozhi_tokens(user_id)
-                            target_slot = None
-                            for t in user_tokens:
-                                if t.get("board_mac") == clean_mac:
-                                    target_slot = t["slot_number"]
-                                    break
-                            if not target_slot:
-                                for t in user_tokens:
-                                    if not t.get("board_mac"):
-                                        target_slot = t["slot_number"]
-                                        break
-                            if target_slot:
-                                store.bind_board_to_slot(user_id, slot=target_slot, device_mac=clean_mac, request_id="stream_audio")
-                        except Exception as b_exc:
-                            logger.warning(f"Gagal auto-lock slot MAC stream: {b_exc}")
-                else:
-                    if hasattr(store, "record_device_activity"):
-                        store.record_device_activity(clean_mac, user_id)
-                    logger.warning(f"[STREAM MAC] Board MAC {clean_mac} TIDAK ditautkan ke user {user_id} karena MCP tidak terhubung.")
-            except Exception as exc:
-                logger.error(f"[STREAM MAC ERROR] Gagal memproses MAC {clean_mac}: {exc}")
-
     return user, title, device_mac
-
-
 
 def _format_chip_name_and_type(chip: Optional[str], clean_mac: str):
     c = (chip or "").lower().replace("-", "").strip()
@@ -545,9 +466,6 @@ async def audio_stream_ogg_opus(
     chip: Optional[str] = Query(None),
     rssi: Optional[int] = Query(None),
     start: float = 0.0,
-    owner_id: Optional[int] = Query(None),
-    mac: Optional[str] = Query(None),
-    token: Optional[str] = Query(None),
 ):
     """Real-time Ogg/Opus transcoding stream for ESP32 hardware decoder with adaptive bitrate, chip profiling, and seek resume support."""
     # Resolve chip from query or header
@@ -571,7 +489,7 @@ async def audio_stream_ogg_opus(
     sample_rate = resolve_chip_audio_profile(detected_chip)
 
     store = get_store()
-    user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request, owner_id=owner_id, mac=mac, token=token)
+    user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request)
     user_id = user["id"] if user else None
     username = user["username"] if user else ""
 
@@ -634,9 +552,7 @@ async def audio_stream_ogg_opus(
 async def audio_commands_for_device(device_id: str, request: Request):
     """ESP32 firmware command poll endpoint."""
     store = get_store()
-    owner_id = _resolve_owner_for_device(store, device_id)
-    if not owner_id:
-        return {"commands": []}
+    owner_id, _ = _require_device_auth(store, request, device_id)
 
     # Auto-register device MAC for owner_id only if MCP is connected
     if device_id and hasattr(store, "register_device"):
@@ -668,7 +584,7 @@ async def audio_commands_for_device(device_id: str, request: Request):
     commands = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else store.get_audio_commands(owner_id)
 
     formatted_commands = []
-    base_url = str(request.base_url).rstrip("/")
+    base_url = _absolute_base_url(request)
 
     for cmd in commands:
         stream_url = cmd.get("stream_url", "")
@@ -699,9 +615,9 @@ async def audio_ack_for_device(command_id: str, request: Request):
     if not device_id:
         device_id = request.headers.get("Device-Id", "").strip() or request.headers.get("X-Device-Mac", "").strip()
 
-    owner_id = _resolve_owner_for_device(store, device_id)
+    owner_id, device_id = _require_device_auth(store, request, device_id)
+    store.ack_audio_command(owner_id, command_id)
     if owner_id:
-        store.ack_audio_command(owner_id, command_id)
         if device_id and hasattr(store, "register_device"):
             clean_mac = device_id[6:] if device_id.lower().startswith("esp32-") else device_id
             clean_mac = clean_mac.strip().upper()
@@ -809,9 +725,6 @@ async def now_playing(request: Request):
 async def audio_play_direct(
     request: Request,
     q: str = Query(""),
-    mac: str = Query(""),
-    token: str = Query(""),
-    owner_id: Optional[int] = Query(None),
 ):
     """Direct search and stream for ESP32 instant on-demand playback with auto MAC binding."""
     q = (q or "").strip()
@@ -826,40 +739,19 @@ async def audio_play_direct(
         title = results[0]["title"]
         store = get_store()
 
-        # Extract device MAC
-        device_mac = (mac or "").strip()
-        if not device_mac and hasattr(request, "headers"):
-            device_mac = (
-                request.headers.get("Device-Id", "") or
-                request.headers.get("X-Device-Mac", "") or
-                request.headers.get("X-MAC-Address", "") or
-                request.headers.get("X-Device-Id", "") or
-                request.headers.get("device_id", "") or
-                request.headers.get("mac", "")
-            ).strip()
-
-        # Resolve owner
-        resolved_owner_id = owner_id
-        if not resolved_owner_id and token:
-            owner = store.find_user_by_mcp_token(token)
-            if owner and owner.get("user_id"):
-                resolved_owner_id = owner["user_id"]
-        if not resolved_owner_id and device_mac:
-            resolved_owner_id = _resolve_owner_for_device(store, device_mac)
-        if not resolved_owner_id:
-            try:
-                su = get_current_user(request)
-                if su and su.get("id"):
-                    resolved_owner_id = su["id"]
-            except Exception:
-                pass
+        session_user = get_current_user(request)
+        if session_user:
+            resolved_owner_id = int(session_user["id"])
+            device_mac = ""
+        else:
+            resolved_owner_id, device_mac = _require_device_auth(store, request)
 
         clean_mac = ""
         if device_mac:
             clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
             clean_mac = clean_mac.strip().upper()
 
-        base_url = str(request.base_url).rstrip("/")
+        base_url = _absolute_base_url(request)
         if resolved_owner_id:
             # Auto-register device MAC only if MCP is connected
             if clean_mac and len(clean_mac) >= 11 and hasattr(store, "register_device"):
@@ -888,8 +780,7 @@ async def audio_play_direct(
                     logger.error(f"[PLAY DIRECT MAC ERROR] {exc}")
 
             # Queue command so streaming and tracker recognize the user
-            mac_param = f"&mac={clean_mac}" if clean_mac else ""
-            stream_url = f"/api/audio/stream/{vid}?owner_id={resolved_owner_id}{mac_param}"
+            stream_url = f"/api/audio/stream/{vid}"
             full_stream = f"{base_url}{stream_url}"
             try:
                 store.queue_audio_command(
@@ -901,17 +792,14 @@ async def audio_play_direct(
                 )
             except Exception:
                 pass
-        else:
-            mac_param = f"&mac={clean_mac}" if clean_mac else ""
-            stream_url = f"/api/audio/stream/{vid}?{mac_param.lstrip('&')}" if mac_param else f"/api/audio/stream/{vid}"
-
         return {
             "success": True,
             "video_id": vid,
             "title": title,
             "stream_url": stream_url,
-            "owner_id": resolved_owner_id,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -919,8 +807,6 @@ async def audio_play_direct(
 @router.get("/api/device/audio/commands")
 async def device_audio_commands(
     request: Request,
-    token: str = Query(""),
-    mac: str = Query(""),
     chip: str = Query("")
 ):
     store = get_store()
@@ -937,34 +823,9 @@ async def device_audio_commands(
         except Exception:
             pass
 
-    owner_id = None
-    if token:
-        owner = store.find_user_by_mcp_token(token)
-        if owner:
-            owner_id = owner["user_id"]
-    if not owner_id and mac:
-        owner_id = _resolve_owner_for_device(store, mac)
-
-    if not owner_id:
-        device_hdr = request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
-        if device_hdr:
-            owner_id = _resolve_owner_for_device(store, device_hdr)
-
-    # If owner_id is still None, check if there's a recent pending command in audio_queue created in last 2 mins
-    if not owner_id and (mac or request.headers.get("Device-Id", "")):
-        if hasattr(store, "find_recent_pending_audio_command"):
-            try:
-                recent = store.find_recent_pending_audio_command(minutes=2)
-                if recent and recent.get("owner_id"):
-                    owner_id = int(recent["owner_id"])
-            except Exception:
-                pass
-
-    if not owner_id:
-        return {"success": True, "commands": []}
+    owner_id, device_mac = _require_device_auth(store, request)
 
     # Auto-register / update device MAC for this user only if MCP is connected
-    device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "") or request.headers.get("X-MAC-Address", "")
     mac_saved_ok = False
     if owner_id and device_mac and hasattr(store, "register_device"):
         clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
@@ -1000,19 +861,13 @@ async def device_audio_commands(
         commands = [latest]
 
     formatted_commands = []
-    base_url = str(request.base_url).rstrip("/")
+    base_url = _absolute_base_url(request)
     for cmd in commands:
         c = dict(cmd)
         surl = c.get("stream_url", "")
         if surl.startswith("/"):
             surl = f"{base_url}{surl}"
         sep = "&" if "?" in surl else "?"
-        if "owner_id=" not in surl and owner_id:
-            surl = f"{surl}{sep}owner_id={owner_id}"
-            sep = "&"
-        if "mac=" not in surl and device_mac:
-            surl = f"{surl}{sep}mac={device_mac}"
-            sep = "&"
         if "chip=" not in surl and detected_chip:
             surl = f"{surl}{sep}chip={detected_chip}"
             sep = "&"
@@ -1039,23 +894,12 @@ async def device_audio_ack(request: Request):
         form = await request.form()
         body = dict(form)
 
-    token = str(body.get("token", "")).strip()
     command_id = str(body.get("command_id", "")).strip()
     mac = str(body.get("mac", "")).strip()
 
-    owner_id = None
-    if token:
-        owner = store.find_user_by_mcp_token(token)
-        if owner:
-            owner_id = owner["user_id"]
-    if not owner_id and mac:
-        owner_id = _resolve_owner_for_device(store, mac)
-    if not owner_id:
-        device_hdr = request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
-        if device_hdr:
-            owner_id = _resolve_owner_for_device(store, device_hdr)
+    owner_id, authenticated_mac = _require_device_auth(store, request, mac)
 
-    device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
+    device_mac = authenticated_mac
     mac_saved_ok = False
     if owner_id and device_mac and hasattr(store, "register_device"):
         clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
@@ -1116,42 +960,10 @@ async def device_audio_status(request: Request):
     status = str(body.get("status", "")).strip().lower()
     mac = str(body.get("mac", "") or body.get("device_id", "")).strip()
     video_id = str(body.get("video_id", "")).strip()
-    token = str(body.get("token", "")).strip()
-
-    device_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "") or request.headers.get("X-MAC-Address", "") or request.headers.get("device_id", "")
-    device_mac = device_mac.strip()
+    owner_id, device_mac = _require_device_auth(store, request, mac)
 
     if not status:
         return {"success": False, "error": "status parameter is required"}
-
-    owner_id = None
-    if token:
-        owner = store.find_user_by_mcp_token(token)
-        if owner and owner.get("user_id"):
-            owner_id = owner["user_id"]
-
-    # 1. Check audio_queue for this video_id in the last 30 minutes
-    if not owner_id and video_id and hasattr(store, "find_recent_audio_command_by_video_id"):
-        try:
-            recent = store.find_recent_audio_command_by_video_id(video_id, minutes=30)
-            if recent and recent.get("owner_id"):
-                owner_id = int(recent["owner_id"])
-        except Exception:
-            pass
-
-    # 2. Fallback: find active session by video_id or device_mac in playback_tracker
-    if not owner_id:
-        for s in playback_tracker.get_active_sessions():
-            if video_id and s.get("video_id") == video_id:
-                owner_id = s.get("user_id")
-                break
-            if device_mac and s.get("device_mac", "").upper() == device_mac.upper():
-                owner_id = s.get("user_id")
-                break
-
-    # 3. Fallback: resolve from registered_devices
-    if not owner_id and device_mac:
-        owner_id = _resolve_owner_for_device(store, device_mac)
 
     # CRITICAL: Auto-register / rebind device MAC to this user in registered_devices only if MCP is connected
     mac_saved_ok = False
@@ -1222,14 +1034,21 @@ async def ws_audio_stream_endpoint(
     video_id: str,
     sample_rate: int = 24000,
     title: str = "",
-    owner_id: Optional[int] = Query(None),
-    mac: Optional[str] = Query(None),
-    token: Optional[str] = Query(None)
 ):
     """WebSocket Opus 24kHz stream for ESP32 hardware decoder."""
     await websocket.accept()
+    if IS_PRODUCTION and websocket.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower() != "https":
+        await websocket.close(code=4403, reason="HTTPS required")
+        return
+    if "token" in websocket.query_params or "owner_id" in websocket.query_params:
+        await websocket.close(code=4400, reason="Credentials must not be sent in the query string")
+        return
     store = get_store()
-    user, extracted_title, device_mac = _resolve_stream_user_and_info(store, video_id, websocket, owner_id=owner_id, mac=mac, token=token)
+    try:
+        user, extracted_title, device_mac = _resolve_stream_user_and_info(store, video_id, websocket)
+    except HTTPException:
+        await websocket.close(code=4401, reason="Authentication required")
+        return
     user_id = user["id"] if user else None
     username = user["username"] if user else ""
     if not title and extracted_title:
@@ -1254,8 +1073,18 @@ async def ws_audio_stream_endpoint(
 async def ws_device_audio_channel(websocket: WebSocket, device_id: str):
     """Persistent audio streaming channel for ESP32 device."""
     await websocket.accept()
+    if IS_PRODUCTION and websocket.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower() != "https":
+        await websocket.close(code=4403, reason="HTTPS required")
+        return
+    if "token" in websocket.query_params:
+        await websocket.close(code=4400, reason="Credentials must not be sent in the query string")
+        return
     store = get_store()
-    owner_id = _resolve_owner_for_device(store, device_id)
+    try:
+        owner_id, _ = _require_device_auth(store, websocket, device_id)
+    except HTTPException:
+        await websocket.close(code=4401, reason="Authentication required")
+        return
     if owner_id and device_id and hasattr(store, "register_device"):
         clean_mac = device_id[6:] if device_id.lower().startswith("esp32-") else device_id
         clean_mac = clean_mac.strip().upper()

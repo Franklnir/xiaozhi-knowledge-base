@@ -24,7 +24,7 @@ def run_backup(
     pg_port: str = "5432",
     pg_db: str = "xiaozhi",
     pg_user: str = "xiaozhi_app",
-    pg_password: str = "xiaozhi_secret",
+    pg_password: str = "",
 ) -> Optional[Path]:
     backup_path = Path(output_dir)
     backup_path.mkdir(parents=True, exist_ok=True)
@@ -101,8 +101,10 @@ def main():
     parser.add_argument("--port", default=os.getenv("POSTGRES_PORT", "5432"))
     parser.add_argument("--db", default=os.getenv("POSTGRES_DB", "xiaozhi"))
     parser.add_argument("--user", default=os.getenv("POSTGRES_USER", "xiaozhi_app"))
-    parser.add_argument("--password", default=os.getenv("POSTGRES_PASSWORD", "xiaozhi_secret"))
+    parser.add_argument("--password", default=os.getenv("POSTGRES_PASSWORD", ""))
     args = parser.parse_args()
+    if not args.password:
+        parser.error("--password atau POSTGRES_PASSWORD wajib diset")
 
     result = run_backup(
         output_dir=args.output_dir,

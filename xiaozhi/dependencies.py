@@ -43,7 +43,12 @@ def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
             user_info, error = validate_access_token(token)
             if user_info and not error:
                 user = _store.get_user(user_info["user_id"])
-                if user and user.get("username") == user_info.get("username"):
+                if (
+                    user
+                    and user.get("username") == user_info.get("username")
+                    and max(1, int(user.get("session_version", 1) or 1))
+                    == max(1, int(user_info.get("session_version", 1) or 1))
+                ):
                     return user
 
     # Try session cookie (for web)
@@ -82,8 +87,7 @@ def validate_csrf(request: Request, token: str, user: Optional[Dict[str, Any]]) 
         raise HTTPException(status_code=403, detail="Token keamanan form tidak valid.") from exc
     expected_uid = int(user["id"]) if user else None
     token_uid = payload.get("uid")
-    # If token was issued to a specific user, ensure it matches current user
-    if token_uid is not None and expected_uid is not None and token_uid != expected_uid:
+    if token_uid != expected_uid:
         raise HTTPException(status_code=403, detail="Token keamanan form tidak cocok dengan sesi.")
 
 

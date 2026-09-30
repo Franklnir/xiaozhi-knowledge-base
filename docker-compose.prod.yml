@@ -11,16 +11,31 @@ services:
       - "7860"
     environment:
       - ENVIRONMENT=production
+      - DB_AUTO_INIT_SCHEMA=false
       - COOKIE_SECURE=true
       - HF_TOKEN=${HF_TOKEN}
       - HF_DATASET_REPO=${HF_DATASET_REPO}
       - APP_SECRET_KEY=${APP_SECRET_KEY}
       - JWT_SECRET=${JWT_SECRET}
       - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY}
-      - ALLOWED_HOSTS=*
+      - MARKETPLACE_DATA_ENCRYPTION_KEY=${MARKETPLACE_DATA_ENCRYPTION_KEY}
+      - DOWNLOAD_TOKEN_SECRET=${DOWNLOAD_TOKEN_SECRET}
+      - FIRMWARE_PRESET_SECRET=${FIRMWARE_PRESET_SECRET}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-xiaozhiscig.biz.id,www.xiaozhiscig.biz.id,localhost,127.0.0.1}
+      - GOOGLE_AUTH_ENABLED=${GOOGLE_AUTH_ENABLED:-false}
+      - PAYMENTS_ENABLED=${PAYMENTS_ENABLED:-false}
+      - ALLOW_SIMULATOR_PAYMENTS=false
       - LOG_LEVEL=INFO
     volumes:
       - app_data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
     mem_limit: 512m
     memswap_limit: 1g
     cpus: 1.0

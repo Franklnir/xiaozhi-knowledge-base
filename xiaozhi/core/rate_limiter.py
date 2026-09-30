@@ -1,4 +1,5 @@
 """Rate limiting per endpoint and IP."""
+import ipaddress
 import time
 from collections import defaultdict
 from threading import Lock
@@ -9,6 +10,22 @@ from fastapi import HTTPException, Request
 # Rate limit storage: {key: [timestamps]}
 _rate_limits: Dict[str, List[float]] = {}
 _lock = Lock()
+
+
+def get_client_ip(request: Request) -> str:
+    """Trust proxy headers only when the direct peer is an internal proxy."""
+    direct = request.client.host if request.client else "unknown"
+    try:
+        peer = ipaddress.ip_address(direct)
+    except ValueError:
+        return direct
+    if not (peer.is_loopback or peer.is_private):
+        return direct
+    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+    try:
+        return str(ipaddress.ip_address(forwarded)) if forwarded else direct
+    except ValueError:
+        return direct
 
 
 def _cleanup_old_entries(key: str, window_seconds: int) -> None:
@@ -52,7 +69,7 @@ def enforce_rate_limit(request: Request, endpoint: str, limit: int = 60, window_
     Enforce rate limit for an endpoint.
     Raises HTTPException 429 if exceeded.
     """
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)
     key = f"{endpoint}:{client_ip}"
     if not check_rate_limit(key, limit, window_seconds):
         info = get_rate_limit_info(key, limit, window_seconds)

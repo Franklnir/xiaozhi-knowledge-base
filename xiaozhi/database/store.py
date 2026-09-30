@@ -1368,6 +1368,7 @@ class HFJsonStore:
                             "user_id": user_id,
                             "slot_number": int(item.get("slot_number", 1) or 1),
                             "device_label": item.get("device_label", "XiaoZhi 1"),
+                            "board_mac": item.get("board_mac", ""),
                             "username": user.get("username", ""),
                             "role": user.get("role", "user"),
                             "created_at": item.get("created_at", ""),

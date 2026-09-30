@@ -16,6 +16,7 @@ from xiaozhi.marketplace.deps import (
     get_entitlement_service,
     get_wallet_service,
     get_chat_service,
+    get_marketplace_repo,
 )
 from xiaozhi.marketplace.storage import storage_service
 from xiaozhi.marketplace.security import verify_download_token
@@ -273,12 +274,16 @@ async def serve_local_firmware_download(token: str, filename: Optional[str] = No
         )
 
     storage_key = payload.get("k", "")
+    purchase_id = payload.get("p", "")
+    repo = get_marketplace_repo()
+    if not repo.validate_download_grant(purchase_id, storage_key):
+        raise HTTPException(status_code=403, detail="Hak unduh sudah tidak aktif atau aset tidak cocok.")
     target_path = storage_service.get_local_firmware_path(storage_key)
     if not target_path or not target_path.exists():
         raise HTTPException(status_code=404, detail="File aset tidak ditemukan di storage.")
 
     is_stl = target_path.suffix.lower() == ".stl"
-    safe_filename = filename or ("model.stl" if is_stl else "firmware.bin")
+    safe_filename = Path(filename).name if filename else ("model.stl" if is_stl else "firmware.bin")
     media_type = "model/stl" if is_stl else "application/octet-stream"
     return FileResponse(
         path=target_path,
@@ -377,4 +382,3 @@ async def share_product_in_chat(request: Request, conversation_id: str, payload:
         raise HTTPException(status_code=400, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
-

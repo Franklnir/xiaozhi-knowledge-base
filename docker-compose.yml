@@ -1,6 +1,6 @@
 services:
   xiaozhi:
-    image: ghcr.io/franklnir/xiaozhi:latest
+    image: ${XIAOZHI_IMAGE:-ghcr.io/franklnir/xiaozhi:latest}
     build:
       context: .
       dockerfile: Dockerfile.prod
@@ -9,43 +9,59 @@ services:
     ports:
       - "127.0.0.1:8080:7860"
     environment:
-      - APP_SECRET_KEY=${APP_SECRET_KEY:-Zb6fyD2dkYd7pSSGNk1RBqTt+DQXf18elJ7euA0r5qw=}
-      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:-dbaxtyENVdPRoCcRhWEArO2UhWWhx14nh6XE3+xQh0o=}
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-irsyad03}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-irsyad031226}
-      - RESTORED_USER_USERNAME=${RESTORED_USER_USERNAME:-irsyad26}
-      - RESTORED_USER_PASSWORD=${RESTORED_USER_PASSWORD:-irsyad261203}
-      - DB_BACKEND=${DB_BACKEND:-postgres}
-      - SQLITE_DB_PATH=${SQLITE_DB_PATH:-/app/data/xiaozhi.db}
-      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - POSTGRES_DB=${POSTGRES_DB:-xiaozhi}
-      - POSTGRES_USER=${POSTGRES_USER:-xiaozhi_app}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-xiaozhi_secret}
-      - PG_POOL_MIN=${PG_POOL_MIN:-3}
-      - PG_POOL_MAX=${PG_POOL_MAX:-10}
-      - ENVIRONMENT=production
-      - ALLOWED_HOSTS=163.61.58.235,localhost,xiaozhiscig.biz.id,www.xiaozhiscig.biz.id
-      # S3 / Object Storage (NevaObjects / AWS / MinIO)
-      - S3_ENDPOINT=${S3_ENDPOINT:-https://s3.nevaobjects.id}
-      - S3_REGION=${S3_REGION:-us-east-1}
-      - S3_BUCKET_PUBLIC=${S3_BUCKET_PUBLIC:-xiaozhi-public}
-      - S3_BUCKET_PRIVATE=${S3_BUCKET_PRIVATE:-xiaozhi-private}
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
-      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
-      - S3_USE_SSL=${S3_USE_SSL:-true}
-      # Google OAuth
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-https://xiaozhiscig.biz.id/api/auth/google/callback}
-      # Payment Gateway
-      - XENDIT_SECRET_KEY=${XENDIT_SECRET_KEY:-}
-      - XENDIT_WEBHOOK_TOKEN=${XENDIT_WEBHOOK_TOKEN:-}
-      - MIDTRANS_SERVER_KEY=${MIDTRANS_SERVER_KEY:-}
-      - MIDTRANS_CLIENT_KEY=${MIDTRANS_CLIENT_KEY:-}
-      - MIDTRANS_IS_PRODUCTION=${MIDTRANS_IS_PRODUCTION:-false}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?APP_SECRET_KEY is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?DATA_ENCRYPTION_KEY is required}
+      MARKETPLACE_DATA_ENCRYPTION_KEY: ${MARKETPLACE_DATA_ENCRYPTION_KEY:?MARKETPLACE_DATA_ENCRYPTION_KEY is required}
+      DOWNLOAD_TOKEN_SECRET: ${DOWNLOAD_TOKEN_SECRET:?DOWNLOAD_TOKEN_SECRET is required}
+      FIRMWARE_PRESET_SECRET: ${FIRMWARE_PRESET_SECRET:?FIRMWARE_PRESET_SECRET is required}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      RESTORED_USER_USERNAME: ${RESTORED_USER_USERNAME:-}
+      RESTORED_USER_PASSWORD: ${RESTORED_USER_PASSWORD:-}
+      DB_BACKEND: postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-xiaozhi}
+      POSTGRES_USER: ${POSTGRES_USER:-xiaozhi_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      PG_POOL_MIN: ${PG_POOL_MIN:-3}
+      PG_POOL_MAX: ${PG_POOL_MAX:-10}
+      ENVIRONMENT: production
+      DB_AUTO_INIT_SCHEMA: "false"
+      COOKIE_SECURE: "true"
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-xiaozhiscig.biz.id,www.xiaozhiscig.biz.id,localhost,127.0.0.1}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://xiaozhiscig.biz.id}
+      HF_HOME: /app/data/.hf_cache
+      S3_ENDPOINT: ${S3_ENDPOINT:-https://s3.nevaobjects.id}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET_PUBLIC: ${S3_BUCKET_PUBLIC:-xiaozhi-public}
+      S3_BUCKET_PRIVATE: ${S3_BUCKET_PRIVATE:-xiaozhi-private}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_USE_SSL: ${S3_USE_SSL:-true}
+      GOOGLE_AUTH_ENABLED: ${GOOGLE_AUTH_ENABLED:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-https://xiaozhiscig.biz.id/api/auth/google/callback}
+      PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
+      ALLOW_SIMULATOR_PAYMENTS: "false"
+      MARKETPLACE_PAYMENT_PROVIDER: ${MARKETPLACE_PAYMENT_PROVIDER:-disabled}
+      XENDIT_SECRET_KEY: ${XENDIT_SECRET_KEY:-}
+      XENDIT_WEBHOOK_TOKEN: ${XENDIT_WEBHOOK_TOKEN:-}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
+      MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-true}
     volumes:
       - ./data:/app/data
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
     mem_limit: 512m
     memswap_limit: 1g
     cpus: 1.0
@@ -57,11 +73,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 20s
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "5m"
+        max-size: 5m
         max-file: "2"
 
   postgres:
@@ -71,24 +87,22 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-xiaozhi}
       POSTGRES_USER: ${POSTGRES_USER:-xiaozhi_app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xiaozhi_secret}
-    ports:
-      - "127.0.0.1:5432:5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U xiaozhi_app -d xiaozhi"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+      retries: 10
+    mem_limit: 256m
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "5m"
+        max-size: 5m
         max-file: "2"
 
 volumes:

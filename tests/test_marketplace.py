@@ -141,7 +141,7 @@ class TestFirmwareMarketplace(unittest.TestCase):
         self.assertTrue(success_reject)
 
         # Check product status is now REJECTED
-        p_refreshed = self.repo.get_product_by_id(prod_id)
+        p_refreshed = self.repo.get_product_by_id(prod_id, actor_id=int(self.seller_user["id"]))
         self.assertEqual(p_refreshed["status"], "REJECTED")
 
         # 5. User resubmits for review
@@ -188,6 +188,7 @@ class TestFirmwareMarketplace(unittest.TestCase):
             provider_event_id=f"sim_evt_{uuid.uuid4().hex[:10]}",
             provider_reference=order_number,
             payload=payload,
+            paid_amount=35000,
         )
         self.assertTrue(success)
 
@@ -220,6 +221,7 @@ class TestFirmwareMarketplace(unittest.TestCase):
             provider_event_id="sim_evt_duplicate",
             provider_reference=order_number,
             payload=payload,
+            paid_amount=35000,
         )
         self.assertTrue(dup_success)
         seller_fin_after = self.wallet_service.get_seller_financial_data(int(self.seller_user["id"]))
@@ -231,7 +233,7 @@ class TestFirmwareMarketplace(unittest.TestCase):
         purchase_id = str(purchases[0]["purchase_id"])
 
         dl_meta = self.entitlement_service.authorize_download(purchase_id, int(self.buyer_user["id"]))
-        self.assertTrue(dl_meta["download_url"].startswith("http"))
+        self.assertTrue(dl_meta["download_url"].startswith(("http", "/api/v1/marketplace/")))
         self.assertIn("lamp_v1.bin", dl_meta["download_url"])
         self.assertEqual(dl_meta["filename"], "lamp_v1.bin")
 

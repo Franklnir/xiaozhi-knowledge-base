@@ -32,6 +32,13 @@ _load_env_file()
 logger = logging.getLogger("xiaozhi")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 # ── Categories ──────────────────────────────────────────────────────────────
 DEFAULT_CATEGORIES = [
     "Materi Perkuliahan",
@@ -553,6 +560,14 @@ DEFAULT_UI_THEME = "neo"
 # ── Production Detection ───────────────────────────────────────────────────
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production" or bool(os.getenv("SPACE_ID"))
 
+_raw_hosts = os.getenv("ALLOWED_HOSTS", "").strip()
+if _raw_hosts:
+    ALLOWED_HOSTS = [host.strip() for host in _raw_hosts.split(",") if host.strip()]
+else:
+    ALLOWED_HOSTS = ["xiaozhiscig.biz.id", "www.xiaozhiscig.biz.id", "localhost", "127.0.0.1"]
+if IS_PRODUCTION and (not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS):
+    raise RuntimeError("ALLOWED_HOSTS production wajib berupa daftar host eksplisit, bukan '*'.")
+
 # ── CORS Origins ───────────────────────────────────────────────────────────
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
 if _raw_origins:
@@ -581,24 +596,25 @@ csrf_serializer = URLSafeTimedSerializer(APP_SECRET_KEY, salt="edusmart-csrf")
 google_oauth_serializer = URLSafeTimedSerializer(APP_SECRET_KEY, salt="edusmart-google-oauth")
 
 # ── Google OAuth ───────────────────────────────────────────────────────────
-_DEF_G_CID = "".join(["3260223826-k8qrmthkeegt36pvnbac3oqurnmcmnvq", ".apps.googleusercontent.com"])
-_DEF_G_SEC = "".join(["GOCSPX-", "cIYUNvGCNmhn7izC0EBvacRSt7KW"])
-
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip() or _DEF_G_CID
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip() or _DEF_G_SEC
+GOOGLE_AUTH_ENABLED = _env_bool("GOOGLE_AUTH_ENABLED", False)
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.getenv(
     "GOOGLE_REDIRECT_URI",
     "https://xiaozhiscig.biz.id/api/auth/google/callback",
 ).strip()
+if GOOGLE_AUTH_ENABLED and (not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET):
+    raise RuntimeError("GOOGLE_CLIENT_ID dan GOOGLE_CLIENT_SECRET wajib diset saat Google OAuth aktif.")
 
 # ── JWT Secret ─────────────────────────────────────────────────────────────
 JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET:
-    JWT_SECRET = APP_SECRET_KEY
-    if not IS_PRODUCTION:
-        logger.warning(
-            "JWT_SECRET belum diset. Menggunakan APP_SECRET_KEY sebagai fallback."
-        )
+    if IS_PRODUCTION:
+        raise RuntimeError("JWT_SECRET terpisah wajib diset untuk production.")
+    JWT_SECRET = secrets.token_urlsafe(48)
+    logger.warning("JWT_SECRET belum diset. Token JWT hanya stabil sampai proses restart.")
+if IS_PRODUCTION and JWT_SECRET == APP_SECRET_KEY:
+    raise RuntimeError("JWT_SECRET production wajib berbeda dari APP_SECRET_KEY.")
 
 
 def _fernet_from_secret() -> Fernet:
@@ -606,6 +622,8 @@ def _fernet_from_secret() -> Fernet:
     if IS_PRODUCTION and not data_secret:
         raise RuntimeError("DATA_ENCRYPTION_KEY wajib diset untuk production.")
     secret = data_secret or APP_SECRET_KEY
+    if IS_PRODUCTION and secret == APP_SECRET_KEY:
+        raise RuntimeError("DATA_ENCRYPTION_KEY production wajib berbeda dari APP_SECRET_KEY.")
     try:
         return Fernet(secret.encode("utf-8"))
     except Exception:
@@ -706,7 +724,11 @@ for _ch, _meta in SMART_HOME_RELAYS.items():
 # ── Firmware Marketplace ───────────────────────────────────────────────────
 MARKETPLACE_ADMIN_FEE_FLAT = int(os.getenv("MARKETPLACE_ADMIN_FEE_FLAT", "1500"))
 MARKETPLACE_ADMIN_FEE_PERCENT = float(os.getenv("MARKETPLACE_ADMIN_FEE_PERCENT", "0.0"))
-MARKETPLACE_PAYMENT_PROVIDER = os.getenv("MARKETPLACE_PAYMENT_PROVIDER", "simulator").strip().lower()
+PAYMENTS_ENABLED = _env_bool("PAYMENTS_ENABLED", False)
+ALLOW_SIMULATOR_PAYMENTS = _env_bool("ALLOW_SIMULATOR_PAYMENTS", False)
+MARKETPLACE_PAYMENT_PROVIDER = os.getenv("MARKETPLACE_PAYMENT_PROVIDER", "disabled").strip().lower()
+if IS_PRODUCTION and ALLOW_SIMULATOR_PAYMENTS:
+    raise RuntimeError("Simulator pembayaran tidak boleh diaktifkan di production.")
 MINIMUM_WITHDRAWAL = int(os.getenv("MINIMUM_WITHDRAWAL", "10000"))
 WITHDRAWAL_FEE = int(os.getenv("WITHDRAWAL_FEE", "0"))
 
@@ -725,6 +747,22 @@ XENDIT_WEBHOOK_TOKEN = os.getenv("XENDIT_WEBHOOK_TOKEN", "").strip()
 MIDTRANS_SERVER_KEY = os.getenv("MIDTRANS_SERVER_KEY", "").strip()
 MIDTRANS_CLIENT_KEY = os.getenv("MIDTRANS_CLIENT_KEY", "").strip()
 MIDTRANS_IS_PRODUCTION = os.getenv("MIDTRANS_IS_PRODUCTION", "false").strip().lower() == "true"
+
+MARKETPLACE_DATA_ENCRYPTION_KEY = os.getenv("MARKETPLACE_DATA_ENCRYPTION_KEY", "").strip()
+DOWNLOAD_TOKEN_SECRET = os.getenv("DOWNLOAD_TOKEN_SECRET", "").strip()
+FIRMWARE_PRESET_SECRET = os.getenv("FIRMWARE_PRESET_SECRET", "").strip()
+if IS_PRODUCTION:
+    for _name, _value in (
+        ("MARKETPLACE_DATA_ENCRYPTION_KEY", MARKETPLACE_DATA_ENCRYPTION_KEY),
+        ("DOWNLOAD_TOKEN_SECRET", DOWNLOAD_TOKEN_SECRET),
+        ("FIRMWARE_PRESET_SECRET", FIRMWARE_PRESET_SECRET),
+    ):
+        if len(_value) < 32:
+            raise RuntimeError(f"{_name} production wajib diset dengan nilai acak minimal 32 karakter.")
+else:
+    MARKETPLACE_DATA_ENCRYPTION_KEY = MARKETPLACE_DATA_ENCRYPTION_KEY or secrets.token_urlsafe(32)
+    DOWNLOAD_TOKEN_SECRET = DOWNLOAD_TOKEN_SECRET or secrets.token_urlsafe(32)
+    FIRMWARE_PRESET_SECRET = FIRMWARE_PRESET_SECRET or secrets.token_urlsafe(32)
 
 # ── Firebase Integration ──────────────────────────────────────────────────
 FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY", "").strip()

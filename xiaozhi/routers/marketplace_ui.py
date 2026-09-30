@@ -14,7 +14,12 @@ from xiaozhi.marketplace.deps import (
     get_marketplace_repo,
     get_chat_service,
 )
-from xiaozhi.config import MARKETPLACE_ADMIN_FEE_FLAT, MARKETPLACE_ADMIN_FEE_PERCENT
+from xiaozhi.config import (
+    ALLOW_SIMULATOR_PAYMENTS,
+    IS_PRODUCTION,
+    MARKETPLACE_ADMIN_FEE_FLAT,
+    MARKETPLACE_ADMIN_FEE_PERCENT,
+)
 from xiaozhi.marketplace.services.bank_service import verify_account
 
 logger = logging.getLogger("xiaozhi.marketplace.ui")
@@ -390,11 +395,15 @@ async def request_withdrawal_action(
 # ── SIMULATED CHECKOUT FLOW (ZERO-COST SANDBOX) ──────────────────────────────
 @router.get("/checkout/simulate", response_class=HTMLResponse)
 async def simulated_checkout_page(request: Request, order_number: str):
+    if IS_PRODUCTION or not ALLOW_SIMULATOR_PAYMENTS:
+        raise HTTPException(status_code=404, detail="Not found")
     user = require_user(request)
     repo = get_marketplace_repo()
     order = repo.get_order_by_number(order_number)
     if not order:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan.")
+    if int(order["buyer_id"]) != int(user["id"]):
+        raise HTTPException(status_code=403, detail="Akses ditolak.")
 
     return render(request, "marketplace/checkout_simulate.html", {
         "user": user,
@@ -405,11 +414,15 @@ async def simulated_checkout_page(request: Request, order_number: str):
 
 @router.post("/checkout/simulate/confirm")
 async def confirm_simulated_checkout_action(request: Request, order_number: str = Form(...)):
+    if IS_PRODUCTION or not ALLOW_SIMULATOR_PAYMENTS:
+        raise HTTPException(status_code=404, detail="Not found")
     user = require_user(request)
     repo = get_marketplace_repo()
     order = repo.get_order_by_number(order_number)
     if not order:
         return redirect_with_message("/firmware/marketplace", "Pesanan tidak ditemukan.")
+    if int(order["buyer_id"]) != int(user["id"]):
+        raise HTTPException(status_code=403, detail="Akses ditolak.")
 
     # Finalize payment via repo
     import uuid
@@ -420,6 +433,7 @@ async def confirm_simulated_checkout_action(request: Request, order_number: str 
         provider_event_id=evt_id,
         provider_reference=order_number,
         payload={"order_number": order_number, "status": "PAID", "simulated": True},
+        paid_amount=int(order["buyer_total_amount"]),
     )
 
     return redirect_with_message("/profil?mode=marketplace&sub=purchases", f"Pembayaran pesanan #{order_number} berhasil dikonfirmasi!")
@@ -450,4 +464,3 @@ async def start_chat_from_product(request: Request, product_id_or_slug: str):
     chat_service = get_chat_service()
     conv = chat_service.get_or_start_chat(str(product["id"]), seller_id, buyer_id)
     return RedirectResponse(url=f"/profil?mode=marketplace&sub=chats&conv_id={conv['id']}", status_code=303)
-

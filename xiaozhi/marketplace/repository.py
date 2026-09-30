@@ -89,12 +89,16 @@ class MarketplaceRepository:
             logger.warning("get_published_products query failed: %s", exc)
             return []
 
-    def get_product_by_id(self, product_id: str) -> Optional[Dict[str, Any]]:
+    def get_product_by_id(
+        self, product_id: str, actor_id: Optional[int] = None, is_admin: bool = False
+    ) -> Optional[Dict[str, Any]]:
         if not self.is_db_ready():
             return None
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    if actor_id is not None:
+                        self.set_rls_context(cur, actor_id, "admin" if is_admin else "user")
                     cur.execute("""
                         SELECT p.*, u.username AS seller_username, u.role AS seller_role
                         FROM firmware_products p
@@ -107,12 +111,16 @@ class MarketplaceRepository:
             logger.warning("get_product_by_id query failed: %s", exc)
             return None
 
-    def get_product_by_slug(self, slug: str) -> Optional[Dict[str, Any]]:
+    def get_product_by_slug(
+        self, slug: str, actor_id: Optional[int] = None, is_admin: bool = False
+    ) -> Optional[Dict[str, Any]]:
         if not self.is_db_ready():
             return None
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    if actor_id is not None:
+                        self.set_rls_context(cur, actor_id, "admin" if is_admin else "user")
                     cur.execute("""
                         SELECT p.*, u.username AS seller_username, u.role AS seller_role
                         FROM firmware_products p
@@ -125,9 +133,11 @@ class MarketplaceRepository:
             logger.warning("get_product_by_slug query failed: %s", exc)
             return None
 
-    def get_product_images(self, product_id: str) -> List[Dict[str, Any]]:
+    def get_product_images(self, product_id: str, actor_id: Optional[int] = None) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                if actor_id is not None:
+                    self.set_rls_context(cur, actor_id)
                 cur.execute("""
                     SELECT * FROM firmware_product_images
                     WHERE product_id = %s
@@ -135,9 +145,11 @@ class MarketplaceRepository:
                 """, (product_id,))
                 return [dict(r) for r in cur.fetchall()]
 
-    def get_product_links(self, product_id: str) -> List[Dict[str, Any]]:
+    def get_product_links(self, product_id: str, actor_id: Optional[int] = None) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                if actor_id is not None:
+                    self.set_rls_context(cur, actor_id)
                 cur.execute("""
                     SELECT * FROM firmware_product_links
                     WHERE product_id = %s
@@ -145,9 +157,11 @@ class MarketplaceRepository:
                 """, (product_id,))
                 return [dict(r) for r in cur.fetchall()]
 
-    def get_latest_version(self, product_id: str) -> Optional[Dict[str, Any]]:
+    def get_latest_version(self, product_id: str, actor_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                if actor_id is not None:
+                    self.set_rls_context(cur, actor_id)
                 cur.execute("""
                     SELECT v.*, 
                            a.id AS asset_id, a.original_filename, a.file_size, a.sha256, a.upload_status, a.storage_key,
@@ -187,6 +201,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, seller_id)
                     cur.execute(query, params)
                     return [dict(r) for r in cur.fetchall()]
         except Exception as exc:
@@ -214,6 +229,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, None, "system")
                     cur.execute(query, params)
                     return [dict(r) for r in cur.fetchall()]
         except Exception as exc:
@@ -299,6 +315,7 @@ class MarketplaceRepository:
         """
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, actor_id, "admin" if is_admin else "user")
                 if is_admin:
                     cur.execute("SELECT * FROM firmware_products WHERE id = %s FOR UPDATE;", (product_id,))
                 else:
@@ -331,6 +348,7 @@ class MarketplaceRepository:
     def admin_get_all_products(self, limit: int = 100) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, None, "system")
                 cur.execute("""
                     SELECT p.*, u.username AS seller_username, u.role AS seller_role,
                            img.storage_key AS primary_image_key
@@ -343,10 +361,13 @@ class MarketplaceRepository:
                 return [dict(r) for r in cur.fetchall()]
 
 
-    def set_product_images(self, product_id: str, images: List[Dict[str, Any]]) -> None:
+    def set_product_images(
+        self, product_id: str, images: List[Dict[str, Any]], actor_id: int, is_admin: bool = False
+    ) -> None:
         """Replace product images (max 3)."""
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, actor_id, "admin" if is_admin else "user")
                 cur.execute("DELETE FROM firmware_product_images WHERE product_id = %s;", (product_id,))
                 for idx, img in enumerate(images[:3]):
                     is_primary = (idx == 0)
@@ -358,10 +379,13 @@ class MarketplaceRepository:
                           img["file_size"], img.get("width"), img.get("height"), img["sha256"], is_primary))
                 conn.commit()
 
-    def set_product_links(self, product_id: str, links: List[Dict[str, str]]) -> None:
+    def set_product_links(
+        self, product_id: str, links: List[Dict[str, str]], actor_id: int, is_admin: bool = False
+    ) -> None:
         """Replace product documentation links."""
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, actor_id, "admin" if is_admin else "user")
                 cur.execute("DELETE FROM firmware_product_links WHERE product_id = %s;", (product_id,))
                 for idx, link in enumerate(links):
                     label = link.get("label", "Dokumentasi").strip()
@@ -381,9 +405,12 @@ class MarketplaceRepository:
         storage_key: str,
         file_size: int,
         sha256: str,
+        actor_id: int,
+        is_admin: bool = False,
     ) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, actor_id, "admin" if is_admin else "user")
                 cur.execute("""
                     INSERT INTO firmware_assets (
                         product_version_id, original_filename, storage_bucket, storage_key, file_size, sha256, upload_status
@@ -409,9 +436,12 @@ class MarketplaceRepository:
         storage_key: str,
         file_size: int,
         sha256: str,
+        actor_id: int,
+        is_admin: bool = False,
     ) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, actor_id, "admin" if is_admin else "user")
                 cur.execute("""
                     INSERT INTO product_stl_assets (
                         product_version_id, original_filename, storage_bucket, storage_key, file_size, sha256, upload_status
@@ -432,6 +462,7 @@ class MarketplaceRepository:
     def submit_product_for_approval(self, product_id: str, seller_id: int) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, seller_id)
                 # 1. Lock product row
                 cur.execute("""
                     SELECT * FROM firmware_products 
@@ -493,6 +524,7 @@ class MarketplaceRepository:
     def get_pending_approvals(self) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, None, "system")
                 cur.execute("""
                     SELECT 
                         appr.id AS approval_id, appr.status, appr.submitted_at,
@@ -513,6 +545,7 @@ class MarketplaceRepository:
     def admin_approve_product(self, approval_id: str, admin_user_id: int) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, admin_user_id, "admin")
                 cur.execute("""
                     SELECT * FROM product_approvals WHERE id = %s FOR UPDATE;
                 """, (approval_id,))
@@ -556,6 +589,7 @@ class MarketplaceRepository:
 
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, admin_user_id, "admin")
                 cur.execute("""
                     SELECT * FROM product_approvals WHERE id = %s FOR UPDATE;
                 """, (approval_id,))
@@ -608,6 +642,7 @@ class MarketplaceRepository:
     ) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, buyer_id)
                 cur.execute("""
                     INSERT INTO orders (
                         buyer_id, seller_id, product_id, product_version_id, order_number,
@@ -633,6 +668,7 @@ class MarketplaceRepository:
     def get_order_by_number(self, order_number: str) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, None, "system")
                 cur.execute("SELECT * FROM orders WHERE order_number = %s;", (order_number,))
                 row = cur.fetchone()
                 return dict(row) if row else None
@@ -640,6 +676,7 @@ class MarketplaceRepository:
     def get_order_by_id(self, order_id: str) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, None, "system")
                 cur.execute("SELECT * FROM orders WHERE id = %s;", (order_id,))
                 row = cur.fetchone()
                 return dict(row) if row else None
@@ -648,6 +685,7 @@ class MarketplaceRepository:
         """Returns True if buyer already owns an active entitlement for this product."""
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, buyer_id)
                 cur.execute("""
                     SELECT 1 FROM purchase_entitlements
                     WHERE buyer_id = %s AND product_id = %s AND status = 'ACTIVE'
@@ -663,6 +701,7 @@ class MarketplaceRepository:
         provider_event_id: str,
         provider_reference: str,
         payload: Dict[str, Any],
+        paid_amount: Optional[int] = None,
     ) -> bool:
         """
         Atomic, idempotent finalization of a paid order:
@@ -678,6 +717,7 @@ class MarketplaceRepository:
 
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, None, "system")
                 # 1. Idempotency check on webhook event
                 cur.execute("""
                     INSERT INTO payment_webhook_events (
@@ -710,12 +750,56 @@ class MarketplaceRepository:
                     conn.commit()
                     return True
 
+                # The signed event must match the checkout intent exactly.
+                cur.execute(
+                    """
+                    SELECT provider, amount
+                    FROM payment_transactions
+                    WHERE order_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    FOR UPDATE;
+                    """,
+                    (order["id"],),
+                )
+                transaction = cur.fetchone()
+                expected_amount = int(order["buyer_total_amount"])
+                if (
+                    not transaction
+                    or str(transaction["provider"]).lower() != str(provider).lower()
+                    or int(transaction["amount"]) != expected_amount
+                    or paid_amount is None
+                    or int(paid_amount) != expected_amount
+                ):
+                    cur.execute(
+                        """
+                        UPDATE payment_webhook_events
+                        SET processing_status = 'REJECTED',
+                            error_message = 'Provider or amount mismatch',
+                            processed_at = CURRENT_TIMESTAMP
+                        WHERE id = %s;
+                        """,
+                        (webhook_event_id,),
+                    )
+                    conn.commit()
+                    logger.warning("Rejected mismatched payment event for order %s", order_number)
+                    return False
+
                 # 3. Update order
                 cur.execute("""
                     UPDATE orders 
                     SET status = 'PAID', paid_at = CURRENT_TIMESTAMP 
                     WHERE id = %s;
                 """, (order["id"],))
+
+                cur.execute(
+                    """
+                    UPDATE payment_transactions
+                    SET status = 'PAID', updated_at = CURRENT_TIMESTAMP
+                    WHERE order_id = %s AND provider = %s;
+                    """,
+                    (order["id"], provider),
+                )
 
                 # 4. Create Entitlement
                 cur.execute("""
@@ -840,6 +924,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, buyer_id)
                     cur.execute("""
                         SELECT 
                             e.id AS purchase_id, e.status AS entitlement_status, e.entitled_at,
@@ -868,9 +953,11 @@ class MarketplaceRepository:
     def get_entitlement_for_download(self, purchase_id: str, buyer_id: int, asset_type: str = "bin") -> Optional[Dict[str, Any]]:
         if not self.is_db_ready():
             return None
+
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, buyer_id)
                     if str(asset_type).lower() == "stl":
                         cur.execute("""
                             SELECT 
@@ -901,6 +988,34 @@ class MarketplaceRepository:
             logger.warning("get_entitlement_for_download failed: %s", exc)
             return None
 
+    def validate_download_grant(self, purchase_id: str, storage_key: str) -> bool:
+        """Re-check entitlement state and bind a signed token to its exact asset."""
+        if not self.is_db_ready() or not purchase_id or not storage_key:
+            return False
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    self.set_rls_context(cur, None, "system")
+                    cur.execute(
+                        """
+                        SELECT 1
+                        FROM purchase_entitlements e
+                        JOIN orders o ON o.id = e.order_id
+                        LEFT JOIN firmware_assets a ON a.product_version_id = e.product_version_id
+                        LEFT JOIN product_stl_assets s ON s.product_version_id = e.product_version_id
+                        WHERE e.id = %s
+                          AND e.status = 'ACTIVE'
+                          AND o.status = 'PAID'
+                          AND (a.storage_key = %s OR s.storage_key = %s)
+                        LIMIT 1;
+                        """,
+                        (purchase_id, storage_key, storage_key),
+                    )
+                    return bool(cur.fetchone())
+        except Exception as exc:
+            logger.warning("validate_download_grant failed: %s", exc)
+            return False
+
     # ── WALLET & WITHDRAWALS ─────────────────────────────────────────────────
     def get_wallet(self, user_id: int) -> Dict[str, Any]:
         default_wallet = {"id": "0", "user_id": user_id, "available_balance": 0, "pending_balance": 0, "currency": "IDR"}
@@ -909,6 +1024,9 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    # Wallet balances are financial state: creation and updates stay
+                    # restricted to the trusted application service context.
+                    self.set_rls_context(cur, None, "system")
                     cur.execute("""
                         INSERT INTO wallet_accounts (user_id, currency, available_balance, pending_balance)
                         VALUES (%s, 'IDR', 0, 0)
@@ -928,6 +1046,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, user_id)
                     cur.execute("""
                         SELECT l.* 
                         FROM wallet_ledger l
@@ -954,6 +1073,9 @@ class MarketplaceRepository:
     ) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                # Row locking and ledger mutation are restricted by policy to the
+                # trusted financial service, after the caller has been authorized.
+                self.set_rls_context(cur, None, "system")
                 # 1. Lock wallet row
                 cur.execute("""
                     SELECT * FROM wallet_accounts WHERE user_id = %s FOR UPDATE;
@@ -1010,6 +1132,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, user_id)
                     cur.execute("""
                         SELECT * FROM withdrawals
                         WHERE user_id = %s
@@ -1027,6 +1150,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, seller_id)
                     cur.execute("""
                         SELECT 
                             COALESCE(COUNT(*), 0) AS total_orders,
@@ -1047,6 +1171,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, seller_id)
                     cur.execute("""
                         SELECT 
                             o.*, u.username AS buyer_username
@@ -1069,6 +1194,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, None, "system")
                     # Overall marketplace stats
                     cur.execute("""
                         SELECT 
@@ -1124,6 +1250,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, None, "system")
                     where_clauses = []
                     params = []
 
@@ -1185,6 +1312,7 @@ class MarketplaceRepository:
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, None, "system")
                     cur.execute("""
                         SELECT 
                             o.*,
@@ -1245,6 +1373,7 @@ class MarketplaceRepository:
             from xiaozhi.marketplace.security import decrypt_sensitive_data
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, None, "system")
                     where_clause = ""
                     params = []
                     if status and status.upper() not in ("ALL", ""):
@@ -1297,6 +1426,7 @@ class MarketplaceRepository:
             return False
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, admin_user_id, "admin")
                 # Lock row
                 cur.execute("""
                     SELECT * FROM withdrawals WHERE id = %s FOR UPDATE;
@@ -1376,6 +1506,7 @@ class MarketplaceRepository:
     def get_or_create_conversation(self, product_id: str, seller_id: int, buyer_id: int) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, buyer_id)
                 cur.execute("""
                     INSERT INTO chat_conversations (product_id, seller_id, buyer_id)
                     VALUES (%s, %s, %s)
@@ -1387,9 +1518,10 @@ class MarketplaceRepository:
                 conn.commit()
                 return conv
 
-    def get_conversation_by_id(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+    def get_conversation_by_id(self, conversation_id: str, user_id: int) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id)
                 cur.execute("""
                     SELECT c.id::text,
                            c.product_id::text,
@@ -1430,6 +1562,7 @@ class MarketplaceRepository:
         from xiaozhi.marketplace.storage import storage_service
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id)
                 cur.execute("""
                     SELECT 
                         c.id::text,
@@ -1501,6 +1634,7 @@ class MarketplaceRepository:
     def get_total_unread_chat_count(self, user_id: int) -> int:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id)
                 cur.execute("""
                     SELECT COUNT(*) AS count
                     FROM chat_messages m
@@ -1519,6 +1653,7 @@ class MarketplaceRepository:
     def mark_conversation_as_read(self, conversation_id: str, user_id: int) -> int:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id)
                 cur.execute("""
                     UPDATE chat_messages
                     SET read_at = CURRENT_TIMESTAMP
@@ -1530,9 +1665,10 @@ class MarketplaceRepository:
                 conn.commit()
                 return count
 
-    def get_messages(self, conversation_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_messages(self, conversation_id: str, user_id: int, limit: int = 100) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id)
                 cur.execute("""
                     SELECT m.id::text, m.conversation_id::text, m.sender_id, m.body, 
                            m.created_at, m.read_at, u.username AS sender_username
@@ -1561,6 +1697,7 @@ class MarketplaceRepository:
     def send_message(self, conversation_id: str, sender_id: int, body: str) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, sender_id)
                 cur.execute("""
                     INSERT INTO chat_messages (conversation_id, sender_id, body)
                     VALUES (%s, %s, %s)
@@ -1574,4 +1711,3 @@ class MarketplaceRepository:
                 """, (conversation_id,))
                 conn.commit()
                 return msg
-

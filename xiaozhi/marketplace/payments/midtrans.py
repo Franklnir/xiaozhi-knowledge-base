@@ -18,6 +18,8 @@ class MidtransPaymentProvider:
     """
     def __init__(self):
         self.server_key = MIDTRANS_SERVER_KEY
+        if not self.server_key:
+            raise RuntimeError("MIDTRANS_SERVER_KEY belum dikonfigurasi.")
         self.is_production = MIDTRANS_IS_PRODUCTION
         if self.is_production:
             self.snap_url = "https://app.midtrans.com/snap/v1/transactions"
@@ -78,6 +80,8 @@ class MidtransPaymentProvider:
         status_code = str(payload.get("status_code", ""))
         gross_amount = str(payload.get("gross_amount", ""))
         provided_sig = str(payload.get("signature_key", ""))
+        if not order_id or not status_code or not gross_amount or not provided_sig:
+            raise ValueError("Payload webhook Midtrans tidak lengkap.")
 
         # Expected = SHA512(order_id + status_code + gross_amount + ServerKey)
         sign_str = f"{order_id}{status_code}{gross_amount}{self.server_key}"

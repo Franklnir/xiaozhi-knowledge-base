@@ -18,6 +18,8 @@ class XenditPaymentProvider:
     def __init__(self):
         self.secret_key = XENDIT_SECRET_KEY
         self.webhook_token = XENDIT_WEBHOOK_TOKEN
+        if not self.secret_key or not self.webhook_token:
+            raise RuntimeError("Kredensial Xendit belum dikonfigurasi lengkap.")
         self.base_url = "https://api.xendit.co/v2/invoices"
 
     async def create_checkout(self, order: Dict[str, Any]) -> CheckoutResult:
@@ -69,6 +71,8 @@ class XenditPaymentProvider:
         order_number = str(payload.get("external_id", ""))
         status_raw = str(payload.get("status", "")).upper()
         amount = int(payload.get("amount", 0))
+        if not event_id or not order_number or amount < 0:
+            raise ValueError("Payload webhook Xendit tidak lengkap.")
 
         status = "PENDING_PAYMENT"
         if status_raw in ("PAID", "SETTLED"):

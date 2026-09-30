@@ -1,4 +1,4 @@
-name: Deploy to VPS
+name: Build and deploy
 
 on:
   push:
@@ -8,6 +8,10 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: franklnir/xiaozhi
@@ -16,12 +20,13 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           lfs: true
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -33,171 +38,61 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Build and push immutable image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile.prod
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
 
   deploy:
+    if: ${{ vars.ENABLE_PRODUCTION_DEPLOY == 'true' }}
     needs: build-and-push
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: production
     steps:
-      - name: Deploy to VPS via SSH
+      - name: Deploy immutable image to VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: irsyad
           key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
           script: |
+            set -eu
             cd ${{ env.APP_DIR }}
+            chmod 600 .env .db-admin.env
+            find . -maxdepth 1 -type f -name '.env.*' -exec chmod 600 {} \;
 
-            # Fix permissions using Docker (runs as root without needing sudo)
-            docker run --rm -v ${{ env.APP_DIR }}:${{ env.APP_DIR }} alpine chown -R $(id -u):$(id -g) ${{ env.APP_DIR }}
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            export XIAOZHI_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+            docker compose pull xiaozhi
+            docker run --rm \
+              --network xiaozhi_default \
+              --env-file .env \
+              --env-file .db-admin.env \
+              "$XIAOZHI_IMAGE" alembic upgrade head
+            docker compose up -d --no-deps xiaozhi
 
-            # REPAIR & CONFIGURE HOST NGINX (100M BODY SIZE)
-            docker run --rm --privileged --pid=host -v /:/host alpine sh -c '
-              echo "=== 1. CLEANING ALL ROGUE DIRECTIVES FROM /etc/nginx ==="
-              # Remove any client_max_body_size from ALL files in /etc/nginx
-              find /host/etc/nginx -type f 2>/dev/null | while read f; do
-                if grep -q "client_max_body_size" "$f" 2>/dev/null; then
-                  sed -i "/client_max_body_size/d" "$f"
-                  echo "Cleaned Nginx file: $f"
-                fi
-              done
-
-              # Clean any non-nginx /etc files that may have been touched
-              for dir in /host/etc/fail2ban /host/etc/letsencrypt /host/etc/ssl /host/etc/ufw /host/etc/ssh /host/etc/sysctl.d; do
-                if [ -d "$dir" ]; then
-                  find "$dir" -type f 2>/dev/null | while read f; do
-                    if grep -q "client_max_body_size" "$f" 2>/dev/null; then
-                      sed -i "/client_max_body_size/d" "$f"
-                      echo "Cleaned non-nginx file: $f"
-                    fi
-                  done
-                fi
-              done
-
-              # Clean /etc/services and /etc/ssh/moduli
-              for f in /host/etc/services /host/etc/ssh/moduli /host/etc/resolv.conf; do
-                if [ -f "$f" ] && grep -q "client_max_body_size" "$f" 2>/dev/null; then
-                  sed -i "/client_max_body_size/d" "$f"
-                  echo "Cleaned: $f"
-                fi
-              done
-
-              echo "=== 2. ADDING 100M TO conf.d/upload_size.conf ==="
-              mkdir -p /host/etc/nginx/conf.d
-              echo "client_max_body_size 100M;" > /host/etc/nginx/conf.d/upload_size.conf
-              echo "Created /etc/nginx/conf.d/upload_size.conf (100M)"
-
-              # Also ensure xiaozhi site config has client_max_body_size 100M in its server block
-              for site in /host/etc/nginx/sites-available/*; do
-                if [ -f "$site" ] && grep -q "server_name" "$site"; then
-                  # Add client_max_body_size inside server block
-                  sed -i "/server {/a \    client_max_body_size 100M;" "$site"
-                  echo "Added 100M to server block in: $site"
-                fi
-              done
-
-              echo "=== 3. TESTING NGINX CONFIGURATION (nginx -t) ==="
-              nsenter -t 1 -m -u -i -n -p -- /usr/sbin/nginx -t 2>&1 || true
-
-              echo "=== 4. STARTING / RESTARTING NGINX SERVICE ==="
-              nsenter -t 1 -m -u -i -n -p -- systemctl unmask nginx 2>&1 || true
-              nsenter -t 1 -m -u -i -n -p -- systemctl enable nginx 2>&1 || true
-              nsenter -t 1 -m -u -i -n -p -- systemctl restart nginx 2>&1 || true
-              sleep 2
-
-              # Fallback if systemctl fails: try service or direct binary
-              if ! nsenter -t 1 -m -u -i -n -p -- systemctl is-active --quiet nginx 2>/dev/null; then
-                echo "systemctl restart was not active, trying service nginx start / direct binary..."
-                nsenter -t 1 -m -u -i -n -p -- service nginx start 2>&1 || true
-                sleep 1
-                if ! nsenter -t 1 -m -u -i -n -p -- pgrep nginx >/dev/null 2>&1; then
-                  echo "Starting /usr/sbin/nginx directly..."
-                  nsenter -t 1 -m -u -i -n -p -- /usr/sbin/nginx 2>&1 || true
-                fi
+            attempt=0
+            until [ "$(docker inspect --format '{{.State.Health.Status}}' xiaozhi 2>/dev/null || true)" = "healthy" ]; do
+              attempt=$((attempt + 1))
+              if [ "$attempt" -ge 24 ]; then
+                docker compose logs --tail 100 xiaozhi
+                exit 1
               fi
-
-              echo "=== 5. NGINX PROCESS STATUS ==="
-              nsenter -t 1 -m -u -i -n -p -- systemctl status nginx --no-pager 2>&1 || true
-              nsenter -t 1 -m -u -i -n -p -- ps aux | grep "[n]ginx" || true
-
-              echo "=== 6. LOCAL PORT 80/443 LISTEN CHECK ==="
-              nsenter -t 1 -m -u -i -n -p -- ss -tulpn | grep -E ":80|:443" || true
-            '
-
-            # Reload any Docker-based proxy containers if present
-            for cid in $(docker ps -q); do
-              c_img=$(docker inspect --format '{{.Config.Image}}' "$cid")
-              case "$c_img" in
-                *nginx*|*proxy*|*swag*)
-                  echo "Updating proxy container $cid ($c_img)..."
-                  docker exec "$cid" sh -c '
-                    mkdir -p /etc/nginx/conf.d 2>/dev/null || true
-                    echo "client_max_body_size 100M;" > /etc/nginx/conf.d/upload_size.conf 2>/dev/null || true
-                    if [ -f /etc/nginx/nginx.conf ]; then
-                      if grep -q "client_max_body_size" /etc/nginx/nginx.conf; then
-                        sed -i "s/client_max_body_size [^;]*;/client_max_body_size 100M;/g" /etc/nginx/nginx.conf
-                      else
-                        sed -i "/http {/a \    client_max_body_size 100M;" /etc/nginx/nginx.conf
-                      fi
-                    fi
-                    nginx -s reload 2>/dev/null || true
-                  ' || true
-                  ;;
-              esac
+              sleep 5
             done
 
-            # Pull latest code and reset cleanly
-            git fetch origin main
-            git reset --hard origin/main
-
-            # Authenticate Docker to pull private GHCR image
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-            # Pull pre-built image (ZERO build on VPS!)
-            docker compose pull xiaozhi
-
-            # Restart app service with pre-built image
-            docker compose up -d xiaozhi
-
-            # Wait for health check
-            echo "Waiting for services to be healthy..."
-            sleep 10
-
-            # Run Alembic migrations on PostgreSQL
-            docker compose exec -T xiaozhi alembic upgrade head || true
-
-            # Verify service is running
-            if docker compose ps | grep -q "xiaozhi.*Up"; then
-              echo "✅ xiaozhi service is running"
-            else
-              echo "❌ xiaozhi service failed to start"
-              docker compose logs --tail 50 xiaozhi
-              exit 1
-            fi
-
-            # Verify 3MB upload limit on live Nginx using curl
-            echo "=== TESTING 3MB UPLOAD TO VERIFY 413 IS RESOLVED ==="
-            dd if=/dev/zero of=/tmp/test_3m.bin bs=1M count=3 2>/dev/null
-            HTTP_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" -F "title=LimitTest" -F "firmware_file=@/tmp/test_3m.bin" https://xiaozhiscig.biz.id/firmware/seller/products || true)
-            echo "Live Test HTTP Response Code: $HTTP_CODE"
-            echo "Live Test HTTP Response Code: $HTTP_CODE" >> /opt/xiaozhi/data/nginx_diag.txt
-            rm -f /tmp/test_3m.bin
-            if [ "$HTTP_CODE" = "413" ]; then
-              echo "❌ Still received HTTP 413"
-            else
-              echo "✅ Passed Nginx gate! Received HTTP $HTTP_CODE (non-413)"
-            fi
-
-            # Clean up old unused images
-            docker image prune -f
-
-            echo "✅ Zero-Build Deployment completed successfully!"
+            curl --fail --silent --show-error \
+              -H 'Host: xiaozhiscig.biz.id' \
+              http://127.0.0.1:8080/login >/dev/null
+            docker logout ghcr.io >/dev/null 2>&1 || true

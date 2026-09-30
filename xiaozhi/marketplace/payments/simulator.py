@@ -4,6 +4,7 @@ import uuid
 from typing import Dict, Any
 
 from xiaozhi.marketplace.payments.base import CheckoutResult, VerifiedWebhookEvent
+from xiaozhi.config import ALLOW_SIMULATOR_PAYMENTS, IS_PRODUCTION
 
 
 class SimulatorPaymentProvider:
@@ -12,6 +13,8 @@ class SimulatorPaymentProvider:
     Allows zero-cost testing of the entire purchase, webhook, and entitlement workflow.
     """
     def __init__(self):
+        if IS_PRODUCTION or not ALLOW_SIMULATOR_PAYMENTS:
+            raise RuntimeError("Simulator pembayaran dinonaktifkan.")
         self.provider_name = "simulator"
 
     async def create_checkout(self, order: Dict[str, Any]) -> CheckoutResult:
@@ -26,7 +29,7 @@ class SimulatorPaymentProvider:
     async def verify_webhook(self, headers: Dict[str, str], raw_body: bytes) -> VerifiedWebhookEvent:
         payload = json.loads(raw_body.decode("utf-8"))
         order_number = str(payload.get("order_number", ""))
-        status = str(payload.get("status", "PAID")).upper()
+        status = str(payload.get("status", "")).upper()
         amount = int(payload.get("amount", 0))
         event_id = str(payload.get("event_id", f"sim_evt_{uuid.uuid4().hex[:12]}"))
 

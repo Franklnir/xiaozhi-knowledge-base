@@ -18,7 +18,7 @@ class MarketplaceChatService:
         return self.repo.get_or_create_conversation(product_id, int(seller_id), int(buyer_id))
 
     def get_conversation(self, conversation_id: str, user_id: int) -> Dict[str, Any]:
-        conv = self.repo.get_conversation_by_id(conversation_id)
+        conv = self.repo.get_conversation_by_id(conversation_id, int(user_id))
         if not conv:
             raise LookupError("Percakapan tidak ditemukan.")
         if int(conv["seller_id"]) != int(user_id) and int(conv["buyer_id"]) != int(user_id):
@@ -36,7 +36,7 @@ class MarketplaceChatService:
         self.get_conversation(conversation_id, user_id)
         # Auto-mark incoming messages as read
         self.repo.mark_conversation_as_read(conversation_id, int(user_id))
-        return self.repo.get_messages(conversation_id, limit=limit)
+        return self.repo.get_messages(conversation_id, int(user_id), limit=limit)
 
     def send_message(self, conversation_id: str, sender_id: int, body: str) -> Dict[str, Any]:
         # Verify user is a member of this conversation
@@ -89,7 +89,7 @@ class MarketplaceChatService:
             raise PermissionError("Hanya penjual dalam percakapan ini yang dapat membagikan kartu produk.")
 
         # Verify product ownership
-        product = self.repo.get_product_by_id(product_id)
+        product = self.repo.get_product_by_id(product_id, actor_id=sender_id)
         if not product:
             raise LookupError("Produk yang dipilih tidak ditemukan.")
         if int(product["seller_id"]) != int(sender_id):

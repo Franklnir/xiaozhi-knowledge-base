@@ -85,7 +85,17 @@ class PostgresStore:
             kwargs={"row_factory": dict_row},
             open=True,
         )
-        self._init_db()
+        environment = os.getenv("ENVIRONMENT", "development").strip().lower()
+        auto_init_value = os.getenv("DB_AUTO_INIT_SCHEMA")
+        auto_init_schema = (
+            auto_init_value.strip().lower() in {"1", "true", "yes", "on"}
+            if auto_init_value is not None
+            else environment != "production"
+        )
+        if auto_init_schema:
+            self._init_db()
+        else:
+            logger.info("Skipping runtime schema DDL; migrations are authoritative in production.")
 
     @staticmethod
     def _build_dsn() -> str:
@@ -96,7 +106,9 @@ class PostgresStore:
         port = os.getenv("POSTGRES_PORT", "5432")
         dbname = os.getenv("POSTGRES_DB", "xiaozhi")
         user = os.getenv("POSTGRES_USER", "xiaozhi_app")
-        password = os.getenv("POSTGRES_PASSWORD", "xiaozhi_secret")
+        password = os.getenv("POSTGRES_PASSWORD", "")
+        if not password:
+            raise RuntimeError("POSTGRES_PASSWORD wajib diset untuk backend PostgreSQL.")
         sslmode = os.getenv("POSTGRES_SSLMODE", "prefer")
         return f"postgresql://{user}:{password}@{host}:{port}/{dbname}?sslmode={sslmode}"
 
@@ -772,6 +784,7 @@ class PostgresStore:
     def _seed_default_categories(self, user_id: int) -> None:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, int(user_id))
                 now = utc_now()
                 for name in DEFAULT_CATEGORIES:
                     cur.execute(
@@ -787,6 +800,7 @@ class PostgresStore:
     def _ensure_live_api_category(self, user_id: int) -> None:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, int(user_id))
                 cur.execute(
                     """
                     INSERT INTO categories (owner_id, name, created_at)
@@ -800,6 +814,7 @@ class PostgresStore:
     def list_categories(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM categories WHERE owner_id = %s ORDER BY name ASC", (int(owner_id),))
                 return cur.fetchall()
 
@@ -809,6 +824,7 @@ class PostgresStore:
             raise ValueError("Nama kategori tidak boleh kosong.")
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 try:
                     cur.execute(
                         "INSERT INTO categories (owner_id, name, created_at) VALUES (%s, %s, %s)",
@@ -822,6 +838,7 @@ class PostgresStore:
     def delete_category(self, owner_id: int, category_id: int) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("DELETE FROM categories WHERE id = %s AND owner_id = %s", (int(category_id), int(owner_id)))
                 affected = cur.rowcount > 0
             conn.commit()
@@ -833,6 +850,7 @@ class PostgresStore:
             return []
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 now = utc_now()
                 for cat in cleaned:
                     cur.execute(
@@ -851,6 +869,7 @@ class PostgresStore:
     def list_materials(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM materials WHERE owner_id = %s ORDER BY id DESC", (int(owner_id),))
                 rows = cur.fetchall()
                 return [self._public_material(row) for row in rows]
@@ -858,6 +877,7 @@ class PostgresStore:
     def get_material(self, owner_id: int, material_id: int) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                 row = cur.fetchone()
                 return self._public_material(row) if row else None
@@ -866,6 +886,7 @@ class PostgresStore:
         keyword = keyword.strip()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 if not keyword:
                     cur.execute(
                         "SELECT * FROM materials WHERE owner_id = %s ORDER BY id DESC LIMIT %s",
@@ -893,6 +914,7 @@ class PostgresStore:
     ) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 if material_id:
                     cur.execute("SELECT * FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                     row = cur.fetchone()
@@ -923,6 +945,7 @@ class PostgresStore:
     def _get_user_limits_dict(self, owner_id: int) -> Dict[str, int]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM user_limits WHERE user_id = %s", (int(owner_id),))
                 row = cur.fetchone()
                 if not row:
@@ -937,6 +960,7 @@ class PostgresStore:
         limits = self._get_user_limits_dict(owner_id)
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 if is_new:
                     cur.execute("SELECT COUNT(*) as cnt FROM materials WHERE owner_id = %s", (int(owner_id),))
                     cnt = cur.fetchone()["cnt"]
@@ -979,6 +1003,7 @@ class PostgresStore:
 
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     INSERT INTO materials (
@@ -1014,6 +1039,7 @@ class PostgresStore:
         api_ciphertext = encrypt_secret(api_url.strip()) if api_url.strip() else None
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     UPDATE materials SET
@@ -1039,6 +1065,7 @@ class PostgresStore:
     def delete_material(self, owner_id: int, material_id: int) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("DELETE FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                 affected = cur.rowcount > 0
             conn.commit()
@@ -1047,6 +1074,7 @@ class PostgresStore:
     def list_live_api_materials(self, owner_id: int, keyword: str = "", limit: int = 5) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     SELECT * FROM materials 
@@ -1063,6 +1091,7 @@ class PostgresStore:
     ) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 sql = "SELECT * FROM materials WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
                 if category:
@@ -1449,7 +1478,7 @@ class PostgresStore:
                 self.set_rls_context(cur, user_id=None, user_role="system")
                 cur.execute(
                     """
-                    SELECT u.*, t.slot_number, t.device_label FROM users u
+                    SELECT u.*, u.id AS user_id, t.slot_number, t.device_label, t.board_mac FROM users u
                     JOIN xiaozhi_tokens t ON u.id = t.user_id
                     WHERE t.token_hash = %s
                     """,
@@ -1483,6 +1512,7 @@ class PostgresStore:
         now = utc_now()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 # Scoped turbo: logging can tolerate async commit without threatening integrity of core tables
                 cur.execute("SET LOCAL synchronous_commit = off;")
                 cur.execute(
@@ -1562,6 +1592,7 @@ class PostgresStore:
         if xiaozhi_answer and not user_message:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.set_rls_context(cur, owner_id)
                     if slot_num == 1:
                         cur.execute(
                             """
@@ -1643,6 +1674,7 @@ class PostgresStore:
     ) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 sql = "SELECT * FROM chat_history WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
                 if date:
@@ -1695,6 +1727,7 @@ class PostgresStore:
     def chat_history_dates(self, owner_id: int, token_hash: str = "", slot_number: Optional[int] = None) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 sql = """
                     SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COUNT(*) as count
                     FROM chat_history
@@ -1717,6 +1750,7 @@ class PostgresStore:
     def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "", slot_number: Optional[int] = None) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 sql = "SELECT COUNT(*) as total FROM chat_history WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
                 if date:
@@ -1739,6 +1773,7 @@ class PostgresStore:
     def clear_chat_history(self, owner_id: int) -> int:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("DELETE FROM chat_history WHERE owner_id = %s", (int(owner_id),))
                 count = cur.rowcount
             conn.commit()
@@ -1747,6 +1782,7 @@ class PostgresStore:
     def delete_chat_history_item(self, owner_id: int, chat_id: int) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("DELETE FROM chat_history WHERE id = %s AND owner_id = %s", (int(chat_id), int(owner_id)))
                 count = cur.rowcount
             conn.commit()
@@ -1759,6 +1795,7 @@ class PostgresStore:
             today_date = datetime.now().strftime("%Y-%m-%d")
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id=None, user_role="system")
                 sql = """
                     SELECT owner_id, tool_name, source, user_message, xiaozhi_answer, TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
                     FROM chat_history
@@ -1816,6 +1853,7 @@ class PostgresStore:
         now = utc_now()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     INSERT INTO user_persona (owner_id, category, preference_key, preference_value, confidence, created_at, updated_at)
@@ -1842,6 +1880,7 @@ class PostgresStore:
     def get_user_persona(self, owner_id: int, category: str = "") -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 sql = "SELECT * FROM user_persona WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
                 if category:
@@ -1860,6 +1899,7 @@ class PostgresStore:
     def delete_user_preference(self, owner_id: int, preference_key: str) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("DELETE FROM user_persona WHERE owner_id = %s AND preference_key = %s", (int(owner_id), preference_key.strip()))
                 affected = cur.rowcount > 0
             conn.commit()
@@ -1870,6 +1910,7 @@ class PostgresStore:
     def list_relay_rooms(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM relay_rooms WHERE owner_id = %s ORDER BY id ASC", (int(owner_id),))
                 rooms = cur.fetchall()
                 result = []
@@ -1896,6 +1937,7 @@ class PostgresStore:
             if max_rooms > 0:
                 with self._get_conn() as conn:
                     with conn.cursor() as cur:
+                        self.set_rls_context(cur, owner_id)
                         cur.execute("SELECT COUNT(*) as cnt FROM relay_rooms WHERE owner_id = %s", (int(owner_id),))
                         if cur.fetchone()["cnt"] >= max_rooms:
                             raise ValueError(f"Batas perangkat Relay Nyata akun Anda telah tercapai ({max_rooms} ruangan).")
@@ -1906,6 +1948,7 @@ class PostgresStore:
 
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     INSERT INTO relay_rooms (owner_id, nama_tempat, api_slug, api_token_ciphertext, api_token_hash, api_client_id, created_at)
@@ -1936,6 +1979,7 @@ class PostgresStore:
     def get_relay_room(self, owner_id: int, room_id: int) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM relay_rooms WHERE id = %s AND owner_id = %s", (int(room_id), int(owner_id)))
                 room = cur.fetchone()
                 if not room:
@@ -1954,6 +1998,7 @@ class PostgresStore:
         now = utc_now()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     "UPDATE relay_rooms SET nama_tempat = %s, updated_at = %s WHERE id = %s AND owner_id = %s",
                     (nama_tempat, now, int(room_id), int(owner_id)),
@@ -1982,6 +2027,7 @@ class PostgresStore:
     def delete_relay_room(self, owner_id: int, room_id: int) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("DELETE FROM relay_rooms WHERE id = %s AND owner_id = %s", (int(room_id), int(owner_id)))
                 affected = cur.rowcount > 0
             conn.commit()
@@ -1993,6 +2039,7 @@ class PostgresStore:
             raise ValueError("Status relay harus ON atau OFF.")
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     "UPDATE relay_devices SET status = %s WHERE room_id = %s AND relay_number = %s",
                     (status_clean, int(room_id), int(relay_number)),
@@ -2020,6 +2067,7 @@ class PostgresStore:
     ) -> Dict[str, Any]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     INSERT INTO audio_queue (owner_id, title, stream_url, video_url, duration, video_id, created_at)
@@ -2035,6 +2083,7 @@ class PostgresStore:
     def get_audio_commands(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     "SELECT * FROM audio_queue WHERE owner_id = %s AND status = 'pending' ORDER BY id ASC",
                     (int(owner_id),),
@@ -2051,12 +2100,14 @@ class PostgresStore:
     def ack_audio_command(self, owner_id: int, command_id: Union[int, str]) -> None:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("UPDATE audio_queue SET status = 'played' WHERE id = %s AND owner_id = %s", (int(command_id), int(owner_id)))
             conn.commit()
 
     def get_current_audio(self, owner_id: int) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     "SELECT * FROM audio_queue WHERE owner_id = %s AND status = 'pending' ORDER BY id DESC LIMIT 1",
                     (int(owner_id),),
@@ -2809,6 +2860,7 @@ class PostgresStore:
         now = utc_now()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     INSERT INTO reminders (id, owner_id, message, scheduled_at, status, created_at)
@@ -2829,6 +2881,7 @@ class PostgresStore:
     def list_reminders(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM reminders WHERE owner_id = %s ORDER BY scheduled_at ASC", (int(owner_id),))
                 rows = [dict(r) for r in cur.fetchall()]
                 for r in rows:
@@ -2839,6 +2892,7 @@ class PostgresStore:
     def delete_reminder(self, owner_id: int, reminder_id: str) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("DELETE FROM reminders WHERE id = %s AND owner_id = %s", (reminder_id, int(owner_id)))
                 affected = cur.rowcount > 0
             conn.commit()
@@ -2848,6 +2902,7 @@ class PostgresStore:
         now = utc_now()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id=None, user_role="system")
                 cur.execute(
                     "SELECT * FROM reminders WHERE status = 'pending' AND scheduled_at <= %s ORDER BY scheduled_at ASC",
                     (now,),
@@ -2868,6 +2923,7 @@ class PostgresStore:
     def mark_reminder_sent(self, reminder_id: str) -> None:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id=None, user_role="system")
                 cur.execute("UPDATE reminders SET status = 'sent', sent_at = %s WHERE id = %s", (utc_now(), reminder_id))
             conn.commit()
 

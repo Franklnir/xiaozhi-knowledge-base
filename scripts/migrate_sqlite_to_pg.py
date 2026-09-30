@@ -545,7 +545,9 @@ def main():
         port = os.getenv("POSTGRES_PORT", "5432")
         db = os.getenv("POSTGRES_DB", "xiaozhi")
         user = os.getenv("POSTGRES_USER", "xiaozhi_app")
-        pw = os.getenv("POSTGRES_PASSWORD", "xiaozhi_secret")
+        pw = os.getenv("POSTGRES_PASSWORD", "")
+        if not pw:
+            raise RuntimeError("POSTGRES_PASSWORD wajib diset.")
         dsn = f"postgresql://{user}:{pw}@{host}:{port}/{db}"
 
     ok = migrate_data(args.sqlite_path, dsn, truncate_first=args.truncate, verify_only=args.verify)

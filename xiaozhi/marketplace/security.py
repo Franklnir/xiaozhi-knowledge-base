@@ -7,39 +7,30 @@ import time
 from typing import Optional, Tuple
 from collections import defaultdict
 
-from xiaozhi.config import APP_SECRET_KEY as SECRET_KEY
+from cryptography.fernet import Fernet, InvalidToken
+
+from xiaozhi.config import DOWNLOAD_TOKEN_SECRET, MARKETPLACE_DATA_ENCRYPTION_KEY
 
 # Decompression bomb guard & maximum limits
 MAX_FIRMWARE_SIZE_BYTES = int(os.getenv("MAX_FIRMWARE_SIZE_BYTES", str(32 * 1024 * 1024))) # 32 MB
 MAX_IMAGE_SIZE_BYTES = 512000 # 500 KB exact as spec (500 * 1024 = 512000)
 
-_ENCRYPTION_KEY = hashlib.sha256(SECRET_KEY.encode()).digest()
+_DATA_KEY = hashlib.sha256(MARKETPLACE_DATA_ENCRYPTION_KEY.encode()).digest()
+_TOKEN_KEY = hashlib.sha256(DOWNLOAD_TOKEN_SECRET.encode()).digest()
+_FERNET = Fernet(base64.urlsafe_b64encode(_DATA_KEY))
 
 
 def encrypt_sensitive_data(plaintext: str) -> str:
-    """Simple XOR-based Fernet-compatible authenticated encryption using Fernet from cryptography."""
-    try:
-        from cryptography.fernet import Fernet
-        key = base64.urlsafe_b64encode(_ENCRYPTION_KEY)
-        f = Fernet(key)
-        return f.encrypt(plaintext.encode("utf-8")).decode("utf-8")
-    except Exception:
-        # Fallback if cryptography fernet has issue
-        return base64.b64encode(plaintext.encode("utf-8")).decode("utf-8")
+    """Encrypt marketplace PII with an independent authenticated key."""
+    return _FERNET.encrypt(plaintext.encode("utf-8")).decode("utf-8")
 
 
 def decrypt_sensitive_data(ciphertext: str) -> str:
     """Decrypt sensitive data."""
     try:
-        from cryptography.fernet import Fernet
-        key = base64.urlsafe_b64encode(_ENCRYPTION_KEY)
-        f = Fernet(key)
-        return f.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
-    except Exception:
-        try:
-            return base64.b64decode(ciphertext.encode("utf-8")).decode("utf-8")
-        except Exception:
-            return ""
+        return _FERNET.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
+    except (InvalidToken, ValueError, TypeError):
+        return ""
 
 
 def generate_download_token(purchase_id: str, storage_key: str, expires_in_seconds: int = 600) -> str:
@@ -51,7 +42,7 @@ def generate_download_token(purchase_id: str, storage_key: str, expires_in_secon
         "e": expires_at,
     }
     encoded_payload = base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8").rstrip("=")
-    signature = hmac.new(_ENCRYPTION_KEY, encoded_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    signature = hmac.new(_TOKEN_KEY, encoded_payload.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{encoded_payload}.{signature}"
 
 
@@ -61,7 +52,7 @@ def verify_download_token(token: str) -> Optional[dict]:
         return None
     try:
         encoded_payload, signature = token.split(".", 1)
-        expected_sig = hmac.new(_ENCRYPTION_KEY, encoded_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        expected_sig = hmac.new(_TOKEN_KEY, encoded_payload.encode("utf-8"), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(signature, expected_sig):
             return None
         

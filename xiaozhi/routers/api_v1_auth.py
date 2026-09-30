@@ -6,7 +6,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from xiaozhi.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+from xiaozhi.config import GOOGLE_AUTH_ENABLED, GOOGLE_CLIENT_ID
 from xiaozhi.core.security import (
     create_token_pair,
     validate_access_token,
@@ -251,6 +251,11 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
     Authenticate, register, or link with Google ID token (for Android & Mobile clients).
     """
     enforce_predefined_limit(request, "login")
+    if not GOOGLE_AUTH_ENABLED or not GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=503,
+            detail={"success": False, "data": None, "message": "Integrasi Google sedang dinonaktifkan."},
+        )
     token_str = body.id_token.strip()
     if not token_str:
         raise HTTPException(
@@ -258,57 +263,31 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
             detail={"success": False, "data": None, "message": "ID token Google diperlukan."}
         )
 
-    # Verify token with Google (support id_token, access_token, and auth code)
+    # Accept only an OpenID Connect ID token and bind it to this OAuth client.
     google_id = None
     google_email = None
     google_name = None
 
     try:
-        resp = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token_str}", timeout=10)
-        if resp.ok:
-            payload = resp.json()
-            google_id = payload.get("sub")
-            google_email = (payload.get("email") or "").strip().lower()
-            google_name = payload.get("name") or ""
-        else:
-            resp2 = requests.get(
-                "https://www.googleapis.com/oauth2/v2/userinfo",
-                headers={"Authorization": f"Bearer {token_str}"},
-                timeout=10,
-            )
-            if resp2.ok:
-                payload2 = resp2.json()
-                google_id = str(payload2.get("id") or "")
-                google_email = (payload2.get("email") or "").strip().lower()
-                google_name = payload2.get("name") or ""
-            else:
-                # Try exchanging as authorization code
-                if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
-                    token_resp = requests.post(
-                        "https://oauth2.googleapis.com/token",
-                        data={
-                            "code": token_str,
-                            "client_id": GOOGLE_CLIENT_ID,
-                            "client_secret": GOOGLE_CLIENT_SECRET,
-                            "grant_type": "authorization_code",
-                            "redirect_uri": "",
-                        },
-                        timeout=10,
-                    )
-                    if token_resp.ok:
-                        tdata = token_resp.json()
-                        act = tdata.get("access_token")
-                        if act:
-                            u_resp = requests.get(
-                                "https://www.googleapis.com/oauth2/v2/userinfo",
-                                headers={"Authorization": f"Bearer {act}"},
-                                timeout=10,
-                            )
-                            if u_resp.ok:
-                                u_info = u_resp.json()
-                                google_id = str(u_info.get("id") or "")
-                                google_email = (u_info.get("email") or "").strip().lower()
-                                google_name = u_info.get("name") or ""
+        resp = requests.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": token_str},
+            timeout=10,
+        )
+        if not resp.ok:
+            raise ValueError("ID token ditolak oleh Google.")
+        payload = resp.json()
+        issuer = str(payload.get("iss") or "")
+        email_verified = payload.get("email_verified") in (True, "true", "True", "1")
+        if payload.get("aud") != GOOGLE_CLIENT_ID:
+            raise ValueError("Audience ID token tidak cocok.")
+        if issuer not in {"accounts.google.com", "https://accounts.google.com"}:
+            raise ValueError("Issuer ID token tidak valid.")
+        if not email_verified:
+            raise ValueError("Email Google belum terverifikasi.")
+        google_id = payload.get("sub")
+        google_email = (payload.get("email") or "").strip().lower()
+        google_name = payload.get("name") or ""
     except Exception as exc:
         raise HTTPException(
             status_code=502,

@@ -13,6 +13,8 @@ from xiaozhi.config import JWT_SECRET, MCP_TOKEN_HASH_LENGTH, fernet
 
 # JWT Configuration
 JWT_ALGORITHM = "HS256"
+JWT_ISSUER = "xiaozhi-indonesia"
+JWT_AUDIENCE = "xiaozhi-api"
 JWT_ACCESS_TOKEN_EXPIRE = 3600  # 1 hour
 JWT_REFRESH_TOKEN_EXPIRE = 604800  # 7 days
 
@@ -116,6 +118,8 @@ def create_access_token(user_id: int, username: str, role: str, session_version:
         "exp": int(time.time()) + JWT_ACCESS_TOKEN_EXPIRE,
         "iat": int(time.time()),
         "jti": secrets.token_hex(16),
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -130,6 +134,8 @@ def create_refresh_token(user_id: int, username: str, session_version: int = 1) 
         "exp": int(time.time()) + JWT_REFRESH_TOKEN_EXPIRE,
         "iat": int(time.time()),
         "jti": secrets.token_hex(16),
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -150,7 +156,14 @@ def decode_jwt_token(token: str) -> Tuple[Optional[Dict[str, Any]], Optional[str
     Returns (payload, error_message). If valid, error_message is None.
     """
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            issuer=JWT_ISSUER,
+            audience=JWT_AUDIENCE,
+            options={"require": ["exp", "iat", "sub", "type", "iss", "aud"]},
+        )
         return payload, None
     except jwt.ExpiredSignatureError:
         return None, "Token sudah kedaluwarsa."

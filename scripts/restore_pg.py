@@ -26,7 +26,7 @@ def run_restore(
     pg_port: str = "5432",
     pg_db: str = "xiaozhi",
     pg_user: str = "xiaozhi_app",
-    pg_password: str = "xiaozhi_secret",
+    pg_password: str = "",
     clean: bool = True,
 ) -> bool:
     dump_path = Path(dump_file)
@@ -116,9 +116,11 @@ def main():
     parser.add_argument("--port", default=os.getenv("POSTGRES_PORT", "5432"))
     parser.add_argument("--db", default=os.getenv("POSTGRES_DB", "xiaozhi"))
     parser.add_argument("--user", default=os.getenv("POSTGRES_USER", "xiaozhi_app"))
-    parser.add_argument("--password", default=os.getenv("POSTGRES_PASSWORD", "xiaozhi_secret"))
+    parser.add_argument("--password", default=os.getenv("POSTGRES_PASSWORD", ""))
     parser.add_argument("--no-clean", action="store_true", help="Do not drop existing objects before restoring")
     args = parser.parse_args()
+    if not args.password:
+        parser.error("--password atau POSTGRES_PASSWORD wajib diset")
 
     ok = run_restore(
         dump_file=args.dump_file,

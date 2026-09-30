@@ -106,7 +106,7 @@ class ProductService:
                 "height": p_img["height"],
                 "sha256": p_img["sha256"],
             })
-        self.repo.set_product_images(product_id, db_images)
+        self.repo.set_product_images(product_id, db_images, seller_id, is_admin=is_admin)
 
         # 7. Save firmware to private storage and save to DB
         if has_fw and firmware_io and fw_meta:
@@ -119,6 +119,8 @@ class ProductService:
                 storage_key=fw_key,
                 file_size=fw_meta["file_size"],
                 sha256=fw_meta["sha256"],
+                actor_id=seller_id,
+                is_admin=is_admin,
             )
 
         # 8. Save STL to private storage and save to DB
@@ -132,11 +134,13 @@ class ProductService:
                 storage_key=stl_key,
                 file_size=stl_meta["file_size"],
                 sha256=stl_meta["sha256"],
+                actor_id=seller_id,
+                is_admin=is_admin,
             )
 
         # 9. Set links if any
         if links:
-            self.repo.set_product_links(product_id, links)
+            self.repo.set_product_links(product_id, links, seller_id, is_admin=is_admin)
 
         return product
 
@@ -162,18 +166,18 @@ class ProductService:
         product = None
         try:
             uuid.UUID(str(product_id_or_slug))
-            product = self.repo.get_product_by_id(str(product_id_or_slug))
+            product = self.repo.get_product_by_id(str(product_id_or_slug), actor_id=current_user_id)
         except (ValueError, TypeError):
             pass
 
         if not product:
-            product = self.repo.get_product_by_slug(str(product_id_or_slug))
+            product = self.repo.get_product_by_slug(str(product_id_or_slug), actor_id=current_user_id)
 
         if not product:
             return None
 
         # Fetch images
-        raw_images = self.repo.get_product_images(str(product["id"]))
+        raw_images = self.repo.get_product_images(str(product["id"]), actor_id=current_user_id)
         images = []
         for img in raw_images:
             img["url"] = storage_service.get_image_url(img["storage_key"])
@@ -181,10 +185,10 @@ class ProductService:
         product["images"] = images
 
         # Fetch links
-        product["links"] = self.repo.get_product_links(str(product["id"]))
+        product["links"] = self.repo.get_product_links(str(product["id"]), actor_id=current_user_id)
 
         # Fetch latest version & asset info
-        latest_ver = self.repo.get_latest_version(str(product["id"]))
+        latest_ver = self.repo.get_latest_version(str(product["id"]), actor_id=current_user_id)
         product["latest_version"] = latest_ver
 
         # Check STL 3D asset
@@ -232,7 +236,7 @@ class ProductService:
         user_id = int(user["id"])
         is_admin = (str(user.get("role", "")).lower() == "admin")
 
-        prod = self.repo.get_product_by_id(product_id)
+        prod = self.repo.get_product_by_id(product_id, actor_id=user_id, is_admin=is_admin)
         if not prod:
             raise ValueError("Produk tidak ditemukan.")
         if not is_admin and prod["seller_id"] != user_id:
@@ -273,7 +277,7 @@ class ProductService:
                     "height": p_img["height"],
                     "sha256": p_img["sha256"],
                 })
-            self.repo.set_product_images(product_id, db_images)
+            self.repo.set_product_images(product_id, db_images, user_id, is_admin=is_admin)
 
         has_new_fw = bool(firmware_bytes and len(firmware_bytes) > 0 and firmware_filename)
         has_new_stl = bool(stl_bytes and len(stl_bytes) > 0 and stl_filename)
@@ -298,6 +302,7 @@ class ProductService:
 
             with self.repo._get_conn() as conn:
                 with conn.cursor() as cur:
+                    self.repo.set_rls_context(cur, user_id, "admin" if is_admin else "user")
                     cur.execute("""
                         INSERT INTO firmware_product_versions (
                             product_id, version_label, release_notes, status, published_at, created_by
@@ -322,6 +327,8 @@ class ProductService:
                     storage_key=fw_key,
                     file_size=fw_meta["file_size"],
                     sha256=fw_meta["sha256"],
+                    actor_id=user_id,
+                    is_admin=is_admin,
                 )
 
             if has_new_stl and stl_io and stl_meta:
@@ -334,11 +341,13 @@ class ProductService:
                     storage_key=stl_key,
                     file_size=stl_meta["file_size"],
                     sha256=stl_meta["sha256"],
+                    actor_id=user_id,
+                    is_admin=is_admin,
                 )
 
         # Update links if provided
         if links is not None:
-            self.repo.set_product_links(product_id, links)
+            self.repo.set_product_links(product_id, links, user_id, is_admin=is_admin)
 
         return updated
 
@@ -346,4 +355,3 @@ class ProductService:
         user_id = int(user["id"])
         is_admin = (str(user.get("role", "")).lower() == "admin")
         return self.repo.delete_or_archive_product(product_id, user_id, is_admin=is_admin)
-

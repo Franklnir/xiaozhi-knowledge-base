@@ -50,6 +50,9 @@ def download_with_progress(url: str, dest_path: Path):
 
 
 def main():
+    database_password = os.getenv("POSTGRES_PASSWORD", "")
+    if not database_password:
+        raise RuntimeError("POSTGRES_PASSWORD wajib diset sebelum menjalankan skrip ini.")
     bin_dir = PGSQL_DIR / "bin"
     initdb_exe = bin_dir / "initdb.exe"
     pg_ctl_exe = bin_dir / "pg_ctl.exe"
@@ -100,31 +103,30 @@ def main():
 
     # Step 4: Create Role & Database
     log("Configuring xiaozhi_app role and xiaozhi database...")
-    create_role_sql = """
-    DO $$
-    BEGIN
-        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'xiaozhi_app') THEN
-            CREATE ROLE xiaozhi_app WITH LOGIN PASSWORD 'xiaozhi_secret' SUPERUSER;
-        END IF;
-    END
-    $$;
-    """
-    subprocess.run([str(psql_exe), "-h", "127.0.0.1", "-U", "postgres", "-p", "5432", "-c", create_role_sql], check=True)
+    import psycopg
+    from psycopg import sql
 
-    db_check = subprocess.run(
-        [str(psql_exe), "-h", "127.0.0.1", "-U", "postgres", "-p", "5432", "-tAc", "SELECT 1 FROM pg_database WHERE datname='xiaozhi'"],
-        capture_output=True, text=True
-    )
-    if "1" not in db_check.stdout:
-        subprocess.run([str(psql_exe), "-h", "127.0.0.1", "-U", "postgres", "-p", "5432", "-c", "CREATE DATABASE xiaozhi OWNER xiaozhi_app;"], check=True)
-        log("Database 'xiaozhi' created.")
-    else:
-        log("Database 'xiaozhi' already exists.")
+    with psycopg.connect("postgresql://postgres@127.0.0.1:5432/postgres", autocommit=True) as admin_conn:
+        with admin_conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", ("xiaozhi_app",))
+            if cur.fetchone():
+                cur.execute("ALTER ROLE xiaozhi_app WITH LOGIN NOSUPERUSER PASSWORD %s", (database_password,))
+            else:
+                cur.execute("CREATE ROLE xiaozhi_app WITH LOGIN NOSUPERUSER PASSWORD %s", (database_password,))
+            cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", ("xiaozhi",))
+            if not cur.fetchone():
+                cur.execute(sql.SQL("CREATE DATABASE {} OWNER {}").format(
+                    sql.Identifier("xiaozhi"), sql.Identifier("xiaozhi_app")
+                ))
+                log("Database 'xiaozhi' created.")
+            else:
+                log("Database 'xiaozhi' already exists.")
 
     # Step 5: Test Connection via psycopg
     log("Testing connection via psycopg...")
-    import psycopg
-    with psycopg.connect("postgresql://xiaozhi_app:xiaozhi_secret@127.0.0.1:5432/xiaozhi") as conn:
+    with psycopg.connect(
+        host="127.0.0.1", port=5432, dbname="xiaozhi", user="xiaozhi_app", password=database_password
+    ) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT version();")
             ver = cur.fetchone()[0]

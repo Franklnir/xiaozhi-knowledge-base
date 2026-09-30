@@ -8,14 +8,17 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from xiaozhi.config import (
     ADMIN_PASSWORD,
     ADMIN_USERNAME,
     ALLOWED_ORIGINS,
     ALLOWED_ORIGIN_REGEX,
+    ALLOWED_HOSTS,
     IS_PRODUCTION,
     RESTORED_USER_PASSWORD,
     RESTORED_USER_USERNAME,
@@ -160,6 +163,7 @@ if STATIC_DIR.exists():
 setup_api_docs(app)
 
 # Middleware - W3C Standard Compliant CORS
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -178,6 +182,19 @@ async def monitor_requests(request: Request, call_next):
     req_id = request.headers.get("X-Request-ID") or f"req-{uuid.uuid4().hex[:10]}"
     request.state.request_id = req_id
 
+    path = request.url.path
+    sensitive_device_path = path.startswith(("/api/audio/", "/api/device/audio/"))
+    if IS_PRODUCTION and sensitive_device_path:
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+        client_host = request.client.host if request.client else ""
+        if forwarded_proto != "https" and client_host not in {"127.0.0.1", "::1"}:
+            return JSONResponse(status_code=426, content={"detail": "HTTPS required"})
+        if "token" in request.query_params:
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Kredensial perangkat wajib dikirim melalui header X-Device-Token."},
+            )
+
     response = await call_next(request)
     duration_ms = (time.time() - start) * 1000
 
@@ -194,6 +211,13 @@ async def monitor_requests(request: Request, call_next):
     # Add performance headers
     response.headers["X-Response-Time"] = f"{duration_ms:.0f}ms"
     response.headers["X-Request-ID"] = req_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    if request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower() == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
     return response
 
@@ -354,6 +378,8 @@ async def robots_txt():
 
 @app.get("/api/v1/nginx-diag", response_class=PlainTextResponse, include_in_schema=False)
 async def nginx_diag():
+    if IS_PRODUCTION:
+        return PlainTextResponse("Not found", status_code=404)
     diag_file = Path("/app/data/nginx_diag.txt")
     if diag_file.exists():
         return PlainTextResponse(diag_file.read_text(encoding="utf-8", errors="ignore"))

@@ -19,9 +19,11 @@ from itsdangerous import BadSignature, SignatureExpired
 
 from xiaozhi.config import (
     DEFAULT_UI_THEME,
+    GOOGLE_AUTH_ENABLED,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI,
+    IS_PRODUCTION,
     google_oauth_serializer,
 )
 from xiaozhi.core.security import create_token_pair, normalize_username
@@ -88,13 +90,12 @@ async def google_login(
     request: Request,
     intent: str = Query("login"),
     source: str = Query("web"),
-    token: Optional[str] = Query(None),
 ):
     """Initiate Google OAuth flow for Login, Register, or Link."""
     if intent == "link":
-        return await google_link(request=request, token=token, source=source)
+        return await google_link(request=request, source=source)
 
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+    if not GOOGLE_AUTH_ENABLED or not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         logger.error("Google OAuth credentials not configured.")
         if source in ("mobile", "mobile_app", "app"):
             return RedirectResponse(url=f"espbridge://oauth/callback?error={urlencode({'msg': 'Integrasi Google belum dikonfigurasi di server.'})}", status_code=303)
@@ -103,10 +104,11 @@ async def google_login(
     valid_intent = "register" if intent == "register" else "login"
 
     # State payload signed with secret key and salt
+    state_nonce = secrets.token_urlsafe(24)
     state = google_oauth_serializer.dumps({
         "action": valid_intent,
         "source": source,
-        "nonce": secrets.token_urlsafe(16),
+        "nonce": state_nonce,
     })
 
     redirect_uri = get_google_redirect_uri(request)
@@ -120,23 +122,26 @@ async def google_login(
         "prompt": "select_account",
     }
     google_auth_url = f"https://accounts.google.com/o/oauth2/auth?{urlencode(params)}"
-    return RedirectResponse(url=google_auth_url, status_code=303)
+    response = RedirectResponse(url=google_auth_url, status_code=303)
+    response.set_cookie(
+        "google_oauth_state_nonce",
+        state_nonce,
+        max_age=600,
+        httponly=True,
+        secure=IS_PRODUCTION,
+        samesite="lax",
+        path="/api/auth/google",
+    )
+    return response
 
 
 @router.get("/link")
 async def google_link(
     request: Request,
-    token: Optional[str] = Query(None),
     source: str = Query("web"),
 ):
     """Initiate Google OAuth flow to link Google account to current logged-in user."""
     user = get_current_user(request)
-    if not user and token:
-        from xiaozhi.core.security import validate_access_token
-        user_info, err = validate_access_token(token.strip())
-        if user_info and not err:
-            store = get_store()
-            user = store.get_user(int(user_info["user_id"]))
 
     if not user:
         if source in ("mobile", "mobile_app", "app"):
@@ -146,7 +151,7 @@ async def google_link(
             )
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu untuk menautkan Google.")
 
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+    if not GOOGLE_AUTH_ENABLED or not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         if source in ("mobile", "mobile_app", "app"):
             return RedirectResponse(
                 url=f"espbridge://oauth/callback?error={urlencode({'msg': 'Integrasi Google belum dikonfigurasi di server.'})}",
@@ -154,11 +159,12 @@ async def google_link(
             )
         return redirect_with_message("/profil", "Integrasi Google belum dikonfigurasi di server.")
 
+    state_nonce = secrets.token_urlsafe(24)
     state = google_oauth_serializer.dumps({
         "action": "link",
         "user_id": int(user["id"]),
         "source": source,
-        "nonce": secrets.token_urlsafe(16),
+        "nonce": state_nonce,
     })
 
     redirect_uri = get_google_redirect_uri(request)
@@ -172,7 +178,17 @@ async def google_link(
         "prompt": "select_account",
     }
     google_auth_url = f"https://accounts.google.com/o/oauth2/auth?{urlencode(params)}"
-    return RedirectResponse(url=google_auth_url, status_code=303)
+    response = RedirectResponse(url=google_auth_url, status_code=303)
+    response.set_cookie(
+        "google_oauth_state_nonce",
+        state_nonce,
+        max_age=600,
+        httponly=True,
+        secure=IS_PRODUCTION,
+        samesite="lax",
+        path="/api/auth/google",
+    )
+    return response
 
 
 @router.get("/callback")
@@ -183,6 +199,8 @@ async def google_callback(
     error: Optional[str] = Query(None),
 ):
     """Handle OAuth 2.0 callback from Google."""
+    if not GOOGLE_AUTH_ENABLED:
+        return redirect_with_message("/login", "Integrasi Google sedang dinonaktifkan.")
     if error:
         logger.warning("Google OAuth error callback: %s", error)
         return redirect_with_message("/login", f"Autentikasi Google dibatalkan: {error}")
@@ -199,11 +217,19 @@ async def google_callback(
 
     action = state_data.get("action", "login")
     is_mobile = (state_data.get("source") in ("mobile", "mobile_app", "app"))
+    state_nonce = str(state_data.get("nonce") or "")
+    cookie_nonce = request.cookies.get("google_oauth_state_nonce", "")
+    if not state_nonce or not cookie_nonce or not secrets.compare_digest(state_nonce, cookie_nonce):
+        logger.warning("Google OAuth state cookie mismatch")
+        return redirect_with_message("/login", "Sesi autentikasi Google tidak valid. Silakan coba lagi.")
 
     def respond_error(msg: str, target: str = "/login"):
         if is_mobile:
-            return RedirectResponse(url=f"espbridge://oauth/callback?error={urlencode({'msg': msg})}", status_code=303)
-        return redirect_with_message(target, msg)
+            response = RedirectResponse(url=f"espbridge://oauth/callback?error={urlencode({'msg': msg})}", status_code=303)
+        else:
+            response = redirect_with_message(target, msg)
+        response.delete_cookie("google_oauth_state_nonce", path="/api/auth/google")
+        return response
 
     def mobile_success_response(u: dict, r: str) -> RedirectResponse:
         token_pair = create_token_pair(u["id"], u["username"], r, u.get("session_version", 1))
@@ -215,7 +241,9 @@ async def google_callback(
             "role": r,
             "user_id": str(u["id"]),
         }
-        return RedirectResponse(url=f"espbridge://oauth/callback?{urlencode(cb_params)}", status_code=303)
+        response = RedirectResponse(url=f"espbridge://oauth/callback#{urlencode(cb_params)}", status_code=303)
+        response.delete_cookie("google_oauth_state_nonce", path="/api/auth/google")
+        return response
 
     # Exchange authorization code for tokens
     redirect_uri = get_google_redirect_uri(request)
@@ -265,7 +293,7 @@ async def google_callback(
     google_email = str(userinfo.get("email") or "").strip().lower()
     google_name = str(userinfo.get("name") or "").strip()
 
-    if not google_id or not google_email:
+    if not google_id or not google_email or userinfo.get("verified_email") is not True:
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
         return respond_error("Data akun Google tidak memiliki ID atau Email.", target)
 
@@ -278,10 +306,10 @@ async def google_callback(
             return respond_error("Data sesi tautan Google tidak valid.", "/login")
 
         current_user = get_current_user(request)
-        if current_user and int(current_user["id"]) != int(state_uid):
+        if not current_user or int(current_user["id"]) != int(state_uid):
             return respond_error("Sesi login tidak cocok saat menautkan akun.", "/login")
 
-        user_to_link = current_user or store.get_user(int(state_uid))
+        user_to_link = current_user
         if not user_to_link:
             return respond_error("Pengguna tidak ditemukan untuk menautkan akun.", "/login")
 
@@ -297,9 +325,12 @@ async def google_callback(
                 "email": google_email,
                 "msg": f"Akun Google ({google_email}) berhasil ditautkan!",
             }
-            return RedirectResponse(url=f"espbridge://oauth/callback?{urlencode(cb_params)}", status_code=303)
+            response = RedirectResponse(url=f"espbridge://oauth/callback#{urlencode(cb_params)}", status_code=303)
+            response.delete_cookie("google_oauth_state_nonce", path="/api/auth/google")
+            return response
 
         redirect = redirect_with_message("/profil", f"Akun Google ({google_email}) berhasil ditautkan!")
+        redirect.delete_cookie("google_oauth_state_nonce", path="/api/auth/google")
         set_session_cookie(redirect, request, user_to_link)
         return redirect
 
