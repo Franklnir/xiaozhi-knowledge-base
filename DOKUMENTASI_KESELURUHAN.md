@@ -1476,3 +1476,43 @@ Sistem database Xiaozhi Indonesia menerapkan strategi pertahanan berlapis ganda 
 - `community_chats`: Ruang obrolan publik komunitas antar pengguna.
 - `user_chat_read_state`: Penanda status pesan belum terbaca pada ruang obrolan komunitas.
 - `payment_webhook_events`: Respon webhook callback otomatis dari gateway pembayaran pihak ketiga.
+
+---
+
+## 25. Pertanyaan yang Sering Diajukan (FAQ) & Panduan Preset Firmware YouTube
+
+### 25.1 Pemutar Musik YouTube & Preset Firmware Resmi
+
+#### Q: Bagaimana cara agar perangkat ESP32 bisa memutar lagu YouTube?
+**Jawaban:**
+Untuk dapat memutar lagu YouTube secara langsung melalui speaker perangkat ESP32, Anda **wajib membeli dan menggunakan Preset Firmware resmi berlisensi** (khususnya varian ESP32-S3 atau ESP32-C3).
+Firmware bawaan generic open-source belum dilengkapi pipeline decoding hardware audio Ogg/Opus I2S, buffer adaptif anti-stuttering, serta integrasi endpoint streaming cloud real-time Xiaozhi Indonesia. Preset firmware resmi telah dioptimasi dan otomatis terhubung ke sistem YouTube Music Xiaozhi.
+
+#### Q: Bagaimana cara membeli Preset Firmware YouTube tersebut?
+**Jawaban:**
+Saat ini sistem pembelian / checkout mandiri otomatis langsung di website **belum tersedia**.
+Untuk membeli lisensi preset firmware, silakan **langsung chat Admin** untuk konsultasi tipe board Anda (ESP32-S3 atau ESP32-C3), pengecekan ketersediaan slot lisensi, dan instruksi pembayaran.
+Setelah pembayaran berhasil diverifikasi oleh admin, lisensi preset firmware akan langsung diaktifkan pada akun Anda dan otomatis muncul pada menu **Web Flasher**.
+
+- **Kontak WhatsApp Resmi Admin:** [+62 895-3183-2365](https://wa.me/6289531832365?text=Halo%20Admin%2C%20saya%20ingin%20membeli%20Preset%20Firmware%20YouTube%20Xiaozhi)
+- **Chat Komunitas:** Menu `/chat` di dashboard platform.
+
+#### Q: Bagaimana cara melakukan flash Preset Firmware ke board ESP32?
+**Jawaban:**
+Proses flashing dilakukan sangat mudah dan instan langsung dari peramban (browser) tanpa instalasi aplikasi tambahan:
+1. Buka menu **Web Flasher** (`/web-flasher`) menggunakan browser **Google Chrome** atau **Microsoft Edge** di PC/Laptop (atau ponsel Android via kabel USB OTG).
+2. Sambungkan board ESP32 ke komputer/ponsel menggunakan kabel data USB Type-C berkualitas.
+3. Pada halaman Web Flasher, pilih tab **"🎯 Preset Firmware (ESP32-S3 / C3)"**.
+4. Pilih preset resmi yang telah diaktifkan oleh admin pada akun Anda (atau masukkan kode klaim lisensi).
+5. Klik tombol **"Hubungkan Perangkat (Connect Device)"**, lalu pilih port serial COM board ESP32 Anda pada jendela pop-up browser.
+6. Klik tombol **"Mulai Flash Firmware"** dan tunggu hingga proses penulisan firmware mencapai **100% (Selesai)**.
+7. Setelah selesai, tekan tombol reset pada board ESP32, hubungkan ke Wi-Fi Anda. Board langsung aktif dan siap memutar lagu YouTube saat Anda mengucapkan perintah suara: *"Putar lagu [Judul Lagu]"*!
+
+#### Q: Mengapa lagu YouTube tidak bisa diputar atau terputus di tengah jalan?
+**Jawaban:**
+Periksa hal-hal berikut:
+1. Pastikan board telah di-flash menggunakan Preset Firmware resmi (bukan firmware generic).
+2. Pastikan status fitur YouTube Music pada akun Anda berstatus aktif (hubungi admin jika dinonaktifkan).
+3. Pastikan kabel modul amplifier I2S DAC (MAX98357A) terhubung kencang ke pin I2S board (ESP32-S3 default: BCLK=GPIO 26, LRC=GPIO 25, DIN=GPIO 22).
+4. Pastikan sinyal Wi-Fi ESP32 stabil dan koneksi MCP di Dashboard berstatus **Online**.
+
