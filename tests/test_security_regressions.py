@@ -17,6 +17,7 @@ from xiaozhi.core.security import (
 )
 from xiaozhi.marketplace.payments import midtrans, simulator
 from xiaozhi.marketplace import payments
+from xiaozhi.mcp.bridge import _safe_endpoint_for_log
 from xiaozhi.routers import api_v1_auth
 from xiaozhi.routers.youtube import _require_device_auth
 
@@ -116,6 +117,16 @@ def test_device_endpoint_requires_header_and_bound_mac():
     )
     assert owner_id == 7
     assert mac == "AA-BB-CC-DD-EE-FF"
+
+
+def test_mcp_log_endpoint_never_contains_query_credentials():
+    endpoint = "wss://api.xiaozhi.me/mcp/?token=secret-value&key=another-secret"
+
+    safe = _safe_endpoint_for_log(endpoint)
+
+    assert safe == "wss://api.xiaozhi.me"
+    assert "secret-value" not in safe
+    assert "another-secret" not in safe
 
 
 def test_payment_providers_fail_closed(monkeypatch):

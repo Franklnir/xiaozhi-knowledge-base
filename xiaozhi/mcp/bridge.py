@@ -3,6 +3,7 @@ import logging
 import uuid
 from contextlib import asynccontextmanager, suppress
 from typing import Any, Dict, Optional
+from urllib.parse import urlsplit
 
 from xiaozhi.mcp.context import (
     mcp_active_owner_ctx,
@@ -19,6 +20,11 @@ from xiaozhi.services.mcp_service import (
 )
 
 logger = logging.getLogger("xiaozhi.mcp.bridge")
+
+
+def _safe_endpoint_for_log(url: str) -> str:
+    parsed = urlsplit(url)
+    return f"{parsed.scheme}://{parsed.hostname or 'invalid-host'}"
 
 
 def capture_xiaozhi_ws_chat(owner_id: int, direction: str, raw_message: str, token_hash: str = "", slot: int = 1, device_mac: str = "", request_id: str = ""):
@@ -214,8 +220,14 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
     token_hash = normalize_token_hash(token_hash) or xiaozhi_token_hash(url)
     task_key = f"{user_id}:{slot}"
     request_id = f"mcp-{user_id}-s{slot}-{uuid.uuid4().hex[:6]}"
-    masked = url[:50] + "..." if len(url) > 50 else url
-    logger.info("[%s] MCP bridge start: user_id=%s slot=%s mac=%s url=%s", request_id, user_id, slot, board_mac, masked)
+    safe_endpoint = _safe_endpoint_for_log(url)
+    logger.info(
+        "[%s] MCP bridge start: user_id=%s slot=%s endpoint=%s",
+        request_id,
+        user_id,
+        slot,
+        safe_endpoint,
+    )
     ctx_token = mcp_active_owner_ctx.set(user_id)
     req_token = mcp_request_id_ctx.set(request_id)
     slot_token = mcp_active_slot_ctx.set(int(slot or 1))

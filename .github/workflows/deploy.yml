@@ -64,7 +64,6 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: irsyad
           key: ${{ secrets.VPS_SSH_KEY }}
-          script_stop: true
           script: |
             set -eu
             cd ${{ env.APP_DIR }}
