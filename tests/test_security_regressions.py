@@ -21,7 +21,11 @@ from xiaozhi.marketplace import payments
 from xiaozhi.mcp.bridge import _safe_endpoint_for_log
 from xiaozhi.routers import api_v1_auth
 from xiaozhi.routers import auth, google_auth
-from xiaozhi.routers.youtube import _require_device_auth
+from xiaozhi.routers.youtube import (
+    _require_device_auth,
+    _resolve_device_owner_and_mac,
+    _resolve_stream_user_and_info,
+)
 
 
 def make_request(headers=None, query_string=b"", method="GET", path="/"):
@@ -119,6 +123,27 @@ def test_device_endpoint_requires_header_and_bound_mac():
     )
     assert owner_id == 7
     assert mac == "AA-BB-CC-DD-EE-FF"
+
+
+def test_device_stream_and_command_flexible_auth():
+    store = FakeDeviceStore()
+    # 1. Unauthenticated query params do not raise 401
+    owner_id, mac = _resolve_device_owner_and_mac(store, make_request(query_string=b"mac=AC:27:6E:A5:76:00"))
+    assert owner_id is None
+    assert mac == "AC:27:6E:A5:76:00"
+
+    # 2. Query token resolves owner
+    owner_id, mac = _resolve_device_owner_and_mac(
+        store, make_request(query_string=b"token=device-secret&mac=AA:BB:CC:DD:EE:FF")
+    )
+    assert owner_id == 7
+    assert mac == "AA:BB:CC:DD:EE:FF"
+
+    # 3. Stream info does not raise 401 on unauthenticated request
+    user, title, stream_mac = _resolve_stream_user_and_info(
+        store, "kJQP7kiw5Fk", make_request(query_string=b"owner_id=7")
+    )
+    assert stream_mac == ""
 
 
 def test_mcp_log_endpoint_never_contains_query_credentials():

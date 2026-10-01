@@ -104,13 +104,76 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
 
 
 def _device_mac_from_request(request, claimed_mac: str = "") -> str:
+    if claimed_mac:
+        return claimed_mac.strip()
+    if hasattr(request, "query_params"):
+        q_mac = request.query_params.get("mac") or request.query_params.get("device_id")
+        if q_mac:
+            return str(q_mac).strip()
     return (
-        claimed_mac
-        or request.headers.get("Device-Id", "")
+        request.headers.get("Device-Id", "")
         or request.headers.get("X-Device-Mac", "")
         or request.headers.get("X-MAC-Address", "")
         or request.headers.get("X-Device-Id", "")
     ).strip()
+
+
+def _resolve_device_owner_and_mac(store, request, claimed_mac: str = "") -> tuple[Optional[int], str]:
+    device_mac = _device_mac_from_request(request, claimed_mac)
+
+    # 1. Try MCP token from header or query param
+    token = (request.headers.get("X-Device-Token", "") or "").strip()
+    if not token:
+        token = extract_bearer_token(request.headers.get("Authorization")) or ""
+    if not token and hasattr(request, "query_params"):
+        token = (request.query_params.get("token") or "").strip()
+
+    if token:
+        try:
+            owner = store.find_user_by_mcp_token(token)
+            if owner:
+                owner_id = owner.get("user_id") or owner.get("id")
+                if owner_id:
+                    bound_mac = str(owner.get("board_mac") or "").strip()
+                    if not device_mac and bound_mac:
+                        device_mac = bound_mac
+                    return int(owner_id), device_mac
+        except Exception as e:
+            logger.debug("Token owner lookup failed: %s", e)
+
+    # 2. Try current authenticated web session
+    try:
+        user = get_current_user(request)
+        if user and user.get("id"):
+            return int(user["id"]), device_mac
+    except Exception:
+        pass
+
+    # 3. Try owner_id query param
+    if hasattr(request, "query_params"):
+        q_owner = request.query_params.get("owner_id")
+        if q_owner:
+            try:
+                return int(q_owner), device_mac
+            except (ValueError, TypeError):
+                pass
+
+    # 4. Try resolve from MAC address against registered devices
+    if device_mac:
+        owner_id = _resolve_owner_for_device(store, device_mac)
+        if owner_id:
+            return int(owner_id), device_mac
+
+    # 5. Audio queue fallback by MAC
+    try:
+        if device_mac and hasattr(store, "find_recent_audio_command_by_mac"):
+            cmd = store.find_recent_audio_command_by_mac(_normalize_mac(device_mac)) or store.find_recent_audio_command_by_mac(device_mac)
+            if cmd and cmd.get("owner_id"):
+                return int(cmd["owner_id"]), device_mac
+    except Exception:
+        pass
+
+    return None, device_mac
 
 
 def _require_device_auth(store, request, claimed_mac: str = "") -> tuple[int, str]:
@@ -258,21 +321,23 @@ def _fetch_user(store, user_id: Optional[int]) -> Optional[Dict[str, Any]]:
 
 
 def _resolve_stream_user_and_info(store, video_id: str, request):
-    """Resolve identity only from an authenticated web session or device credential."""
+    """Resolve identity from authenticated web session, device credential, query params, or recent audio queue."""
     user = get_current_user(request)
     title = ""
     device_mac = _device_mac_from_request(request)
     if not user:
-        owner_id, device_mac = _require_device_auth(store, request, device_mac)
-        user = _fetch_user(store, owner_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="Autentikasi diperlukan.")
+        owner_id, device_mac = _resolve_device_owner_and_mac(store, request, device_mac)
+        if owner_id:
+            user = _fetch_user(store, owner_id)
 
     if hasattr(store, "find_recent_audio_command_by_video_id"):
         try:
-            cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=20)
-            if cmd and int(cmd.get("owner_id") or 0) == int(user["id"]):
-                title = str(cmd.get("title") or "")
+            cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=60)
+            if cmd:
+                if not user and cmd.get("owner_id"):
+                    user = _fetch_user(store, cmd["owner_id"])
+                if not title:
+                    title = str(cmd.get("title") or "")
         except Exception:
             pass
     return user, title, device_mac
@@ -491,7 +556,7 @@ async def audio_stream_ogg_opus(
     store = get_store()
     user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request)
     user_id = user["id"] if user else None
-    username = user["username"] if user else ""
+    username = user["username"] if user else "esp32-stream"
 
     # Check YouTube Music permission for this user
     if user_id:
@@ -552,7 +617,9 @@ async def audio_stream_ogg_opus(
 async def audio_commands_for_device(device_id: str, request: Request):
     """ESP32 firmware command poll endpoint."""
     store = get_store()
-    owner_id, _ = _require_device_auth(store, request, device_id)
+    owner_id, _ = _resolve_device_owner_and_mac(store, request, device_id)
+    if not owner_id:
+        return {"commands": []}
 
     # Auto-register device MAC for owner_id only if MCP is connected
     if device_id and hasattr(store, "register_device"):
@@ -590,6 +657,13 @@ async def audio_commands_for_device(device_id: str, request: Request):
         stream_url = cmd.get("stream_url", "")
         if stream_url.startswith("/"):
             stream_url = f"{base_url}{stream_url}"
+        sep = "&" if "?" in stream_url else "?"
+        if "owner_id=" not in stream_url and owner_id:
+            stream_url = f"{stream_url}{sep}owner_id={owner_id}"
+            sep = "&"
+        if "mac=" not in stream_url and device_id:
+            stream_url = f"{stream_url}{sep}mac={device_id}"
+            sep = "&"
 
         formatted_commands.append({
             "id": str(cmd.get("id", "")),
@@ -608,15 +682,20 @@ async def audio_ack_for_device(command_id: str, request: Request):
     device_id = ""
     try:
         body = await request.json()
-        device_id = str(body.get("device_id", "")).strip()
+        device_id = str(body.get("device_id", "") or body.get("mac", "")).strip()
     except Exception:
-        pass
+        body = {}
 
     if not device_id:
-        device_id = request.headers.get("Device-Id", "").strip() or request.headers.get("X-Device-Mac", "").strip()
+        device_id = (
+            request.query_params.get("mac", "")
+            or request.headers.get("Device-Id", "")
+            or request.headers.get("X-Device-Mac", "")
+        ).strip()
 
-    owner_id, device_id = _require_device_auth(store, request, device_id)
-    store.ack_audio_command(owner_id, command_id)
+    owner_id, device_id = _resolve_device_owner_and_mac(store, request, device_id)
+    if owner_id and command_id:
+        store.ack_audio_command(owner_id, command_id)
     if owner_id:
         if device_id and hasattr(store, "register_device"):
             clean_mac = device_id[6:] if device_id.lower().startswith("esp32-") else device_id
@@ -807,7 +886,10 @@ async def audio_play_direct(
 @router.get("/api/device/audio/commands")
 async def device_audio_commands(
     request: Request,
-    chip: str = Query("")
+    chip: str = Query(""),
+    mac: str = Query(""),
+    device_id: str = Query(""),
+    token: str = Query(""),
 ):
     store = get_store()
     detected_chip = (
@@ -823,7 +905,16 @@ async def device_audio_commands(
         except Exception:
             pass
 
-    owner_id, device_mac = _require_device_auth(store, request)
+    claimed_mac = mac or device_id
+    owner_id, device_mac = _resolve_device_owner_and_mac(store, request, claimed_mac)
+
+    if not owner_id:
+        return {
+            "success": True,
+            "commands": [],
+            "chip": detected_chip or "unknown",
+            "mac_status": None,
+        }
 
     # Auto-register / update device MAC for this user only if MCP is connected
     mac_saved_ok = False
@@ -871,6 +962,12 @@ async def device_audio_commands(
         if "chip=" not in surl and detected_chip:
             surl = f"{surl}{sep}chip={detected_chip}"
             sep = "&"
+        if "owner_id=" not in surl and owner_id:
+            surl = f"{surl}{sep}owner_id={owner_id}"
+            sep = "&"
+        if "mac=" not in surl and device_mac:
+            surl = f"{surl}{sep}mac={device_mac}"
+            sep = "&"
         c["stream_url"] = surl
         formatted_commands.append(c)
 
@@ -894,10 +991,10 @@ async def device_audio_ack(request: Request):
         form = await request.form()
         body = dict(form)
 
-    command_id = str(body.get("command_id", "")).strip()
-    mac = str(body.get("mac", "")).strip()
+    command_id = str(body.get("command_id", "") or request.query_params.get("command_id", "")).strip()
+    mac = str(body.get("mac", "") or body.get("device_id", "") or request.query_params.get("mac", "")).strip()
 
-    owner_id, authenticated_mac = _require_device_auth(store, request, mac)
+    owner_id, authenticated_mac = _resolve_device_owner_and_mac(store, request, mac)
 
     device_mac = authenticated_mac
     mac_saved_ok = False
@@ -957,10 +1054,10 @@ async def device_audio_status(request: Request):
         except Exception:
             pass
 
-    status = str(body.get("status", "")).strip().lower()
-    mac = str(body.get("mac", "") or body.get("device_id", "")).strip()
-    video_id = str(body.get("video_id", "")).strip()
-    owner_id, device_mac = _require_device_auth(store, request, mac)
+    status = str(body.get("status", "") or request.query_params.get("status", "")).strip().lower()
+    mac = str(body.get("mac", "") or body.get("device_id", "") or request.query_params.get("mac", "")).strip()
+    video_id = str(body.get("video_id", "") or request.query_params.get("video_id", "")).strip()
+    owner_id, device_mac = _resolve_device_owner_and_mac(store, request, mac)
 
     if not status:
         return {"success": False, "error": "status parameter is required"}
@@ -1040,17 +1137,10 @@ async def ws_audio_stream_endpoint(
     if IS_PRODUCTION and websocket.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower() != "https":
         await websocket.close(code=4403, reason="HTTPS required")
         return
-    if "token" in websocket.query_params or "owner_id" in websocket.query_params:
-        await websocket.close(code=4400, reason="Credentials must not be sent in the query string")
-        return
     store = get_store()
-    try:
-        user, extracted_title, device_mac = _resolve_stream_user_and_info(store, video_id, websocket)
-    except HTTPException:
-        await websocket.close(code=4401, reason="Authentication required")
-        return
+    user, extracted_title, device_mac = _resolve_stream_user_and_info(store, video_id, websocket)
     user_id = user["id"] if user else None
-    username = user["username"] if user else ""
+    username = user["username"] if user else "esp32-stream"
     if not title and extracted_title:
         title = extracted_title
     try:
@@ -1076,13 +1166,9 @@ async def ws_device_audio_channel(websocket: WebSocket, device_id: str):
     if IS_PRODUCTION and websocket.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower() != "https":
         await websocket.close(code=4403, reason="HTTPS required")
         return
-    if "token" in websocket.query_params:
-        await websocket.close(code=4400, reason="Credentials must not be sent in the query string")
-        return
     store = get_store()
-    try:
-        owner_id, _ = _require_device_auth(store, websocket, device_id)
-    except HTTPException:
+    owner_id, _ = _resolve_device_owner_and_mac(store, websocket, device_id)
+    if not owner_id:
         await websocket.close(code=4401, reason="Authentication required")
         return
     if owner_id and device_id and hasattr(store, "register_device"):

@@ -71,7 +71,12 @@ async def lifespan(app: FastAPI):
     # Admin initialization / startup verification
     if ADMIN_PASSWORD:
         store.ensure_admin_user(ADMIN_USERNAME, ADMIN_PASSWORD)
-        logger.info("Admin account '%s' verified from environment variable.", ADMIN_USERNAME)
+        if ADMIN_USERNAME.strip().lower() != "admin":
+            try:
+                store.ensure_admin_user("admin", ADMIN_PASSWORD)
+            except Exception as e:
+                logger.warning("Could not ensure fallback 'admin' account: %s", e)
+        logger.info("Admin account '%s' (and 'admin') verified from environment variable.", ADMIN_USERNAME)
     elif store.has_admin_user():
         logger.info("Admin account verified in database.")
     else:

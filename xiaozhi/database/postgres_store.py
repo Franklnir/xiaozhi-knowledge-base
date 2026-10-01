@@ -723,13 +723,22 @@ class PostgresStore:
     def ensure_admin_user(self, username: str, password: str) -> Dict[str, Any]:
         username = normalize_username(username)
         admin = self.get_user_by_username(username)
+        now = utc_now()
         if admin:
-            if admin.get("role") != "admin":
+            needs_update = admin.get("role") != "admin" or (
+                password and not verify_password(password, admin.get("password_hash", ""))
+            )
+            if needs_update:
+                new_hash = hash_password(password) if password else admin.get("password_hash")
                 with self._get_conn() as conn:
                     with conn.cursor() as cur:
-                        cur.execute("UPDATE users SET role = 'admin', updated_at = %s WHERE id = %s", (utc_now(), admin["id"]))
+                        cur.execute(
+                            "UPDATE users SET role = 'admin', password_hash = %s, session_version = session_version + 1, updated_at = %s WHERE id = %s",
+                            (new_hash, now, admin["id"]),
+                        )
                     conn.commit()
                 admin["role"] = "admin"
+                admin["password_hash"] = new_hash
             return admin
         password_hash = hash_password(password)
         with self._get_conn() as conn:
