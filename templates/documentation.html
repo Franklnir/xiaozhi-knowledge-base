@@ -3187,9 +3187,10 @@ void ackCommand(String cmdId) {
 
                                 <!-- Layar 2 -->
                                 <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
-                                    <strong style="color:var(--app-brand);">2. 💬 Notifikasi HP Real-Time</strong>
+                                    <strong style="color:var(--app-brand);">2. 💬 Notifikasi HP Real-Time &amp; Getar (Haptic)</strong>
                                     <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
                                         • Menampilkan pesan masuk dari <strong>WhatsApp, Telegram, SMS, Caller ID panggilan masuk, serta notifikasi aplikasi</strong>.<br>
+                                        • <strong>Getaran Taktil (Haptic Pulse):</strong> Setiap kali pesan masuk, motor getar (GPIO 20) otomatis bergetar 2x denyut pendek (100ms ON, 80ms OFF, 100ms ON).<br>
                                         • Teks nama pengirim dan isi pesan tampil selama 7 detik di layar OLED.
                                     </div>
                                 </div>
@@ -3229,7 +3230,22 @@ void ackCommand(String cmdId) {
                         </div>
                     </div>
                 </div>
-            </div>
+            
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">🔔 Fitur Temukan Perangkat (Find My Device) dari Chronos &amp; ESPBridge</div>
+                        <div class="doc-step-desc">
+                            Ketika Anda lupa menaruh perangkat atau ingin mencarinya melalui smartphone:<br>
+                            1. Buka aplikasi <strong>Chronos</strong> dan tekan menu <strong>Find Watch / Temukan Perangkat</strong> (atau kirim perintah FIND di ESPBridge).<br>
+                            2. <strong>Bunyi Dentangan Bell Nyaring Maksimal:</strong> Speaker amplifier I2S MAX98357A (3W) seketika membunyikan nada dentang bell ganda (<em>Ding-Dong!</em> 2048 Hz &amp; 1706 Hz) pada volume maksimal 100% secara berulang.<br>
+                            3. <strong>Alarm Getar Berdenyut:</strong> Motor getar aktif berdenyut secara ritmik (350ms ON, 250ms OFF) agar perangkat mudah ditemukan meski tertutup barang atau di tempat gelap.<br>
+                            4. <strong>Tampilan Layar OLED:</strong> OLED menampilkan popup peringatan <code>CARI PERANGKAT - Panggilan dari Chronos</code>.<br>
+                            5. <strong>Matikan Dering:</strong> Tekan tombol fisik <strong>GPIO 3</strong> sekali pada perangkat ESP32 untuk langsung membungkam suara bell dan mematikan getaran seketika!
+                        </div>
+                    </div>
+                </div>
+</div>
 
             <!-- Section 6: Pinout Diagram -->
             <div class="doc-section" style="margin-top:24px;">
