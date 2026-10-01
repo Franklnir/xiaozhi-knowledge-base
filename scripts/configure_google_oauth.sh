@@ -47,12 +47,15 @@ declare -A seen=()
 
 while IFS= read -r line || [[ -n "${line}" ]]; do
   key="${line%%=*}"
-  if [[ -v "replacements[${key}]" ]]; then
-    printf '%s=%s\n' "${key}" "${replacements[${key}]}" >>"${temp_env}"
-    seen["${key}"]=1
-  else
-    printf '%s\n' "${line}" >>"${temp_env}"
-  fi
+  case "${key}" in
+    GOOGLE_AUTH_ENABLED|GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET|GOOGLE_REDIRECT_URI)
+      printf '%s=%s\n' "${key}" "${replacements[${key}]}" >>"${temp_env}"
+      seen["${key}"]=1
+      ;;
+    *)
+      printf '%s\n' "${line}" >>"${temp_env}"
+      ;;
+  esac
 done <"${ENV_FILE}"
 
 for key in GOOGLE_AUTH_ENABLED GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI; do
@@ -70,14 +73,21 @@ cd "${APP_DIR}"
 current_image="$(docker inspect --format '{{.Config.Image}}' xiaozhi)"
 XIAOZHI_IMAGE="${current_image}" docker compose up -d --force-recreate --no-deps xiaozhi
 
+cookie_jar="$(mktemp)"
+cleanup_cookie() {
+  rm -f -- "${cookie_jar}"
+}
+trap cleanup_cookie EXIT
+
 for _ in $(seq 1 24); do
   if [[ "$(docker inspect --format '{{.State.Health.Status}}' xiaozhi 2>/dev/null || true)" == "healthy" ]]; then
     location="$(curl --fail --silent --show-error --output /dev/null --write-out '%{redirect_url}' \
       -H 'Host: xiaozhiscig.biz.id' \
-      -c /tmp/xiaozhi-google-cookie.txt \
+      -c "${cookie_jar}" \
       http://127.0.0.1:8080/api/auth/google/login?intent=login)"
-    rm -f -- /tmp/xiaozhi-google-cookie.txt
     if [[ "${location}" == https://accounts.google.com/* && "${location}" == *"code_challenge="* ]]; then
+      cleanup_cookie
+      trap - EXIT
       echo "Google OAuth aktif dan redirect PKCE berhasil diverifikasi."
       exit 0
     fi
