@@ -59,9 +59,26 @@ def _get_data_file() -> Path:
     return p2
 
 
-def _get_aesgcm() -> AESGCM:
-    secret = os.getenv("FIRMWARE_PRESET_SECRET", "xiaozhi-esp32-preset-secure-token-2026-v1")
-    key = hashlib.sha256(secret.encode()).digest()
+DEFAULT_PRESET_SECRETS: List[str] = [
+    "x8W_LBSsKQVbdEB0IUlCOLuA59QaYm3U2qoOCl4XS0OLG8_l-HMhNeejW18UhUETarOBk-Sel48JfZTxiRaF3g",
+    "xiaozhi-esp32-preset-secure-token-2026-v1",
+]
+
+
+def _get_candidate_secrets() -> List[str]:
+    secrets_list: List[str] = []
+    env_secret = os.getenv("FIRMWARE_PRESET_SECRET")
+    if env_secret and env_secret.strip():
+        secrets_list.append(env_secret.strip())
+    for s in DEFAULT_PRESET_SECRETS:
+        if s not in secrets_list:
+            secrets_list.append(s)
+    return secrets_list
+
+
+def _get_aesgcm(secret: Optional[str] = None) -> AESGCM:
+    sec = secret or (os.getenv("FIRMWARE_PRESET_SECRET") or "").strip() or DEFAULT_PRESET_SECRETS[0]
+    key = hashlib.sha256(sec.encode()).digest()
     return AESGCM(key)
 
 
@@ -734,8 +751,18 @@ def get_decrypted_preset_binary(preset_id: str = "esp32s3_cam", version: Optiona
     if len(enc_bytes) < 28:
         raise ValueError(f"File terenkripsi rusak atau ukuran tidak valid: {len(enc_bytes)} bytes.")
 
-    aesgcm = _get_aesgcm()
     nonce = enc_bytes[:12]
     ciphertext = enc_bytes[12:]
-    raw_binary = aesgcm.decrypt(nonce, ciphertext, None)
-    return raw_binary
+
+    candidate_secrets = _get_candidate_secrets()
+    last_exc = None
+    for sec in candidate_secrets:
+        try:
+            aesgcm = _get_aesgcm(sec)
+            raw_binary = aesgcm.decrypt(nonce, ciphertext, None)
+            return raw_binary
+        except Exception as exc:
+            last_exc = exc
+
+    logger.error("Failed to decrypt preset '%s' with all %d candidate keys: %s", clean_id, len(candidate_secrets), last_exc)
+    raise last_exc or ValueError(f"Gagal mendekripsi binary firmware preset '{clean_id}'.")
