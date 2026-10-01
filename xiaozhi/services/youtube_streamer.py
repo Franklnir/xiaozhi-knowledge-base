@@ -45,10 +45,34 @@ async def extract_audio_url(video_id: str) -> tuple[Optional[str], str]:
             "no_warnings": True,
             "format": "bestaudio/best",
             "extractaudio": True,
+            "noplaylist": True,
+            "socket_timeout": 15,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            return info.get("url"), info.get("title", "")
+            if not info:
+                return None, ""
+
+            title = info.get("title", "")
+            url = info.get("url")
+
+            # Fallback to inspecting formats if top-level url is None
+            if not url:
+                formats = info.get("formats", [])
+                audio_formats = [
+                    f for f in formats
+                    if f.get("url") and f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none")
+                ]
+                if not audio_formats:
+                    audio_formats = [f for f in formats if f.get("url") and f.get("acodec") not in (None, "none")]
+
+                if audio_formats:
+                    audio_formats.sort(key=lambda x: (x.get("abr") or x.get("tbr") or 0), reverse=True)
+                    url = audio_formats[0].get("url")
+                elif formats:
+                    url = formats[-1].get("url")
+
+            return url, title
 
     return await loop.run_in_executor(None, _extract)
 
@@ -156,7 +180,7 @@ async def stream_video_to_websocket(
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
-        "-re",
+        "-user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         "-i", source_url,
         "-vn",
         "-ac", "1",
