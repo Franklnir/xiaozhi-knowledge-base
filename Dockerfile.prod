@@ -29,4 +29,4 @@ EXPOSE 7860
 CMD ["python", "-m", "uvicorn", "xiaozhi.main:app", \
      "--host", "0.0.0.0", "--port", "7860", \
      "--workers", "1", "--limit-concurrency", "50", \
-     "--timeout-keep-alive", "30"]
+     "--timeout-keep-alive", "30", "--no-access-log"]
