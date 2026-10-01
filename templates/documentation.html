@@ -2916,34 +2916,107 @@ void ackCommand(String cmdId) {
     </div>
 
     
-    <!-- ESP32-C3 Super Mini Hardware & Buttons Tab -->
+    <!-- ESP32-C3 Super Mini Hardware, Wake Word, & Buttons Tab -->
     <div id="tab-hardware-c3" class="doc-tab-content">
         <div class="app-card">
+            <!-- Section 1: Intro & Architecture -->
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🚀</span> Panduan Operasional ESP32-C3 Super Mini / Pro
+                    <span>🚀</span> Panduan Operasional ESP32-C3 Super Mini / Pro (Dual-Mode Edition)
                 </div>
                 <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:16px;">
-                    Firmware khusus untuk mikrokontroler <strong>ESP32-C3 RISC-V 32-bit Single-Core @ 160MHz</strong> (4MB Flash, ~400KB SRAM internal). Dirancang untuk solusi mini smart speaker yang sangat compact, hemat daya, dan hemat biaya (~Rp 35.000).
+                    Firmware khusus untuk mikrokontroler <strong>ESP32-C3 RISC-V 32-bit Single-Core @ 160MHz</strong> (4MB Flash, ~400KB SRAM internal). Dirancang sebagai solusi smart speaker AI yang sangat compact, efisien, hemat daya, dan hemat biaya (~Rp 91.000 total perakitan).
                 </div>
 
-                <div class="doc-warning">
-                    <strong>⚠️ Perhatian Khusus Arsitektur Audio ESP32-C3 (Shared Clock):</strong><br>
-                    ESP32-C3 hanya memiliki <strong>1 periferal I2S</strong>. Oleh karena itu, modul Microphone (INMP441) dan Amplifier Speaker (MAX98357A) <strong>wajib berbagi pin Clock (BCLK = GPIO 5, WS/LRC = GPIO 6) bersamaan</strong> pada mode Full Duplex.
+                <div class="doc-warning" style="margin-bottom:16px;">
+                    <strong>⚠️ Perhatian Khusus Arsitektur Audio ESP32-C3 (Shared Clock Full Duplex):</strong><br>
+                    ESP32-C3 hanya memiliki <strong>1 periferal I2S</strong>. Oleh karena itu, modul Microphone (INMP441) dan Amplifier Speaker (MAX98357A) <strong>wajib berbagi pin Clock (BCLK = GPIO 5, WS/LRC = GPIO 6) secara paralel bersamaan</strong> pada mode Full Duplex.
+                </div>
+
+                <div class="doc-tip">
+                    <strong>🔄 Sistem Dual-Boot Saling Eksklusif (Mutual Exclusion):</strong><br>
+                    • <strong>Mode XiaoZhi (Voice Assistant AI):</strong> Mengaktifkan Wi-Fi, audio I2S (Mic + Spk), WakeNet wake word, WebSocket AI Cloud, dan streaming musik YouTube.<br>
+                    • <strong>Mode Chronchi (OLED Smart Companion):</strong> Wi-Fi dan I2S dimatikan sepenuhnya agar radio Bluetooth Low Energy (BLE) dapat berjalan 100% stabil pada sisa RAM 400KB ESP32-C3 tanpa bentrok frekuensi 2.4GHz.
                 </div>
             </div>
 
-            <!-- Section 1: Button Guide (Updated as requested) -->
+            <!-- Section 2: Web Config & Wake Word Selection -->
             <div class="doc-section" style="margin-top:24px;">
                 <div class="doc-section-title">
-                    <span>🎮</span> Panduan Lengkap Fungsi Tombol Fisik ESP32-C3
+                    <span>🌐</span> Alur Konfigurasi Wi-Fi &amp; Pilihan Wake Word (Web Portal 192.168.4.1)
                 </div>
-                <div style="font-size:13px; color:var(--app-muted); margin-bottom:12px;">
-                    Navigasi tombol dibuat ringkas dan multifungsi menggunakan kombinasi klik tunggal, klik ganda, dan tekan tahan:
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
+                    Saat menyala pertama kali atau saat tombol reset ditekan, hubungkan smartphone/laptop Anda ke hotspot bernama <strong>XiaoZhi-XXXX</strong> lalu buka browser ke alamat <code>http://192.168.4.1</code>:
                 </div>
 
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Pilihan Mode 1 Wi-Fi vs Multi-SSID Failover Otomatis</div>
+                        <div class="doc-step-desc">
+                            Anda dapat mendaftarkan 1 SSID atau beberapa SSID Wi-Fi cadangan (Prioritas 1: Wi-Fi Rumah, Prioritas 2: Hotspot HP, Prioritas 3: Wi-Fi Kantor). Jika Wi-Fi utama terputus, ESP32-C3 otomatis beralih ke Wi-Fi cadangan dalam hitungan detik.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Pilihan Model Wake Word (Kata Pemicu Suara Bawaan)</div>
+                        <div class="doc-step-desc">
+                            Pada portal konfigurasi, tersedia menu pemilihan model deteksi kata pemicu (WakeNet On-Device) tanpa memerlukan koneksi cloud:
+                            <div style="margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:10px;">
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:10px;">
+                                    <strong style="color:var(--app-brand);">1. "Hi Jason" (<code>hijason</code>) — Default</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:3px;">
+                                        Paling direkomendasikan. Respon sangat cepat, akurasi tinggi, dan minim false trigger pada kebisingan ruangan.
+                                    </div>
+                                </div>
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:10px;">
+                                    <strong style="color:var(--app-brand);">2. "Hi Lexin" (<code>hilexin</code>)</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:3px;">
+                                        Kata pemicu resmi Espressif Lexin. Stabil dan cocok untuk pengucapan bahasa Inggris standar.
+                                    </div>
+                                </div>
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:10px;">
+                                    <strong style="color:var(--app-brand);">3. "Hi ESP" (<code>hiesp</code>)</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:3px;">
+                                        Kata pemicu singkat 2 suku kata untuk panggilan cepat dan responsif.
+                                    </div>
+                                </div>
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:10px;">
+                                    <strong style="color:var(--app-brand);">4. "Ni Hao Xiaozhi" (<code>nihaoxiaozhi</code>)</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:3px;">
+                                        Kata pemicu klasik Xiaozhi berbahasa Mandarin.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="doc-tip" style="margin-top:10px;">
+                                <strong>💡 Tampilan Standby Dinamis di Layar OLED:</strong><br>
+                                Saat dalam kondisi standby, layar OLED otomatis menampilkan petunjuk pemicu suara sesuai pilihan Anda, contoh: <code>Standby, say: Hi Jason</code>. Dilengkapi fitur <em>cooldown</em> 2 detik agar AI tidak terpanggil berulang kali.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 3: Dual Mode Button Guide -->
+            <div class="doc-section" style="margin-top:24px;">
+                <div class="doc-section-title">
+                    <span>🎮</span> Panduan Lengkap Fungsi Tombol Fisik ESP32-C3 (Dual-Mode)
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); margin-bottom:12px;">
+                    Navigasi tombol dibuat efisien dan multifungsi menggunakan kombinasi gestur cerdas (<strong>Klik 1x</strong>, <strong>Klik 2x Cepat</strong>, <strong>Klik 3x</strong>, dan <strong>Tekan Tahan</strong>):
+                </div>
+
+                <div class="doc-tip" style="margin-bottom:16px;">
+                    <strong>🔄 Cara Berpindah Mode (XiaoZhi ↔ Chronchi):</strong><br>
+                    • <strong>Metode Cepat (Fast Switch):</strong> Tekan <strong>Klik 2x Cepat pada Tombol Utama (GPIO 3)</strong> untuk beralih mode seketika tanpa masuk menu!<br>
+                    • <strong>Metode Visual Menu:</strong> Tahan <strong>Tombol Utama (GPIO 3) selama 2.5 detik</strong> hingga menu <code>SELECT MODE</code> muncul di layar OLED, lalu klik singkat untuk memilih dan tahan 2 detik untuk konfirmasi.
+                </div>
+
+                <div style="overflow-x:auto; margin-bottom:16px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
                         <thead>
                             <tr style="background:var(--app-surface-muted); text-align:left;">
                                 <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Tombol &amp; Pin</th>
@@ -2954,48 +3027,54 @@ void ackCommand(String cmdId) {
                         </thead>
                         <tbody>
                             <tr>
-                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
-                                    Tombol 1: Utama (BOOT / Chat)<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 3</span>
+                                <td rowspan="4" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    Tombol 1: Utama<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 3 (Active Low)</span>
                                 </td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x (Singkat)</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Bicara / Stop / Interupsi</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
                                     • Mulai bicara manual (Push-to-Talk).<br>
-                                    • Interupsi / potong suara AI jika sedang bicara.<br>
-                                    • Hentikan musik jika lagu lokal atau YouTube sedang diputar.
+                                    • Interupsi suara AI saat AI sedang berbicara.<br>
+                                    • <strong>Instant Stop Musik:</strong> Langsung menghentikan lagu YouTube yang sedang berputar (0 ms latency).
                                 </td>
                             </tr>
                             <tr>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x Cepat</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#8b5cf6; font-weight:600;">Switch Mode (XiaoZhi ↔ Chronchi)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#8b5cf6; font-weight:600;">Fast Switch Mode (XiaoZhi ↔ Chronchi)</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
-                                    • <strong>Beralih ke Chronchi</strong> (Jam Meja Pintar / BLE Companion).<br>
-                                    • Untuk kembali ke XiaoZhi AI, <strong>klik 2x cepat lagi</strong>.
+                                    Beralih langsung antara mode Asisten Suara AI XiaoZhi dan mode Smartwatch BLE Chronchi secara instan.
                                 </td>
                             </tr>
                             <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan 5 Detik</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Masuk Konfigurasi Wi-Fi</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tahan 2.5 Detik</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Visual Menu (SELECT MODE)</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
-                                    Mengaktifkan kembali Web Portal Wi-Fi Access Point (<code>192.168.4.1</code>) untuk setup jaringan baru.
+                                    Membuka menu grafis pemilihan mode di layar OLED. Klik singkat untuk mengganti pilihan dan tahan 2 detik untuk konfirmasi.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 3x (di Mode Chronchi)</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Hapus Konfigurasi Wi-Fi</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    Menghapus data SSID dan kata sandi Wi-Fi dari NVS Flash seketika tanpa perlu membuka portal setup.
                                 </td>
                             </tr>
 
                             <tr style="background:var(--app-surface);">
-                                <td rowspan="2" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
-                                    Tombol 2: Sekunder (Opsional)<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 2</span>
+                                <td rowspan="2" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    Tombol 2: Sekunder<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 2 (Active Low)</span>
                                 </td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x (Singkat)</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Toggle Hands-Free (ON/OFF)</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
-                                    Mengaktifkan atau mematikan mode bicara otomatis tanpa tombol.
+                                    Mengaktifkan mode bicara hands-free otomatis. Anda bisa berbicara terus menerus tanpa menyentuh tombol. Jika hening >12 detik, perangkat masuk ke mode standby hemat daya.
                                 </td>
                             </tr>
                             <tr style="background:var(--app-surface);">
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan 5 Detik</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Hapus SSID Tersimpan</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Reset SSID &amp; Reboot</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
-                                    Membersihkan kata sandi Wi-Fi lama di NVS dan melakukan reboot.
+                                    Membersihkan kredensial Wi-Fi lama di NVS dan melakukan reboot mikrokontroler.
                                 </td>
                             </tr>
                         </tbody>
@@ -3003,7 +3082,156 @@ void ackCommand(String cmdId) {
                 </div>
             </div>
 
-            <!-- Section 2: Pinout Diagram -->
+            <!-- Section 4: Voice Commands on ESP32-C3 -->
+            <div class="doc-section" style="margin-top:28px;">
+                <div class="doc-section-title">
+                    <span>🗣️</span> Daftar Lengkap Perintah Suara XiaoZhi (ESP32-C3 Edition)
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
+                    ESP32-C3 mendukung perintah suara alami dalam bahasa Indonesia dengan latensi rendah:
+                </div>
+
+                <div class="tool-grid">
+                    <!-- Tool 1: Volume -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>🔊</span> Kontrol Suara &amp; Volume Speaker
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <em>"Naikkan volume"</em> / <em>"Keraskan suaranya"</em> (+10%)<br>
+                            • <em>"Turunkan volume"</em> / <em>"Kecilkan suaranya"</em> (-10%)<br>
+                            • <em>"Setel volume ke 80 persen"</em> (0 - 100%)<br>
+                            • <em>"Berapa volume audio sekarang?"</em>
+                        </div>
+                    </div>
+
+                    <!-- Tool 2: Reset Wi-Fi -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>📶</span> Reset Wi-Fi via Suara (Dialog Aman)
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <em>"Tolong reset Wi-Fi"</em> / <em>"Ganti Wi-Fi"</em><br>
+                            • AI akan meminta konfirmasi terlebih dahulu:<br>
+                            <em>"Apakah Anda yakin ingin masuk ke mode konfigurasi Wi-Fi? Jawab ya atau batal."</em><br>
+                            • Jawab <em>"Ya"</em> untuk membuka hotspot setup.
+                        </div>
+                    </div>
+
+                    <!-- Tool 3: YouTube Streaming -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>🎵</span> Pemutaran Musik YouTube (Adaptive Bitrate)
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <em>"Putar lagu [judul lagu / nama penyanyi]"</em><br>
+                            • <em>"Putar musik santai lofi"</em><br>
+                            • <em>"Hentikan musik"</em> atau tekan 1x tombol GPIO 3.<br>
+                            • Menggunakan format Ogg/Opus mono 24kHz dengan adaptive bitrate 11kbps super hemat RAM untuk ESP32-C3!
+                        </div>
+                    </div>
+
+                    <!-- Tool 4: System Info -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>ℹ️</span> Status Sistem &amp; Daya Baterai
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <em>"Berapa sisa baterai alat ini?"</em> (membaca tegangan baterai 1S via ADC1 CH1 GPIO 1).<br>
+                            • <em>"Spesifikasi alat ini apa saja?"</em> (AI membacakan chip ESP32-C3, RAM 400KB, Flash 4MB, I2S Mic + Spk, OLED SSD1306).<br>
+                            • <em>"Apa saja fungsi tombol di perangkat ini?"</em>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 5: Mode Chronchi on ESP32-C3 -->
+            <div class="doc-section" style="margin-top:28px;">
+                <div class="doc-section-title">
+                    <span>⌚</span> Panduan Lengkap Mode Chronchi di ESP32-C3 (Smartwatch &amp; BLE Companion)
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
+                    Mode Chronchi mengubah ESP32-C3 Anda menjadi pendamping jam pintar meja (smart desk clock &amp; notification hub) melalui koneksi Bluetooth Low Energy (BLE) yang terhubung ke aplikasi <strong>Chronos</strong> atau <strong>ESPBridge</strong> (Android / iOS).
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Cara Menghubungkan ke Smartphone via Bluetooth BLE</div>
+                        <div class="doc-step-desc">
+                            1. Beralih ke <strong>Mode Chronchi</strong> dengan menekan <strong>Klik 2x Cepat pada GPIO 3</strong>.<br>
+                            2. Layar OLED akan menampilkan logo Chronchi dan BLE advertising otomatis aktif.<br>
+                            3. Di smartphone, pasang aplikasi <strong>Chronos</strong> (Play Store / App Store) atau <strong>ESPBridge APK</strong>.<br>
+                            4. Nyalakan Bluetooth HP, scan perangkat BLE bernama <strong>Chronchi</strong>, lalu pilih <strong>Pair / Connect</strong>.<br>
+                            5. Layar OLED menampilkan status <code>ESPBridge READY</code> dan sinkronisasi data langsung aktif!
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Data &amp; Layar yang Tampil pada Layar OLED SSD1306 (128x64)</div>
+                        <div class="doc-step-desc">
+                            <div style="margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+                                <!-- Layar 1 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">1. ⌚ Layar Home (Clock &amp; Status)</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Jam digital besar tersinkronisasi otomatis dari ponsel.<br>
+                                        • Hari, tanggal, dan bulan otomatis.<br>
+                                        • Indikator status koneksi Bluetooth BLE.<br>
+                                        • Indikator baterai perangkat &amp; status charging.
+                                    </div>
+                                </div>
+
+                                <!-- Layar 2 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">2. 💬 Notifikasi HP Real-Time</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Menampilkan pesan masuk dari <strong>WhatsApp, Telegram, SMS, Caller ID panggilan masuk, serta notifikasi aplikasi</strong>.<br>
+                                        • Teks nama pengirim dan isi pesan tampil selama 7 detik di layar OLED.
+                                    </div>
+                                </div>
+
+                                <!-- Layar 3 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">3. 🗺️ Navigasi Turn-by-Turn Google Maps</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Saat bernavigasi di ponsel, layar OLED menampilkan arah belokan rute (maneuver), jarak belokan (misal 150m), dan nama jalan tujuan.
+                                    </div>
+                                </div>
+
+                                <!-- Layar 4 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">4. ⛅ Cuaca &amp; Suhu Real-Time</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Menampilkan suhu lingkungan aktual (°C) dan kondisi cuaca dari GPS smartphone secara real-time.
+                                    </div>
+                                </div>
+
+                                <!-- Layar 5 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">5. 📱 Status Ponsel (Phone Status)</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Level sisa baterai ponsel, status charging ponsel, dan indikator kekuatan sinyal seluler.
+                                    </div>
+                                </div>
+
+                                <!-- Layar 6 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">6. 📶 BLE Wi-Fi Provisioning</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Anda dapat mengirim konfigurasi nama SSID dan password Wi-Fi baru langsung dari aplikasi smartphone via BLE tanpa perlu membuka mode web portal hotspot!
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 6: Pinout Diagram -->
             <div class="doc-section" style="margin-top:24px;">
                 <div class="doc-section-title">
                     <span>📌</span> Referensi Pinout Hardware ESP32-C3 Mini
@@ -3023,17 +3251,17 @@ void ackCommand(String cmdId) {
                                 <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Modul</th>
                                 <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:20%;">Pin Modul</th>
                                 <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:25%;">Pin ESP32-C3</th>
-                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Keterangan &amp; Catu Daya</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Keterangan &amp; Wiring Sambungan</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td rowspan="5" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
-                                    Microphone<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">INMP441 (I2S Mic)</span>
+                                    Microphone<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">INMP441</span>
                                 </td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>VDD</code> / <code>GND</code></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>3.3V</strong> / <strong>GND</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Catu daya 3.3V stabil &amp; Ground bersama</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Catu daya stabil 3.3V &amp; Ground bersama</td>
                             </tr>
                             <tr>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><code>L/R</code></td>
@@ -3131,14 +3359,14 @@ void ackCommand(String cmdId) {
                         </thead>
                         <tbody>
                             <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Utama</strong> (Bicara / Wi-Fi)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Utama</strong> (Bicara / Fast Mode Switch)</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 3</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);"><em>Active Low</em>: Hubungkan kaki tombol ke GPIO 3 &amp; kaki lainnya ke <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);"><em>Active Low</em>: Kaki 1 ke GPIO 3 &amp; Kaki 2 ke <strong>GND</strong></td>
                             </tr>
                             <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Sekunder</strong> (Hands-free / Reset)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Sekunder</strong> (Hands-free / Reset SSID)</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 2</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);"><em>Active Low</em>: Hubungkan kaki tombol ke GPIO 2 &amp; kaki lainnya ke <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);"><em>Active Low</em>: Kaki 1 ke GPIO 2 &amp; Kaki 2 ke <strong>GND</strong></td>
                             </tr>
                             <tr>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Sensor Pembagi Tegangan Baterai 1S</strong></td>
@@ -3147,83 +3375,6 @@ void ackCommand(String cmdId) {
                             </tr>
                         </tbody>
                     </table>
-                </div>
-            </div>
-
-            
-            <!-- Section: Multi-SSID Failover & Screen Animation -->
-            <div class="doc-section" style="margin-top:28px;">
-                <div class="doc-section-title">
-                    <span>📶</span> Konfigurasi Multi-SSID Backup (Failover Otomatis)
-                </div>
-                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
-                    Portal konfigurasi <code>192.168.4.1</code> menyediakan fitur fleksibel untuk keandalan jaringan internet tanpa putus serta kustomisasi visual ekspresi layar:
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-number">📶</div>
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Pilihan Mode 1 Wi-Fi vs Multi-SSID Failover (Backup Wi-Fi)</div>
-                        <div class="doc-step-desc">
-                            Pada tab <strong>Jaringan Wi-Fi</strong>, terdapat tombol pilihan mode koneksi:
-                            <ul style="margin:6px 0 0 16px; padding:0;">
-                                <li><strong>Mode 1 Wi-Fi (Utama):</strong> Menyimpan 1 jaringan Wi-Fi tetap (misal Wi-Fi rumah).</li>
-                                <li><strong>Mode Multi Wi-Fi (Failover Otomatis):</strong> Anda dapat mendaftarkan beberapa SSID sekaligus dengan sistem prioritas:
-                                    <ul style="margin:4px 0 0 16px;">
-                                        <li><strong>Prioritas 1 (Utama):</strong> Wi-Fi rumah atau router utama.</li>
-                                        <li><strong>Prioritas 2 (Cadangan 1):</strong> Hotspot pribadi dari smartphone Anda.</li>
-                                        <li><strong>Prioritas 3 (Cadangan 2):</strong> Wi-Fi kantor atau modem cadangan.</li>
-                                    </ul>
-                                </li>
-                            </ul>
-                            <div class="doc-tip" style="margin-top:8px;">
-                                <strong>💡 Sistem Failover Cerdas:</strong> Jika Wi-Fi utama mati lampu atau di luar jangkauan, ESP32 otomatis memindai dan menyambung ke Wi-Fi Cadangan dalam hitungan detik tanpa perlu masuk ke mode setup ulang!
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                
-            </div>
-
-            <!-- Section 3: Smart Voice Commands -->
-            <div class="doc-section" style="margin-top:24px;">
-                <div class="doc-section-title">
-                    <span>🗣️</span> Fitur Perintah Suara &amp; Mode Offline
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-number">1</div>
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Mode Hands-Free Cerdas</div>
-                        <div class="doc-step-desc">
-                            Bicara langsung ke mikrofon tanpa perlu memencet tombol. Sensor VAD akan mendeteksi ketika Anda berhenti bicara dan AI langsung merespons. Jika hening selama 30 detik, perangkat otomatis masuk ke mode <em>Low-Power Standby</em>.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-number">2</div>
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Pemutar Musik Lokal Offline (SPIFFS)</div>
-                        <div class="doc-step-desc">
-                            Perangkat dapat memutar lagu bawaan yang tersimpan di flash tanpa internet:<br>
-                            • <em>"Putar lagu"</em> atau <em>"Nyanyi"</em> ──> Memutar <code>song1.ogg</code><br>
-                            • <em>"Lagu dua"</em> ──> Memutar <code>song2.ogg</code><br>
-                            • <em>"Lagu tiga"</em> ──> Memutar <code>song3.ogg</code><br>
-                            • <em>"Stop"</em> atau <em>"Berhenti"</em> ──> Menghentikan pemutaran lagu
-                        </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-number">3</div>
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Reset Wi-Fi via Suara (Dua Langkah Aman)</div>
-                        <div class="doc-step-desc">
-                            Cukup ucapkan <em>"Reset wifi"</em>, lalu konfirmasi dalam waktu 15 detik dengan mengucapkan <em>"Ya"</em>. Perangkat akan menghapus kredensial Wi-Fi dan masuk kembali ke mode setup.
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
