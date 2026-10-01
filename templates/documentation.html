@@ -2302,85 +2302,100 @@ void ackCommand(String cmdId) {
                 </div>
             </div>
 
-            <!-- Section 3: Detailed Button Guide -->
+            <!-- Section 3: Detailed Button Guide (Dual Mode: XiaoZhi & Chronchi) -->
             <div class="doc-section" style="margin-top:28px;">
                 <div class="doc-section-title">
-                    <span>🎮</span> Panduan Lengkap Fungsi Ke-3 Tombol Fisik
+                    <span>🎮</span> Panduan Lengkap Fungsi Ke-3 Tombol Fisik (Dual Mode)
                 </div>
-                <div style="font-size:13px; color:var(--app-muted); margin-bottom:12px;">
-                    Setiap tombol mendukung gestur <strong>Klik 1x</strong>, <strong>Klik 2x Cepat</strong>, dan <strong>Tekan Tahan (Long Press)</strong>.
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
+                    Perangkat dilengkapi 3 tombol fisik taktil serbaguna dengan dukungan gestur cerdas (<strong>Klik 1x</strong>, <strong>Klik 2x Cepat</strong>, <strong>Klik 3x Cepat</strong>, dan <strong>Tekan Tahan / Long Press</strong>). Fungsi tombol otomatis beradaptasi sesuai mode aktif saat ini:
                 </div>
 
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                <div class="doc-tip" style="margin-bottom:16px;">
+                    <strong>🔄 Cara Berpindah Antar Mode (Switch Mode):</strong><br>
+                    • <strong>Dari XiaoZhi ke Chronchi:</strong> Tekan <strong>3x Cepat Tombol BOOT (GPIO 0)</strong> atau <strong>2x Cepat Tombol VOL DOWN (GPIO 46)</strong>.<br>
+                    • <strong>Dari Chronchi kembali ke XiaoZhi:</strong> Tekan <strong>3x Cepat Tombol BOOT (GPIO 0)</strong> atau <strong>2x Cepat Tombol VOL DOWN (GPIO 46)</strong>.
+                </div>
+
+                <!-- Sub-tabel 1: Mode XiaoZhi -->
+                <div style="font-size:14px; font-weight:700; color:var(--app-text); margin:18px 0 8px; display:flex; align-items:center; gap:6px;">
+                    <span>🤖</span> 1. Fungsi Tombol pada Mode XiaoZhi (Voice Assistant AI &amp; YouTube Multimedia)
+                </div>
+                <div style="overflow-x:auto; margin-bottom:20px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
                         <thead>
                             <tr style="background:var(--app-surface-muted); text-align:left;">
-                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Tombol & Pin</th>
-                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:20%;">Gestur</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Tombol &amp; Pin</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:18%;">Gestur</th>
                                 <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Fungsi Utama</th>
                                 <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Deskripsi / Keterangan</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                <td rowspan="4" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
                                     Tombol 1: BOOT<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 0</span>
                                 </td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Bicara / Stop / Interupsi</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
                                     • Stop lagu YouTube jika sedang diputar.<br>
-                                    • Interupsi suara AI jika sedang bicara.<br>
-                                    • Mulai mendengarkan tanpa wake-word jika standby.
+                                    • Interupsi suara AI jika AI sedang berbicara.<br>
+                                    • Mulai mendengarkan tanpa wake-word jika standby (Toggle Chat).
                                 </td>
                             </tr>
                             <tr>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Auto Play Test Music</td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Langsung memutar lagu pengujian/remix santai dari YouTube.</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Putar Lagu Uji YouTube</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Langsung memutar lagu pengujian audio remix dari YouTube secara instan.</td>
                             </tr>
                             <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan (>3s)</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Reset Wi-Fi Portal</td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Membuka kembali hotspot Web Config (192.168.4.1) untuk ganti Wi-Fi.</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 3x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#8b5cf6; font-weight:600;">Switch ke Mode Chronchi</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Beralih ke mode Smartwatch / BLE companion (jam pintar).</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan (&gt;3s)</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ef4444; font-weight:600;">Reset / Portal Wi-Fi</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Membuka kembali hotspot Web Config (192.168.4.1) untuk ganti SSID / Wi-Fi.</td>
                             </tr>
 
                             <tr style="background:var(--app-surface);">
-                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
                                     Tombol 2: VOL UP<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 14</span>
                                 </td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Volume +10% / Zoom In</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
                                     • Naikkan volume speaker +10%.<br>
-                                    • Jika live camera aktif: Zoom In (1x → 2x → 3x).
+                                    • Jika live streaming kamera aktif di layar: Zoom In (1x → 2x → 3x hingga 10x).
                                 </td>
                             </tr>
                             <tr style="background:var(--app-surface);">
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Rotasi Layar 180°</td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Memutar tampilan layar ST7789 180 derajat seketika tanpa restart.</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Memutar tampilan layar ST7789 180 derajat seketika tanpa perlu restart.</td>
                             </tr>
                             <tr style="background:var(--app-surface);">
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Volume Maksimal (100%)</td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Mengatur volume speaker langsung ke batas tertinggi 100%.</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Mengatur volume speaker langsung ke batas tertinggi 100% MAX.</td>
                             </tr>
 
                             <tr>
-                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                <td rowspan="3" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
                                     Tombol 3: VOL DOWN<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 46</span>
                                 </td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Volume -10% / Zoom Out</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
                                     • Turunkan volume speaker -10%.<br>
-                                    • Jika live camera aktif: Zoom Out perkecil gambar.
+                                    • Jika live streaming kamera aktif di layar: Zoom Out perkecil gambar.
                                 </td>
                             </tr>
                             <tr>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#8b5cf6; font-weight:600;">Switch Mode (XiaoZhi ↔ Chronchi)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#8b5cf6; font-weight:600;">Switch ke Mode Chronchi</td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Beralih antara mode Asisten Suara AI dan mode Jam Pintar / BLE Companion.</td>
                             </tr>
                             <tr>
@@ -2391,15 +2406,292 @@ void ackCommand(String cmdId) {
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Sub-tabel 2: Mode Chronchi -->
+                <div style="font-size:14px; font-weight:700; color:var(--app-text); margin:18px 0 8px; display:flex; align-items:center; gap:6px;">
+                    <span>⌚</span> 2. Fungsi Tombol pada Mode Chronchi (Smartwatch &amp; Phone Companion via Chronos BLE)
+                </div>
+                <div style="overflow-x:auto; margin-bottom:16px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Tombol &amp; Pin</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:18%;">Gestur</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Fungsi Utama</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Deskripsi / Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="4" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    Tombol 1: BOOT<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 0</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Ganti Layar (Cycle Screen)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    Berpindah layar secara berurutan:<br>
+                                    <strong>Jam Utama ➔ Navigasi Maps ➔ Notifikasi ➔ Cuaca ➔ Kontrol Musik ➔ Status HP ➔ kembali ke Jam</strong>.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Toggle Dark / Light Mode</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Mengganti mode warna tema tampilan jam (Gelap / Terang / Preset Tema).</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 3x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#8b5cf6; font-weight:600;">Switch ke Mode XiaoZhi</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Kembali ke mode Asisten Suara AI XiaoZhi.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tekan Tahan (1.5 detik)</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#ea580c; font-weight:600;">Find Phone (Cari Ponsel)</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Mengirim sinyal Bluetooth BLE ke ponsel agar berdering kencang untuk dicari saat terselip.</td>
+                            </tr>
+
+                            <tr style="background:var(--app-surface);">
+                                <td rowspan="2" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    Tombol 2: VOL UP<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 14</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Camera Shutter / Next Music</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">
+                                    • Jika kamera HP sedang dibuka: <strong>Ambil Foto (Shutter Remote Nirkabel)</strong>.<br>
+                                    • Jika pemutar musik HP sedang aktif: <strong>Lagu Berikutnya (Next Track)</strong>.
+                                </td>
+                            </tr>
+                            <tr style="background:var(--app-surface);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-brand); font-weight:600;">Rotasi Layar 180°</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Memutar tampilan layar sebesar 180 derajat seketika.</td>
+                            </tr>
+
+                            <tr>
+                                <td rowspan="2" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    Tombol 3: VOL DOWN<br><span style="font-size:11px; font-family:monospace; color:var(--app-muted);">GPIO 46</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 1x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-sky); font-weight:600;">Previous Track Musik</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Kembali ke lagu sebelumnya pada pemutar musik smartphone.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Klik 2x</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; color:#8b5cf6; font-weight:600;">Switch ke Mode XiaoZhi</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Beralih kembali ke Mode Asisten Suara AI XiaoZhi.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <!-- Section 4: Pinout Reference -->
+            <!-- Section 4: Voice Commands & Built-in Features -->
+            <div class="doc-section" style="margin-top:28px;">
+                <div class="doc-section-title">
+                    <span>🗣️</span> Daftar Lengkap Perintah Suara XiaoZhi (Voice Commands &amp; Tools)
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
+                    Anda dapat berbicara langsung ke XiaoZhi dalam bahasa Indonesia alami. Firmware telah dilengkapi berbagai tools MCP bawaan untuk mengontrol perangkat keras, media, dan sistem:
+                </div>
+
+                <div class="tool-grid">
+                    <!-- Tool 1: Volume & Audio -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>🔊</span> Kontrol Suara &amp; Volume Speaker
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <em>"Naikkan volume"</em> / <em>"Keraskan suaranya"</em> (+10%)<br>
+                            • <em>"Turunkan volume"</em> / <em>"Kecilkan suaranya"</em> (-10%)<br>
+                            • <em>"Setel volume ke 80 persen"</em> (0 - 100%)<br>
+                            • <em>"Berapa volume audio sekarang?"</em>
+                        </div>
+                    </div>
+
+                    <!-- Tool 2: Kecerahan & Layar -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>💡</span> Kontrol Kecerahan &amp; Redup Layar
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <em>"Redupkan layar"</em> / <em>"Turunkan kecerahan"</em><br>
+                            • <em>"Terangkan layar"</em> / <em>"Naikkan kecerahan layar"</em><br>
+                            • <em>"Atur kecerahan layar ke 50 persen"</em> (0 - 100%)<br>
+                            • <em>"Ubah tema ke mode gelap (dark mode)"</em> / <em>"Mode terang"</em>
+                        </div>
+                    </div>
+
+                    <!-- Tool 3: Reset Wi-Fi -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>📶</span> Reset &amp; Konfigurasi Ulang Wi-Fi
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <em>"Tolong reset Wi-Fi"</em> / <em>"Ganti Wi-Fi"</em> / <em>"Buka konfigurasi Wi-Fi"</em><br>
+                            • <strong>Proteksi Dialog Konfirmasi:</strong> AI akan memastikan dengan bertanya:<br>
+                            <em>"Apakah Anda yakin ingin masuk ke mode konfigurasi Wi-Fi? Jawab ya untuk konfirmasi, atau batal."</em><br>
+                            Setelah dijawab <em>"Ya"</em>, hotspot setup otomatis aktif.
+                        </div>
+                    </div>
+
+                    <!-- Tool 4: Musik YouTube -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>🎵</span> Pemutaran Musik YouTube Streaming
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <em>"Putar lagu [judul lagu / nama artis]"</em> (misal: <em>"Putar lagu Bohemian Rhapsody"</em>)<br>
+                            • <em>"Putar musik santai lofi"</em> / <em>"Putar lagu dangdut terbaru"</em><br>
+                            • <em>"Hentikan musik"</em> / klik 1x tombol BOOT untuk stop musik.<br>
+                            • Audio ditranscode ke Ogg/Opus mono 24kHz super hemat bandwidth.
+                        </div>
+                    </div>
+
+                    <!-- Tool 5: Kamera AI & Vision -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>📷</span> Kamera AI, Vision &amp; Live Streaming
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <strong>Vision AI:</strong> <em>"Coba lihat apa yang saya pegang"</em>, <em>"Jelaskan benda ini"</em>.<br>
+                            • <strong>Live Streaming Layar:</strong> <em>"Mulai live streaming kamera"</em> / <em>"Tampilkan kamera di layar"</em>.<br>
+                            • <strong>Zoom Kamera:</strong> <em>"Zoom in kamera"</em> / <em>"Zoom out kamera"</em> (hingga 10x).<br>
+                            • <strong>Mode Cermin:</strong> <em>"Ubah jadi cermin"</em> / <em>"Matikan mode cermin"</em>.<br>
+                            • <strong>Resolusi:</strong> <em>"Ubah resolusi ke VGA (640x480)"</em> / <em>"Ubah ke QVGA"</em>.<br>
+                            • <strong>Tutup Kamera:</strong> <em>"Tutup kamera"</em> / <em>"Hentikan streaming"</em>.
+                        </div>
+                    </div>
+
+                    <!-- Tool 6: Hardware Status -->
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:16px;">
+                        <div style="font-size:14px; font-weight:700; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                            <span>ℹ️</span> Status Sistem &amp; Spesifikasi Hardware
+                        </div>
+                        <div style="font-size:12px; color:var(--app-muted); line-height:1.6;">
+                            • <em>"Berapa sisa baterai alat ini?"</em> (membaca kapasitas baterai LiPo/Li-ion).<br>
+                            • <em>"Spesifikasi alat ini apa saja?"</em> (AI menyebutkan chip ESP32-S3, RAM 8MB PSRAM, Flash 16MB, kamera OV5640, LCD ST7789, mic INMP441, audio amp MAX98357A).<br>
+                            • <em>"Apa saja fungsi tombol di perangkat ini?"</em> (AI membacakan panduan 3 tombol fisik).
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 5: Mode Chronchi Smartwatch & Phone Companion -->
+            <div class="doc-section" style="margin-top:28px;">
+                <div class="doc-section-title">
+                    <span>⌚</span> Panduan Lengkap Mode Chronchi (Smartwatch &amp; Phone Companion via Chronos App)
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
+                    Mode Chronchi mengubah ESP32-S3 Anda menjadi pendamping jam pintar (smartwatch) nirkabel yang terhubung langsung ke ponsel cerdas Anda melalui koneksi Bluetooth Low Energy (BLE) menggunakan aplikasi <strong>Chronos</strong> (gratis untuk Android dan iOS).
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Cara Menghubungkan ke Smartphone (Pairing BLE)</div>
+                        <div class="doc-step-desc">
+                            1. Unduh dan pasang aplikasi <strong>Chronos</strong> dari Google Play Store atau Apple App Store.<br>
+                            2. Pastikan Bluetooth di smartphone Anda dalam kondisi menyala (ON).<br>
+                            3. Alihkan perangkat ke <strong>Mode Chronchi</strong> (tekan <strong>3x tombol BOOT</strong> atau <strong>2x tombol VOL DOWN</strong>).<br>
+                            4. Di aplikasi Chronos, masuk ke tab <strong>Watch / Devices</strong>, lalu tekan tombol <strong>Scan</strong>.<br>
+                            5. Pilih perangkat bernama <strong>Chronchi</strong> untuk menyambungkan.<br>
+                            6. Ikon Bluetooth di sudut kiri atas layar jam akan berubah menjadi <strong style="color:#22c55e;">Hijau</strong> menandakan koneksi aktif!
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Daftar 6 Layar Utama Chronchi (Dapat Diganti dengan 1x Klik Tombol BOOT)</div>
+                        <div class="doc-step-desc">
+                            <div style="margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+                                <!-- Layar 1 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">1. ⌚ Layar Jam Utama (Watchface)</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Jam digital besar (sinkron waktu otomatis dari HP, format 12h/24h).<br>
+                                        • Kalender hari dan tanggal otomatis.<br>
+                                        • Status koneksi Bluetooth BLE.<br>
+                                        • <strong>Baterai Bar Visual (Tanpa Angka):</strong> Menampilkan sisa daya dalam bentuk kapsul baterai bar (Hijau &gt;50%, Oranye &gt;20%, Merah &le;20%, dan Cyan + petir saat charging).<br>
+                                        • Smart Glance capsule di bagian bawah.
+                                    </div>
+                                </div>
+
+                                <!-- Layar 2 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">2. 💬 Layar Notifikasi HP Real-Time</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Menerima pesan masuk dari <strong>WhatsApp, Telegram, SMS, Panggilan Telepon (Caller ID), Gmail, Instagram, dll</strong>.<br>
+                                        • Menampilkan ikon aplikasi, nama pengirim, waktu masuk, dan isi pesan teks secara jelas.
+                                    </div>
+                                </div>
+
+                                <!-- Layar 3 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">3. 🗺️ Layar Navigasi Google Maps</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        Saat navigasi rute aktif di Google Maps HP:<br>
+                                        • Menampilkan ikon visual belokan dinamis (belok kiri, kanan, putar balik, bundaran, lurus).<br>
+                                        • Nama jalan yang harus dituju.<br>
+                                        • Sisa jarak belokan (misal 150m), estimasi waktu tiba (ETA), sisa durasi perjalanan, dan kecepatan kendaraan.
+                                    </div>
+                                </div>
+
+                                <!-- Layar 4 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">4. ⛅ Layar Cuaca &amp; Suhu Real-Time</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Suhu lingkungan terkini (°C) dari lokasi ponsel.<br>
+                                        • Kondisi cuaca (Cerah, Hujan, Berawan, Badai).<br>
+                                        • Suhu maksimum/minimum (High/Low), kelembapan udara (%), tekanan udara (hPa), indeks UV, dan nama kota/lokasi.
+                                    </div>
+                                </div>
+
+                                <!-- Layar 5 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">5. 🎵 Layar Kontrol Musik Smartphone</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • Mengontrol Spotify, YouTube Music, Apple Music.<br>
+                                        • Menampilkan judul lagu, nama artis, nama aplikasi musik, progress bar durasi lagu, dan status Play/Pause.<br>
+                                        • Tombol fisik dapat digunakan untuk ganti lagu (Next/Prev).
+                                    </div>
+                                </div>
+
+                                <!-- Layar 6 -->
+                                <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
+                                    <strong style="color:var(--app-brand);">6. 📱 Layar Status Ponsel (Phone Status)</strong>
+                                    <div style="font-size:12px; color:var(--app-muted); margin-top:4px; line-height:1.5;">
+                                        • <strong>Level Baterai Ponsel:</strong> Ditampilkan dalam bentuk visual progress bar horizontal (tanpa angka).<br>
+                                        • <strong>Jaringan Seluler:</strong> Menampilkan tipe jaringan ponsel (4G LTE, 5G, Wi-Fi).<br>
+                                        • <strong>Sinyal Ponsel:</strong> Indikator bar kekuatan sinyal seluler (●●●○ 3/4).
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Fitur-Fitur Spesial Tambahan Chronchi</div>
+                        <div class="doc-step-desc">
+                            • <strong>🔍 Find Phone (Cari Ponsel):</strong> Tekan tahan Tombol BOOT selama 1.5 detik. Ponsel Anda akan langsung berdering keras meskipun sedang dalam mode diam/silent, memudahkan Anda menemukan ponsel yang terselip.<br>
+                            • <strong>📸 Wireless Camera Remote Shutter:</strong> Buka aplikasi kamera di smartphone Anda, lalu klik 1x Tombol VOL UP (GPIO 14) untuk mengambil foto tanpa perlu menyentuh layar HP.<br>
+                            • <strong>⏰ Smart Alarm Alert:</strong> Menampilkan peringatan alarm bergetar secara otomatis pada layar saat jadwal alarm di aplikasi Chronos berbunyi.<br>
+                            • <strong>🎨 Kustomisasi Tema Visual:</strong> Sesuaikan warna aksen jam dan mode Light/Dark langsung dari menu Chronos atau klik 2x Tombol BOOT.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 6: Pinout Reference -->
             <div class="doc-section" style="margin-top:24px;">
                 <div class="doc-section-title">
                     <span>📌</span> Referensi Pinout Hardware ESP32-S3
                 </div>
                 <div class="doc-step-desc" style="margin-bottom:14px;">
-                    Tabel pemetaan pin GPIO hardware untuk ESP32-S3 N16R8 (Simplex Dual I2S Bus dan Tombol Kendali):
+                    Tabel pemetaan pin GPIO hardware untuk ESP32-S3 N16R8 (Simplex Dual I2S Bus, Layar ST7789/OLED, Kamera OV5640, dan Tombol Kendali):
                 </div>
 
                 <!-- Sub-tabel 1: Audio I2S (Mic & Speaker) -->
@@ -2478,42 +2770,102 @@ void ackCommand(String cmdId) {
                     </table>
                 </div>
 
-                <!-- Sub-tabel 2: Tombol Fisik -->
+                <!-- Sub-tabel 2: Layar ST7789 SPI & OLED I2C -->
                 <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:16px 0 8px; display:flex; align-items:center; gap:6px;">
-                    <span>🔘</span> Tombol Fisik (Active Low - Internal Pull-Up)
+                    <span>🖥️</span> Pinout Modul Layar (ST7789 SPI 8-Pin &amp; OLED I2C)
+                </div>
+                <div style="overflow-x:auto; margin-bottom:16px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Tipe Layar</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin ESP32-S3</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Keterangan Jalur Sinyal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="6" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    ST7789 IPS LCD<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(240x280 / 240x240 SPI)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;">SCL / SCLK = <strong style="color:var(--app-brand);">GPIO 19</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">SPI Clock Pulsa</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;">SDA / MOSI = <strong style="color:var(--app-brand);">GPIO 20</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">SPI Master Out Slave In Data</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;">DC / RS = <strong style="color:var(--app-brand);">GPIO 47</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Data / Command Selector</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;">RES / RST = <strong style="color:var(--app-brand);">GPIO 21</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Hardware Reset Pin Layar</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;">CS = <strong style="color:var(--app-brand);">GPIO 45</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Chip Select Layar (Active Low)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;">BLK / BL = <strong style="color:var(--app-brand);">GPIO 38</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Backlight LED Control (LEDC PWM Kecerahan)</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td rowspan="2" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
+                                    OLED SSD1306 / SH1106<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(128x64 I2C)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;">SDA = <strong style="color:var(--app-brand);">GPIO 20</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">I2C Serial Data</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;">SCL = <strong style="color:var(--app-brand);">GPIO 19</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">I2C Serial Clock</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Sub-tabel 3: Tombol Fisik & Sensor Baterai -->
+                <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:16px 0 8px; display:flex; align-items:center; gap:6px;">
+                    <span>🔘</span> Tombol Fisik (Active Low) &amp; Sensor Baterai ADC
                 </div>
                 <div style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
                         <thead>
                             <tr style="background:var(--app-surface-muted); text-align:left;">
-                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Tombol</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Fungsi</th>
                                 <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:28%;">Pin ESP32-S3</th>
                                 <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Wiring &amp; Keterangan</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol BOOT / AI Voice</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol 1: BOOT / Action</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 0</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Hubungkan pin tombol ke GPIO 0 dan kaki lainnya ke <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Kaki 1 ke GPIO 0, Kaki 2 ke <strong>GND</strong> (Internal Pull-Up aktif)</td>
                             </tr>
                             <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Volume UP</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol 2: Volume UP</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 14</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Hubungkan pin tombol ke GPIO 14 dan kaki lainnya ke <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Kaki 1 ke GPIO 14, Kaki 2 ke <strong>GND</strong> (Internal Pull-Up aktif)</td>
                             </tr>
                             <tr>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol Volume DOWN</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Tombol 3: Volume DOWN</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 46</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Hubungkan pin tombol ke GPIO 46 dan kaki lainnya ke <strong>GND</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Kaki 1 ke GPIO 46, Kaki 2 ke <strong>GND</strong> (Internal Pull-Up aktif)</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Sensor Pembaca Baterai</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 3 (ADC1 CH2)</strong></td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Tegangan baterai via pembagi tegangan (voltage divider 2x 100kΩ) ke ADC</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            
-            <!-- Section: Multi-SSID Failover & Screen Animation -->
+            <!-- Section 7: Multi-SSID Failover & Screen Animation -->
             <div class="doc-section" style="margin-top:28px;">
                 <div class="doc-section-title">
                     <span>📶</span> Konfigurasi Multi-SSID Backup &amp; Gaya Animasi Layar
@@ -2554,33 +2906,8 @@ void ackCommand(String cmdId) {
                             <ul style="margin:6px 0 0 16px; padding:0;">
                                 <li><strong>Animasi Ekspresi Dinamis (LCD ST7789 IPS):</strong> Menampilkan animasi wajah AI yang hidup (mata berkedip santai saat standby, melebar saat mendengarkan, memutar bola mata saat berpikir, dan animasi mulut yang bergerak selaras dengan intonasi suara bicara).</li>
                                 <li><strong>Animasi Klasik / Minimalis (OLED SSD1306):</strong> Menampilkan animasi gelombang audio (waveform), ikon ekspresi klasik monokrom, serta teks bar status yang sangat hemat memori dan daya.</li>
-                                <li><strong>Kustomisasi Tema Jam (Mode Chronchi):</strong> Saat beralih ke mode Chronchi, tampilan jam digital memiliki beberapa pilihan tema visual (Retro Cyber, Minimal Digital, Modern Sport) yang dapat diubah tampilannya dengan gestur tombol.</li>
+                                <li><strong>Kustomisasi Tema Jam (Mode Chronchi):</strong> Saat beralih ke mode Chronchi, tampilan jam digital memiliki beberapa pilihan tema visual elegan dengan indikator baterai bar visual (tanpa angka) dan sinkronisasi data BLE.</li>
                             </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Section 4: MCP Tools for Hardware -->
-            <div class="doc-section" style="margin-top:24px;">
-                <div class="doc-section-title">
-                    <span>🤖</span> Perintah Suara & Tools MCP Bawaan
-                </div>
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">self.get_hardware_specs</div>
-                        <div class="doc-step-desc">
-                            Asisten AI dapat membaca spesifikasi teknis lengkap dari chip ESP32-S3, status PSRAM, Flash, tipe layar, dan pinout audio secara otomatis.<br>
-                            <em>Contoh perintah:</em> "Halo XiaoZhi, apa spesifikasi hardware kamu?"
-                        </div>
-                    </div>
-                </div>
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">self.get_buttons_guide</div>
-                        <div class="doc-step-desc">
-                            Asisten AI akan membacakan dan menjelaskan fungsi ketiga tombol fisik kepada Anda secara interaktif.<br>
-                            <em>Contoh perintah:</em> "Halo XiaoZhi, apa saja fungsi tombol di perangkat ini?"
                         </div>
                     </div>
                 </div>
