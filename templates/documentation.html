@@ -25,6 +25,30 @@
     },
     {
       "@type": "Question",
+      "name": "Bagaimana cara agar perangkat ESP32 bisa memutar lagu YouTube?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Untuk memutar musik YouTube secara langsung di ESP32, Anda harus membeli dan menggunakan Preset Firmware resmi berlisensi. Firmware standar generic belum memiliki decoder hardware Ogg/Opus I2S, buffer adaptif anti-stutter, dan integrasi cloud streaming YouTube XiaoZhi."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Bagaimana cara membeli Preset Firmware YouTube Xiaozhi?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Saat ini sistem pembelian mandiri otomatis langsung di website belum tersedia. Silakan hubungi atau chat admin langsung via WhatsApp (+62 895-3183-2365) untuk konfirmasi tipe board Anda, pengecekan slot lisensi, dan instruksi pembayaran."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Bagaimana cara flash Preset Firmware ke perangkat ESP32?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Gunakan fitur Web Serial Flasher di menu /web-flasher via Google Chrome atau Edge. Sambungkan ESP32 dengan kabel USB, pilih tab Preset Firmware berlisensi akun Anda, klik Hubungkan Perangkat untuk memilih port COM, lalu klik Mulai Flash Firmware hingga 100% selesai."
+      }
+    },
+    {
+      "@type": "Question",
       "name": "Hardware apa saja yang dibutuhkan untuk membuat Xiaozhi?",
       "acceptedAnswer": {
         "@type": "Answer",
@@ -3400,9 +3424,105 @@ void ackCommand(String cmdId) {
     <!-- FAQ Tab -->
     <div id="tab-faq" class="doc-tab-content">
         <div class="app-card">
+            <!-- SECTION 1: YOUTUBE MUSIC & PRESET FIRMWARE -->
             <div class="doc-section">
-                <div class="doc-section-title">
-                    <span>❓</span> Pertanyaan Umum
+                <div class="doc-section-title" style="color: var(--app-brand); border-bottom: 2px solid var(--app-border); padding-bottom: 8px;">
+                    <span>🎵</span> Pemutar Musik YouTube &amp; Preset Firmware
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title" style="font-size: 15px; font-weight: 700; color: var(--app-text);">
+                            Q: Bagaimana cara agar perangkat ESP32 saya bisa memutar lagu YouTube?
+                        </div>
+                        <div class="doc-step-desc" style="margin-top: 8px; line-height: 1.6;">
+                            <strong>A:</strong> Untuk dapat memutar musik YouTube secara langsung di speaker board ESP32, Anda <strong>wajib membeli dan menggunakan Preset Firmware resmi berlisensi</strong> (khususnya untuk varian ESP32-S3 atau ESP32-C3).
+                            <p style="margin-top: 8px;">
+                                Firmware bawaan biasa/generic open-source belum dilengkapi arsitektur transcode audio Ogg/Opus hardware, sistem buffer adaptif anti-stuttering, serta integrasi endpoint streaming cloud real-time Xiaozhi Indonesia. Preset firmware resmi sudah diuji stabil dan otomatis terhubung ke sistem YouTube Music.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title" style="font-size: 15px; font-weight: 700; color: var(--app-text);">
+                            Q: Bagaimana cara membeli Preset Firmware YouTube tersebut?
+                        </div>
+                        <div class="doc-step-desc" style="margin-top: 8px; line-height: 1.6;">
+                            <strong>A:</strong> Saat ini sistem pembelian / checkout mandiri langsung di website <strong>belum tersedia</strong>.
+                            <p style="margin-top: 8px;">
+                                Untuk memesan lisensi preset firmware, silakan <strong>langsung chat Admin</strong> untuk pengecekan tipe board Anda (ESP32-S3 atau ESP32-C3), pengecekan ketersediaan slot lisensi, dan instruksi pembayaran.
+                            </p>
+                            <p style="margin-top: 8px;">
+                                Setelah pembayaran berhasil diverifikasi oleh admin, lisensi preset firmware akan langsung diaktifkan ke akun Anda dan otomatis muncul pada menu <strong>Web Flasher</strong>.
+                            </p>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
+                                <a href="https://wa.me/6289531832365?text=Halo%20Admin%2C%20saya%20ingin%20membeli%20Preset%20Firmware%20YouTube%20Xiaozhi" 
+                                   target="_blank" 
+                                   class="app-button app-button-primary" 
+                                   style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 700;">
+                                    <span>💬</span> Chat Admin via WhatsApp (+62 895-3183-2365)
+                                </a>
+                                <a href="/chat" 
+                                   class="app-button app-button-secondary" 
+                                   style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none;">
+                                    <span>👥</span> Chat Admin di Komunitas
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title" style="font-size: 15px; font-weight: 700; color: var(--app-text);">
+                            Q: Bagaimana cara melakukan flash Preset Firmware ke board ESP32?
+                        </div>
+                        <div class="doc-step-desc" style="margin-top: 8px; line-height: 1.6;">
+                            <strong>A:</strong> Anda dapat melakukan flashing dengan sangat mudah dan instan langsung dari browser tanpa perlu menginstal Arduino IDE, VS Code, atau driver tambahan:
+                            <ol style="margin: 10px 0 10px 22px; line-height: 1.8;">
+                                <li>Buka halaman menu <strong><a href="/web-flasher" style="color: var(--app-brand); text-decoration: underline;">Web Flasher</a></strong> menggunakan peramban <strong>Google Chrome</strong> atau <strong>Microsoft Edge</strong> di PC/Laptop (atau ponsel Android via kabel USB OTG).</li>
+                                <li>Hubungkan modul ESP32 Anda ke komputer/ponsel menggunakan kabel data USB Type-C yang berkualitas.</li>
+                                <li>Pada halaman Web Flasher, pilih tab <strong>"🎯 Preset Firmware (ESP32-S3 / C3)"</strong>.</li>
+                                <li>Pilih preset firmware resmi yang telah dilisensikan oleh admin ke akun Anda (atau masukkan kode klaim lisensi jika ada).</li>
+                                <li>Klik tombol <strong>"Hubungkan Perangkat (Connect Device)"</strong>, lalu pilih port serial COM board ESP32 Anda pada jendela pop-up browser.</li>
+                                <li>Klik tombol <strong>"Mulai Flash Firmware"</strong> dan tunggu hingga proses penulisan dan verifikasi mencapai <strong>100% (Selesai)</strong>.</li>
+                                <li>Setelah flash selesai, tekan tombol reset pada board ESP32, lalu hubungkan perangkat ke jaringan Wi-Fi Anda. Board otomatis terhubung ke server dan langsung siap memutar musik saat Anda berkata: <em>"Putar lagu [Judul Lagu]"</em>!</li>
+                            </ol>
+                            <div style="margin-top: 10px;">
+                                <a href="/web-flasher" 
+                                   class="app-button app-button-primary" 
+                                   style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 700;">
+                                    <span>⚡</span> Buka Web Flasher Sekarang
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title" style="font-size: 15px; font-weight: 700; color: var(--app-text);">
+                            Q: Lagu YouTube tidak bisa diputar atau terputus di tengah jalan?
+                        </div>
+                        <div class="doc-step-desc" style="margin-top: 8px; line-height: 1.6;">
+                            <strong>A:</strong> Jika mengalami kendala playback, periksa hal-hal berikut:
+                            <ul style="margin: 8px 0 0 20px; line-height: 1.8;">
+                                <li><strong>Preset Firmware:</strong> Pastikan board Anda telah di-flash menggunakan Preset Firmware resmi (bukan firmware generic).</li>
+                                <li><strong>Izin Fitur YouTube:</strong> Pastikan status fitur YouTube Music pada akun Anda berstatus aktif (hubungi admin jika dinonaktifkan).</li>
+                                <li><strong>Wiring DAC Amplifier:</strong> Pastikan kabel modul MAX98357A terhubung kencang ke pin I2S board (ESP32-S3 default: BCLK=GPIO 26, LRC=GPIO 25, DIN=GPIO 22).</li>
+                                <li><strong>Kualitas Sinyal Wi-Fi:</strong> Pastikan koneksi Wi-Fi ESP32 stabil dan status MCP di Dashboard berstatus <strong>Online</strong>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: MCP & KNOWLEDGE BASE -->
+            <div class="doc-section" style="margin-top: 32px;">
+                <div class="doc-section-title" style="border-bottom: 2px solid var(--app-border); padding-bottom: 8px;">
+                    <span>🔌</span> Koneksi MCP &amp; Pengetahuan Belajar
                 </div>
 
                 <div class="doc-step">
@@ -3410,35 +3530,20 @@ void ackCommand(String cmdId) {
                         <div class="doc-step-title">Q: XiaoZhi tidak bisa membaca materi saya?</div>
                         <div class="doc-step-desc">
                             <strong>A:</strong> Pastikan koneksi MCP sudah <strong>Online</strong> di Dashboard. 
-                            Jika belum, ulangi langkah setup MCP.
+                            Jika belum, ulangi langkah setup MCP dan verifikasi bahwa token telah disimpan dengan benar.
                         </div>
                     </div>
                 </div>
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Q: Lagu YouTube tidak bisa diputar?</div>
-                        <div class="doc-step-desc">
-                            <strong>A:</strong> Periksa:
-                            <ul style="margin:8px 0 0 20px">
-                                <li>Fitur YouTube harus diaktifkan oleh admin</li>
-                                <li>ESP32 terhubung ke WiFi</li>
-                                <li>Speaker terhubung ke ESP32</li>
-                                <li>MCP dalam status Online</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Q: Smart home tidak merespons?</div>
+                        <div class="doc-step-title">Q: Smart home tidak merespons perintah suara?</div>
                         <div class="doc-step-desc">
                             <strong>A:</strong> Pastikan:
-                            <ul style="margin:8px 0 0 20px">
-                                <li>MCP dalam status Online</li>
-                                <li>Perintah suara sesuai dengan nama ruangan</li>
-                                <li>Gunakan perintah yang jelas seperti "Nyalakan" atau "Matikan"</li>
+                            <ul style="margin:8px 0 0 20px; line-height: 1.8;">
+                                <li>MCP dalam status Online di Dashboard.</li>
+                                <li>Perintah suara menyebutkan nama ruangan atau nama saklar yang sesuai (misal: "Nyalakan lampu ruang tamu").</li>
+                                <li>Gunakan kata kerja yang jelas seperti "Nyalakan", "Hidupkan", atau "Matikan".</li>
                             </ul>
                         </div>
                     </div>
@@ -3446,39 +3551,45 @@ void ackCommand(String cmdId) {
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Q: Berapa banyak materi yang bisa disimpan?</div>
+                        <div class="doc-step-title">Q: Berapa banyak materi belajar yang bisa disimpan?</div>
                         <div class="doc-step-desc">
-                            <strong>A:</strong> Tergantung batas yang ditetapkan. 
-                            Hubungi admin jika butuh kapasitas lebih.
+                            <strong>A:</strong> Kapasitas penyimpanan tergantung batas paket yang ditetapkan pada akun Anda. 
+                            Hubungi admin jika Anda membutuhkan kuota tambahan atau kapasitas penyimpanan dokumen yang lebih besar.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: SYSTEM & ACCOUNT -->
+            <div class="doc-section" style="margin-top: 32px;">
+                <div class="doc-section-title" style="border-bottom: 2px solid var(--app-border); padding-bottom: 8px;">
+                    <span>🔒</span> Pengaturan &amp; Keamanan Akun
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Bagaimana cara mengubah tema tampilan?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Di sidebar menu bagian bawah, terdapat pilihan <strong>"Tema"</strong>. 
+                            Anda dapat memilih tema favorit: Neo Brutalism, Dark Mode, atau Original.
                         </div>
                     </div>
                 </div>
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Q: Bagaimana cara mengubah tema?</div>
+                        <div class="doc-step-title">Q: Apakah data percakapan dan token saya aman?</div>
                         <div class="doc-step-desc">
-                            <strong>A:</strong> Di sidebar bawah, ada dropdown <strong>"Tema"</strong>. 
-                            Pilih tema yang diinginkan: Neo Brutalism, Dark, atau Original.
+                            <strong>A:</strong> Ya! Semua data sensitif dienkripsi menggunakan standar kriptografi Fernet dan PostgreSQL Row-Level Security (RLS). Token MCP dan data rahasia disimpan dalam bentuk terenkripsi kuat di server.
                         </div>
                     </div>
                 </div>
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Q: Apakah data saya aman?</div>
+                        <div class="doc-step-title">Q: Bagaimana cara menghubungi admin resmi?</div>
                         <div class="doc-step-desc">
-                            <strong>A:</strong> Ya! Semua data dienkripsi menggunakan Fernet encryption. 
-                            Token MCP disimpan dalam bentuk terenkripsi di database.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Q: Bagaimana cara menghubungi admin?</div>
-                        <div class="doc-step-desc">
-                            <strong>A:</strong> Hubungi admin melalui kontak yang tersedia di aplikasi atau melalui kontak resmi.
+                            <strong>A:</strong> Hubungi admin melalui WhatsApp di nomor <strong><a href="https://wa.me/6289531832365" target="_blank" style="color: var(--app-brand); text-decoration: underline;">+62 895-3183-2365</a></strong> atau melalui fitur Chat Komunitas di dashboard.
                         </div>
                     </div>
                 </div>
