@@ -101,6 +101,36 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
     return None
 
 
+def sanitize_youtube_query(raw_q: str) -> str:
+    """Membersihkan kata percakapan, imbuhan ASR terpotong, dan tanda baca dari query pencarian YouTube."""
+    if not raw_q:
+        return ""
+    q = raw_q.strip()
+    # 1. Bersihkan tanda kutip dan tanda baca di ujung awal/akhir
+    q = re.sub(r'^["\'\s.,!?;:-]+|["\'\s.,!?;:-]+$', '', q).strip()
+
+    # 2. Bersihkan awalan percakapan (termasuk token ASR terpotong seperti 'kan lagu', 'terin lagu')
+    prefix_pattern = (
+        r"(?i)^(?:(?:halo\s+|hi\s+|hai\s+)?(?:xiaozhi|asisten)\s*,?\s*)?"
+        r"(?:tolong\s+|coba\s+|bisa\s+|mohon\s+)?"
+        r"(?:(?:putar(?:kan)?|puter(?:in)?|setel(?:kan)?|main(?:kan)?|cari(?:kan)?|dengar(?:kan)?|play|nyala(?:kan)?|hidup(?:kan)?)\s+)?"
+        r"(?:kan\s+)?"
+        r"(?:lagu|musik|music|video|song|track)?\s*"
+        r"(?:yang\s+)?(?:judul(?:nya)?\s+|berjudul\s+|dari\s+)?"
+    )
+    q_stripped = re.sub(prefix_pattern, "", q).strip()
+    if q_stripped:
+        q = q_stripped
+
+    # 3. Bersihkan akhiran percakapan (misal 'di youtube music', 'di youtube', 'youtube', 'dari youtube')
+    suffix_pattern = r"(?i)\s*(?:di|dari|pada|lewat|via|on|from)?\s*youtube(?:\s+music)?[\s.,!?;:-]*$"
+    q = re.sub(suffix_pattern, "", q).strip()
+
+    # 4. Bersihkan sisa tanda baca di tepi
+    q = re.sub(r'^["\'\s.,!?;:-]+|["\'\s.,!?;:-]+$', '', q).strip()
+    return q or raw_q.strip()
+
+
 def youtube_search(query: str, max_results: int = 5) -> list:
     if not yt_dlp:
         raise ValueError("yt_dlp tidak tersedia.")
@@ -170,12 +200,7 @@ def youtube_search(query: str, max_results: int = 5) -> list:
             logger.warning("Playlist extraction for %s failed (%s), fallback to search", playlist_id, exc)
 
     # 3. Clean search keywords: strip conversational prefixes & suffixes
-    clean_q = re.sub(
-        r"(?i)^(?:tolong\s+)?(?:putar(?:kan)?|setel(?:kan)?|mainkan|cari(?:kan)?|dengarkan|play)\s+(?:lagu|musik|video)?\s*",
-        "",
-        raw_q,
-    ).strip()
-    clean_q = re.sub(r"(?i)\s+(?:di\s+)?youtube(?:\s+music)?$", "", clean_q).strip()
+    clean_q = sanitize_youtube_query(raw_q)
     target_q = clean_q if clean_q else raw_q
 
     ydl_opts = {
@@ -477,11 +502,11 @@ async def _stream_opus_audio(
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
+        "-user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     ]
     if start_sec > 0:
         cmd.extend(["-ss", f"{start_sec:.2f}"])
     cmd.extend([
-        "-re",
         "-i", source_url,
         "-vn",
         "-ac", "1",
@@ -505,11 +530,14 @@ async def _stream_opus_audio(
     )
 
     total_bytes = 0
+    last_logged_bytes = 0
+    end_reason = "finished"
     logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
     try:
         while True:
             if session and session.abort_event.is_set():
                 logger.info(f"Stream aborted by admin for video {video_id}")
+                end_reason = "aborted"
                 break
             chunk = await proc.stdout.read(1536)
             if not chunk:
@@ -518,16 +546,19 @@ async def _stream_opus_audio(
             total_bytes += len(chunk)
             if session:
                 session.record_chunk(len(chunk))
-            if total_bytes % (1536 * 50) == 0:
+            if total_bytes - last_logged_bytes >= 76800:
                 logger.info(f"YouTube stream for {video_id}: sent {total_bytes // 1024} KB")
+                last_logged_bytes = total_bytes
             yield chunk
     except (asyncio.CancelledError, GeneratorExit) as exc:
+        end_reason = "cancelled"
         logger.warning(f"YouTube stream for {video_id} client disconnected or cancelled after {total_bytes} bytes")
     except Exception as exc:
+        end_reason = "error"
         logger.error(f"YouTube stream for {video_id} error after {total_bytes} bytes: {exc}")
     finally:
         if session:
-            playback_tracker.end_session(session.session_id)
+            playback_tracker.end_session(session.session_id, reason=end_reason)
         if proc.returncode is None:
             try:
                 proc.kill()
@@ -817,15 +848,8 @@ async def audio_play_direct(
     q = (q or "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Query required")
-    try:
-        results = youtube_search(q, max_results=1)
-        if not results:
-            raise HTTPException(status_code=404, detail="Song not found")
-        
-        vid = results[0]["video_id"]
-        title = results[0]["title"]
-        store = get_store()
 
+    try:
         # Extract device MAC
         device_mac = (mac or "").strip()
         if not device_mac and hasattr(request, "headers"):
@@ -838,7 +862,8 @@ async def audio_play_direct(
                 request.headers.get("mac", "")
             ).strip()
 
-        # Resolve owner
+        # Resolve owner first so playlist intents can be handled
+        store = get_store()
         resolved_owner_id = owner_id
         if not resolved_owner_id and token:
             owner = store.find_user_by_mcp_token(token)
@@ -853,6 +878,45 @@ async def audio_play_direct(
                     resolved_owner_id = su["id"]
             except Exception:
                 pass
+
+        vid = None
+        title = None
+
+        # Check if user requested playlist navigation (e.g. 'berikutnya di playlist', 'lagu selanjutnya', 'putar playlist')
+        if resolved_owner_id and (
+            re.search(r"(?i)\b(playlist|daftar\s*putar)\b", q) or
+            re.search(r"(?i)\b(lagu\s+)?(berikutnya|selanjutnya|next)\b", q)
+        ):
+            try:
+                user_tracks = store.get_user_playlist(resolved_owner_id) if hasattr(store, "get_user_playlist") else []
+                if user_tracks:
+                    picked_track = user_tracks[0]
+                    curr = store.get_current_audio(resolved_owner_id) if hasattr(store, "get_current_audio") else None
+                    if curr and curr.get("video_id"):
+                        curr_vid = curr["video_id"]
+                        for idx, trk in enumerate(user_tracks):
+                            if trk.get("video_id") == curr_vid:
+                                next_idx = (idx + 1) % len(user_tracks)
+                                picked_track = user_tracks[next_idx]
+                                break
+                    vid = picked_track.get("video_id")
+                    title = picked_track.get("title")
+                    if hasattr(store, "increment_playlist_play_count") and picked_track.get("id"):
+                        try:
+                            store.increment_playlist_play_count(resolved_owner_id, picked_track["id"])
+                        except Exception:
+                            pass
+                    logger.info(f"[PLAY DIRECT PLAYLIST] User {resolved_owner_id} requested playlist track: {title} ({vid})")
+            except Exception as e:
+                logger.warning("Failed to resolve playlist track: %s", e)
+
+        # Standard YouTube search if not resolved from playlist
+        if not vid:
+            results = youtube_search(q, max_results=1)
+            if not results:
+                raise HTTPException(status_code=404, detail="Song not found")
+            vid = results[0]["video_id"]
+            title = results[0]["title"]
 
         clean_mac = ""
         if device_mac:
@@ -912,6 +976,8 @@ async def audio_play_direct(
             "stream_url": stream_url,
             "owner_id": resolved_owner_id,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
