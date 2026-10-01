@@ -28,6 +28,7 @@ services:
       - LOG_LEVEL=INFO
     volumes:
       - app_data:/app/data
+      - ./xiaozhi/protected_assets/firmware:/app/xiaozhi/protected_assets/firmware:ro
     read_only: true
     tmpfs:
       - /tmp:size=128m,mode=1777

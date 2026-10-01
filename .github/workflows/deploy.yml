@@ -53,7 +53,6 @@ jobs:
           sbom: true
 
   deploy:
-    if: ${{ vars.ENABLE_PRODUCTION_DEPLOY == 'true' }}
     needs: build-and-push
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -95,4 +94,6 @@ jobs:
             curl --fail --silent --show-error \
               -H 'Host: xiaozhiscig.biz.id' \
               http://127.0.0.1:8080/login >/dev/null
+            docker exec -e PYTHONPATH=/app xiaozhi \
+              python /app/scripts/smoke_runtime_role.py
             docker logout ghcr.io >/dev/null 2>&1 || true

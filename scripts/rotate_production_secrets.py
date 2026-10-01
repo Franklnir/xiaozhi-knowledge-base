@@ -164,50 +164,62 @@ def safe_field(value: object) -> str:
     return str(value or "").replace("\t", " ").replace("\r", " ").replace("\n", " ")
 
 
-def rotate_service_credentials(cur, new_data: Fernet) -> tuple[dict[str, int], str]:
-    """Replace every device/relay credential and return a private recovery mapping."""
-    lines = ["type\tusername\tuser_id\tslot_or_room\tlabel\tboard_mac\tnew_token"]
-    counts = {"device_credentials": 0, "relay_credentials": 0}
-    device_hash_length = int(os.environ.get("MCP_TOKEN_HASH_LENGTH", "16"))
-    if not 16 <= device_hash_length <= 64:
+def reencrypt_mcp_endpoints(cur, old_data: Fernet, new_data: Fernet) -> tuple[int, int]:
+    """Preserve externally-issued WSS endpoints while rotating at-rest encryption.
+
+    The endpoint itself is issued by the XiaoZhi service and cannot be replaced
+    locally without breaking the device. Unreadable and insecure endpoints are
+    encrypted as an empty value so the bridge skips them until the owner saves a
+    newly-issued wss:// endpoint.
+    """
+    if not table_exists(cur, "xiaozhi_tokens"):
+        return 0, 0
+    hash_length = int(os.environ.get("MCP_TOKEN_HASH_LENGTH", "16"))
+    if not 16 <= hash_length <= 64:
         raise RuntimeError("MCP_TOKEN_HASH_LENGTH must be between 16 and 64")
 
-    if table_exists(cur, "xiaozhi_tokens"):
+    cur.execute(
+        "SELECT user_id, slot_number, token_ciphertext FROM xiaozhi_tokens ORDER BY user_id, slot_number FOR UPDATE"
+    )
+    restored = 0
+    quarantined = 0
+    for user_id, slot_number, ciphertext in cur.fetchall():
+        endpoint = ""
+        try:
+            endpoint = old_data.decrypt(str(ciphertext).encode("utf-8")).decode("utf-8")
+        except (InvalidToken, UnicodeDecodeError, ValueError, TypeError):
+            endpoint = ""
+
+        if endpoint.startswith("wss://"):
+            token_hash = hashlib.sha256(endpoint.encode("utf-8")).hexdigest()[:hash_length]
+            restored += 1
+        else:
+            endpoint = ""
+            token_hash = hashlib.sha256(
+                f"quarantined-mcp-slot:{user_id}:{slot_number}".encode("utf-8")
+            ).hexdigest()[:hash_length]
+            quarantined += 1
+
         cur.execute(
             """
-            SELECT t.user_id, t.slot_number, t.device_label, t.board_mac, u.username
-            FROM xiaozhi_tokens t
-            JOIN users u ON u.id = t.user_id
-            ORDER BY t.user_id, t.slot_number
-            FOR UPDATE OF t
-            """
+            UPDATE xiaozhi_tokens
+            SET token_ciphertext = %s, token_hash = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = %s AND slot_number = %s
+            """,
+            (
+                new_data.encrypt(endpoint.encode("utf-8")).decode("utf-8"),
+                token_hash,
+                user_id,
+                slot_number,
+            ),
         )
-        for user_id, slot_number, label, board_mac, username in cur.fetchall():
-            new_token = "xz_" + secrets.token_urlsafe(32)
-            new_hash = hashlib.sha256(new_token.encode("utf-8")).hexdigest()[:device_hash_length]
-            new_ciphertext = new_data.encrypt(new_token.encode("utf-8")).decode("utf-8")
-            cur.execute(
-                """
-                UPDATE xiaozhi_tokens
-                SET token_ciphertext = %s, token_hash = %s, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = %s AND slot_number = %s
-                """,
-                (new_ciphertext, new_hash, user_id, slot_number),
-            )
-            lines.append(
-                "\t".join(
-                    (
-                        "device",
-                        safe_field(username),
-                        safe_field(user_id),
-                        safe_field(slot_number),
-                        safe_field(label),
-                        safe_field(board_mac),
-                        new_token,
-                    )
-                )
-            )
-            counts["device_credentials"] += 1
+    return restored, quarantined
+
+
+def rotate_relay_credentials(cur, new_data: Fernet) -> tuple[dict[str, int], str]:
+    """Replace every application-managed relay credential and return a private mapping."""
+    lines = ["type\tusername\tuser_id\tslot_or_room\tlabel\tboard_mac\tnew_token"]
+    counts = {"relay_credentials": 0}
 
     if table_exists(cur, "relay_rooms"):
         cur.execute(
@@ -374,7 +386,10 @@ def main() -> int:
                 new_data,
                 reset_unrecoverable=allow_material_reset,
             )
-            credential_counts, credential_content = rotate_service_credentials(cur, new_data)
+            counts["mcp_endpoints"], counts["mcp_endpoints_quarantined"] = reencrypt_mcp_endpoints(
+                cur, old_data, new_data
+            )
+            credential_counts, credential_content = rotate_relay_credentials(cur, new_data)
             counts.update(credential_counts)
             counts["withdrawals"], counts["withdrawals_reset"] = reencrypt_column(
                 cur, "withdrawals", ("id",), "destination_account_encrypted", old_market, new_market

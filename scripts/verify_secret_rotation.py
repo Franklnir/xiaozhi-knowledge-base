@@ -63,6 +63,25 @@ def decrypt_column(cur, table: str, column: str, cipher: Fernet) -> int:
     return len(rows)
 
 
+def verify_mcp_endpoints(cur, cipher: Fernet) -> int:
+    cur.execute("SELECT to_regclass('public.xiaozhi_tokens')")
+    if cur.fetchone()[0] is None:
+        return 0
+    hash_length = int(os.environ.get("MCP_TOKEN_HASH_LENGTH", "16"))
+    cur.execute("SELECT token_ciphertext, token_hash FROM xiaozhi_tokens")
+    rows = cur.fetchall()
+    for ciphertext, stored_hash in rows:
+        endpoint = cipher.decrypt(str(ciphertext).encode("utf-8")).decode("utf-8")
+        if not endpoint:
+            continue
+        if not endpoint.startswith("wss://"):
+            raise RuntimeError("MCP endpoint is not secured with wss://")
+        expected_hash = hashlib.sha256(endpoint.encode("utf-8")).hexdigest()[:hash_length]
+        if not hmac.compare_digest(expected_hash, str(stored_hash)):
+            raise RuntimeError("MCP endpoint hash verification failed")
+    return len(rows)
+
+
 def firmware_files() -> list[Path]:
     roots = [Path(item) for item in required("FIRMWARE_SEARCH_ROOTS").split(os.pathsep) if item]
     found: set[Path] = set()
@@ -110,7 +129,7 @@ def main() -> int:
             market_cipher = marketplace_fernet(required("MARKETPLACE_DATA_ENCRYPTION_KEY"))
             decrypted = {
                 "materials": decrypt_column(cur, "materials", "api_url_ciphertext", data_cipher),
-                "device_tokens": decrypt_column(cur, "xiaozhi_tokens", "token_ciphertext", data_cipher),
+                "device_tokens": verify_mcp_endpoints(cur, data_cipher),
                 "relay_tokens": decrypt_column(cur, "relay_rooms", "api_token_ciphertext", data_cipher),
                 "withdrawals": decrypt_column(
                     cur, "withdrawals", "destination_account_encrypted", market_cipher

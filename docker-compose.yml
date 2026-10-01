@@ -54,6 +54,7 @@ services:
       MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-true}
     volumes:
       - ./data:/app/data
+      - ./xiaozhi/protected_assets/firmware:/app/xiaozhi/protected_assets/firmware:ro
     tmpfs:
       - /tmp:size=128m,mode=1777
     read_only: true
