@@ -376,3 +376,138 @@ def test_google_login_never_auto_links_local_account_by_email(monkeypatch):
     assert response.status_code == 303
     assert "belum+ditautkan" in response.headers["location"]
     assert store.link_called is False
+
+
+def test_login_by_username_or_email_in_sqlite_store(tmp_path):
+    from xiaozhi.database.sqlite_store import SQLiteStore
+    store = SQLiteStore(str(tmp_path / "test.db"))
+    user = store.create_user("johndoe", "SecurePassword123!")
+    store.link_google_account(user["id"], "gid_12345", "john.doe@example.com")
+
+    # 1. By exact username
+    found = store.get_user_by_identifier("johndoe")
+    assert found is not None
+    assert found["id"] == user["id"]
+
+    # 2. By username with whitespace and case
+    found = store.get_user_by_identifier("  JohnDoe  ")
+    assert found is not None
+    assert found["id"] == user["id"]
+
+    # 3. By google email
+    found = store.get_user_by_identifier("john.doe@example.com")
+    assert found is not None
+    assert found["id"] == user["id"]
+
+    # 4. By email with different case
+    found = store.get_user_by_identifier("JOHN.DOE@EXAMPLE.COM")
+    assert found is not None
+    assert found["id"] == user["id"]
+
+    # 5. Invalid characters should return None safely, never raise ValueError
+    assert store.get_user_by_identifier("invalid chars!@#") is None
+    assert store.get_user_by_identifier("ab") is None
+    assert store.get_user_by_identifier("") is None
+    assert store.get_user_by_identifier("nonexistent") is None
+
+
+def test_api_login_warns_when_account_registered_with_google(monkeypatch):
+    class GoogleRegisteredStore:
+        def get_user_by_identifier(self, identifier):
+            return {
+                "id": 99,
+                "username": "googler",
+                "role": "user",
+                "password_hash": "pbkdf2_sha256$310000$randomsalt$randomhash",
+                "registered_with_google": True,
+            }
+
+    monkeypatch.setattr(api_v1_auth, "get_store", lambda: GoogleRegisteredStore())
+    body = api_v1_auth.LoginRequest(username="googler", password="anyPassword123")
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(api_v1_auth.api_login(body, make_request()))
+
+    assert exc.value.status_code == 401
+    assert "terdaftar via Google" in exc.value.detail["message"]
+
+
+def test_google_login_seamless_register_for_new_user(monkeypatch):
+    state_nonce = "state-nonce"
+    verifier = "s" * 64
+    oidc_nonce = "oidc-nonce"
+    state = google_auth.google_oauth_serializer.dumps(
+        {
+            "action": "login",
+            "source": "web",
+            "nonce": state_nonce,
+            "oidc_nonce": oidc_nonce,
+            "pkce_challenge": google_auth._pkce_challenge(verifier),
+        }
+    )
+
+    class NewUserStore:
+        created = False
+
+        @staticmethod
+        def get_user_by_google_id(_google_id):
+            return None
+
+        @staticmethod
+        def get_user_by_email(_email):
+            return None
+
+        @staticmethod
+        def get_user_by_username(_username):
+            return None
+
+        def create_google_user(self, username, google_id, google_email):
+            self.created = True
+            return {
+                "id": 101,
+                "username": username,
+                "role": "user",
+                "google_id": google_id,
+                "google_email": google_email,
+                "registered_with_google": True,
+                "session_version": 1,
+            }
+
+        @staticmethod
+        def get_xiaozhi_token_info(_user_id):
+            return {"preview": ""}
+
+    store = NewUserStore()
+    monkeypatch.setattr(google_auth, "GOOGLE_AUTH_ENABLED", True)
+    monkeypatch.setattr(google_auth, "GOOGLE_CLIENT_ID", "client.apps.googleusercontent.com")
+    monkeypatch.setattr(google_auth, "GOOGLE_CLIENT_SECRET", "test-secret")
+    monkeypatch.setattr(
+        google_auth.requests,
+        "post",
+        lambda *args, **kwargs: type("Resp", (), {"ok": True, "status_code": 200, "json": lambda *a, **k: {"id_token": "token"}})()
+    )
+    monkeypatch.setattr(google_auth, "get_store", lambda: store)
+    monkeypatch.setattr(google_auth, "is_mcp_connected", lambda _uid: True)
+    monkeypatch.setattr(
+        google_auth.google_id_token,
+        "verify_oauth2_token",
+        lambda *args, **kwargs: {
+            "sub": "brand-new-google-sub",
+            "email": "brandnew@example.test",
+            "name": "Brand New",
+            "email_verified": True,
+            "nonce": oidc_nonce,
+        },
+    )
+
+    response = asyncio.run(
+        google_auth.google_callback(
+            _google_callback_request(state_nonce, verifier),
+            code="authorization-code",
+            state=state,
+            error=None,
+        )
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/dashboard"
+    assert store.created is True

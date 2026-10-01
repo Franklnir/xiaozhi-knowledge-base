@@ -702,8 +702,26 @@ class HFJsonStore:
         target = email.strip().lower()
         with self._lock:
             data = self._load()
-            user = next((u for u in data["users"] if str(u.get("google_email") or "").strip().lower() == target), None)
+            user = next(
+                (
+                    u for u in data["users"]
+                    if str(u.get("google_email") or "").strip().lower() == target
+                    or str(u.get("firebase_email") or "").strip().lower() == target
+                ),
+                None,
+            )
             return dict(user) if user else None
+
+    def get_user_by_identifier(self, identifier: str) -> Optional[Dict[str, Any]]:
+        target = (identifier or "").strip()
+        if not target:
+            return None
+        if "@" in target:
+            return self.get_user_by_email(target)
+        try:
+            return self.get_user_by_username(target)
+        except ValueError:
+            return None
 
     def link_google_account(self, user_id: int, google_id: str, google_email: str) -> None:
         with self._lock:

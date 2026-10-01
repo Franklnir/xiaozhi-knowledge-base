@@ -509,8 +509,22 @@ class SQLiteStore:
         if not email:
             return None
         conn = self._get_conn()
-        row = conn.execute("SELECT * FROM users WHERE LOWER(google_email) = LOWER(?)", (email.strip(),)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM users WHERE LOWER(google_email) = LOWER(?) OR LOWER(firebase_email) = LOWER(?) ORDER BY id ASC LIMIT 1",
+            (email.strip(), email.strip()),
+        ).fetchone()
         return dict(row) if row else None
+
+    def get_user_by_identifier(self, identifier: str) -> Optional[Dict[str, Any]]:
+        target = (identifier or "").strip()
+        if not target:
+            return None
+        if "@" in target:
+            return self.get_user_by_email(target)
+        try:
+            return self.get_user_by_username(target)
+        except ValueError:
+            return None
 
     def link_google_account(self, user_id: int, google_id: str, google_email: str) -> None:
         conn = self._get_conn()

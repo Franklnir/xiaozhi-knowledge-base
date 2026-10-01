@@ -27,7 +27,7 @@ logger = logging.getLogger("xiaozhi.api_v1_auth")
 # ── Request/Response Models ────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=32, pattern=r"[a-z0-9_]+")
+    username: str = Field(..., min_length=3, max_length=255)
     password: str = Field(..., min_length=6, max_length=128)
 
 
@@ -108,9 +108,18 @@ async def api_login(body: LoginRequest, request: Request):
     """
     enforce_predefined_limit(request, "login")
     store = get_store()
-    user_record = store.get_user_by_username(body.username)
+    user_record = store.get_user_by_identifier(body.username)
 
     if not user_record or not verify_password(body.password, user_record.get("password_hash", "")):
+        if user_record and user_record.get("registered_with_google"):
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "success": False,
+                    "data": None,
+                    "message": "Akun ini terdaftar via Google. Silakan masuk menggunakan tombol 'Masuk dengan Google'."
+                }
+            )
         raise HTTPException(
             status_code=401,
             detail={"success": False, "data": None, "message": "Username atau password salah."}
@@ -118,9 +127,10 @@ async def api_login(body: LoginRequest, request: Request):
 
     role = str(user_record.get("role") or "user").lower()
     user_id = int(user_record["id"])
+    actual_username = user_record["username"]
     session_version = max(1, int(user_record.get("session_version", 1) or 1))
 
-    tokens = create_token_pair(user_id, body.username, role, session_version)
+    tokens = create_token_pair(user_id, actual_username, role, session_version)
     mcp_required = (role != "admin")
     mcp_connected = bool(is_mcp_connected(user_id))
 
@@ -129,7 +139,7 @@ async def api_login(body: LoginRequest, request: Request):
         data={
             "user": {
                 "id": user_id,
-                "username": body.username,
+                "username": actual_username,
                 "role": role,
                 "firebase_uid": user_record.get("firebase_uid"),
                 "firebase_email": user_record.get("firebase_email"),
@@ -334,15 +344,6 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
                     "success": False,
                     "data": None,
                     "message": "Email sudah dipakai. Login dengan password lalu tautkan Google.",
-                },
-            )
-        if action == "login":
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "success": False,
-                    "data": None,
-                    "message": "Akun Google belum terdaftar. Daftar dengan Google terlebih dahulu.",
                 },
             )
         from xiaozhi.routers.google_auth import generate_unique_username

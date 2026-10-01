@@ -623,8 +623,22 @@ class PostgresStore:
             return None
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT * FROM users WHERE LOWER(google_email) = LOWER(%s)", (email.strip(),))
+                cur.execute(
+                    "SELECT * FROM users WHERE LOWER(google_email) = LOWER(%s) OR LOWER(firebase_email) = LOWER(%s) ORDER BY id ASC LIMIT 1",
+                    (email.strip(), email.strip()),
+                )
                 return cur.fetchone()
+
+    def get_user_by_identifier(self, identifier: str) -> Optional[Dict[str, Any]]:
+        target = (identifier or "").strip()
+        if not target:
+            return None
+        if "@" in target:
+            return self.get_user_by_email(target)
+        try:
+            return self.get_user_by_username(target)
+        except ValueError:
+            return None
 
     def link_google_account(self, user_id: int, google_id: str, google_email: str) -> None:
         with self._get_conn() as conn:

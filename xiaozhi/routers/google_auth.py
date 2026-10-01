@@ -474,7 +474,12 @@ async def google_callback(
                 "Akun Google belum ditautkan. Masuk dengan password lalu tautkan dari halaman Profil.",
                 "/login",
             )
-        return respond_error("Akun Google belum terdaftar. Pilih Daftar dengan Google terlebih dahulu.", "/login")
+        # Seamless registration if account does not exist yet
+        username = generate_unique_username(google_email, google_name, store)
+        try:
+            user_record = store.create_google_user(username, google_id, google_email)
+        except ValueError as exc:
+            return respond_error(str(exc), "/login")
 
     # User is registered / linked, proceed with role & MCP check.
     role = str(user_record.get("role") or "user").lower()

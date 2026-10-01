@@ -108,9 +108,9 @@ async def login_post(
     store = get_store()
     validate_csrf(request, csrf_token, None)
     active_mode = "search" if auth_mode == "search" else "login"
-    submitted_username = (username or "").strip().lower()
+    submitted_identifier = (username or "").strip()
     try:
-        user_record = store.get_user_by_username(username)
+        user_record = store.get_user_by_identifier(submitted_identifier)
         if user_record and verify_password(password, user_record.get("password_hash", "")):
             role = str(user_record.get("role") or "user").lower()
             user_id = int(user_record["id"])
@@ -146,21 +146,25 @@ async def login_post(
             set_session_cookie(response, request, user)
             return response
 
+        error_msg = "Username atau password salah."
+        if user_record and user_record.get("registered_with_google"):
+            error_msg = "Akun ini terdaftar via Google. Silakan masuk menggunakan tombol 'Masuk dengan Google'."
+
         return render(
             request,
             "login.html",
             {
                 "user": None,
-                "error": "Username atau password salah.",
+                "error": error_msg,
                 "success": None,
                 "active_mode": active_mode,
                 "active_page": "login",
-                "login_username": submitted_username if active_mode == "login" else "",
-                "search_username": submitted_username if active_mode == "search" else "",
+                "login_username": submitted_identifier if active_mode == "login" else "",
+                "search_username": submitted_identifier if active_mode == "search" else "",
             },
             status_code=400,
         )
-    except ValueError:
+    except Exception:
         return render(
             request,
             "login.html",
@@ -170,8 +174,8 @@ async def login_post(
                 "success": None,
                 "active_mode": active_mode,
                 "active_page": "login",
-                "login_username": submitted_username if active_mode == "login" else "",
-                "search_username": submitted_username if active_mode == "search" else "",
+                "login_username": submitted_identifier if active_mode == "login" else "",
+                "search_username": submitted_identifier if active_mode == "search" else "",
             },
             status_code=400,
         )
@@ -182,15 +186,28 @@ async def web_login_api(request: Request):
     from fastapi.responses import JSONResponse
     from xiaozhi.services.mcp_service import is_mcp_connected
     enforce_predefined_limit(request, "login")
-    body = await request.json()
-    username = str(body.get("username", "")).strip().lower()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "message": "Format data tidak valid."}, status_code=400)
+
+    identifier = str(body.get("username", "")).strip()
     password = str(body.get("password", ""))
     csrf_token = str(body.get("csrf_token", ""))
 
     validate_csrf(request, csrf_token, None)
     store = get_store()
-    user_record = store.get_user_by_username(username)
+    try:
+        user_record = store.get_user_by_identifier(identifier)
+    except Exception:
+        user_record = None
+
     if not user_record or not verify_password(password, user_record.get("password_hash", "")):
+        if user_record and user_record.get("registered_with_google"):
+            return JSONResponse({
+                "success": False,
+                "message": "Akun ini terdaftar via Google. Silakan masuk menggunakan tombol 'Masuk dengan Google'."
+            }, status_code=401)
         return JSONResponse({"success": False, "message": "Username atau password salah."}, status_code=401)
 
     role = str(user_record.get("role") or "user").lower()
