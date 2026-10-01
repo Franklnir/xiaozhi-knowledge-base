@@ -1674,7 +1674,10 @@
                 <option value="dark">Dark</option>
                 <option value="default">Original</option>
             </select>
-            <a href="/logout" class="app-button app-button-small" style="justify-content:center">Keluar</a>
+            <form action="/logout" method="POST" style="margin:0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="app-button app-button-small" style="justify-content:center;width:100%">Keluar</button>
+            </form>
         </div>
     </aside>
     {% else %}

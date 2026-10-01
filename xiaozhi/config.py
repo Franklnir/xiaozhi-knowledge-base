@@ -548,7 +548,14 @@ SEARCH_ALIASES = {
 }
 
 # ── Session & CSRF ─────────────────────────────────────────────────────────
-SESSION_COOKIE = "edusmart_session"
+# The __Host- prefix is enforced by modern browsers: Secure, Path=/, and no
+# Domain attribute.  Keep the development name on plain HTTP localhost.
+SESSION_COOKIE = (
+    "__Host-xiaozhi_session"
+    if os.getenv("ENVIRONMENT", "").lower() == "production" or bool(os.getenv("SPACE_ID"))
+    else "edusmart_session"
+)
+LEGACY_SESSION_COOKIES = ("edusmart_session", "user_session")
 LEGACY_SESSION_COOKIE = "user_session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 7
 CSRF_MAX_AGE = 60 * 60 * 4
@@ -605,6 +612,8 @@ GOOGLE_REDIRECT_URI = os.getenv(
 ).strip()
 if GOOGLE_AUTH_ENABLED and (not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET):
     raise RuntimeError("GOOGLE_CLIENT_ID dan GOOGLE_CLIENT_SECRET wajib diset saat Google OAuth aktif.")
+if GOOGLE_AUTH_ENABLED and IS_PRODUCTION and GOOGLE_REDIRECT_URI != "https://xiaozhiscig.biz.id/api/auth/google/callback":
+    raise RuntimeError("GOOGLE_REDIRECT_URI production wajib memakai callback HTTPS resmi.")
 
 # ── JWT Secret ─────────────────────────────────────────────────────────────
 JWT_SECRET = os.getenv("JWT_SECRET")

@@ -66,6 +66,7 @@
             <button id="registerSubmitBtn" type="submit" class="app-button app-button-primary app-button-full">
                 Daftar Akun
             </button>
+            {% if google_auth_enabled %}
             <div class="auth-divider">
                 <span>atau</span>
             </div>
@@ -78,6 +79,7 @@
                 </svg>
                 <span>Daftar dengan Google</span>
             </a>
+            {% endif %}
         </form>
 
         <!-- Bagian Input MCP yang Muncul Otomatis Setelah Register Sukses -->

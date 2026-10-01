@@ -1198,10 +1198,12 @@
                             Putuskan Tautan
                         </button>
                         {% endif %}
-                    {% else %}
+                    {% elif google_auth_enabled %}
                     <a href="/api/auth/google/link" class="app-button app-button-primary app-button-small" style="text-decoration:none;">
                         Tautkan Akun Google
                     </a>
+                    {% else %}
+                    <span class="app-chip app-chip-neutral app-chip-small">Google login belum aktif</span>
                     {% endif %}
                 </div>
             </div>

@@ -86,6 +86,7 @@
                 <button type="submit" class="app-button app-button-primary app-button-full">
                     Masuk
                 </button>
+                {% if google_auth_enabled %}
                 <div class="auth-divider">
                     <span>atau</span>
                 </div>
@@ -98,6 +99,7 @@
                     </svg>
                     <span>Masuk dengan Google</span>
                 </a>
+                {% endif %}
             </form>
 
             <div id="searchPanel" class="space-y-4{% if active_mode != 'search' %} hidden{% endif %}">
@@ -139,6 +141,7 @@
                 <button type="submit" class="app-button app-button-success app-button-full">
                     Daftar
                 </button>
+                {% if google_auth_enabled %}
                 <div class="auth-divider">
                     <span>atau</span>
                 </div>
@@ -151,6 +154,7 @@
                     </svg>
                     <span>Daftar dengan Google</span>
                 </a>
+                {% endif %}
             </form>
 
             <div id="cek_mcpPanel" class="space-y-4{% if active_mode != 'cek_mcp' %} hidden{% endif %}">

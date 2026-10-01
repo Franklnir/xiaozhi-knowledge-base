@@ -9,6 +9,9 @@ from itsdangerous import BadSignature, SignatureExpired
 
 from xiaozhi.config import (
     CSRF_MAX_AGE,
+    GOOGLE_AUTH_ENABLED,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
     SESSION_COOKIE,
     SESSION_MAX_AGE,
     csrf_serializer,
@@ -149,6 +152,9 @@ def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None
         "mcp_connected": mcp_connected,
         "mcp_required": mcp_required,
         "active_announcement": active_announcement,
+        "google_auth_enabled": bool(
+            GOOGLE_AUTH_ENABLED and GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+        ),
     }
     if context:
         merged.update(context)

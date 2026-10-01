@@ -5,6 +5,8 @@ Supports:
 2. Link Google Account from user profile.
 3. Unlink Google Account with confirmation and CSRF verification.
 """
+import base64
+import hashlib
 import logging
 import os
 import re
@@ -13,8 +15,10 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import requests
-from fastapi import APIRouter, Form, HTTPException, Query, Request
+from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import RedirectResponse
+from google.auth.transport import requests as google_auth_requests
+from google.oauth2 import id_token as google_id_token
 from itsdangerous import BadSignature, SignatureExpired
 
 from xiaozhi.config import (
@@ -41,25 +45,105 @@ logger = logging.getLogger("xiaozhi.google_auth")
 
 router = APIRouter(prefix="/api/auth/google", tags=["Google Auth"])
 
+OAUTH_COOKIE_PATH = "/api/auth/google"
+# These cookies are intentionally scoped to the OAuth endpoint.  __Secure-
+# requires HTTPS without imposing the Path=/ rule of the __Host- prefix.
+OAUTH_STATE_COOKIE = "__Secure-google_oauth_state" if IS_PRODUCTION else "google_oauth_state"
+OAUTH_PKCE_COOKIE = "__Secure-google_oauth_pkce" if IS_PRODUCTION else "google_oauth_pkce"
+MOBILE_SOURCES = {"mobile", "mobile_app", "app"}
+
+
+def _secure_cookie(request: Request) -> bool:
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    return IS_PRODUCTION or request.url.scheme == "https" or forwarded_proto == "https"
+
+
+def _pkce_challenge(verifier: str) -> str:
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def _set_oauth_cookies(response: RedirectResponse, request: Request, state_nonce: str, verifier: str) -> None:
+    options = {
+        "max_age": 600,
+        "httponly": True,
+        "secure": _secure_cookie(request),
+        "samesite": "lax",
+        "path": OAUTH_COOKIE_PATH,
+    }
+    response.set_cookie(OAUTH_STATE_COOKIE, state_nonce, **options)
+    response.set_cookie(OAUTH_PKCE_COOKIE, verifier, **options)
+
+
+def _clear_oauth_cookies(response: RedirectResponse) -> None:
+    options = {
+        "path": OAUTH_COOKIE_PATH,
+        "secure": IS_PRODUCTION,
+        "httponly": True,
+        "samesite": "lax",
+    }
+    response.delete_cookie(OAUTH_STATE_COOKIE, **options)
+    response.delete_cookie(OAUTH_PKCE_COOKIE, **options)
+
+
+def _normalize_source(source: str) -> str:
+    return source if source in MOBILE_SOURCES else "web"
+
+
+def _build_google_authorization(request: Request, action: str, source: str, user_id: Optional[int] = None) -> RedirectResponse:
+    state_nonce = secrets.token_urlsafe(24)
+    oidc_nonce = secrets.token_urlsafe(24)
+    verifier = secrets.token_urlsafe(64)
+    challenge = _pkce_challenge(verifier)
+    state_payload = {
+        "action": action,
+        "source": _normalize_source(source),
+        "nonce": state_nonce,
+        "oidc_nonce": oidc_nonce,
+        "pkce_challenge": challenge,
+    }
+    if user_id is not None:
+        state_payload["user_id"] = int(user_id)
+    state = google_oauth_serializer.dumps(state_payload)
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": get_google_redirect_uri(request),
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "nonce": oidc_nonce,
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+    response = RedirectResponse(
+        url=f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}",
+        status_code=303,
+    )
+    _set_oauth_cookies(response, request, state_nonce, verifier)
+    return response
+
 
 def get_google_redirect_uri(request: Request) -> str:
     """Determine the valid Google OAuth redirect URI matching Google Cloud Console configuration."""
     # Detect host and protocol from request
     forwarded_host = request.headers.get("x-forwarded-host")
     host = forwarded_host or request.headers.get("host") or ""
+    hostname = host.split(",", 1)[0].strip().split(":", 1)[0].lower()
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
 
     # Match against authorized redirect URIs in Google Cloud Console:
     # - https://xiaozhiscig.biz.id/api/auth/google/callback
     # - http://localhost:8000/api/auth/google/callback
     # - http://127.0.0.1:8000/api/auth/google/callback
-    if "127.0.0.1" in host:
+    if hostname == "127.0.0.1":
         return "http://127.0.0.1:8000/api/auth/google/callback"
-    if "localhost" in host:
+    if hostname == "localhost":
         return "http://localhost:8000/api/auth/google/callback"
     if GOOGLE_REDIRECT_URI:
         return GOOGLE_REDIRECT_URI
-    if "xiaozhiscig.biz.id" in host or os.getenv("ENVIRONMENT") == "production":
+    if hostname in {"xiaozhiscig.biz.id", "www.xiaozhiscig.biz.id"} or os.getenv("ENVIRONMENT") == "production":
         return "https://xiaozhiscig.biz.id/api/auth/google/callback"
 
     return f"{proto}://{host}/api/auth/google/callback"
@@ -102,37 +186,7 @@ async def google_login(
         return redirect_with_message("/login", "Integrasi Google belum dikonfigurasi di server.")
 
     valid_intent = "register" if intent == "register" else "login"
-
-    # State payload signed with secret key and salt
-    state_nonce = secrets.token_urlsafe(24)
-    state = google_oauth_serializer.dumps({
-        "action": valid_intent,
-        "source": source,
-        "nonce": state_nonce,
-    })
-
-    redirect_uri = get_google_redirect_uri(request)
-    params = {
-        "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": "openid email profile",
-        "state": state,
-        "access_type": "online",
-        "prompt": "select_account",
-    }
-    google_auth_url = f"https://accounts.google.com/o/oauth2/auth?{urlencode(params)}"
-    response = RedirectResponse(url=google_auth_url, status_code=303)
-    response.set_cookie(
-        "google_oauth_state_nonce",
-        state_nonce,
-        max_age=600,
-        httponly=True,
-        secure=IS_PRODUCTION,
-        samesite="lax",
-        path="/api/auth/google",
-    )
-    return response
+    return _build_google_authorization(request, valid_intent, source)
 
 
 @router.get("/link")
@@ -159,36 +213,7 @@ async def google_link(
             )
         return redirect_with_message("/profil", "Integrasi Google belum dikonfigurasi di server.")
 
-    state_nonce = secrets.token_urlsafe(24)
-    state = google_oauth_serializer.dumps({
-        "action": "link",
-        "user_id": int(user["id"]),
-        "source": source,
-        "nonce": state_nonce,
-    })
-
-    redirect_uri = get_google_redirect_uri(request)
-    params = {
-        "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": "openid email profile",
-        "state": state,
-        "access_type": "online",
-        "prompt": "select_account",
-    }
-    google_auth_url = f"https://accounts.google.com/o/oauth2/auth?{urlencode(params)}"
-    response = RedirectResponse(url=google_auth_url, status_code=303)
-    response.set_cookie(
-        "google_oauth_state_nonce",
-        state_nonce,
-        max_age=600,
-        httponly=True,
-        secure=IS_PRODUCTION,
-        samesite="lax",
-        path="/api/auth/google",
-    )
-    return response
+    return _build_google_authorization(request, "link", source, int(user["id"]))
 
 
 @router.get("/callback")
@@ -203,32 +228,62 @@ async def google_callback(
         return redirect_with_message("/login", "Integrasi Google sedang dinonaktifkan.")
     if error:
         logger.warning("Google OAuth error callback: %s", error)
-        return redirect_with_message("/login", f"Autentikasi Google dibatalkan: {error}")
+        response = redirect_with_message("/login", "Autentikasi Google dibatalkan.")
+        _clear_oauth_cookies(response)
+        return response
 
     if not code or not state:
-        return redirect_with_message("/login", "Permintaan autentikasi Google tidak lengkap.")
+        response = redirect_with_message("/login", "Permintaan autentikasi Google tidak lengkap.")
+        _clear_oauth_cookies(response)
+        return response
 
     # Validate state parameter
     try:
         state_data = google_oauth_serializer.loads(state, max_age=600)
     except (SignatureExpired, BadSignature) as exc:
         logger.warning("Invalid or expired Google OAuth state: %s", exc)
-        return redirect_with_message("/login", "Sesi autentikasi Google kedaluwarsa. Silakan coba lagi.")
+        response = redirect_with_message("/login", "Sesi autentikasi Google kedaluwarsa. Silakan coba lagi.")
+        _clear_oauth_cookies(response)
+        return response
+    if not isinstance(state_data, dict):
+        response = redirect_with_message("/login", "Sesi autentikasi Google tidak valid.")
+        _clear_oauth_cookies(response)
+        return response
 
-    action = state_data.get("action", "login")
-    is_mobile = (state_data.get("source") in ("mobile", "mobile_app", "app"))
+    action = str(state_data.get("action") or "")
+    if action not in {"login", "register", "link"}:
+        response = redirect_with_message("/login", "Aksi autentikasi Google tidak valid.")
+        _clear_oauth_cookies(response)
+        return response
+    is_mobile = state_data.get("source") in MOBILE_SOURCES
     state_nonce = str(state_data.get("nonce") or "")
-    cookie_nonce = request.cookies.get("google_oauth_state_nonce", "")
+    cookie_nonce = request.cookies.get(OAUTH_STATE_COOKIE, "")
     if not state_nonce or not cookie_nonce or not secrets.compare_digest(state_nonce, cookie_nonce):
         logger.warning("Google OAuth state cookie mismatch")
-        return redirect_with_message("/login", "Sesi autentikasi Google tidak valid. Silakan coba lagi.")
+        response = redirect_with_message("/login", "Sesi autentikasi Google tidak valid. Silakan coba lagi.")
+        _clear_oauth_cookies(response)
+        return response
+
+    verifier = request.cookies.get(OAUTH_PKCE_COOKIE, "")
+    expected_challenge = str(state_data.get("pkce_challenge") or "")
+    oidc_nonce = str(state_data.get("oidc_nonce") or "")
+    if (
+        not verifier
+        or not expected_challenge
+        or not secrets.compare_digest(_pkce_challenge(verifier), expected_challenge)
+        or not oidc_nonce
+    ):
+        logger.warning("Google OAuth PKCE or OIDC nonce is missing or invalid")
+        response = redirect_with_message("/login", "Sesi autentikasi Google tidak valid. Silakan coba lagi.")
+        _clear_oauth_cookies(response)
+        return response
 
     def respond_error(msg: str, target: str = "/login"):
         if is_mobile:
             response = RedirectResponse(url=f"espbridge://oauth/callback?error={urlencode({'msg': msg})}", status_code=303)
         else:
             response = redirect_with_message(target, msg)
-        response.delete_cookie("google_oauth_state_nonce", path="/api/auth/google")
+        _clear_oauth_cookies(response)
         return response
 
     def mobile_success_response(u: dict, r: str) -> RedirectResponse:
@@ -242,7 +297,7 @@ async def google_callback(
             "user_id": str(u["id"]),
         }
         response = RedirectResponse(url=f"espbridge://oauth/callback#{urlencode(cb_params)}", status_code=303)
-        response.delete_cookie("google_oauth_state_nonce", path="/api/auth/google")
+        _clear_oauth_cookies(response)
         return response
 
     # Exchange authorization code for tokens
@@ -254,6 +309,7 @@ async def google_callback(
         "client_secret": GOOGLE_CLIENT_SECRET,
         "redirect_uri": redirect_uri,
         "grant_type": "authorization_code",
+        "code_verifier": verifier,
     }
 
     try:
@@ -264,38 +320,43 @@ async def google_callback(
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
         return respond_error("Gagal menghubungi server Google. Coba lagi.", target)
 
-    if not token_resp.ok or "access_token" not in token_data:
-        err_msg = token_data.get("error_description") or token_data.get("error") or "Gagal menukar token Google."
-        logger.error("Google token exchange error: %s", token_data)
+    if not isinstance(token_data, dict) or not token_resp.ok or "id_token" not in token_data:
+        if not isinstance(token_data, dict):
+            token_data = {}
+        error_code = str(token_data.get("error") or "unknown_error")[:80]
+        logger.error("Google token exchange failed (status=%s, error=%s)", token_resp.status_code, error_code)
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
-        return respond_error(f"Error Google: {err_msg}", target)
+        return respond_error("Google menolak permintaan login. Silakan coba lagi.", target)
 
-    access_token = token_data["access_token"]
-
-    # Fetch Google user profile
+    # Verify signature, audience, issuer and expiry using Google's maintained
+    # certificate verifier, then bind the ID token to this browser flow by nonce.
     try:
-        userinfo_resp = requests.get(
-            "https://www.googleapis.com/oauth2/v2/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"},
-            timeout=10,
+        claims = google_id_token.verify_oauth2_token(
+            token_data["id_token"],
+            google_auth_requests.Request(),
+            GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=30,
         )
-        userinfo = userinfo_resp.json()
     except Exception as exc:
-        logger.error("Failed to fetch userinfo from Google: %s", exc)
-        target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
-        return respond_error("Gagal mengambil data profil Google.", target)
-
-    if not userinfo_resp.ok:
+        logger.warning("Google ID token verification failed: %s", type(exc).__name__)
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
         return respond_error("Gagal memverifikasi akun Google.", target)
 
-    google_id = str(userinfo.get("id") or "").strip()
-    google_email = str(userinfo.get("email") or "").strip().lower()
-    google_name = str(userinfo.get("name") or "").strip()
+    token_nonce = str(claims.get("nonce") or "")
+    google_id = str(claims.get("sub") or "").strip()
+    google_email = str(claims.get("email") or "").strip().lower()
+    google_name = str(claims.get("name") or "").strip()
+    email_verified = claims.get("email_verified") is True or claims.get("email_verified") == "true"
 
-    if not google_id or not google_email or userinfo.get("verified_email") is not True:
+    if (
+        not token_nonce
+        or not secrets.compare_digest(token_nonce, oidc_nonce)
+        or not google_id
+        or not google_email
+        or not email_verified
+    ):
         target = "/profil" if action == "link" else ("/register" if action == "register" else "/login")
-        return respond_error("Data akun Google tidak memiliki ID atau Email.", target)
+        return respond_error("Identitas akun Google tidak valid atau email belum diverifikasi.", target)
 
     store = get_store()
 
@@ -326,25 +387,24 @@ async def google_callback(
                 "msg": f"Akun Google ({google_email}) berhasil ditautkan!",
             }
             response = RedirectResponse(url=f"espbridge://oauth/callback#{urlencode(cb_params)}", status_code=303)
-            response.delete_cookie("google_oauth_state_nonce", path="/api/auth/google")
+            _clear_oauth_cookies(response)
             return response
 
         redirect = redirect_with_message("/profil", f"Akun Google ({google_email}) berhasil ditautkan!")
-        redirect.delete_cookie("google_oauth_state_nonce", path="/api/auth/google")
+        _clear_oauth_cookies(redirect)
         set_session_cookie(redirect, request, user_to_link)
         return redirect
 
     # ── Action: REGISTER DENGAN GOOGLE ─────────────────────────────────────
     if action == "register":
-        # Check if already registered by google_id or email
+        # Only an already linked Google subject may sign in directly.  A matching
+        # email alone is not proof that this browser may take over a local account.
         existing_user = store.get_user_by_google_id(google_id)
-        if not existing_user and google_email:
-            existing_user = store.get_user_by_email(google_email)
-            if existing_user:
-                try:
-                    store.link_google_account(int(existing_user["id"]), google_id, google_email)
-                except Exception:
-                    pass
+        if not existing_user and store.get_user_by_email(google_email):
+            return respond_error(
+                "Email ini sudah dipakai. Masuk dengan password lalu tautkan Google dari halaman Profil.",
+                "/login",
+            )
 
         # If already registered, seamless login!
         if existing_user:
@@ -365,15 +425,6 @@ async def google_callback(
             "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
         }
 
-        # Synchronize with Firebase
-        from xiaozhi.services.firebase_service import sync_firebase_user
-        fb_res = sync_firebase_user(user["username"], email=google_email, display_name=google_name or user["username"])
-        if fb_res:
-            try:
-                store.link_firebase_account(int(user["id"]), fb_res["firebase_uid"], fb_res["firebase_email"])
-            except Exception:
-                pass
-
         if is_mobile:
             return mobile_success_response(user, role)
 
@@ -381,12 +432,14 @@ async def google_callback(
         # Admin: NOT mandatory to enter MCP!
         if role == "admin":
             redirect = RedirectResponse(url="/admin", status_code=303)
+            _clear_oauth_cookies(redirect)
             set_session_cookie(redirect, request, user)
             return redirect
 
         # Non-admin: MCP is mandatory!
         if is_mcp_connected(user["id"]):
             redirect = RedirectResponse(url="/dashboard", status_code=303)
+            _clear_oauth_cookies(redirect)
             set_session_cookie(redirect, request, user)
             return redirect
 
@@ -405,6 +458,7 @@ async def google_callback(
                 "mcp_token_preview": token_info.get("preview", "") if token_info else "",
             }
         )
+        _clear_oauth_cookies(response)
         set_session_cookie(response, request, user)
         return response
 
@@ -412,24 +466,17 @@ async def google_callback(
     # 1. Check if user exists by google_id
     user_record = store.get_user_by_google_id(google_id)
 
-    # 2. Check if user exists by matching email
-    if not user_record and google_email:
-        user_record = store.get_user_by_email(google_email)
-        if user_record:
-            try:
-                store.link_google_account(int(user_record["id"]), google_id, google_email)
-            except Exception as exc:
-                logger.warning("Could not auto-link Google account: %s", exc)
-
-    # 3. If user is NOT registered yet, auto-register them seamlessly!
+    # Never auto-link by email. Account linking requires an authenticated local
+    # session and a separate OAuth state bound to that user ID.
     if not user_record:
-        username = generate_unique_username(google_email, google_name, store)
-        try:
-            user_record = store.create_google_user(username, google_id, google_email)
-        except ValueError as exc:
-            return respond_error(f"Gagal membuat akun Google: {exc}", "/login")
+        if store.get_user_by_email(google_email):
+            return respond_error(
+                "Akun Google belum ditautkan. Masuk dengan password lalu tautkan dari halaman Profil.",
+                "/login",
+            )
+        return respond_error("Akun Google belum terdaftar. Pilih Daftar dengan Google terlebih dahulu.", "/login")
 
-    # 4. User is registered / logged in, proceed with role & MCP check
+    # User is registered / linked, proceed with role & MCP check.
     role = str(user_record.get("role") or "user").lower()
     user = {
         "id": int(user_record["id"]),
@@ -439,27 +486,20 @@ async def google_callback(
         "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
     }
 
-    # Synchronize with Firebase
-    from xiaozhi.services.firebase_service import sync_firebase_user
-    fb_res = sync_firebase_user(user["username"], email=google_email, display_name=google_name or user["username"])
-    if fb_res:
-        try:
-            store.link_firebase_account(int(user["id"]), fb_res["firebase_uid"], fb_res["firebase_email"])
-        except Exception:
-            pass
-
     if is_mobile:
         return mobile_success_response(user, role)
 
     # Admin: never required to enter MCP!
     if role == "admin":
         redirect = RedirectResponse(url="/admin", status_code=303)
+        _clear_oauth_cookies(redirect)
         set_session_cookie(redirect, request, user)
         return redirect
 
     # Non-admin: check MCP connection
     if is_mcp_connected(user["id"]):
         redirect = RedirectResponse(url="/dashboard", status_code=303)
+        _clear_oauth_cookies(redirect)
         set_session_cookie(redirect, request, user)
         return redirect
 
@@ -478,6 +518,7 @@ async def google_callback(
             "mcp_token_preview": token_info.get("preview", "") if token_info else "",
         }
     )
+    _clear_oauth_cookies(response)
     set_session_cookie(response, request, user)
     return response
 

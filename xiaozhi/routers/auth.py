@@ -1,14 +1,15 @@
-import os
 import secrets
 from typing import Optional
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Query, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from itsdangerous import BadSignature, SignatureExpired
 
 from xiaozhi.config import (
     DEFAULT_UI_THEME,
+    IS_PRODUCTION,
+    LEGACY_SESSION_COOKIES,
     SESSION_COOKIE,
     SESSION_MAX_AGE,
     session_serializer,
@@ -27,22 +28,44 @@ from xiaozhi.dependencies import (
 router = APIRouter()
 
 
-def set_session_cookie(response: RedirectResponse, request: Request, user: dict) -> None:
+def _secure_cookie(request: Request) -> bool:
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    return IS_PRODUCTION or request.url.scheme == "https" or forwarded_proto == "https"
+
+
+def _delete_session_cookies(response: Response) -> None:
+    response.delete_cookie(
+        SESSION_COOKIE,
+        path="/",
+        secure=IS_PRODUCTION,
+        httponly=True,
+        samesite="lax",
+    )
+    for cookie_name in LEGACY_SESSION_COOKIES:
+        if cookie_name != SESSION_COOKIE:
+            response.delete_cookie(
+                cookie_name,
+                path="/",
+                secure=IS_PRODUCTION,
+                httponly=True,
+                samesite="lax",
+            )
+
+
+def set_session_cookie(response: Response, request: Request, user: dict) -> None:
     token = session_serializer.dumps({
         "id": user["id"],
         "username": user["username"],
         "session_version": user.get("session_version", 1),
     })
-    # HuggingFace Spaces: always secure, no domain restriction
-    is_hf = bool(os.getenv("SPACE_ID"))
-    secure = is_hf or request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    _delete_session_cookies(response)
     response.set_cookie(
         SESSION_COOKIE,
         token,
         max_age=SESSION_MAX_AGE,
         httponly=True,
-        secure=secure,
-        samesite="none" if is_hf else "lax",
+        secure=_secure_cookie(request),
+        samesite="lax",
         path="/",
     )
 
@@ -98,15 +121,6 @@ async def login_post(
                 "session_version": max(1, int(user_record.get("session_version", 1) or 1)),
                 "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
             }
-
-            # Synchronize with Firebase
-            from xiaozhi.services.firebase_service import sync_firebase_user
-            fb_res = sync_firebase_user(user_record["username"], password=password, email=user_record.get("google_email"), is_register=False)
-            if fb_res:
-                try:
-                    store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
-                except Exception:
-                    pass
 
             # Admin always bypasses MCP gating
             if role == "admin" or is_mcp_connected(user["id"]):
@@ -189,15 +203,6 @@ async def web_login_api(request: Request):
         "ui_theme": str(user_record.get("ui_theme") or DEFAULT_UI_THEME),
     }
 
-    # Synchronize with Firebase
-    from xiaozhi.services.firebase_service import sync_firebase_user
-    fb_res = sync_firebase_user(user_record["username"], password=password, email=user_record.get("google_email"), is_register=False)
-    if fb_res:
-        try:
-            store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
-        except Exception:
-            pass
-
     token_info = store.get_xiaozhi_token_info(user_id)
     mcp_ok = is_mcp_connected(user_id)
 
@@ -259,15 +264,6 @@ async def register_post(
             "ui_theme": DEFAULT_UI_THEME,
         }
 
-        # Synchronize with Firebase
-        from xiaozhi.services.firebase_service import sync_firebase_user
-        fb_res = sync_firebase_user(username, password=password, is_register=True)
-        if fb_res:
-            try:
-                store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
-            except Exception:
-                pass
-
         # Render register page with MCP input section smoothly shown below
         response = render(
             request,
@@ -318,15 +314,6 @@ async def web_register_api(request: Request):
             "ui_theme": DEFAULT_UI_THEME,
         }
 
-        # Synchronize with Firebase
-        from xiaozhi.services.firebase_service import sync_firebase_user
-        fb_res = sync_firebase_user(username, password=password, is_register=True)
-        if fb_res:
-            try:
-                store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
-            except Exception:
-                pass
-
         new_csrf = make_csrf_token(user)
         res = JSONResponse({
             "success": True,
@@ -344,7 +331,16 @@ async def web_register_api(request: Request):
 
 
 @router.get("/logout")
-async def logout(request: Request):
+async def logout_get():
+    """GET must not mutate a session; this also blocks cross-site logout."""
+    return redirect_with_message("/", "Gunakan tombol Keluar untuk mengakhiri sesi dengan aman.")
+
+
+@router.post("/logout")
+async def logout(request: Request, csrf_token: str = Form(...)):
+    user = get_current_user(request)
+    if user:
+        validate_csrf(request, csrf_token, user)
     response = RedirectResponse(url="/login", status_code=303)
-    response.delete_cookie(SESSION_COOKIE)
+    _delete_session_cookies(response)
     return response

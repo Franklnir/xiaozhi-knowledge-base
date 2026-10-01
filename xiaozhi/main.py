@@ -228,6 +228,9 @@ async def monitor_requests(request: Request, call_next):
         "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
         "form-action 'self'; upgrade-insecure-requests"
     )
+    if path in {"/login", "/register", "/logout"} or path.startswith("/api/auth/"):
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
     if request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower() == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 

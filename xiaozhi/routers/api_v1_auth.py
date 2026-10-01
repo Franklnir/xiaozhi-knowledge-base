@@ -2,8 +2,11 @@
 API v1 Authentication endpoints for mobile and API clients.
 Uses JWT tokens instead of session cookies.
 """
-import requests
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
+from google.auth.transport import requests as google_auth_requests
+from google.oauth2 import id_token as google_id_token
 from pydantic import BaseModel, Field
 
 from xiaozhi.config import GOOGLE_AUTH_ENABLED, GOOGLE_CLIENT_ID
@@ -18,6 +21,7 @@ from xiaozhi.dependencies import get_store
 from xiaozhi.services.mcp_service import is_mcp_connected
 
 router = APIRouter(prefix="/api/v1/auth", tags=["API v1 Auth"])
+logger = logging.getLogger("xiaozhi.api_v1_auth")
 
 
 # ── Request/Response Models ────────────────────────────────────────────────
@@ -74,15 +78,6 @@ async def api_register(body: RegisterRequest, request: Request):
     role = str(user.get("role") or "user").lower()
     session_version = max(1, int(user.get("session_version", 1) or 1))
 
-    # Synchronize with Firebase
-    from xiaozhi.services.firebase_service import sync_firebase_user
-    fb_res = sync_firebase_user(body.username, password=body.password, is_register=True)
-    if fb_res:
-        try:
-            store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
-        except Exception:
-            pass
-
     tokens = create_token_pair(user_id, body.username, role, session_version)
     mcp_required = (role != "admin")
     mcp_connected = bool(is_mcp_connected(user_id))
@@ -94,8 +89,8 @@ async def api_register(body: RegisterRequest, request: Request):
                 "id": user_id,
                 "username": body.username,
                 "role": role,
-                "firebase_uid": fb_res.get("firebase_uid") if fb_res else None,
-                "firebase_email": fb_res.get("firebase_email") if fb_res else None,
+                "firebase_uid": user.get("firebase_uid"),
+                "firebase_email": user.get("firebase_email"),
             },
             **tokens,
             "mcp_required": mcp_required,
@@ -125,15 +120,6 @@ async def api_login(body: LoginRequest, request: Request):
     user_id = int(user_record["id"])
     session_version = max(1, int(user_record.get("session_version", 1) or 1))
 
-    # Synchronize with Firebase
-    from xiaozhi.services.firebase_service import sync_firebase_user
-    fb_res = sync_firebase_user(body.username, password=body.password, email=user_record.get("google_email"), is_register=False)
-    if fb_res:
-        try:
-            store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
-        except Exception:
-            pass
-
     tokens = create_token_pair(user_id, body.username, role, session_version)
     mcp_required = (role != "admin")
     mcp_connected = bool(is_mcp_connected(user_id))
@@ -145,8 +131,8 @@ async def api_login(body: LoginRequest, request: Request):
                 "id": user_id,
                 "username": body.username,
                 "role": role,
-                "firebase_uid": fb_res.get("firebase_uid") if fb_res else user_record.get("firebase_uid"),
-                "firebase_email": fb_res.get("firebase_email") if fb_res else user_record.get("firebase_email"),
+                "firebase_uid": user_record.get("firebase_uid"),
+                "firebase_email": user_record.get("firebase_email"),
             },
             **tokens,
             "mcp_required": mcp_required,
@@ -269,30 +255,24 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
     google_name = None
 
     try:
-        resp = requests.get(
-            "https://oauth2.googleapis.com/tokeninfo",
-            params={"id_token": token_str},
-            timeout=10,
+        payload = google_id_token.verify_oauth2_token(
+            token_str,
+            google_auth_requests.Request(),
+            GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=30,
         )
-        if not resp.ok:
-            raise ValueError("ID token ditolak oleh Google.")
-        payload = resp.json()
-        issuer = str(payload.get("iss") or "")
         email_verified = payload.get("email_verified") in (True, "true", "True", "1")
-        if payload.get("aud") != GOOGLE_CLIENT_ID:
-            raise ValueError("Audience ID token tidak cocok.")
-        if issuer not in {"accounts.google.com", "https://accounts.google.com"}:
-            raise ValueError("Issuer ID token tidak valid.")
         if not email_verified:
             raise ValueError("Email Google belum terverifikasi.")
         google_id = payload.get("sub")
         google_email = (payload.get("email") or "").strip().lower()
         google_name = payload.get("name") or ""
     except Exception as exc:
+        logger.warning("Google API ID token verification failed: %s", type(exc).__name__)
         raise HTTPException(
-            status_code=502,
-            detail={"success": False, "data": None, "message": f"Gagal memverifikasi token Google: {exc}"}
-        )
+            status_code=401,
+            detail={"success": False, "data": None, "message": "Token Google tidak valid atau kedaluwarsa."},
+        ) from exc
 
     if not google_id or not google_email:
         raise HTTPException(
@@ -302,6 +282,11 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
 
     store = get_store()
     action = body.action.strip().lower()
+    if action not in {"login", "register", "link"}:
+        raise HTTPException(
+            status_code=400,
+            detail={"success": False, "data": None, "message": "Aksi autentikasi Google tidak valid."},
+        )
 
     # ── Action: LINK ──
     if action == "link":
@@ -338,18 +323,28 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
             )
 
     # ── Seamless LOGIN / REGISTER ──
-    # 1. Look up existing user by google_id or email
+    # Login and registration are intentionally distinct. Never auto-link an
+    # existing local account merely because its email matches a Google claim.
     user_record = store.get_user_by_google_id(google_id)
-    if not user_record and google_email:
-        user_record = store.get_user_by_email(google_email)
-        if user_record:
-            try:
-                store.link_google_account(int(user_record["id"]), google_id, google_email)
-            except Exception:
-                pass
-
-    # 2. If user does not exist, auto-register them seamlessly!
     if not user_record:
+        if store.get_user_by_email(google_email):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "success": False,
+                    "data": None,
+                    "message": "Email sudah dipakai. Login dengan password lalu tautkan Google.",
+                },
+            )
+        if action == "login":
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "success": False,
+                    "data": None,
+                    "message": "Akun Google belum terdaftar. Daftar dengan Google terlebih dahulu.",
+                },
+            )
         from xiaozhi.routers.google_auth import generate_unique_username
         username = generate_unique_username(google_email, google_name, store)
         try:
@@ -363,15 +358,6 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
     user_id = int(user_record["id"])
     role = str(user_record.get("role") or "user").lower()
     session_version = max(1, int(user_record.get("session_version", 1) or 1))
-
-    # Synchronize with Firebase
-    from xiaozhi.services.firebase_service import sync_firebase_user
-    fb_res = sync_firebase_user(user_record["username"], email=google_email, display_name=google_name)
-    if fb_res:
-        try:
-            store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
-        except Exception:
-            pass
 
     tokens = create_token_pair(user_id, user_record["username"], role, session_version)
     mcp_required = (role != "admin")
@@ -387,8 +373,8 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
                 "google_id": google_id,
                 "google_email": google_email,
                 "registered_with_google": bool(user_record.get("registered_with_google", False)),
-                "firebase_uid": fb_res.get("firebase_uid") if fb_res else user_record.get("firebase_uid"),
-                "firebase_email": fb_res.get("firebase_email") if fb_res else user_record.get("firebase_email"),
+                "firebase_uid": user_record.get("firebase_uid"),
+                "firebase_email": user_record.get("firebase_email"),
             },
             **tokens,
             "mcp_required": mcp_required,
