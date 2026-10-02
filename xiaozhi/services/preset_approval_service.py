@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from xiaozhi.marketplace.storage import storage_service
+from xiaozhi.marketplace.storage import storage_service, LOCAL_STORAGE_DIR
 
 logger = logging.getLogger("xiaozhi.preset_approval")
 
@@ -37,7 +37,7 @@ DEFAULT_PRESETS: Dict[str, Dict[str, Any]] = {
                 "storage_bucket": "local-private",
                 "storage_key": "protected_assets/firmware/esp32_s3_n16r8_cam_full_factory.bin.enc",
                 "size_bytes": 9651352,
-                "sha256": "43928a47fb8427f79fbc5009a933f721532f86aa5f818b248a31ea41829e7436",
+                "sha256": "3bac682cf9a943ea0d2fbf0312d48614f928da1536769117b359e0022530799f",
                 "changelog": "Rilis awal Full Factory Merged",
                 "uploaded_at": "2026-09-20T00:00:00+00:00",
                 "uploaded_by": "system",
@@ -188,6 +188,97 @@ def get_preset(preset_id: str) -> Optional[Dict[str, Any]]:
     clean_id = str(preset_id).strip().lower()
     data = _load_data()
     return data.get("presets", {}).get(clean_id)
+
+
+def sanitize_preset_for_client(preset: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """
+    Menyaring metadata preset agar aman dikirim ke browser / frontend.
+    Menghilangkan path penyimpanan internal (storage_bucket, storage_key, enc_rel_path),
+    tetapi menyertakan daftar versi lengkap yang dapat dipilih oleh pengguna beserta
+    catatan rilis (changelog) dan ukuran filenya.
+    """
+    if not preset:
+        return None
+
+    clean_p = dict(preset)
+    clean_p.pop("enc_rel_path", None)
+
+    active_ver = str(clean_p.get("active_version") or "v001").strip()
+    raw_versions = clean_p.get("versions", []) or []
+
+    safe_versions: List[Dict[str, Any]] = []
+    for v in raw_versions:
+        v_code = str(v.get("version", "")).strip()
+        sha = str(v.get("sha256", "")).strip()
+        safe_versions.append({
+            "version": v_code,
+            "filename": str(v.get("filename", "")),
+            "size_bytes": int(v.get("size_bytes", 0)),
+            "sha256_short": sha[:12] if sha else "",
+            "changelog": str(v.get("changelog", "")),
+            "uploaded_at": str(v.get("uploaded_at", "")),
+            "is_active": (v_code == active_ver),
+        })
+
+    # Urutkan versi secara descending (versi nomor tertinggi / terbaru di paling atas)
+    def _ver_sort_key(item: Dict[str, Any]) -> int:
+        match = re.search(r"(\d+)", item.get("version", ""))
+        return int(match.group(1)) if match else 0
+
+    safe_versions.sort(key=_ver_sort_key, reverse=True)
+    clean_p["versions"] = safe_versions
+    return clean_p
+
+
+def set_active_preset_version(
+    preset_id: str,
+    version: str,
+    admin_user: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Mengubah versi aktif default dari suatu preset ke salah satu versi historis yang ada.
+    Dapat digunakan oleh Admin untuk rollback atau pengujian versi lama.
+    """
+    clean_id = _clean_slug(preset_id)
+    target_ver_code = str(version).strip()
+    if not clean_id:
+        raise ValueError("ID preset tidak valid.")
+    if not target_ver_code:
+        raise ValueError("Kode versi tidak boleh kosong.")
+
+    data = _load_data()
+    presets = data.setdefault("presets", {})
+    existing = presets.get(clean_id)
+    if not existing:
+        raise ValueError(f"Preset '{clean_id}' tidak ditemukan.")
+
+    versions = existing.get("versions", [])
+    target_ver = None
+    for v in versions:
+        if str(v.get("version", "")).strip().lower() == target_ver_code.lower():
+            target_ver = v
+            break
+
+    if not target_ver:
+        raise ValueError(f"Versi '{target_ver_code}' tidak ditemukan pada preset '{clean_id}'.")
+
+    admin_name = str((admin_user or {}).get("username") or "admin")
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    existing["active_version"] = target_ver.get("version")
+    if target_ver.get("filename"):
+        existing["filename"] = target_ver.get("filename")
+    if target_ver.get("size_bytes"):
+        existing["size_bytes"] = target_ver.get("size_bytes")
+    existing["updated_at"] = now_iso
+    existing["updated_by"] = admin_name
+
+    presets[clean_id] = existing
+    _save_data(data)
+    logger.info(
+        f"Admin '{admin_name}' berhasil mengubah versi aktif preset '{clean_id}' ke '{existing['active_version']}'."
+    )
+    return existing
 
 
 def _clean_slug(text: str) -> str:
@@ -501,8 +592,9 @@ def is_user_authorized(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3
 def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_cam") -> Dict[str, Any]:
     data = _load_data()
     presets_dict = data.get("presets", {})
-    preset_info = presets_dict.get(preset_id) or DEFAULT_PRESETS.get(preset_id)
-    active_version = (preset_info or {}).get("active_version", "v001")
+    preset_raw = presets_dict.get(preset_id) or DEFAULT_PRESETS.get(preset_id)
+    preset_info = sanitize_preset_for_client(preset_raw) if preset_raw else None
+    active_version = (preset_raw or {}).get("active_version", "v001")
 
     if not user:
         return {
@@ -686,39 +778,55 @@ def list_granted_users() -> Dict[str, Any]:
     return data.get("granted_users", {})
 
 
-def get_decrypted_preset_binary(preset_id: str = "esp32s3_cam", version: Optional[str] = None) -> bytes:
+def get_preset_version_binary(
+    preset_id: str = "esp32s3_cam",
+    version: Optional[str] = None,
+) -> Tuple[bytes, Dict[str, Any]]:
     """
     Ambil bytes file .bin yang didekripsi secara streaming on-the-fly dari
-    Object Storage S3 atau protected_assets lokal.
+    Object Storage S3 atau protected_assets lokal untuk versi yang diminta (atau versi aktif).
+    Mengembalikan tuple: (raw_binary, version_metadata_dict).
+
+    Fitur Keamanan:
+    1. Validasi ketat nama versi (mencegah path traversal & injeksi).
+    2. Jika versi diminta secara eksplisit namun tidak terdaftar, proses digagalkan (tidak fallback diam-diam).
+    3. Verifikasi integritas hash SHA-256 binary hasil dekripsi terhadap checksum tersimpan.
     """
-    clean_id = str(preset_id).strip().lower()
+    clean_id = _clean_slug(preset_id)
+    if not clean_id:
+        raise ValueError("ID Preset tidak valid.")
+
     data = _load_data()
     presets_dict = data.get("presets", {})
     preset_info = presets_dict.get(clean_id) or DEFAULT_PRESETS.get(clean_id)
 
     if not preset_info:
-        raise ValueError(f"Preset tidak ditemukan: {clean_id}")
+        raise ValueError(f"Preset '{clean_id}' tidak ditemukan di sistem.")
 
     versions = preset_info.get("versions", [])
-    target_ver = None
+    target_ver: Optional[Dict[str, Any]] = None
 
-    if version:
+    if version and str(version).strip():
+        req_ver = str(version).strip()
+        if not re.match(r"^[a-zA-Z0-9_\.-]+$", req_ver):
+            raise ValueError(f"Format parameter versi tidak valid: '{req_ver}'.")
         for v in versions:
-            if v.get("version") == version:
+            if str(v.get("version", "")).strip().lower() == req_ver.lower():
                 target_ver = v
                 break
-
-    if not target_ver and versions:
+        if not target_ver:
+            raise ValueError(f"Versi '{req_ver}' tidak ditemukan pada preset '{clean_id}'.")
+    else:
         # Gunakan versi aktif terbaru
         active_code = preset_info.get("active_version")
         for v in reversed(versions):
             if v.get("version") == active_code:
                 target_ver = v
                 break
-        if not target_ver:
+        if not target_ver and versions:
             target_ver = versions[-1]
 
-    enc_bytes = None
+    enc_bytes: Optional[bytes] = None
 
     if target_ver and target_ver.get("storage_key"):
         bucket_name = target_ver.get("storage_bucket", "local-private")
@@ -726,25 +834,47 @@ def get_decrypted_preset_binary(preset_id: str = "esp32s3_cam", version: Optiona
         try:
             enc_bytes = storage_service.get_encrypted_preset_bytes(bucket_name, storage_key)
         except Exception as e:
-            logger.warning(f"Gagal mengambil dari storage_service: {e}. Mencoba jalur lokal...")
+            logger.warning(f"Gagal mengambil dari storage_service: {e}. Mencoba kandidat penyimpanan lokal...")
 
     if not enc_bytes:
-        # Fallback ke path lokal protected_assets
+        # Candidate resolution untuk versi target spesifik
+        candidates: List[Path] = []
+        if target_ver:
+            s_key = target_ver.get("storage_key") or ""
+            v_code = target_ver.get("version") or ""
+            v_fn = target_ver.get("filename") or ""
+
+            if s_key:
+                candidates.append(storage_service.get_local_firmware_path(s_key) or Path(s_key))
+                candidates.append(LOCAL_STORAGE_DIR / "private" / "presets" / clean_id / Path(s_key).name)
+                candidates.append(BASE_DIR / s_key)
+                candidates.append(PROJECT_ROOT / "xiaozhi" / s_key)
+                candidates.append(PROJECT_ROOT / s_key)
+            if v_code:
+                candidates.append(LOCAL_STORAGE_DIR / "private" / "presets" / clean_id / f"{v_code}.bin.enc")
+            if v_fn:
+                candidates.append(BASE_DIR / "protected_assets" / "firmware" / f"{v_fn}.enc")
+                candidates.append(PROJECT_ROOT / "xiaozhi" / "protected_assets" / "firmware" / f"{v_fn}.enc")
+
         enc_rel = preset_info.get("enc_rel_path") or f"protected_assets/firmware/{clean_id}.bin.enc"
-        candidates = [
+        candidates.extend([
             BASE_DIR / enc_rel,
             PROJECT_ROOT / "xiaozhi" / enc_rel,
             Path("xiaozhi") / enc_rel,
             BASE_DIR / "protected_assets" / "firmware" / Path(enc_rel).name,
-        ]
+            PROJECT_ROOT / "xiaozhi" / "protected_assets" / "firmware" / "esp32_s3_n16r8_cam_full_factory.bin.enc",
+        ])
+
         enc_path = None
         for cand in candidates:
-            if cand.exists():
+            if cand and isinstance(cand, Path) and cand.exists() and cand.is_file():
                 enc_path = cand
                 break
 
         if not enc_path:
-            raise FileNotFoundError(f"File terenkripsi firmware preset '{clean_id}' tidak ditemukan di S3 maupun penyimpanan lokal.")
+            raise FileNotFoundError(
+                f"File terenkripsi firmware preset '{clean_id}' versi '{target_ver.get('version') if target_ver else 'unknown'}' tidak ditemukan di S3 maupun penyimpanan lokal."
+            )
 
         enc_bytes = enc_path.read_bytes()
 
@@ -756,13 +886,35 @@ def get_decrypted_preset_binary(preset_id: str = "esp32s3_cam", version: Optiona
 
     candidate_secrets = _get_candidate_secrets()
     last_exc = None
+    raw_binary: Optional[bytes] = None
     for sec in candidate_secrets:
         try:
             aesgcm = _get_aesgcm(sec)
             raw_binary = aesgcm.decrypt(nonce, ciphertext, None)
-            return raw_binary
+            break
         except Exception as exc:
             last_exc = exc
 
-    logger.error("Failed to decrypt preset '%s' with all %d candidate keys: %s", clean_id, len(candidate_secrets), last_exc)
-    raise last_exc or ValueError(f"Gagal mendekripsi binary firmware preset '{clean_id}'.")
+    if raw_binary is None:
+        logger.error("Gagal mendekripsi preset '%s' dengan seluruh %d secret kandidat: %s", clean_id, len(candidate_secrets), last_exc)
+        raise last_exc or ValueError(f"Gagal mendekripsi binary firmware preset '{clean_id}'.")
+
+    # VERIFIKASI INTEGRITAS SHA-256 (PASTIKAN SECARA AMAN)
+    if target_ver and target_ver.get("sha256"):
+        expected_sha = str(target_ver.get("sha256", "")).strip().lower()
+        actual_sha = hashlib.sha256(raw_binary).hexdigest().lower()
+        if expected_sha and actual_sha != expected_sha:
+            logger.critical(
+                f"INTEGRITY FAILURE: Firmware preset '{clean_id}' versi '{target_ver.get('version')}' checksum tidak cocok! Expected: {expected_sha}, Actual: {actual_sha}"
+            )
+            raise ValueError(
+                f"Peringatan Keamanan: Verifikasi integritas firmware versi '{target_ver.get('version')}' gagal (SHA-256 mismatch). File dibatalkan demi keamanan peranti microcontroller Anda."
+            )
+
+    return raw_binary, target_ver or {}
+
+
+def get_decrypted_preset_binary(preset_id: str = "esp32s3_cam", version: Optional[str] = None) -> bytes:
+    """Wrapper kompatibilitas untuk get_preset_version_binary."""
+    raw_bytes, _ = get_preset_version_binary(preset_id, version=version)
+    return raw_bytes

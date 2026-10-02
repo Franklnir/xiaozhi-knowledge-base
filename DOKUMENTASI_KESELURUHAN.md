@@ -1503,10 +1503,11 @@ Proses flashing dilakukan sangat mudah dan instan langsung dari peramban (browse
 1. Buka menu **Web Flasher** (`/web-flasher`) menggunakan browser **Google Chrome** atau **Microsoft Edge** di PC/Laptop (atau ponsel Android via kabel USB OTG).
 2. Sambungkan board ESP32 ke komputer/ponsel menggunakan kabel data USB Type-C berkualitas.
 3. Pada halaman Web Flasher, pilih tab **"🎯 Preset Firmware (ESP32-S3 / C3)"**.
-4. Pilih preset resmi yang telah diaktifkan oleh admin pada akun Anda (atau masukkan kode klaim lisensi).
-5. Klik tombol **"Hubungkan Perangkat (Connect Device)"**, lalu pilih port serial COM board ESP32 Anda pada jendela pop-up browser.
-6. Klik tombol **"Mulai Flash Firmware"** dan tunggu hingga proses penulisan firmware mencapai **100% (Selesai)**.
-7. Setelah selesai, tekan tombol reset pada board ESP32, hubungkan ke Wi-Fi Anda. Board langsung aktif dan siap memutar lagu YouTube saat Anda mengucapkan perintah suara: *"Putar lagu [Judul Lagu]"*!
+4. Pilih preset resmi yang telah diaktifkan pada akun Anda (atau masukkan kode klaim lisensi), lalu **pilih versi firmware yang diinginkan** (tersedia opsi versi terbaru maupun arsip versi sebelumnya lengkap dengan catatan rilis changelog). Seluruh versi dilindungi enkripsi AES-256 dan verifikasi otomatis hash SHA-256 sebelum ditulis ke memori chip.
+5. Klik tombol **"⚡ Muat Preset Ini ke Flasher"**.
+6. Sambungkan perangkat dengan mengklik **"Hubungkan Perangkat (Connect Device)"**, lalu pilih port serial COM board ESP32 Anda.
+7. Klik tombol **"Mulai Flash Firmware"** dan tunggu hingga proses penulisan firmware mencapai **100% (Selesai)**.
+8. Setelah selesai, tekan tombol reset pada board ESP32 dan hubungkan ke Wi-Fi Anda. Board langsung aktif dan siap beroperasi!
 
 #### Q: Mengapa lagu YouTube tidak bisa diputar atau terputus di tengah jalan?
 **Jawaban:**
