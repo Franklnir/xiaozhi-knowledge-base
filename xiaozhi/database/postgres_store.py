@@ -1753,21 +1753,43 @@ class PostgresStore:
         return count > 0
 
     def get_today_users_activity(self, today_date: str = "") -> Dict[int, Dict[str, Any]]:
-        """Ambil ringkasan aktivitas user hari ini (stream youtube, mcp tools yang terpanggil)."""
-        if not today_date:
-            from datetime import datetime
-            today_date = datetime.now().strftime("%Y-%m-%d")
+        """Ambil ringkasan aktivitas user hari ini (stream youtube, mcp tools yang terpanggil) berbasis WIB."""
+        activity: Dict[int, Dict[str, Any]] = {}
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                sql = """
-                    SELECT owner_id, tool_name, source, user_message, xiaozhi_answer, TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
-                    FROM chat_history
-                    WHERE (TO_CHAR(created_at, 'YYYY-MM-DD') = %s OR created_at::text LIKE %s)
-                    ORDER BY id DESC
-                """
-                cur.execute(sql, (today_date, f"{today_date}%"))
+                if not today_date:
+                    cur.execute("""
+                        SELECT 
+                            owner_id, tool_name, source, user_message, xiaozhi_answer, 
+                            TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'HH24:MI') as time_str,
+                            TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+                        FROM chat_history
+                        WHERE TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') = TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD')
+                        ORDER BY id DESC
+                    """)
+                else:
+                    cur.execute("""
+                        SELECT 
+                            owner_id, tool_name, source, user_message, xiaozhi_answer, 
+                            TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'HH24:MI') as time_str,
+                            TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+                        FROM chat_history
+                        WHERE (TO_CHAR(created_at, 'YYYY-MM-DD') = %s OR created_at::text LIKE %s)
+                        ORDER BY id DESC
+                    """, (today_date, f"{today_date}%"))
                 rows = [dict(r) for r in cur.fetchall()]
-        activity: Dict[int, Dict[str, Any]] = {}
+
+                # Ambil juga riwayat pemutaran musik audio_queue hari ini
+                cur.execute("""
+                    SELECT 
+                        owner_id, title, video_id,
+                        TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'HH24:MI') as time_str
+                    FROM audio_queue
+                    WHERE TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') = TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD')
+                    ORDER BY id DESC
+                """)
+                aq_today_rows = [dict(r) for r in cur.fetchall()]
+
         for r in rows:
             uid = int(r["owner_id"])
             if uid not in activity:
@@ -1790,14 +1812,132 @@ class PostgresStore:
                     activity[uid]["tools_list"].append(tname)
             if not activity[uid]["last_tool"] and tname:
                 activity[uid]["last_tool"] = tname
-            if not activity[uid]["last_activity_time"] and r.get("created_at"):
-                raw_time = str(r["created_at"])
-                activity[uid]["last_activity_time"] = raw_time[11:16] if len(raw_time) >= 16 else raw_time
+            if not activity[uid]["last_activity_time"] and r.get("time_str"):
+                activity[uid]["last_activity_time"] = str(r["time_str"])
             if not activity[uid]["last_message_preview"]:
                 msg = str(r.get("user_message") or r.get("xiaozhi_answer") or "")
                 if msg:
                     activity[uid]["last_message_preview"] = msg[:60]
+
+        # Gabungkan pemutaran lagu audio_queue hari ini ke activity
+        for aq in aq_today_rows:
+            uid = int(aq["owner_id"])
+            if uid not in activity:
+                activity[uid] = {
+                    "tools_count": 0,
+                    "youtube_count": 0,
+                    "tools_list": [],
+                    "last_tool": "play_youtube_song",
+                    "last_activity_time": aq.get("time_str") or "",
+                    "last_message_preview": aq.get("title") or "Putar Lagu YouTube",
+                }
+            activity[uid]["youtube_count"] += 1
+            if "play_youtube_song" not in activity[uid]["tools_list"]:
+                activity[uid]["tools_list"].append("play_youtube_song")
+            if not activity[uid]["last_activity_time"] and aq.get("time_str"):
+                activity[uid]["last_activity_time"] = aq["time_str"]
+            if not activity[uid]["last_message_preview"]:
+                activity[uid]["last_message_preview"] = aq.get("title") or "Putar Lagu YouTube"
+
         return activity
+
+    def get_all_youtube_playback_stats(self) -> Dict[int, Dict[str, Any]]:
+        """Ambil statistik lengkap seluruh pemutaran musik YouTube (audio_queue & chat_history) per user berbasis WIB."""
+        stats: Dict[int, Dict[str, Any]] = {}
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    # 1. Agregasi dari audio_queue (sumber utama pemutaran lagu audio player ESP32)
+                    cur.execute("""
+                        SELECT 
+                            owner_id, 
+                            title, 
+                            video_id, 
+                            created_at,
+                            TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') as date_str,
+                            TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'HH24:MI') as time_str,
+                            TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') as today_wib,
+                            TO_CHAR((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta') - INTERVAL '1 day', 'YYYY-MM-DD') as yest_wib
+                        FROM audio_queue
+                        ORDER BY id DESC
+                    """)
+                    rows = [dict(r) for r in cur.fetchall()]
+
+            for r in rows:
+                uid = int(r["owner_id"])
+                d_str = r.get("date_str") or ""
+                t_str = r.get("time_str") or ""
+                today_wib = r.get("today_wib") or ""
+                yest_wib = r.get("yest_wib") or ""
+                if uid not in stats:
+                    if d_str == today_wib:
+                        fmt_time = f"Hari ini {t_str}"
+                    elif d_str == yest_wib:
+                        fmt_time = f"Kemarin {t_str}"
+                    elif d_str:
+                        fmt_time = f"{d_str[8:10]}/{d_str[5:7]} {t_str}"
+                    else:
+                        fmt_time = ""
+                    stats[uid] = {
+                        "total_plays": 0,
+                        "today_plays": 0,
+                        "last_title": (r.get("title") or "").strip()[:80],
+                        "last_video_id": (r.get("video_id") or "").strip(),
+                        "last_played_time": fmt_time,
+                        "last_played_at": str(r.get("created_at") or ""),
+                    }
+                stats[uid]["total_plays"] += 1
+                if d_str == today_wib:
+                    stats[uid]["today_plays"] += 1
+
+            # 2. Periksa chat_history untuk user yang memanggil tool play_youtube_song
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            owner_id, 
+                            user_message, 
+                            created_at,
+                            TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') as date_str,
+                            TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'HH24:MI') as time_str,
+                            TO_CHAR(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') as today_wib,
+                            TO_CHAR((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta') - INTERVAL '1 day', 'YYYY-MM-DD') as yest_wib
+                        FROM chat_history
+                        WHERE (tool_name ILIKE '%youtube%' OR source ILIKE '%youtube%')
+                        ORDER BY id DESC
+                    """)
+                    ch_rows = [dict(r) for r in cur.fetchall()]
+
+            for r in ch_rows:
+                uid = int(r["owner_id"])
+                d_str = r.get("date_str") or ""
+                t_str = r.get("time_str") or ""
+                today_wib = r.get("today_wib") or ""
+                yest_wib = r.get("yest_wib") or ""
+                if uid not in stats:
+                    if d_str == today_wib:
+                        fmt_time = f"Hari ini {t_str}"
+                    elif d_str == yest_wib:
+                        fmt_time = f"Kemarin {t_str}"
+                    elif d_str:
+                        fmt_time = f"{d_str[8:10]}/{d_str[5:7]} {t_str}"
+                    else:
+                        fmt_time = ""
+                    stats[uid] = {
+                        "total_plays": 0,
+                        "today_plays": 0,
+                        "last_title": (r.get("user_message") or "").strip()[:80],
+                        "last_video_id": "",
+                        "last_played_time": fmt_time,
+                        "last_played_at": str(r.get("created_at") or ""),
+                    }
+                stats[uid]["total_plays"] = max(stats[uid]["total_plays"], stats[uid]["total_plays"] + (1 if uid not in stats else 0))
+                if d_str == today_wib and stats[uid]["today_plays"] == 0:
+                    stats[uid]["today_plays"] += 1
+        except Exception as e:
+            logger.debug("Failed to calculate all youtube playback stats: %s", e)
+
+        return stats
 
     # ── User Persona & Preferences ─────────────────────────────────────────
 
