@@ -9,7 +9,7 @@ import logging
 import os
 import shutil
 import time
-from typing import AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Dict, Optional
 
 logger = logging.getLogger("xiaozhi.youtube_streamer")
 
@@ -33,6 +33,13 @@ def get_ffmpeg_binary() -> Optional[str]:
     return _FFMPEG_PATH or shutil.which("ffmpeg")
 
 
+_video_metadata_cache: Dict[str, Dict[str, Any]] = {}
+
+
+def get_cached_video_meta(video_id: str) -> Dict[str, Any]:
+    return _video_metadata_cache.get(video_id, {})
+
+
 async def extract_audio_url(video_id: str) -> tuple[Optional[str], str]:
     if not yt_dlp:
         raise RuntimeError("yt_dlp tidak tersedia di server.")
@@ -54,6 +61,16 @@ async def extract_audio_url(video_id: str) -> tuple[Optional[str], str]:
                 return None, ""
 
             title = info.get("title", "")
+            duration = int(info.get("duration") or 0)
+            dur_mins, dur_secs = divmod(duration, 60)
+            dur_fmt = f"{dur_mins:02d}:{dur_secs:02d}" if duration > 0 else ""
+
+            _video_metadata_cache[video_id] = {
+                "title": title,
+                "duration": duration,
+                "duration_formatted": dur_fmt,
+            }
+
             url = info.get("url")
 
             # Fallback to inspecting formats if top-level url is None

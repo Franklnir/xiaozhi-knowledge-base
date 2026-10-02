@@ -163,6 +163,60 @@
         background: #f1f5f9;
         border-color: #cbd5e1;
     }
+    .stream-card.status-streaming {
+        border-left: 4px solid #10b981;
+        background: #f8fafc;
+    }
+    .stream-card.status-buffering {
+        border-left: 4px solid #0284c7;
+        background: #f0f9ff;
+    }
+    .stream-card.status-interrupted {
+        border-left: 4px solid #f59e0b;
+        background: #fffbeb;
+    }
+    .stream-card.status-gap {
+        border-left: 4px solid #8b5cf6;
+        background: #faf5ff;
+    }
+    .stream-badge-streaming {
+        background: #dcfce7 !important;
+        color: #15803d !important;
+        border: 1px solid #bbf7d0 !important;
+        font-weight: 700;
+    }
+    .stream-badge-buffering {
+        background: #e0f2fe !important;
+        color: #0369a1 !important;
+        border: 1px solid #bae6fd !important;
+        font-weight: 700;
+    }
+    .stream-badge-interrupted {
+        background: #fef3c7 !important;
+        color: #b45309 !important;
+        border: 1px solid #fde68a !important;
+        font-weight: 700;
+    }
+    .stream-badge-gap {
+        background: #f3e8ff !important;
+        color: #7e22ce !important;
+        border: 1px solid #e9d5ff !important;
+        font-weight: 700;
+    }
+    .stream-progress-track {
+        width: 100%;
+        height: 4px;
+        background: #e2e8f0;
+        border-radius: 2px;
+        margin-top: 6px;
+        overflow: hidden;
+    }
+    .stream-progress-bar {
+        height: 100%;
+        background: #10b981;
+        border-radius: 2px;
+        transition: width 0.4s ease;
+    }
     .filter-pill {
         padding: 5px 12px;
         border-radius: 20px;
@@ -264,30 +318,55 @@
             {% if active_streams %}
             <div style="display:flex;flex-direction:column;gap:10px" id="activeStreamsList">
                 {% for s in active_streams %}
-                <div class="stream-card" id="stream-card-{{ s.session_id }}">
+                <div class="stream-card status-{{ s.status or 'streaming' }}" id="stream-card-{{ s.session_id }}">
                     {% if s.thumbnail_url %}
-                    <img src="{{ s.thumbnail_url }}" alt="Thumbnail" style="width:60px;height:45px;border-radius:6px;object-fit:cover;flex-shrink:0;">
+                    <img src="{{ s.thumbnail_url }}" alt="Thumbnail" style="width:64px;height:48px;border-radius:6px;object-fit:cover;flex-shrink:0;">
                     {% else %}
-                    <div style="width:60px;height:45px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🎵</div>
+                    <div style="width:64px;height:48px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">🎵</div>
                     {% endif %}
                     <div style="flex:1;min-width:0">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                            {% if s.status in ['streaming', 'buffering'] %}
                             <span class="music-bar-anim"><span></span><span></span><span></span></span>
-                            <a href="{{ s.video_url }}" target="_blank" style="font-weight:600;font-size:13.5px;color:#0f172a;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px;">
+                            {% else %}
+                            <span style="font-size:14px">⏸️</span>
+                            {% endif %}
+                            <a href="{{ s.video_url }}" target="_blank" style="font-weight:700;font-size:13.5px;color:#0f172a;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;">
                                 {{ s.title }}
                             </a>
-                            <span class="app-chip app-chip-small app-chip-success" style="font-size:10.5px">
+                            {% if s.status == 'streaming' %}
+                            <span class="app-chip app-chip-small stream-badge-streaming" style="font-size:10.5px">🟢 Sedang Streaming</span>
+                            {% elif s.status == 'buffering' %}
+                            <span class="app-chip app-chip-small stream-badge-buffering" style="font-size:10.5px">🔵 Memutar Buffer (100%)</span>
+                            {% elif s.status == 'interrupted' %}
+                            <span class="app-chip app-chip-small stream-badge-interrupted" style="font-size:10.5px">⚠️ Sinyal Terputus</span>
+                            {% elif s.status == 'gap' %}
+                            <span class="app-chip app-chip-small stream-badge-gap" style="font-size:10.5px">⏸️ Jeda Antar Lagu</span>
+                            {% else %}
+                            <span class="app-chip app-chip-small app-chip-neutral" style="font-size:10.5px">{{ s.status_label or 'Aktif' }}</span>
+                            {% endif %}
+                            <span class="app-chip app-chip-small app-chip-neutral" style="font-size:10px">
                                 ▶ {{ s.stream_type }}
                             </span>
                         </div>
-                        <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
+                        <div style="font-size:11.5px;color:#475569;margin-top:3px;margin-bottom:4px;display:flex;align-items:center;gap:6px">
+                            <span>ℹ️ <strong>Status:</strong> {{ s.status_detail or s.status_label or 'Mengalirkan audio' }}</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:12px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
                             <span>👤 <strong>{{ s.username }}</strong> (ID {{ s.user_id }})</span>
+                            <span>📟 <code>{{ s.chip or 'ESP32' }}</code></span>
                             {% if s.device_mac %}
                             <span>📡 <code>{{ s.device_mac }}</code></span>
                             {% endif %}
-                            <span>⏱ Berjalan: <strong id="elapsed-{{ s.session_id }}">{{ s.elapsed_formatted }}</strong></span>
+                            <span>📶 <strong>{{ s.rssi_label or 'Tidak Ada Sinyal' }}</strong></span>
+                            <span>⏱ <strong>Durasi:</strong> <strong id="elapsed-{{ s.session_id }}" class="stream-timer" data-started="{{ s.started_at }}" data-duration="{{ s.duration_seconds or 0 }}" data-status="{{ s.status }}">{{ s.elapsed_formatted }}{% if s.duration %} / {{ s.duration }}{% endif %}</strong></span>
                             <span>📊 {{ s.bytes_formatted }} ({{ s.bitrate }})</span>
                         </div>
+                        {% if s.duration_seconds and s.duration_seconds > 0 %}
+                        <div class="stream-progress-track">
+                            <div class="stream-progress-bar" style="width:{{ s.progress_percent or 0 }}%"></div>
+                        </div>
+                        {% endif %}
                     </div>
                     <button type="button" class="app-button app-button-small" style="background:#dc2626;color:white;flex-shrink:0" onclick="stopPlayback('{{ s.session_id }}')">
                         ⏹ Hentikan
@@ -1366,31 +1445,68 @@
             } else {
                 container.innerHTML = `
                     <div style="display:flex;flex-direction:column;gap:10px" id="activeStreamsList">
-                        ${streams.map(s => `
-                            <div class="stream-card" id="stream-card-${s.session_id}">
-                                ${s.thumbnail_url ? `<img src="${s.thumbnail_url}" alt="Thumbnail" style="width:60px;height:45px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : `<div style="width:60px;height:45px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🎵</div>`}
+                        ${streams.map(s => {
+                            let badgeClass = 'stream-badge-streaming';
+                            let badgeLabel = '🟢 Sedang Streaming';
+                            let isPlayingAnim = true;
+                            if (s.status === 'buffering') {
+                                badgeClass = 'stream-badge-buffering';
+                                badgeLabel = '🔵 Memutar Buffer (100%)';
+                            } else if (s.status === 'interrupted') {
+                                badgeClass = 'stream-badge-interrupted';
+                                badgeLabel = '⚠️ Sinyal Terputus';
+                                isPlayingAnim = false;
+                            } else if (s.status === 'gap') {
+                                badgeClass = 'stream-badge-gap';
+                                badgeLabel = '⏸️ Jeda Antar Lagu';
+                                isPlayingAnim = false;
+                            } else if (s.status && s.status !== 'streaming') {
+                                badgeClass = 'app-chip-neutral';
+                                badgeLabel = s.status_label || s.status;
+                            }
+
+                            const durationText = s.duration ? ` / ${s.duration}` : '';
+                            const progressBarHtml = (s.duration_seconds && s.duration_seconds > 0) ? `
+                                <div class="stream-progress-track">
+                                    <div class="stream-progress-bar" style="width:${s.progress_percent || 0}%"></div>
+                                </div>
+                            ` : '';
+
+                            return `
+                            <div class="stream-card status-${s.status || 'streaming'}" id="stream-card-${s.session_id}">
+                                ${s.thumbnail_url ? `<img src="${s.thumbnail_url}" alt="Thumbnail" style="width:64px;height:48px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : `<div style="width:64px;height:48px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">🎵</div>`}
                                 <div style="flex:1;min-width:0">
                                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                                        <span class="music-bar-anim"><span></span><span></span><span></span></span>
-                                        <a href="${s.video_url}" target="_blank" style="font-weight:600;font-size:13.5px;color:#0f172a;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px;">
+                                        ${isPlayingAnim ? `<span class="music-bar-anim"><span></span><span></span><span></span></span>` : `<span style="font-size:14px">⏸️</span>`}
+                                        <a href="${s.video_url}" target="_blank" style="font-weight:700;font-size:13.5px;color:#0f172a;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;">
                                             ${s.title}
                                         </a>
-                                        <span class="app-chip app-chip-small app-chip-success" style="font-size:10.5px">
+                                        <span class="app-chip app-chip-small ${badgeClass}" style="font-size:10.5px">
+                                            ${badgeLabel}
+                                        </span>
+                                        <span class="app-chip app-chip-small app-chip-neutral" style="font-size:10px">
                                             ▶ ${s.stream_type}
                                         </span>
                                     </div>
-                                    <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
+                                    <div style="font-size:11.5px;color:#475569;margin-top:3px;margin-bottom:4px;display:flex;align-items:center;gap:6px">
+                                        <span>ℹ️ <strong>Status:</strong> ${s.status_detail || s.status_label || 'Mengalirkan audio'}</span>
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:12px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
                                         <span>👤 <strong>${s.username}</strong> (ID ${s.user_id})</span>
+                                        <span>📟 <code>${s.chip || 'ESP32'}</code></span>
                                         ${s.device_mac ? `<span>📡 <code>${s.device_mac}</code></span>` : ''}
-                                        <span>⏱ Berjalan: <strong>${s.elapsed_formatted}</strong></span>
+                                        <span>📶 <strong>${s.rssi_label || 'Tidak Ada Sinyal'}</strong></span>
+                                        <span>⏱ <strong>Durasi:</strong> <strong id="elapsed-${s.session_id}" class="stream-timer" data-started="${s.started_at}" data-duration="${s.duration_seconds || 0}" data-status="${s.status}">${s.elapsed_formatted}${durationText}</strong></span>
                                         <span>📊 ${s.bytes_formatted} (${s.bitrate})</span>
                                     </div>
+                                    ${progressBarHtml}
                                 </div>
                                 <button type="button" class="app-button app-button-small" style="background:#dc2626;color:white;flex-shrink:0" onclick="stopPlayback('${s.session_id}')">
                                     ⏹ Hentikan
                                 </button>
                             </div>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </div>
                 `;
             }
@@ -1762,6 +1878,39 @@ async function viewBoardHistoryAdmin(mac) {
         content.innerHTML = `<div style="color: #ef4444; padding: 20px; text-align: center;">Error: ${err.message}</div>`;
     }
 }
+
+// ── Real-Time 1-Second Stream Duration Ticker ──────────────────────────
+setInterval(function() {
+    const timers = document.querySelectorAll('.stream-timer');
+    if (!timers || timers.length === 0) return;
+    const nowSec = Math.floor(Date.now() / 1000);
+    timers.forEach(function(el) {
+        const status = el.dataset.status;
+        if (status === 'aborted' || status === 'stopped') return;
+        const startedAt = parseFloat(el.dataset.started);
+        if (!startedAt) return;
+        const elapsed = Math.max(0, nowSec - Math.floor(startedAt));
+        const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const secs = String(elapsed % 60).padStart(2, '0');
+        const totalSecs = parseInt(el.dataset.duration) || 0;
+        let text = `${mins}:${secs}`;
+        if (totalSecs > 0) {
+            const totMins = String(Math.floor(totalSecs / 60)).padStart(2, '0');
+            const totSecs = String(totalSecs % 60).padStart(2, '0');
+            text += ` / ${totMins}:${totSecs}`;
+
+            const parentCard = el.closest('.stream-card');
+            if (parentCard) {
+                const bar = parentCard.querySelector('.stream-progress-bar');
+                if (bar) {
+                    const pct = Math.min(100, Math.floor((elapsed / totalSecs) * 100));
+                    bar.style.width = pct + '%';
+                }
+            }
+        }
+        el.textContent = text;
+    });
+}, 1000);
 </script>
 
 {% endblock %}

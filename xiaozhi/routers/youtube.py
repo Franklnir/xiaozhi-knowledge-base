@@ -1,5 +1,5 @@
 from xiaozhi.services.playback_tracker import playback_tracker
-from xiaozhi.services.youtube_streamer import stream_video_to_websocket, extract_audio_url
+from xiaozhi.services.youtube_streamer import stream_video_to_websocket, extract_audio_url, get_cached_video_meta
 import asyncio
 import base64
 import io
@@ -496,6 +496,8 @@ async def _stream_opus_audio(
     title: str = "",
     device_mac: str = "",
     chip: str = "",
+    duration: str = "",
+    duration_seconds: int = 0,
 ) -> AsyncGenerator[bytes, None]:
     br = resolve_adaptive_bitrate(bitrate, rssi, chip=chip)
     ffmpeg_bin = _FFMPEG_PATH or shutil.which("ffmpeg")
@@ -510,8 +512,18 @@ async def _stream_opus_audio(
         stream_type="HTTP Stream",
         device_mac=device_mac or "ESP32 Board",
         bitrate=f"{br}@{sample_rate//1000}kHz",
-        chip=chip or ""
+        duration=duration,
+        duration_seconds=duration_seconds,
+        chip=chip or "",
+        rssi=rssi,
     )
+
+    # Immediately broadcast start of playback to all connected admin websockets
+    try:
+        from xiaozhi.routers.admin import broadcast_admin_users_update
+        asyncio.create_task(broadcast_admin_users_update())
+    except Exception:
+        pass
 
     cmd = [
         ffmpeg_bin,
@@ -558,6 +570,7 @@ async def _stream_opus_audio(
             chunk = await proc.stdout.read(1536)
             if not chunk:
                 logger.info(f"YouTube stream for {video_id} reached EOF, total={total_bytes} bytes")
+                end_reason = "finished"
                 break
             total_bytes += len(chunk)
             if session:
@@ -574,7 +587,12 @@ async def _stream_opus_audio(
         logger.error(f"YouTube stream for {video_id} error after {total_bytes} bytes: {exc}")
     finally:
         if session:
-            playback_tracker.end_session(session.session_id, reason=end_reason)
+            playback_tracker.end_session(session.session_id, reason=end_reason, total_bytes=total_bytes)
+        try:
+            from xiaozhi.routers.admin import broadcast_admin_users_update
+            asyncio.create_task(broadcast_admin_users_update())
+        except Exception:
+            pass
         if proc.returncode is None:
             try:
                 proc.kill()
@@ -643,6 +661,9 @@ async def audio_stream_ogg_opus(
             raise ValueError("Direct audio stream tidak ditemukan.")
         if not title:
             title = extracted_title
+        meta = get_cached_video_meta(video_id)
+        dur_sec = meta.get("duration", 0)
+        dur_fmt = meta.get("duration_formatted", "")
     except Exception as exc:
         logger.warning("Extraction failed for video %s: %s", video_id, exc)
         raise HTTPException(status_code=404, detail=f"Gagal mengekstrak audio YouTube: {exc}")
@@ -659,7 +680,9 @@ async def audio_stream_ogg_opus(
             username=username,
             title=title,
             device_mac=device_mac,
-            chip=detected_chip
+            chip=detected_chip,
+            duration=dur_fmt,
+            duration_seconds=dur_sec,
         ),
         media_type="audio/ogg",
         headers={
