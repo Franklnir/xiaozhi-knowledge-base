@@ -24,14 +24,22 @@ def test_playback_session_attributes_and_duration():
     assert session.elapsed_formatted == "01:15"
     assert session.duration_formatted == "03:32"
     assert session.chip_display == "ESP32-S3"
+    assert session.board_display == "ESP32-S3"
     assert "Bagus" in session.rssi_label or "🟡" in session.rssi_label
     assert session.progress_percent > 30
 
     d = session.to_dict()
     assert d["chip"] == "ESP32-S3"
+    assert d["board"] == "ESP32-S3"
+    assert d["board_display"] == "ESP32-S3"
     assert d["status"] == "streaming"
     assert d["status_label"] == "Sedang Streaming"
     assert d["duration"] == "03:32"
+
+    # Test custom board type
+    s_box = PlaybackSession("s_box", 2, "user", "vid", "title", chip="esp32-s3", board="ESP32-S3-BOX")
+    assert s_box.board_display == "ESP32-S3-BOX"
+    assert s_box.to_dict()["board_display"] == "ESP32-S3-BOX"
 
 
 def test_playback_rssi_levels():

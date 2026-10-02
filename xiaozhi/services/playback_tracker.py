@@ -31,6 +31,7 @@ class PlaybackSession:
     duration_seconds: int = 0
     rssi: Optional[int] = None
     chip: str = ""
+    board: str = ""
     status: str = "streaming"  # "streaming", "buffering", "interrupted", "gap", "aborted"
     status_label: str = "Sedang Streaming"
     status_detail: str = "Mengalirkan audio real-time"
@@ -106,6 +107,28 @@ class PlaybackSession:
         return "ESP32"
 
     @property
+    def board_display(self) -> str:
+        b = (self.board or "").strip()
+        c = (self.chip_display or "").strip()
+        if b:
+            b_norm = b.replace("_", "-").strip()
+            b_low = b_norm.lower()
+            if b_low in ("esp32-s3", "esp32s3", "esp-s3", "s3"):
+                return "ESP32-S3"
+            elif b_low in ("esp32-c3", "esp32c3", "esp-c3", "c3"):
+                return "ESP32-C3"
+            elif b_low in ("esp32-p4", "esp32p4", "esp-p4", "p4"):
+                return "ESP32-P4"
+            elif b_low in ("esp32-s2", "esp32s2", "esp-s2", "s2"):
+                return "ESP32-S2"
+            elif b_low in ("esp32", "esp-32"):
+                return "ESP32 Standard"
+            if c and c.lower() not in b_low:
+                return f"{c} ({b_norm})"
+            return b_norm
+        return c or "ESP32"
+
+    @property
     def bytes_formatted(self) -> str:
         if self.bytes_streamed < 1048576:
             return f"{self.bytes_streamed // 1024} KB"
@@ -134,6 +157,8 @@ class PlaybackSession:
             "rssi": self.rssi,
             "rssi_label": self.rssi_label,
             "chip": self.chip_display,
+            "board": self.board or self.chip_display,
+            "board_display": self.board_display,
             "status": self.status,
             "status_label": self.status_label,
             "status_detail": self.status_detail,
@@ -162,6 +187,7 @@ class PlaybackTracker:
         duration: str = "",
         duration_seconds: int = 0,
         chip: str = "",
+        board: str = "",
         rssi: Optional[int] = None,
     ) -> PlaybackSession:
         with self._lock:
@@ -186,6 +212,20 @@ class PlaybackTracker:
                 elif str(duration).isdigit():
                     duration_seconds = int(duration)
 
+            # Auto-lookup board if not explicitly passed
+            if not board and device_mac:
+                try:
+                    from xiaozhi.dependencies import get_store
+                    st = get_store()
+                    clean_lookup_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+                    clean_lookup_mac = clean_lookup_mac.strip().upper()
+                    if hasattr(st, "find_device_by_mac"):
+                        dev = st.find_device_by_mac(clean_lookup_mac)
+                        if dev:
+                            board = dev.get("device_name") or dev.get("device_type") or ""
+                except Exception:
+                    pass
+
             session_id = f"play_{user_id}_{int(time.time())}_{video_id[:8]}"
             session = PlaybackSession(
                 session_id=session_id,
@@ -199,6 +239,7 @@ class PlaybackTracker:
                 duration=duration,
                 duration_seconds=duration_seconds,
                 chip=chip or "",
+                board=board or "",
                 rssi=rssi,
                 status="streaming",
                 status_label="Sedang Streaming",

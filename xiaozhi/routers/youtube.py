@@ -2,6 +2,7 @@ from xiaozhi.services.playback_tracker import playback_tracker
 from xiaozhi.services.youtube_streamer import stream_video_to_websocket, extract_audio_url, get_cached_video_meta
 import asyncio
 import base64
+import collections
 import io
 import logging
 import re
@@ -496,6 +497,7 @@ async def _stream_opus_audio(
     title: str = "",
     device_mac: str = "",
     chip: str = "",
+    board: str = "",
     duration: str = "",
     duration_seconds: int = 0,
 ) -> AsyncGenerator[bytes, None]:
@@ -515,6 +517,7 @@ async def _stream_opus_audio(
         duration=duration,
         duration_seconds=duration_seconds,
         chip=chip or "",
+        board=board or "",
         rssi=rssi,
     )
 
@@ -554,8 +557,25 @@ async def _stream_opus_audio(
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL
+        stderr=subprocess.PIPE
     )
+
+    # Safe stderr draining to prevent pipe buffer deadlock and capture error details
+    stderr_lines = collections.deque(maxlen=30)
+
+    async def _drain_stderr(pipe):
+        try:
+            while True:
+                line = await pipe.readline()
+                if not line:
+                    break
+                decoded = line.decode("utf-8", errors="ignore").strip()
+                if decoded:
+                    stderr_lines.append(decoded)
+        except Exception:
+            pass
+
+    stderr_task = asyncio.create_task(_drain_stderr(proc.stderr))
 
     total_bytes = 0
     last_logged_bytes = 0
@@ -599,6 +619,24 @@ async def _stream_opus_audio(
                 await proc.wait()
             except Exception:
                 pass
+
+        try:
+            await asyncio.wait_for(stderr_task, timeout=0.5)
+        except Exception:
+            stderr_task.cancel()
+
+        # Log detail jika terjadi kendala proses transcoding FFmpeg
+        if proc.returncode is not None and proc.returncode not in (0, -9, -15, 137) and end_reason != "aborted":
+            err_details = "\n  ".join(stderr_lines) if stderr_lines else "(Tidak ada output stderr dari FFmpeg)"
+            logger.error(
+                f"Kendala transcoding FFmpeg untuk video '{video_id}' (User: {username or user_id}, PID: {proc.pid}, Exit Code: {proc.returncode}):\n  {err_details}"
+            )
+        elif total_bytes == 0 and end_reason == "error":
+            err_details = "\n  ".join(stderr_lines) if stderr_lines else "(Tidak ada output stderr dari FFmpeg)"
+            logger.error(
+                f"Kendala transcoding FFmpeg sebelum streaming dimulai untuk video '{video_id}' (User: {username or user_id}):\n  {err_details}"
+            )
+
         logger.info(f"YouTube stream for {video_id} closed, proc_returncode={proc.returncode}")
 
 
@@ -608,6 +646,8 @@ async def audio_stream_ogg_opus(
     request: Request,
     br: str = "auto",
     chip: Optional[str] = Query(None),
+    board: Optional[str] = Query(None),
+    board_type: Optional[str] = Query(None),
     rssi: Optional[int] = Query(None),
     start: float = 0.0,
     owner_id: Optional[int] = Query(None),
@@ -622,6 +662,20 @@ async def audio_stream_ogg_opus(
         request.headers.get("Device-Chip", "") or
         request.headers.get("X-Chip", "")
     ).strip().lower()
+
+    # Resolve board from query or header
+    detected_board = (
+        board or
+        board_type or
+        request.headers.get("X-Device-Board", "") or
+        request.headers.get("Device-Board", "") or
+        request.headers.get("X-Board-Type", "") or
+        request.headers.get("X-Board", "") or
+        request.headers.get("Board-Type", "") or
+        request.headers.get("Board", "") or
+        request.headers.get("X-Device-Type", "") or
+        request.headers.get("Device-Type", "")
+    ).strip()
 
     # Read RSSI from query param or header
     if rssi is None:
@@ -640,6 +694,17 @@ async def audio_stream_ogg_opus(
     user_id = user["id"] if user else None
     username = user["username"] if user else ""
 
+    # Auto-lookup board from store if not provided in request
+    if not detected_board and device_mac and hasattr(store, "find_device_by_mac"):
+        try:
+            clean_lookup_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+            clean_lookup_mac = clean_lookup_mac.strip().upper()
+            dev = store.find_device_by_mac(clean_lookup_mac)
+            if dev:
+                detected_board = dev.get("device_name") or dev.get("device_type") or ""
+        except Exception:
+            pass
+
     # Check YouTube Music permission for this user
     if user_id:
         features = store.get_user_features(user_id) if hasattr(store, "get_user_features") else {}
@@ -651,7 +716,7 @@ async def audio_stream_ogg_opus(
             )
 
     logger.info(
-        f"Stream request for {video_id}: chip={detected_chip or 'default'} -> sample_rate={sample_rate}Hz, "
+        f"Stream request for {video_id}: chip={detected_chip or 'default'}, board={detected_board or 'default'} -> sample_rate={sample_rate}Hz, "
         f"requested_br={br}, rssi={rssi} dBm -> selected_br={selected_br}"
     )
 
@@ -681,6 +746,7 @@ async def audio_stream_ogg_opus(
             title=title,
             device_mac=device_mac,
             chip=detected_chip,
+            board=detected_board,
             duration=dur_fmt,
             duration_seconds=dur_sec,
         ),
@@ -694,6 +760,7 @@ async def audio_stream_ogg_opus(
             "X-Adaptive-RSSI": str(rssi if rssi is not None else "N/A"),
             "X-Device-MAC": device_mac or "none",
             "X-Device-Chip": detected_chip or "unknown",
+            "X-Device-Board": detected_board or detected_chip or "ESP32",
             "X-Audio-Sample-Rate": str(sample_rate),
             "X-MAC-Status": "Tersimpan OK" if device_mac else "none",
         }
