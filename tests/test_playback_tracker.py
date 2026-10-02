@@ -3,6 +3,12 @@ import pytest
 from xiaozhi.services.playback_tracker import PlaybackTracker, PlaybackSession
 
 
+@pytest.fixture(autouse=True)
+def mock_dependencies(monkeypatch):
+    import xiaozhi.dependencies
+    monkeypatch.setattr(xiaozhi.dependencies, "get_store", lambda: None)
+
+
 def test_playback_session_attributes_and_duration():
     session = PlaybackSession(
         session_id="test_sess_1",
@@ -107,3 +113,56 @@ def test_playback_tracker_grace_period_and_transitions():
     tracker.handle_device_status(11, "finished")
     active_final = tracker.get_active_sessions()
     assert not any(x["user_id"] == 11 for x in active_final)
+
+
+def test_concurrent_multi_device_playback():
+    tracker = PlaybackTracker()
+
+    # User 1 has Board A and Board B playing concurrently
+    sess_a = tracker.start_session(
+        user_id=1,
+        username="frank",
+        video_id="song_a",
+        title="Lagu Ruang Tamu",
+        device_mac="10:06:1C:82:70:C8",
+    )
+    sess_b = tracker.start_session(
+        user_id=1,
+        username="frank",
+        video_id="song_b",
+        title="Lagu Kamar Tidur",
+        device_mac="E8:3D:C1:9B:B5:14",
+    )
+
+    # Different user (User 2) plays on Board C concurrently
+    sess_c = tracker.start_session(
+        user_id=2,
+        username="budi",
+        video_id="song_c",
+        title="Lagu Kantor",
+        device_mac="24:DC:C3:99:11:22",
+    )
+
+    active = tracker.get_active_sessions()
+    active_sids = [s["session_id"] for s in active]
+    assert sess_a.session_id in active_sids
+    assert sess_b.session_id in active_sids
+    assert sess_c.session_id in active_sids
+    assert len(active) == 3
+
+    # If Board A skips to next track, only Board A is replaced, Board B and C keep playing!
+    sess_a2 = tracker.start_session(
+        user_id=1,
+        username="frank",
+        video_id="song_a_next",
+        title="Lagu Ruang Tamu Track 2",
+        device_mac="10:06:1C:82:70:C8",
+    )
+
+    active_after = tracker.get_active_sessions()
+    active_sids_after = [s["session_id"] for s in active_after]
+    assert sess_a.session_id not in active_sids_after
+    assert sess_a2.session_id in active_sids_after
+    assert sess_b.session_id in active_sids_after
+    assert sess_c.session_id in active_sids_after
+    assert len(active_after) == 3

@@ -170,8 +170,10 @@ class PlaybackTracker:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._sessions: Dict[str, PlaybackSession] = {}
-        # Mapping user_id -> active session_id
+        # Mapping user_id -> active session_id (browser / single-board fallback)
         self._user_sessions: Dict[int, str] = {}
+        # Mapping clean_mac -> active session_id (allows multi-board concurrent playback)
+        self._device_sessions: Dict[str, str] = {}
         # Mapping user_id -> last played session info
         self._last_played: Dict[int, Dict[str, Any]] = {}
 
@@ -191,8 +193,20 @@ class PlaybackTracker:
         rssi: Optional[int] = None,
     ) -> PlaybackSession:
         with self._lock:
-            # End any existing session for this user if active
-            old_sid = self._user_sessions.get(user_id)
+            clean_mac = (device_mac or "").strip().upper()
+            if clean_mac.startswith("ESP32-"):
+                clean_mac = clean_mac[6:]
+
+            # Multi-device concurrent playback support:
+            # 1. If device_mac is provided, replace only the previous session for THIS specific device
+            #    (so same user can play different songs on Board 1, Board 2, etc. simultaneously)
+            # 2. If no device_mac (e.g. browser test), replace previous session for this user
+            old_sid = None
+            if clean_mac and len(clean_mac) >= 11:
+                old_sid = self._device_sessions.get(clean_mac)
+            elif user_id and user_id > 0:
+                old_sid = self._user_sessions.get(user_id)
+
             if old_sid and old_sid in self._sessions:
                 old_session = self._sessions.pop(old_sid, None)
                 if old_session:
@@ -246,8 +260,11 @@ class PlaybackTracker:
                 status_detail=f"Mengirim audio real-time ({bitrate})",
             )
             self._sessions[session_id] = session
-            self._user_sessions[user_id] = session_id
-            logger.info("Playback session started: %s for user %s (%s)", session_id, user_id, title)
+            if clean_mac and len(clean_mac) >= 11:
+                self._device_sessions[clean_mac] = session_id
+            if user_id and user_id > 0:
+                self._user_sessions[user_id] = session_id
+            logger.info("Playback session started: %s for user %s (%s, device: %s)", session_id, user_id, title, clean_mac or "none")
 
             # Permanently persist device_mac to database so it never disappears after stream ends (validasi MCP aktif)
             if device_mac and user_id:
@@ -311,6 +328,11 @@ class PlaybackTracker:
                 self._sessions.pop(session_id, None)
                 if self._user_sessions.get(session.user_id) == session_id:
                     self._user_sessions.pop(session.user_id, None)
+                if session.device_mac:
+                    c_mac = session.device_mac[6:] if session.device_mac.startswith("ESP32-") else session.device_mac
+                    c_mac = c_mac.strip().upper()
+                    if self._device_sessions.get(c_mac) == session_id:
+                        self._device_sessions.pop(c_mac, None)
                 self._last_played[session.user_id] = {
                     **session.to_dict(),
                     "ended_at": now,
@@ -421,6 +443,11 @@ class PlaybackTracker:
                 if s:
                     if self._user_sessions.get(s.user_id) == sid:
                         self._user_sessions.pop(s.user_id, None)
+                    if s.device_mac:
+                        c_mac = s.device_mac[6:] if s.device_mac.startswith("ESP32-") else s.device_mac
+                        c_mac = c_mac.strip().upper()
+                        if self._device_sessions.get(c_mac) == sid:
+                            self._device_sessions.pop(c_mac, None)
                     self._last_played[s.user_id] = {
                         **s.to_dict(),
                         "ended_at": s.ended_at or now,
