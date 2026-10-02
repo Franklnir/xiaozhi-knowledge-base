@@ -444,6 +444,11 @@ async def admin_api_youtube_active_streams(request: Request):
 async def admin_api_youtube_stop(request: Request, session_id: str):
     admin = require_admin(request)
     stopped = playback_tracker.stop_session(session_id)
+    if stopped:
+        try:
+            await broadcast_admin_users_update()
+        except Exception:
+            pass
     return {
         "success": stopped,
         "message": "Pemutaran berhasil dihentikan." if stopped else "Sesi pemutaran tidak ditemukan atau sudah selesai.",
