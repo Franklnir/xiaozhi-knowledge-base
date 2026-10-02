@@ -1442,7 +1442,119 @@ class SQLiteStore:
                 msg = str(r["user_message"] or r["xiaozhi_answer"] or "")
                 if msg:
                     activity[uid]["last_message_preview"] = msg[:60]
+
+        try:
+            aq_rows = conn.execute("""
+                SELECT owner_id, title, video_id, created_at
+                FROM audio_queue
+                WHERE (DATE(created_at) = ? OR created_at LIKE ?)
+                ORDER BY id DESC
+            """, (today_date, f"{today_date}%")).fetchall()
+            for aq in aq_rows:
+                uid = int(aq["owner_id"])
+                c_at = str(aq["created_at"] or "")
+                t_str = c_at[11:16] if len(c_at) >= 16 else ""
+                if uid not in activity:
+                    activity[uid] = {
+                        "tools_count": 0,
+                        "youtube_count": 0,
+                        "tools_list": [],
+                        "last_tool": "play_youtube_song",
+                        "last_activity_time": t_str,
+                        "last_message_preview": aq["title"] or "Putar Lagu YouTube",
+                    }
+                activity[uid]["youtube_count"] += 1
+                if "play_youtube_song" not in activity[uid]["tools_list"]:
+                    activity[uid]["tools_list"].append("play_youtube_song")
+                if not activity[uid]["last_activity_time"] and t_str:
+                    activity[uid]["last_activity_time"] = t_str
+                if not activity[uid]["last_message_preview"]:
+                    activity[uid]["last_message_preview"] = aq["title"] or "Putar Lagu YouTube"
+        except Exception:
+            pass
+
         return activity
+
+    def get_all_youtube_playback_stats(self) -> Dict[int, Dict[str, Any]]:
+        """Ambil statistik lengkap seluruh pemutaran musik YouTube (audio_queue & chat_history) per user (SQLite)."""
+        stats: Dict[int, Dict[str, Any]] = {}
+        conn = self._get_conn()
+        try:
+            from datetime import date, timedelta
+            today_str = date.today().strftime("%Y-%m-%d")
+            yesterday_str = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+            rows = conn.execute("""
+                SELECT owner_id, title, video_id, created_at
+                FROM audio_queue
+                ORDER BY id DESC
+            """).fetchall()
+
+            for r in rows:
+                uid = int(r["owner_id"])
+                c_at = str(r["created_at"] or "")
+                d_str = c_at[:10] if len(c_at) >= 10 else ""
+                t_str = c_at[11:16] if len(c_at) >= 16 else ""
+
+                if uid not in stats:
+                    if d_str == today_str:
+                        fmt_time = f"Hari ini {t_str}"
+                    elif d_str == yesterday_str:
+                        fmt_time = f"Kemarin {t_str}"
+                    elif d_str:
+                        fmt_time = f"{d_str[8:10]}/{d_str[5:7]} {t_str}"
+                    else:
+                        fmt_time = ""
+                    stats[uid] = {
+                        "total_plays": 0,
+                        "today_plays": 0,
+                        "last_title": (r["title"] or "").strip()[:80],
+                        "last_video_id": (r["video_id"] or "").strip(),
+                        "last_played_time": fmt_time,
+                        "last_played_at": c_at,
+                    }
+                stats[uid]["total_plays"] += 1
+                if d_str == today_str:
+                    stats[uid]["today_plays"] += 1
+        except Exception:
+            pass
+
+        try:
+            ch_rows = conn.execute("""
+                SELECT owner_id, user_message, created_at
+                FROM chat_history
+                WHERE (tool_name LIKE '%youtube%' OR source LIKE '%youtube%')
+                ORDER BY id DESC
+            """).fetchall()
+            for r in ch_rows:
+                uid = int(r["owner_id"])
+                c_at = str(r["created_at"] or "")
+                d_str = c_at[:10] if len(c_at) >= 10 else ""
+                t_str = c_at[11:16] if len(c_at) >= 16 else ""
+                if uid not in stats:
+                    if d_str == today_str:
+                        fmt_time = f"Hari ini {t_str}"
+                    elif d_str == yesterday_str:
+                        fmt_time = f"Kemarin {t_str}"
+                    elif d_str:
+                        fmt_time = f"{d_str[8:10]}/{d_str[5:7]} {t_str}"
+                    else:
+                        fmt_time = ""
+                    stats[uid] = {
+                        "total_plays": 0,
+                        "today_plays": 0,
+                        "last_title": (r["user_message"] or "").strip()[:80],
+                        "last_video_id": "",
+                        "last_played_time": fmt_time,
+                        "last_played_at": c_at,
+                    }
+                stats[uid]["total_plays"] = max(stats[uid]["total_plays"], stats[uid]["total_plays"] + (1 if uid not in stats else 0))
+                if d_str == today_str and stats[uid]["today_plays"] == 0:
+                    stats[uid]["today_plays"] += 1
+        except Exception:
+            pass
+
+        return stats
 
     # ── User Persona & Preferences ─────────────────────────────────────────
 

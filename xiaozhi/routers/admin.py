@@ -55,6 +55,14 @@ def get_admin_dashboard_snapshot() -> Dict[str, Any]:
     except Exception as e:
         logger.warning("Failed to fetch today activity: %s", e)
 
+    # Fetch all-time YouTube playback stats across audio_queue & chat_history
+    all_yt_stats = {}
+    try:
+        if hasattr(store, "get_all_youtube_playback_stats"):
+            all_yt_stats = store.get_all_youtube_playback_stats()
+    except Exception as e:
+        logger.warning("Failed to fetch all youtube playback stats: %s", e)
+
     # Attach YouTube active stream info and today's activity to each user
     for u in managed_users:
         uid = int(u["id"])
@@ -78,7 +86,28 @@ def get_admin_dashboard_snapshot() -> Dict[str, Any]:
         if stream or u.get("is_playing"):
             user_act["youtube_count"] = max(1, user_act.get("youtube_count", 0))
 
-        has_stream_today = bool(user_act.get("youtube_count", 0) > 0 or u.get("is_playing") or stream)
+        yt_user = all_yt_stats.get(uid, {})
+        is_live = bool(stream or u.get("is_playing"))
+        today_yt_count = max(yt_user.get("today_plays", 0), user_act.get("youtube_count", 0), 1 if is_live else 0)
+        total_yt_count = max(yt_user.get("total_plays", 0), today_yt_count)
+
+        has_stream_today = bool(today_yt_count > 0 or is_live)
+        has_stream_all = bool(total_yt_count > 0 or has_stream_today)
+
+        last_yt_title = stream.get("title") if stream else (yt_user.get("last_title") or (user_act.get("last_message_preview") if "youtube" in str(user_act.get("last_tool", "")).lower() else ""))
+        last_yt_time = "Sedang Memutar" if is_live else (yt_user.get("last_played_time") or user_act.get("last_activity_time") or "")
+
+        u["youtube_stats"] = {
+            "is_live": is_live,
+            "has_stream": has_stream_all,
+            "has_stream_today": has_stream_today,
+            "total_plays": total_yt_count,
+            "today_plays": today_yt_count,
+            "last_title": last_yt_title,
+            "last_played_time": last_yt_time,
+            "last_video_id": stream.get("video_id") if stream else yt_user.get("last_video_id", ""),
+        }
+
         has_tools_today = bool(user_act.get("tools_count", 0) > 0)
         has_activity_today = has_stream_today or has_tools_today
 
@@ -95,7 +124,9 @@ def get_admin_dashboard_snapshot() -> Dict[str, Any]:
         "youtube_active": len(active_streams),
         "users_active_today": sum(1 for u in managed_users if u.get("activity_today", {}).get("has_activity")),
         "users_tools_today": sum(1 for u in managed_users if u.get("activity_today", {}).get("has_tools")),
-        "users_stream_today": sum(1 for u in managed_users if u.get("activity_today", {}).get("has_stream")),
+        "users_stream_today": sum(1 for u in managed_users if u.get("youtube_stats", {}).get("has_stream_today")),
+        "users_stream_all": sum(1 for u in managed_users if u.get("youtube_stats", {}).get("has_stream")),
+        "total_songs_streamed": sum(u.get("youtube_stats", {}).get("total_plays", 0) for u in managed_users),
     }
 
     return {
