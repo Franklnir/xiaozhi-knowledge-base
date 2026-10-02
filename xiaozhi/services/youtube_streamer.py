@@ -221,6 +221,9 @@ async def stream_video_to_websocket(
         stderr=subprocess.PIPE
     )
 
+    if session:
+        session.proc = proc
+
     stderr_lines = collections.deque(maxlen=30)
 
     async def _drain_ws_stderr(pipe):
@@ -246,6 +249,8 @@ async def stream_video_to_websocket(
                 if "abort" in data.lower() or "stop" in data.lower():
                     logger.info("Client meminta abort playback")
                     abort_event.set()
+                    if session:
+                        session.trigger_abort()
                     break
         except Exception:
             abort_event.set()
@@ -266,6 +271,24 @@ async def stream_video_to_websocket(
             if abort_event.is_set() or (session and session.abort_event.is_set()):
                 logger.info("Stream dihentikan oleh user abort atau admin.")
                 break
+
+            # Periodically re-check user permission (every ~20 frames = 1.2 seconds)
+            if user_id and frame_idx % 20 == 0:
+                try:
+                    from xiaozhi.dependencies import get_store
+                    st = get_store()
+                    if hasattr(st, "get_user_features"):
+                        feats = st.get_user_features(user_id)
+                        if not feats.get("youtube_music", True):
+                            logger.warning(
+                                f"WebSocket stream aborted for user {user_id}: feature youtube_music disabled mid-stream."
+                            )
+                            abort_event.set()
+                            if session:
+                                session.trigger_abort()
+                            break
+                except Exception:
+                    pass
 
             # Pack ke XiaoZhi BinaryProtocol3:
             payload_len = len(packet)

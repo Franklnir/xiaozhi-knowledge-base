@@ -560,6 +560,9 @@ async def _stream_opus_audio(
         stderr=subprocess.PIPE
     )
 
+    if session:
+        session.proc = proc
+
     # Safe stderr draining to prevent pipe buffer deadlock and capture error details
     stderr_lines = collections.deque(maxlen=30)
 
@@ -580,13 +583,33 @@ async def _stream_opus_audio(
     total_bytes = 0
     last_logged_bytes = 0
     end_reason = "finished"
+    loop_count = 0
     logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
     try:
         while True:
+            loop_count += 1
             if session and session.abort_event.is_set():
                 logger.info(f"Stream aborted by admin for video {video_id}")
                 end_reason = "aborted"
                 break
+
+            # Periodically re-check user permission (every ~25 chunks, approx every 1.5-2 seconds)
+            if user_id and loop_count % 25 == 0:
+                try:
+                    store = get_store()
+                    if hasattr(store, "get_user_features"):
+                        features = store.get_user_features(user_id)
+                        if not features.get("youtube_music", True):
+                            logger.warning(
+                                f"YouTube stream aborted for user {user_id} ({username}): feature youtube_music disabled mid-stream."
+                            )
+                            end_reason = "aborted"
+                            if session:
+                                session.trigger_abort()
+                            break
+                except Exception as exc:
+                    logger.debug("Error checking user feature in stream loop: %s", exc)
+
             chunk = await proc.stdout.read(1536)
             if not chunk:
                 logger.info(f"YouTube stream for {video_id} reached EOF, total={total_bytes} bytes")
