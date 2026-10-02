@@ -423,38 +423,54 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip
     """
     Intelligently select the optimal Opus bitrate based on requested value, ESP32 Wi-Fi RSSI, and chip profile.
     ESP32-S3 (Dual Core 240MHz, 8MB PSRAM):
-      - RSSI >= -65 dBm (Sinyal Sangat Kuat): 48k (Studio Quality Mono)
-      - -75 to -65 dBm (Sinyal Kuat): 32k (High Quality)
-      - -82 to -75 dBm (Sinyal Sedang): 24k
-      - -88 to -82 dBm (Sinyal Lemah): 16k
-      - < -88 dBm (Sinyal Sangat Lemah): 12k (Batas minimum aman S3)
+      - Maksimal dibatasi pada 30k (stabil, anti putus-putus, hemat bandwidth ~40-50%, audio tetap jernih mono)
+      - RSSI >= -65 dBm / Default: 30k
+      - -75 to -65 dBm: 24k
+      - -82 to -75 dBm: 20k
+      - -88 to -82 dBm: 16k
+      - < -88 dBm: 12k
     ESP32-C3 (Single Core 160MHz, No PSRAM):
-      - RSSI >= -65 dBm: 12k
+      - RSSI >= -65 dBm: 12k (Maksimal 16k)
       - -75 to -65 dBm: 11k
       - -85 to -75 dBm: 8k
       - < -85 dBm: 6k
     """
     br_str = (requested_br or "").lower().strip()
-    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "30k", "32k", "48k"}
-    if br_str and br_str in valid_bitrates and br_str != "auto":
-        return br_str
+    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "28k", "30k", "32k", "40k", "48k"}
 
     is_s3 = bool(chip and "s3" in chip.lower())
     is_c3 = bool(chip and "c3" in chip.lower())
 
+    # Jika client meminta bitrate spesifik:
+    if br_str and br_str != "auto":
+        num_match = re.match(r"^(\d+)k?$", br_str)
+        if num_match:
+            val = int(num_match.group(1))
+            if is_c3:
+                if val > 16:
+                    return "16k"
+                elif f"{val}k" in valid_bitrates:
+                    return f"{val}k"
+            else:
+                # ESP32-S3 & chip default: batasi maksimal 30k
+                if val > 30:
+                    return "30k"
+                elif f"{val}k" in valid_bitrates:
+                    return f"{val}k"
+
     if is_s3:
         if rssi is not None and rssi < 0:
             if rssi >= -65:
-                return "48k"
+                return "30k"
             elif rssi >= -75:
-                return "32k"
-            elif rssi >= -82:
                 return "24k"
+            elif rssi >= -82:
+                return "20k"
             elif rssi >= -88:
                 return "16k"
             else:
                 return "12k"
-        return "48k"
+        return "30k"
 
     if rssi is not None and rssi < 0:
         if rssi >= -65:
