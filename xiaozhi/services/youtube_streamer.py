@@ -5,6 +5,7 @@ demuxes Ogg container on the server, and streams raw Opus frames via WebSocket.
 """
 
 import asyncio
+import collections
 import logging
 import os
 import shutil
@@ -217,8 +218,24 @@ async def stream_video_to_websocket(
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL
+        stderr=subprocess.PIPE
     )
+
+    stderr_lines = collections.deque(maxlen=30)
+
+    async def _drain_ws_stderr(pipe):
+        try:
+            while True:
+                line = await pipe.readline()
+                if not line:
+                    break
+                decoded = line.decode("utf-8", errors="ignore").strip()
+                if decoded:
+                    stderr_lines.append(decoded)
+        except Exception:
+            pass
+
+    stderr_task = asyncio.create_task(_drain_ws_stderr(proc.stderr))
 
     abort_event = asyncio.Event()
 
@@ -292,4 +309,15 @@ async def stream_video_to_websocket(
                 await proc.wait()
             except Exception:
                 pass
+        try:
+            await asyncio.wait_for(stderr_task, timeout=0.5)
+        except Exception:
+            stderr_task.cancel()
+
+        if proc.returncode is not None and proc.returncode not in (0, -9, -15, 137) and not abort_event.is_set():
+            err_details = "\n  ".join(stderr_lines) if stderr_lines else "(Tidak ada output stderr dari FFmpeg)"
+            logger.error(
+                f"Kendala transcoding FFmpeg WebSocket untuk video '{video_id}' (PID: {proc.pid}, Exit Code: {proc.returncode}):\n  {err_details}"
+            )
+
         logger.info("FFmpeg stream selesai untuk %s (%d frame)", video_id, frame_idx)

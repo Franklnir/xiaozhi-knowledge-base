@@ -354,7 +354,7 @@
                         </div>
                         <div style="display:flex;align-items:center;gap:12px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
                             <span>👤 <strong>{{ s.username }}</strong> (ID {{ s.user_id }})</span>
-                            <span>📟 <code>{{ s.chip or 'ESP32' }}</code></span>
+                            <span>📟 <strong>Board:</strong> <code>{{ s.board_display or s.board or s.chip or 'ESP32' }}</code></span>
                             {% if s.device_mac %}
                             <span>📡 <code>{{ s.device_mac }}</code></span>
                             {% endif %}
@@ -1493,7 +1493,7 @@
                                     </div>
                                     <div style="display:flex;align-items:center;gap:12px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
                                         <span>👤 <strong>${s.username}</strong> (ID ${s.user_id})</span>
-                                        <span>📟 <code>${s.chip || 'ESP32'}</code></span>
+                                        <span>📟 <strong>Board:</strong> <code>${s.board_display || s.board || s.chip || 'ESP32'}</code></span>
                                         ${s.device_mac ? `<span>📡 <code>${s.device_mac}</code></span>` : ''}
                                         <span>📶 <strong>${s.rssi_label || 'Tidak Ada Sinyal'}</strong></span>
                                         <span>⏱ <strong>Durasi:</strong> <strong id="elapsed-${s.session_id}" class="stream-timer" data-started="${s.started_at}" data-duration="${s.duration_seconds || 0}" data-status="${s.status}">${s.elapsed_formatted}${durationText}</strong></span>
