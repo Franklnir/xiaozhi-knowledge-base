@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from xiaozhi.core.utils import clean_text
-from xiaozhi.mcp.context import mcp_active_owner_ctx
+from xiaozhi.mcp.context import mcp_active_owner_ctx, mcp_active_mac_ctx
 from xiaozhi.services.smarthome_service import (
     parse_smart_home_action,
     resolve_smart_home_target,
@@ -1152,10 +1152,24 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         - "Cukup lagunya"
         """
         owner_id = mcp_active_owner_ctx.get()
-        if owner_id is None:
+        active_mac = mcp_active_mac_ctx.get()
+        if owner_id is None and not active_mac:
             return {"success": False, "message": "Belum ada koneksi perangkat aktif."}
+
         from xiaozhi.services.playback_tracker import playback_tracker
-        stopped = playback_tracker.stop_user_playback(owner_id)
+        stopped = False
+        if owner_id is not None:
+            stopped = playback_tracker.stop_user_playback(owner_id) or stopped
+        if active_mac:
+            stopped = playback_tracker.stop_device_playback(active_mac) or stopped
+
+        # Also expire any pending audio commands so queue does not resume next track
+        if owner_id is not None and hasattr(store, "expire_audio_commands"):
+            try:
+                store.expire_audio_commands(minutes=0)
+            except Exception:
+                pass
+
         if stopped:
             response = {
                 "success": True,
@@ -1169,7 +1183,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 "stopped": False,
                 "message": "Saat ini memang tidak ada lagu YouTube yang sedang diputar.",
             }
-        record_mcp_tool_history(owner_id, "stop_youtube_song", "stop lagu", {}, response)
+        if owner_id is not None:
+            record_mcp_tool_history(owner_id, "stop_youtube_song", "stop lagu", {}, response)
         return response
 
     @mcp_server.tool()

@@ -166,3 +166,67 @@ def test_concurrent_multi_device_playback():
     assert sess_b.session_id in active_sids_after
     assert sess_c.session_id in active_sids_after
     assert len(active_after) == 3
+
+
+def test_playback_abort_kills_subprocess():
+    """Verify that triggering abort immediately kills the underlying proc."""
+    class DummyProc:
+        def __init__(self):
+            self.killed = False
+            self.returncode = None
+
+        def kill(self):
+            self.killed = True
+            self.returncode = -9
+
+    dummy = DummyProc()
+    session = PlaybackSession(
+        session_id="proc_test",
+        user_id=5,
+        username="tester",
+        video_id="vid123",
+        title="Test Song",
+        proc=dummy
+    )
+
+    assert not session.abort_event.is_set()
+    assert not dummy.killed
+
+    session.trigger_abort()
+    assert session.abort_event.is_set()
+    assert dummy.killed
+    assert dummy.returncode == -9
+
+
+def test_stop_device_playback_and_user_mac_lookup(monkeypatch):
+    """Verify that stop_device_playback aborts session matching device MAC, and stop_user_playback cascades to user MACs."""
+    class MockStore:
+        def get_user_mac_address(self, uid):
+            return "AA:BB:CC:DD:EE:FF" if uid == 7 else None
+
+        def get_user_mac_addresses(self, uid):
+            return ["AA:BB:CC:DD:EE:FF"] if uid == 7 else []
+
+        def get_user_devices(self, uid):
+            return [{"device_id": "AA:BB:CC:DD:EE:FF"}] if uid == 7 else []
+
+    import xiaozhi.dependencies
+    monkeypatch.setattr(xiaozhi.dependencies, "get_store", lambda: MockStore())
+
+    tracker = PlaybackTracker()
+    # Session started with user_id = 0 (e.g. unknown hardware request), but with device_mac
+    sess = tracker.start_session(
+        user_id=0,
+        username="ESP32 Board",
+        video_id="hw_song",
+        title="Hardware Stream",
+        device_mac="AA:BB:CC:DD:EE:FF"
+    )
+
+    assert sess.session_id in [s["session_id"] for s in tracker.get_active_sessions()]
+
+    # Calling stop_user_playback(7) will look up MAC AA:BB:CC:DD:EE:FF and abort this session!
+    stopped = tracker.stop_user_playback(7)
+    assert stopped is True
+    assert sess.session_id not in [s["session_id"] for s in tracker.get_active_sessions()]
+

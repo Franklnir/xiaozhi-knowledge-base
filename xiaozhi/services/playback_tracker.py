@@ -38,6 +38,23 @@ class PlaybackSession:
     ended_at: Optional[float] = None
     grace_until: Optional[float] = None
     abort_event: asyncio.Event = field(default_factory=asyncio.Event)
+    proc: Optional[Any] = None
+    cancel_fn: Optional[Any] = None
+
+    def trigger_abort(self) -> None:
+        """Immediately trigger abort event, kill subprocess, and call cancel callback."""
+        self.abort_event.set()
+        if self.proc is not None:
+            try:
+                if hasattr(self.proc, "returncode") and self.proc.returncode is None:
+                    self.proc.kill()
+            except Exception as e:
+                logger.debug("Error killing session proc %s: %s", self.session_id, e)
+        if callable(self.cancel_fn):
+            try:
+                self.cancel_fn()
+            except Exception as e:
+                logger.debug("Error executing session cancel_fn %s: %s", self.session_id, e)
 
     def record_chunk(self, byte_count: int) -> None:
         self.bytes_streamed += byte_count
@@ -210,7 +227,7 @@ class PlaybackTracker:
             if old_sid and old_sid in self._sessions:
                 old_session = self._sessions.pop(old_sid, None)
                 if old_session:
-                    old_session.abort_event.set()
+                    old_session.trigger_abort()
                     self._last_played[user_id] = {
                         **old_session.to_dict(),
                         "ended_at": time.time(),
@@ -400,33 +417,89 @@ class PlaybackTracker:
                 session.grace_until = now + 25.0
 
     def stop_session(self, session_id: str) -> bool:
-        """Force stop a session by setting its abort event and immediately clearing it."""
+        """Force stop a session by triggering abort, killing FFmpeg proc, and clearing session."""
         with self._lock:
             session = self._sessions.get(session_id)
             if session:
-                session.abort_event.set()
+                session.trigger_abort()
                 self.end_session(session_id, reason="aborted")
                 logger.info("Playback session abort requested by admin: %s", session_id)
                 return True
             return False
 
+    def stop_device_playback(self, device_mac: str) -> bool:
+        """Stop any active playback session matching a device MAC address."""
+        if not device_mac:
+            return False
+        clean_mac = str(device_mac).replace(":", "").replace("-", "").strip().upper()
+        if clean_mac.startswith("ESP32"):
+            clean_mac = clean_mac[5:]
+        stopped = False
+        with self._lock:
+            # 1. Direct device index lookup
+            sid = self._device_sessions.get(clean_mac)
+            if sid and sid in self._sessions:
+                s = self._sessions[sid]
+                s.trigger_abort()
+                self.end_session(sid, reason="aborted")
+                stopped = True
+            # 2. Iterate all active sessions to catch partial or formatted MAC matches
+            for s in list(self._sessions.values()):
+                s_mac = (s.device_mac or "").replace(":", "").replace("-", "").strip().upper()
+                if s_mac.startswith("ESP32"):
+                    s_mac = s_mac[5:]
+                if s_mac and (s_mac == clean_mac or clean_mac.endswith(s_mac) or s_mac.endswith(clean_mac)):
+                    s.trigger_abort()
+                    self.end_session(s.session_id, reason="aborted")
+                    stopped = True
+        return stopped
+
     def stop_user_playback(self, user_id: int) -> bool:
+        """Stop playback for a user by user_id and all associated device MAC addresses."""
+        stopped = False
         with self._lock:
             sid = self._user_sessions.get(user_id)
             if sid and sid in self._sessions:
                 session = self._sessions[sid]
-                session.abort_event.set()
+                session.trigger_abort()
                 self.end_session(sid, reason="aborted")
                 logger.info("Playback session abort requested by user_id %s: %s", user_id, sid)
-                return True
+                stopped = True
             # Also check if any session has this user_id
             for s in list(self._sessions.values()):
                 if s.user_id == user_id:
-                    s.abort_event.set()
+                    s.trigger_abort()
                     self.end_session(s.session_id, reason="aborted")
                     logger.info("Playback session abort requested by user_id %s: %s", user_id, s.session_id)
-                    return True
-            return False
+                    stopped = True
+
+        # Also find and abort sessions for devices belonging to this user (handles user_id=0 sessions on user hardware)
+        try:
+            from xiaozhi.dependencies import get_store
+            store = get_store()
+            user_macs = set()
+            if hasattr(store, "get_user_mac_address"):
+                m = store.get_user_mac_address(user_id)
+                if m:
+                    user_macs.add(m)
+            if hasattr(store, "get_user_mac_addresses"):
+                for m in (store.get_user_mac_addresses(user_id) or []):
+                    if m:
+                        user_macs.add(m)
+            if hasattr(store, "get_user_devices"):
+                for d in (store.get_user_devices(user_id) or []):
+                    mac = d.get("device_id") or d.get("mac")
+                    if mac:
+                        user_macs.add(mac)
+
+            for mac in user_macs:
+                if self.stop_device_playback(mac):
+                    stopped = True
+                    logger.info("Playback session on user device %s aborted for user_id %s", mac, user_id)
+        except Exception as exc:
+            logger.debug("Could not lookup user devices for playback abort: %s", exc)
+
+        return stopped
 
     def get_active_sessions(self) -> List[Dict[str, Any]]:
         with self._lock:
