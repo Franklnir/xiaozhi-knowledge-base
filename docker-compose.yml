@@ -44,8 +44,8 @@ services:
       - MIDTRANS_IS_PRODUCTION=${MIDTRANS_IS_PRODUCTION:-false}
     volumes:
       - ./data:/app/data
-    mem_limit: 512m
-    memswap_limit: 1g
+    mem_limit: 750m
+    memswap_limit: 1.5g
     cpus: 1.0
     depends_on:
       postgres:
