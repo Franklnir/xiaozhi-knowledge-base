@@ -28,33 +28,7 @@ class PlaybackSession:
     last_active_at: float = field(default_factory=time.time)
     bytes_streamed: int = 0
     duration: str = ""
-    duration_seconds: int = 0
-    rssi: Optional[int] = None
-    chip: str = ""
-    board: str = ""
-    status: str = "streaming"  # "streaming", "buffering", "interrupted", "gap", "aborted"
-    status_label: str = "Sedang Streaming"
-    status_detail: str = "Mengalirkan audio real-time"
-    ended_at: Optional[float] = None
-    grace_until: Optional[float] = None
     abort_event: asyncio.Event = field(default_factory=asyncio.Event)
-    proc: Optional[Any] = None
-    cancel_fn: Optional[Any] = None
-
-    def trigger_abort(self) -> None:
-        """Immediately trigger abort event, kill subprocess, and call cancel callback."""
-        self.abort_event.set()
-        if self.proc is not None:
-            try:
-                if hasattr(self.proc, "returncode") and self.proc.returncode is None:
-                    self.proc.kill()
-            except Exception as e:
-                logger.debug("Error killing session proc %s: %s", self.session_id, e)
-        if callable(self.cancel_fn):
-            try:
-                self.cancel_fn()
-            except Exception as e:
-                logger.debug("Error executing session cancel_fn %s: %s", self.session_id, e)
 
     def record_chunk(self, byte_count: int) -> None:
         self.bytes_streamed += byte_count
@@ -62,8 +36,6 @@ class PlaybackSession:
 
     @property
     def elapsed_seconds(self) -> int:
-        if self.status in {"aborted", "stopped"} and self.ended_at:
-            return max(0, int(self.ended_at - self.started_at))
         return max(0, int(time.time() - self.started_at))
 
     @property
@@ -71,85 +43,6 @@ class PlaybackSession:
         s = self.elapsed_seconds
         mins, secs = divmod(s, 60)
         return f"{mins:02d}:{secs:02d}"
-
-    @property
-    def duration_formatted(self) -> str:
-        if not self.duration and self.duration_seconds <= 0:
-            return ""
-        if self.duration_seconds > 0:
-            dm, ds = divmod(self.duration_seconds, 60)
-            return f"{dm:02d}:{ds:02d}"
-        d_str = str(self.duration).strip()
-        if ":" in d_str:
-            return d_str
-        if d_str.isdigit():
-            dm, ds = divmod(int(d_str), 60)
-            return f"{dm:02d}:{ds:02d}"
-        return d_str
-
-    @property
-    def progress_percent(self) -> int:
-        if self.duration_seconds > 0:
-            pct = int((self.elapsed_seconds / self.duration_seconds) * 100)
-            return max(0, min(100, pct))
-        return 0
-
-    @property
-    def rssi_label(self) -> str:
-        if self.rssi is None or self.rssi == 0:
-            return "Tidak Ada Info Sinyal"
-        r = self.rssi
-        if r >= -60:
-            return f"{r} dBm (Sangat Kuat 🟢)"
-        elif r >= -75:
-            return f"{r} dBm (Bagus 🟡)"
-        elif r >= -85:
-            return f"{r} dBm (Lemah 🟠)"
-        else:
-            return f"{r} dBm (Sangat Jelek 🔴)"
-
-    @property
-    def chip_display(self) -> str:
-        c = (self.chip or "").strip().lower()
-        if "s3" in c:
-            return "ESP32-S3"
-        elif "c3" in c:
-            return "ESP32-C3"
-        elif "p4" in c:
-            return "ESP32-P4"
-        elif "esp32" in c:
-            return "ESP32 Standard"
-        elif c:
-            return c.upper()
-        return "ESP32"
-
-    @property
-    def board_display(self) -> str:
-        b = (self.board or "").strip()
-        c = (self.chip_display or "").strip()
-        if b:
-            b_norm = b.replace("_", "-").strip()
-            b_low = b_norm.lower()
-            if b_low in ("esp32-s3", "esp32s3", "esp-s3", "s3"):
-                return "ESP32-S3"
-            elif b_low in ("esp32-c3", "esp32c3", "esp-c3", "c3"):
-                return "ESP32-C3"
-            elif b_low in ("esp32-p4", "esp32p4", "esp-p4", "p4"):
-                return "ESP32-P4"
-            elif b_low in ("esp32-s2", "esp32s2", "esp-s2", "s2"):
-                return "ESP32-S2"
-            elif b_low in ("esp32", "esp-32"):
-                return "ESP32 Standard"
-            if c and c.lower() not in b_low:
-                return f"{c} ({b_norm})"
-            return b_norm
-        return c or "ESP32"
-
-    @property
-    def bytes_formatted(self) -> str:
-        if self.bytes_streamed < 1048576:
-            return f"{self.bytes_streamed // 1024} KB"
-        return f"{self.bytes_streamed / 1048576:.1f} MB"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -164,22 +57,12 @@ class PlaybackSession:
             "started_at": self.started_at,
             "elapsed_seconds": self.elapsed_seconds,
             "elapsed_formatted": self.elapsed_formatted,
-            "duration": self.duration_formatted,
-            "duration_seconds": self.duration_seconds,
-            "progress_percent": self.progress_percent,
+            "duration": self.duration,
             "bytes_streamed": self.bytes_streamed,
             "bytes_formatted": f"{self.bytes_streamed // 1024} KB" if self.bytes_streamed < 1048576 else f"{self.bytes_streamed / 1048576:.1f} MB",
             "thumbnail_url": f"https://img.youtube.com/vi/{self.video_id}/mqdefault.jpg" if self.video_id else "",
             "video_url": f"https://www.youtube.com/watch?v={self.video_id}" if self.video_id else "",
-            "rssi": self.rssi,
-            "rssi_label": self.rssi_label,
-            "chip": self.chip_display,
-            "board": self.board or self.chip_display,
-            "board_display": self.board_display,
-            "status": self.status,
-            "status_label": self.status_label,
-            "status_detail": self.status_detail,
-            "grace_until": self.grace_until,
+            "status": "Memutar",
         }
 
 
@@ -187,10 +70,8 @@ class PlaybackTracker:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._sessions: Dict[str, PlaybackSession] = {}
-        # Mapping user_id -> active session_id (browser / single-board fallback)
+        # Mapping user_id -> active session_id
         self._user_sessions: Dict[int, str] = {}
-        # Mapping clean_mac -> active session_id (allows multi-board concurrent playback)
-        self._device_sessions: Dict[str, str] = {}
         # Mapping user_id -> last played session info
         self._last_played: Dict[int, Dict[str, Any]] = {}
 
@@ -204,58 +85,20 @@ class PlaybackTracker:
         device_mac: str = "",
         bitrate: str = "11k",
         duration: str = "",
-        duration_seconds: int = 0,
         chip: str = "",
-        board: str = "",
-        rssi: Optional[int] = None,
     ) -> PlaybackSession:
         with self._lock:
-            clean_mac = (device_mac or "").strip().upper()
-            if clean_mac.startswith("ESP32-"):
-                clean_mac = clean_mac[6:]
-
-            # Multi-device concurrent playback support:
-            # 1. If device_mac is provided, replace only the previous session for THIS specific device
-            #    (so same user can play different songs on Board 1, Board 2, etc. simultaneously)
-            # 2. If no device_mac (e.g. browser test), replace previous session for this user
-            old_sid = None
-            if clean_mac and len(clean_mac) >= 11:
-                old_sid = self._device_sessions.get(clean_mac)
-            elif user_id and user_id > 0:
-                old_sid = self._user_sessions.get(user_id)
-
+            # End any existing session for this user if active
+            old_sid = self._user_sessions.get(user_id)
             if old_sid and old_sid in self._sessions:
                 old_session = self._sessions.pop(old_sid, None)
                 if old_session:
-                    old_session.trigger_abort()
+                    old_session.abort_event.set()
                     self._last_played[user_id] = {
                         **old_session.to_dict(),
                         "ended_at": time.time(),
                         "end_reason": "replaced"
                     }
-
-            # Parse duration_seconds if not provided
-            if not duration_seconds and duration:
-                if ":" in duration:
-                    parts = duration.split(":")
-                    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
-                        duration_seconds = int(parts[0]) * 60 + int(parts[1])
-                elif str(duration).isdigit():
-                    duration_seconds = int(duration)
-
-            # Auto-lookup board if not explicitly passed
-            if not board and device_mac:
-                try:
-                    from xiaozhi.dependencies import get_store
-                    st = get_store()
-                    clean_lookup_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
-                    clean_lookup_mac = clean_lookup_mac.strip().upper()
-                    if hasattr(st, "find_device_by_mac"):
-                        dev = st.find_device_by_mac(clean_lookup_mac)
-                        if dev:
-                            board = dev.get("device_name") or dev.get("device_type") or ""
-                except Exception:
-                    pass
 
             session_id = f"play_{user_id}_{int(time.time())}_{video_id[:8]}"
             session = PlaybackSession(
@@ -268,20 +111,10 @@ class PlaybackTracker:
                 device_mac=device_mac,
                 bitrate=bitrate,
                 duration=duration,
-                duration_seconds=duration_seconds,
-                chip=chip or "",
-                board=board or "",
-                rssi=rssi,
-                status="streaming",
-                status_label="Sedang Streaming",
-                status_detail=f"Mengirim audio real-time ({bitrate})",
             )
             self._sessions[session_id] = session
-            if clean_mac and len(clean_mac) >= 11:
-                self._device_sessions[clean_mac] = session_id
-            if user_id and user_id > 0:
-                self._user_sessions[user_id] = session_id
-            logger.info("Playback session started: %s for user %s (%s, device: %s)", session_id, user_id, title, clean_mac or "none")
+            self._user_sessions[user_id] = session_id
+            logger.info("Playback session started: %s for user %s (%s)", session_id, user_id, title)
 
             # Permanently persist device_mac to database so it never disappears after stream ends (validasi MCP aktif)
             if device_mac and user_id:
@@ -327,210 +160,65 @@ class PlaybackTracker:
 
             return session
 
-    def end_session(self, session_id: str, reason: str = "finished", total_bytes: int = 0) -> None:
+    def end_session(self, session_id: str, reason: str = "finished") -> None:
         with self._lock:
-            session = self._sessions.get(session_id)
-            if not session:
-                return
-
-            now = time.time()
-            session.ended_at = now
-            if total_bytes > 0:
-                session.bytes_streamed = max(session.bytes_streamed, total_bytes)
-
-            reason_lower = str(reason).strip().lower()
-
-            if reason_lower in {"aborted", "stopped"}:
-                # Forcefully stopped by user or admin -> drop immediately
-                self._sessions.pop(session_id, None)
+            session = self._sessions.pop(session_id, None)
+            if session:
                 if self._user_sessions.get(session.user_id) == session_id:
                     self._user_sessions.pop(session.user_id, None)
-                if session.device_mac:
-                    c_mac = session.device_mac[6:] if session.device_mac.startswith("ESP32-") else session.device_mac
-                    c_mac = c_mac.strip().upper()
-                    if self._device_sessions.get(c_mac) == session_id:
-                        self._device_sessions.pop(c_mac, None)
                 self._last_played[session.user_id] = {
                     **session.to_dict(),
-                    "ended_at": now,
-                    "end_reason": "aborted"
+                    "ended_at": time.time(),
+                    "end_reason": reason
                 }
-                logger.info("Playback session aborted: %s for user %s", session_id, session.user_id)
+                logger.info("Playback session ended (%s): %s for user %s", reason, session_id, session.user_id)
                 try:
                     from xiaozhi.services.sse_service import log_admin_event
-                    log_admin_event("audio", f"Audio stream dihentikan: '{session.title[:40]}' (User: {session.username or session.user_id})", {
+                    log_admin_event("audio", f"Audio stream selesai ({reason}): '{session.title[:40]}' (User: {session.username or session.user_id})", {
                         "session_id": session_id,
                         "user_id": session.user_id,
                         "title": session.title,
                     })
                 except Exception:
                     pass
-                return
-
-            elif reason_lower in {"stream_eof", "finished"}:
-                # Server sent 100% of audio stream to ESP32!
-                # ESP32 is still playing audio out of its internal ring buffer.
-                session.status = "buffering"
-                session.status_label = "Memutar Buffer (100% Terkirim)"
-                session.status_detail = f"Download 100% selesai ({session.bytes_formatted}). Speaker ESP32 memutar sisa buffer."
-                grace_dur = 45.0
-                if session.duration_seconds > 0:
-                    remaining = session.duration_seconds - session.elapsed_seconds
-                    if remaining > 0:
-                        grace_dur = max(30.0, min(remaining + 10.0, 90.0))
-                session.grace_until = now + grace_dur
-                logger.info("Playback session download finished, entering buffering grace: %s (grace: %.1fs)", session_id, grace_dur)
-
-            elif reason_lower in {"cancelled", "disconnect", "reset"}:
-                # Wi-Fi dropped momentarily or reconnecting
-                session.status = "interrupted"
-                session.status_label = "Sinyal Terputus (Reconnecting)"
-                session.status_detail = f"⚠️ Sinyal Wi-Fi ESP32 terputus ({session.rssi_label}). Menunggu auto-reconnect..."
-                session.grace_until = now + 35.0
-                logger.warning("Playback session interrupted by Wi-Fi drop: %s (grace: 35s)", session_id)
-
-            elif reason_lower == "gap":
-                # Inter-track gap in playlist
-                session.status = "gap"
-                session.status_label = "Jeda Transisi Antar Lagu"
-                session.status_detail = "Lagu selesai, jeda transisi ke track berikutnya..."
-                session.grace_until = now + 30.0
-                logger.info("Playback session entering track gap: %s", session_id)
-
-            elif reason_lower in {"idle", "device_finished"}:
-                # ESP32 hardware itself reported that playback has fully stopped
-                self._sessions.pop(session_id, None)
-                if self._user_sessions.get(session.user_id) == session_id:
-                    self._user_sessions.pop(session.user_id, None)
-                self._last_played[session.user_id] = {
-                    **session.to_dict(),
-                    "ended_at": now,
-                    "end_reason": reason_lower
-                }
-                logger.info("Playback session ended by device status report: %s for user %s", session_id, session.user_id)
-                return
-
-            else:
-                session.status = "gap"
-                session.status_label = "Selesai / Transisi"
-                session.status_detail = f"Aliran data selesai ({reason})."
-                session.grace_until = now + 25.0
 
     def stop_session(self, session_id: str) -> bool:
-        """Force stop a session by triggering abort, killing FFmpeg proc, and clearing session."""
+        """Force stop a session by setting its abort event."""
         with self._lock:
             session = self._sessions.get(session_id)
             if session:
-                session.trigger_abort()
-                self.end_session(session_id, reason="aborted")
+                session.abort_event.set()
                 logger.info("Playback session abort requested by admin: %s", session_id)
                 return True
             return False
 
-    def stop_device_playback(self, device_mac: str) -> bool:
-        """Stop any active playback session matching a device MAC address."""
-        if not device_mac:
-            return False
-        clean_mac = str(device_mac).replace(":", "").replace("-", "").strip().upper()
-        if clean_mac.startswith("ESP32"):
-            clean_mac = clean_mac[5:]
-        stopped = False
-        with self._lock:
-            # 1. Direct device index lookup
-            sid = self._device_sessions.get(clean_mac)
-            if sid and sid in self._sessions:
-                s = self._sessions[sid]
-                s.trigger_abort()
-                self.end_session(sid, reason="aborted")
-                stopped = True
-            # 2. Iterate all active sessions to catch partial or formatted MAC matches
-            for s in list(self._sessions.values()):
-                s_mac = (s.device_mac or "").replace(":", "").replace("-", "").strip().upper()
-                if s_mac.startswith("ESP32"):
-                    s_mac = s_mac[5:]
-                if s_mac and (s_mac == clean_mac or clean_mac.endswith(s_mac) or s_mac.endswith(clean_mac)):
-                    s.trigger_abort()
-                    self.end_session(s.session_id, reason="aborted")
-                    stopped = True
-        return stopped
-
     def stop_user_playback(self, user_id: int) -> bool:
-        """Stop playback for a user by user_id and all associated device MAC addresses."""
-        stopped = False
         with self._lock:
             sid = self._user_sessions.get(user_id)
             if sid and sid in self._sessions:
                 session = self._sessions[sid]
-                session.trigger_abort()
-                self.end_session(sid, reason="aborted")
+                session.abort_event.set()
                 logger.info("Playback session abort requested by user_id %s: %s", user_id, sid)
-                stopped = True
+                return True
             # Also check if any session has this user_id
             for s in list(self._sessions.values()):
                 if s.user_id == user_id:
-                    s.trigger_abort()
-                    self.end_session(s.session_id, reason="aborted")
+                    s.abort_event.set()
                     logger.info("Playback session abort requested by user_id %s: %s", user_id, s.session_id)
-                    stopped = True
-
-        # Also find and abort sessions for devices belonging to this user (handles user_id=0 sessions on user hardware)
-        try:
-            from xiaozhi.dependencies import get_store
-            store = get_store()
-            user_macs = set()
-            if hasattr(store, "get_user_mac_address"):
-                m = store.get_user_mac_address(user_id)
-                if m:
-                    user_macs.add(m)
-            if hasattr(store, "get_user_mac_addresses"):
-                for m in (store.get_user_mac_addresses(user_id) or []):
-                    if m:
-                        user_macs.add(m)
-            if hasattr(store, "get_user_devices"):
-                for d in (store.get_user_devices(user_id) or []):
-                    mac = d.get("device_id") or d.get("mac")
-                    if mac:
-                        user_macs.add(mac)
-
-            for mac in user_macs:
-                if self.stop_device_playback(mac):
-                    stopped = True
-                    logger.info("Playback session on user device %s aborted for user_id %s", mac, user_id)
-        except Exception as exc:
-            logger.debug("Could not lookup user devices for playback abort: %s", exc)
-
-        return stopped
+                    return True
+            return False
 
     def get_active_sessions(self) -> List[Dict[str, Any]]:
         with self._lock:
+            # Prune any sessions inactive for > 10 minutes without update
             now = time.time()
-            to_remove = []
-            for sid, s in self._sessions.items():
-                if s.status != "streaming" and s.grace_until and now >= s.grace_until:
-                    to_remove.append(sid)
-                elif s.status == "streaming" and now - s.last_active_at > 600:
-                    to_remove.append(sid)
-
-            for sid in to_remove:
+            stale = [sid for sid, s in self._sessions.items() if now - s.last_active_at > 600]
+            for sid in stale:
                 s = self._sessions.pop(sid, None)
-                if s:
-                    if self._user_sessions.get(s.user_id) == sid:
-                        self._user_sessions.pop(s.user_id, None)
-                    if s.device_mac:
-                        c_mac = s.device_mac[6:] if s.device_mac.startswith("ESP32-") else s.device_mac
-                        c_mac = c_mac.strip().upper()
-                        if self._device_sessions.get(c_mac) == sid:
-                            self._device_sessions.pop(c_mac, None)
-                    self._last_played[s.user_id] = {
-                        **s.to_dict(),
-                        "ended_at": s.ended_at or now,
-                        "end_reason": s.status
-                    }
+                if s and self._user_sessions.get(s.user_id) == sid:
+                    self._user_sessions.pop(s.user_id, None)
 
-            status_order = {"streaming": 0, "buffering": 1, "interrupted": 2, "gap": 3}
-            sessions_list = list(self._sessions.values())
-            sessions_list.sort(key=lambda s: (status_order.get(s.status, 9), -s.started_at))
-            return [s.to_dict() for s in sessions_list]
+            return [s.to_dict() for s in self._sessions.values()]
 
     def get_user_session(self, user_id: int) -> Optional[Dict[str, Any]]:
         with self._lock:
@@ -639,7 +327,7 @@ class PlaybackTracker:
                 if sid and sid in self._sessions:
                     if clean_mac:
                         self._sessions[sid].device_mac = clean_mac
-                    self.end_session(sid, reason="device_finished" if status_lower == "finished" else status_lower)
+                    self.end_session(sid, reason=status_lower)
                     logger.info("Device reported %s for user %s (mac: %s), session %s ended", status_lower, user_id, clean_mac, sid)
                     return True
                 elif user_id in self._last_played:

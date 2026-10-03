@@ -5,12 +5,11 @@ demuxes Ogg container on the server, and streams raw Opus frames via WebSocket.
 """
 
 import asyncio
-import collections
 import logging
 import os
 import shutil
 import time
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import AsyncGenerator, Optional
 
 logger = logging.getLogger("xiaozhi.youtube_streamer")
 
@@ -34,13 +33,6 @@ def get_ffmpeg_binary() -> Optional[str]:
     return _FFMPEG_PATH or shutil.which("ffmpeg")
 
 
-_video_metadata_cache: Dict[str, Dict[str, Any]] = {}
-
-
-def get_cached_video_meta(video_id: str) -> Dict[str, Any]:
-    return _video_metadata_cache.get(video_id, {})
-
-
 async def extract_audio_url(video_id: str) -> tuple[Optional[str], str]:
     if not yt_dlp:
         raise RuntimeError("yt_dlp tidak tersedia di server.")
@@ -53,44 +45,10 @@ async def extract_audio_url(video_id: str) -> tuple[Optional[str], str]:
             "no_warnings": True,
             "format": "bestaudio/best",
             "extractaudio": True,
-            "noplaylist": True,
-            "socket_timeout": 15,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            if not info:
-                return None, ""
-
-            title = info.get("title", "")
-            duration = int(info.get("duration") or 0)
-            dur_mins, dur_secs = divmod(duration, 60)
-            dur_fmt = f"{dur_mins:02d}:{dur_secs:02d}" if duration > 0 else ""
-
-            _video_metadata_cache[video_id] = {
-                "title": title,
-                "duration": duration,
-                "duration_formatted": dur_fmt,
-            }
-
-            url = info.get("url")
-
-            # Fallback to inspecting formats if top-level url is None
-            if not url:
-                formats = info.get("formats", [])
-                audio_formats = [
-                    f for f in formats
-                    if f.get("url") and f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none")
-                ]
-                if not audio_formats:
-                    audio_formats = [f for f in formats if f.get("url") and f.get("acodec") not in (None, "none")]
-
-                if audio_formats:
-                    audio_formats.sort(key=lambda x: (x.get("abr") or x.get("tbr") or 0), reverse=True)
-                    url = audio_formats[0].get("url")
-                elif formats:
-                    url = formats[-1].get("url")
-
-            return url, title
+            return info.get("url"), info.get("title", "")
 
     return await loop.run_in_executor(None, _extract)
 
@@ -198,7 +156,7 @@ async def stream_video_to_websocket(
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
-        "-user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "-re",
         "-i", source_url,
         "-vn",
         "-ac", "1",
@@ -218,27 +176,8 @@ async def stream_video_to_websocket(
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.DEVNULL
     )
-
-    if session:
-        session.proc = proc
-
-    stderr_lines = collections.deque(maxlen=30)
-
-    async def _drain_ws_stderr(pipe):
-        try:
-            while True:
-                line = await pipe.readline()
-                if not line:
-                    break
-                decoded = line.decode("utf-8", errors="ignore").strip()
-                if decoded:
-                    stderr_lines.append(decoded)
-        except Exception:
-            pass
-
-    stderr_task = asyncio.create_task(_drain_ws_stderr(proc.stderr))
 
     abort_event = asyncio.Event()
 
@@ -249,8 +188,6 @@ async def stream_video_to_websocket(
                 if "abort" in data.lower() or "stop" in data.lower():
                     logger.info("Client meminta abort playback")
                     abort_event.set()
-                    if session:
-                        session.trigger_abort()
                     break
         except Exception:
             abort_event.set()
@@ -271,24 +208,6 @@ async def stream_video_to_websocket(
             if abort_event.is_set() or (session and session.abort_event.is_set()):
                 logger.info("Stream dihentikan oleh user abort atau admin.")
                 break
-
-            # Periodically re-check user permission (every ~20 frames = 1.2 seconds)
-            if user_id and frame_idx % 20 == 0:
-                try:
-                    from xiaozhi.dependencies import get_store
-                    st = get_store()
-                    if hasattr(st, "get_user_features"):
-                        feats = st.get_user_features(user_id)
-                        if not feats.get("youtube_music", True):
-                            logger.warning(
-                                f"WebSocket stream aborted for user {user_id}: feature youtube_music disabled mid-stream."
-                            )
-                            abort_event.set()
-                            if session:
-                                session.trigger_abort()
-                            break
-                except Exception:
-                    pass
 
             # Pack ke XiaoZhi BinaryProtocol3:
             payload_len = len(packet)
@@ -332,15 +251,4 @@ async def stream_video_to_websocket(
                 await proc.wait()
             except Exception:
                 pass
-        try:
-            await asyncio.wait_for(stderr_task, timeout=0.5)
-        except Exception:
-            stderr_task.cancel()
-
-        if proc.returncode is not None and proc.returncode not in (0, -9, -15, 137) and not abort_event.is_set():
-            err_details = "\n  ".join(stderr_lines) if stderr_lines else "(Tidak ada output stderr dari FFmpeg)"
-            logger.error(
-                f"Kendala transcoding FFmpeg WebSocket untuk video '{video_id}' (PID: {proc.pid}, Exit Code: {proc.returncode}):\n  {err_details}"
-            )
-
         logger.info("FFmpeg stream selesai untuk %s (%d frame)", video_id, frame_idx)

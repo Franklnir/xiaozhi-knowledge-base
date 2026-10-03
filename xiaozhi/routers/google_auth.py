@@ -28,7 +28,6 @@ from xiaozhi.core.security import create_token_pair, normalize_username
 from xiaozhi.dependencies import (
     get_current_user,
     get_store,
-    redirect_with_error,
     redirect_with_message,
     render,
     validate_csrf,
@@ -186,17 +185,17 @@ async def google_callback(
     """Handle OAuth 2.0 callback from Google."""
     if error:
         logger.warning("Google OAuth error callback: %s", error)
-        return redirect_with_error("/login", f"Autentikasi Google dibatalkan: {error}")
+        return redirect_with_message("/login", f"Autentikasi Google dibatalkan: {error}")
 
     if not code or not state:
-        return redirect_with_error("/login", "Permintaan autentikasi Google tidak lengkap.")
+        return redirect_with_message("/login", "Permintaan autentikasi Google tidak lengkap.")
 
     # Validate state parameter
     try:
         state_data = google_oauth_serializer.loads(state, max_age=600)
     except (SignatureExpired, BadSignature) as exc:
         logger.warning("Invalid or expired Google OAuth state: %s", exc)
-        return redirect_with_error("/login", "Sesi autentikasi Google kedaluwarsa. Silakan coba lagi.")
+        return redirect_with_message("/login", "Sesi autentikasi Google kedaluwarsa. Silakan coba lagi.")
 
     action = state_data.get("action", "login")
     is_mobile = (state_data.get("source") in ("mobile", "mobile_app", "app"))
@@ -204,7 +203,7 @@ async def google_callback(
     def respond_error(msg: str, target: str = "/login"):
         if is_mobile:
             return RedirectResponse(url=f"espbridge://oauth/callback?error={urlencode({'msg': msg})}", status_code=303)
-        return redirect_with_error(target, msg)
+        return redirect_with_message(target, msg)
 
     def mobile_success_response(u: dict, r: str) -> RedirectResponse:
         token_pair = create_token_pair(u["id"], u["username"], r, u.get("session_version", 1))
@@ -391,14 +390,13 @@ async def google_callback(
             except Exception as exc:
                 logger.warning("Could not auto-link Google account: %s", exc)
 
-    # 3. If user is NOT registered yet: DO NOT auto-create user!
-    # Reject login and redirect to register page with clear error notification.
+    # 3. If user is NOT registered yet, auto-register them seamlessly!
     if not user_record:
-        logger.info("Google login rejected: account %s (google_id=%s) is not registered.", google_email, google_id)
-        return respond_error(
-            f"Akun Google Anda ({google_email}) belum terdaftar. Silakan lakukan pendaftaran terlebih dahulu.",
-            "/register"
-        )
+        username = generate_unique_username(google_email, google_name, store)
+        try:
+            user_record = store.create_google_user(username, google_id, google_email)
+        except ValueError as exc:
+            return respond_error(f"Gagal membuat akun Google: {exc}", "/login")
 
     # 4. User is registered / logged in, proceed with role & MCP check
     role = str(user_record.get("role") or "user").lower()
@@ -467,4 +465,4 @@ async def google_unlink(request: Request, csrf_token: str = Form(...)):
         store.unlink_google_account(int(user["id"]))
         return redirect_with_message("/profil", "Tautan akun Google berhasil diputuskan.")
     except ValueError as exc:
-        return redirect_with_error("/profil", str(exc))
+        return redirect_with_message("/profil", str(exc))

@@ -4,7 +4,6 @@ from xiaozhi.services.preset_approval_service import (
     revoke_access as revoke_preset_access,
     list_presets,
     save_or_update_preset,
-    set_active_preset_version,
     generate_claim_code,
     list_claim_codes,
     delete_claim_code,
@@ -139,20 +138,6 @@ async def admin_save_preset_action(
     except Exception as exc:
         logger.exception("Error saving preset firmware")
         return redirect_with_message("/admin/firmware/approvals", f"Gagal menyimpan preset: {str(exc)}")
-
-
-@router.post("/presets/{preset_id}/set-active-version")
-async def admin_set_active_version_action(request: Request, preset_id: str, version: str = Form(...)):
-    user = require_admin(request)
-    try:
-        updated = set_active_preset_version(preset_id=preset_id, version=version, admin_user=user)
-        return redirect_with_message(
-            "/admin/firmware/approvals",
-            f"Versi aktif preset '{updated.get('title')}' berhasil diubah ke {version}."
-        )
-    except Exception as exc:
-        logger.exception("Error changing active preset version")
-        return redirect_with_message("/admin/firmware/approvals", f"Gagal mengubah versi aktif: {str(exc)}")
 
 
 @router.post("/claim-codes/generate")
