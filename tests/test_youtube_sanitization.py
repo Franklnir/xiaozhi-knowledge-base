@@ -50,8 +50,14 @@ def test_esp32_c3_audio_profile_resolution():
     assert resolve_chip_audio_profile("esp32-s3") == 24000
     assert resolve_chip_audio_profile("s3") == 24000
 
-    # Bitrate for ESP32-C3 is capped at 12k/16k max to avoid Wi-Fi buffer bloat and OOM
-    assert resolve_adaptive_bitrate("auto", rssi=-60, chip="esp32c3") == "12k"
-    assert resolve_adaptive_bitrate("32k", chip="esp32c3") == "16k"
+    # Bitrate for ESP32-C3: ladder is 6k -> 8k -> 10k -> 14k, max 14k, default 10k
+    assert resolve_adaptive_bitrate("auto", rssi=-60, chip="esp32c3") == "14k"
+    assert resolve_adaptive_bitrate("auto", rssi=-70, chip="esp32c3") == "10k"
+    assert resolve_adaptive_bitrate("auto", rssi=-80, chip="esp32c3") == "8k"
+    assert resolve_adaptive_bitrate("auto", rssi=-90, chip="esp32c3") == "6k"
+    assert resolve_adaptive_bitrate("auto", rssi=None, chip="esp32c3") == "10k"
+    assert resolve_adaptive_bitrate("12k", chip="esp32c3") == "10k"
+    assert resolve_adaptive_bitrate("16k", chip="esp32c3") == "14k"
+    assert resolve_adaptive_bitrate("32k", chip="esp32c3") == "14k"
     assert resolve_adaptive_bitrate("auto", rssi=-60, chip="esp32s3") == "30k"
 
