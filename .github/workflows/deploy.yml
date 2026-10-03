@@ -155,9 +155,9 @@ jobs:
               esac
             done
 
-            # Pull latest code and reset cleanly
-            git fetch origin main
-            git reset --hard origin/main
+            # Pull latest code and reset cleanly using GITHUB_TOKEN for private repo auth
+            git fetch https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
+            git reset --hard FETCH_HEAD
 
             # Authenticate Docker to pull private GHCR image
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
