@@ -35,3 +35,23 @@ def test_sanitize_youtube_query_plain_song():
 def test_sanitize_youtube_query_empty():
     assert sanitize_youtube_query("") == ""
     assert sanitize_youtube_query("   ") == ""
+
+
+def test_esp32_c3_audio_profile_resolution():
+    from xiaozhi.routers.youtube import resolve_chip_audio_profile, resolve_adaptive_bitrate
+
+    # ESP32-C3 must resolve to 16kHz to prevent single-core CPU overload / watchdog reset
+    assert resolve_chip_audio_profile("esp32c3") == 16000
+    assert resolve_chip_audio_profile("esp32-c3") == 16000
+    assert resolve_chip_audio_profile("c3") == 16000
+
+    # ESP32-S3 resolves to 24kHz
+    assert resolve_chip_audio_profile("esp32s3") == 24000
+    assert resolve_chip_audio_profile("esp32-s3") == 24000
+    assert resolve_chip_audio_profile("s3") == 24000
+
+    # Bitrate for ESP32-C3 is capped at 12k/16k max to avoid Wi-Fi buffer bloat and OOM
+    assert resolve_adaptive_bitrate("auto", rssi=-60, chip="esp32c3") == "12k"
+    assert resolve_adaptive_bitrate("32k", chip="esp32c3") == "16k"
+    assert resolve_adaptive_bitrate("auto", rssi=-60, chip="esp32s3") == "30k"
+
