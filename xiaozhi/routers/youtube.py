@@ -564,10 +564,10 @@ async def _stream_opus_audio(
         "-b:a", br,
         "-vbr", "on",
         "-compression_level", "5",
-        "-application", "voip",
+        "-application", "audio",
         "-flush_packets", "1",
         "-frame_duration", "60",
-        "-page_duration", "60000",
+        "-page_duration", "200000",
         "-f", "ogg",
         "pipe:1"
     ])
@@ -605,10 +605,13 @@ async def _stream_opus_audio(
     logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
 
     is_c3 = bool(chip and "c3" in chip.lower())
-    # Approximate bytes per second based on selected bitrate (e.g. 10k -> 1250 B/s, 14k -> 1750 B/s)
+    # Nominal bytes/sec from bitrate (e.g. 10k -> 1250 B/s, 14k -> 1750 B/s)
     br_num_match = re.match(r"^(\d+)", str(br).strip().lower())
     bitrate_kbps = int(br_num_match.group(1)) if br_num_match else (10 if is_c3 else 24)
-    bytes_per_sec = max(800, (bitrate_kbps * 1000) // 8)
+    nominal_bps = (bitrate_kbps * 1000) // 8
+    # Give 45% delivery headroom above nominal bitrate to account for Ogg page headers,
+    # network jitter, and keep ESP32 ring buffer filled (anti-stutter / anti putus-putus)
+    bytes_per_sec = max(1800, int(nominal_bps * 1.45))
     target_send_time = time.monotonic()
 
     try:
@@ -649,15 +652,16 @@ async def _stream_opus_audio(
                 last_logged_bytes = total_bytes
 
             # Adaptive Pacing for ESP32-C3 / low RAM chips:
-            # Allows initial 3 chunks pre-buffer (~3-4 seconds) for instant playback,
-            # then paces chunks at real-time rate so RAM heap is never exhausted.
-            if is_c3 and loop_count > 3:
+            # Allows initial 10 chunks pre-buffer (~15KB / ~10 detik audio) agar buffer ESP32 terisi mantap,
+            # kemudian mengalirkan chunk dengan 45% delivery headroom agar buffer tidak pernah kering (anti putus-putus)
+            # tanpa membanjiri RAM (anti-OOM reset).
+            if is_c3 and loop_count > 10:
                 chunk_duration = len(chunk) / bytes_per_sec
                 target_send_time += chunk_duration
                 sleep_sec = target_send_time - time.monotonic()
                 if sleep_sec > 0:
-                    await asyncio.sleep(min(sleep_sec, 1.2))
-                elif sleep_sec < -2.0:
+                    await asyncio.sleep(min(sleep_sec, 0.4))
+                elif sleep_sec < -1.5:
                     target_send_time = time.monotonic()
 
             yield chunk
