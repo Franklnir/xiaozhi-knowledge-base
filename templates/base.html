@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/img/favicon-16x16.png">
+    <link rel="icon" type="image/png" href="/static/img/logo.png">
     <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+    <link rel="shortcut icon" href="/static/img/favicon.ico">
 
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,16 +32,16 @@
     <meta property="og:url" content="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
     <meta property="og:title" content="{% block og_title %}Xiaozhi Indonesia - Asisten Suara Cerdas IoT & Knowledge Base | xiaozhiscig{% endblock %}">
     <meta property="og:description" content="{% block og_desc %}Kelola materi belajar, kontrol perangkat smart home virtual & relay nyata, serta akses 47 tools cerdas terintegrasi untuk asisten suara Xiaozhi (xiaozhiscig.biz.id).{% endblock %}">
-    <meta property="og:image" content="https://xiaozhiscig.biz.id/static/img/og-preview.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
+    <meta property="og:image" content="https://xiaozhiscig.biz.id/static/img/logo.png">
+    <meta property="og:image:width" content="1254">
+    <meta property="og:image:height" content="1254">
     <meta property="og:locale" content="id_ID">
 
     <!-- Twitter Cards -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{% block tw_title %}Xiaozhi Indonesia - Asisten Suara Cerdas IoT & AI | xiaozhiscig{% endblock %}">
     <meta name="twitter:description" content="{% block tw_desc %}Platform IoT & Voice Assistant Xiaozhi dengan 47 Tools Cerdas dan integrasi Smart Home (xiaozhiscig.biz.id).{% endblock %}">
-    <meta name="twitter:image" content="https://xiaozhiscig.biz.id/static/img/og-preview.png">
+    <meta name="twitter:image" content="https://xiaozhiscig.biz.id/static/img/logo.png">
 
     <!-- hreflang (bilingual) -->
     <link rel="alternate" hreflang="id" href="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
@@ -56,6 +58,8 @@
       "name": "Xiaozhi Indonesia",
       "alternateName": ["xiaozhiscig", "xiaozhiscig.biz.id", "Xiaozhi AI Indonesia", "ESPBridge"],
       "url": "https://xiaozhiscig.biz.id/",
+      "logo": "https://xiaozhiscig.biz.id/static/img/logo.png",
+      "image": "https://xiaozhiscig.biz.id/static/img/logo.png",
       "applicationCategory": "EducationalApplication, UtilitiesApplication",
       "operatingSystem": "All",
       "description": "Platform resmi Xiaozhi Indonesia (xiaozhiscig.biz.id): integrasi asisten suara cerdas IoT ESP32, 47 tools MCP, kontrol smart home, dan knowledge base.",
@@ -186,6 +190,14 @@
             font-size: 14px;
             font-weight: 800;
             flex-shrink: 0;
+            overflow: hidden;
+        }
+        .app-brand-mark img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            border-radius: inherit;
         }
         .app-brand-text {
             display: flex;
@@ -1020,9 +1032,10 @@
         :root[data-theme="neo"] .app-brand-mark {
             border: 2px solid #111111 !important;
             box-shadow: 2.5px 2.5px 0 #111111 !important;
-            background: #111111 !important;
+            background: #fff06a !important;
             color: #ffffff !important;
             font-weight: 900;
+            overflow: hidden;
         }
         :root[data-theme="neo"] .app-sidebar-link {
             border: 1.5px solid transparent;
@@ -1562,7 +1575,9 @@
     <aside class="app-nav-aside" id="appSidebar">
         <div class="app-sidebar-header">
             <a href="/" class="app-brand">
-                <span class="app-brand-mark">ES</span>
+                <span class="app-brand-mark">
+                    <img src="/static/img/logo.png" alt="Xiaozhi Logo" width="38" height="38" loading="eager">
+                </span>
                 <div class="app-brand-text">
                     <span class="app-brand-name">Xiaozhi Indonesia</span>
                     <span class="app-brand-sub">Knowledge Base</span>
@@ -1681,7 +1696,9 @@
     <!-- Public Header for Visitors & Search Engines -->
     <header style="position:fixed; top:0; left:0; right:0; height:60px; background:var(--app-surface); border-bottom:1px solid var(--app-border); padding:0 20px; display:flex; justify-content:space-between; align-items:center; z-index:40; box-shadow:var(--app-shadow);">
         <a href="/" class="app-brand" style="text-decoration:none;">
-            <span class="app-brand-mark">ES</span>
+            <span class="app-brand-mark">
+                <img src="/static/img/logo.png" alt="Xiaozhi Logo" width="38" height="38" loading="eager">
+            </span>
             <div class="app-brand-text">
                 <span class="app-brand-name">Xiaozhi Indonesia</span>
                 <span class="app-brand-sub">Platform AI & IoT</span>
