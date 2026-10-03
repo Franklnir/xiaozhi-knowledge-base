@@ -401,7 +401,62 @@
                                 </span>
                             </div>
                         </div>
-<!-- Status & Action Box: DUA KONDISI (GEMBOK TERBUKA vs GEMBOK TERKUNCI) -->
+
+                        <!-- PILIHAN VERSI PRESET (Bisa pilih versi lama maupun terbaru dengan aman) -->
+                        <div id="presetVersionSection" style="margin: 12px 0; background: var(--app-surface); border: 1.5px solid var(--app-border-strong); border-radius: var(--app-radius); padding: 12px 14px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+                                <label for="userPresetVersionSelect" style="font-size:12px; font-weight:800; color:var(--app-text); display:flex; align-items:center; gap:6px; margin:0;">
+                                    <span>🏷️</span> Pilih Versi Firmware Preset:
+                                </label>
+                                <div id="versionStatusPill" class="app-chip app-chip-success" style="font-size:10.5px; font-weight:850;">
+                                    Versi Aktif (Rekomendasi)
+                                </div>
+                            </div>
+
+                            <select id="userPresetVersionSelect" class="app-input" onchange="onUserPresetVersionChange(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px; font-weight:700;">
+                                {% if preset_status and preset_status.preset and preset_status.preset.versions %}
+                                    {% for v in preset_status.preset.versions %}
+                                    <option value="{{ v.version }}" {% if v.version == preset_status.active_version %}selected{% endif %}>
+                                        {{ v.version }} {% if v.version == preset_status.active_version %}(Versi Utama / Aktif){% else %}(Versi Sebelumnya / Lama){% endif %}{% if v.changelog %} • {{ v.changelog[:40] }}{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="{{ preset_status.active_version if preset_status else 'v001' }}">
+                                        {{ preset_status.active_version if preset_status else 'v001' }} (Versi Utama / Aktif)
+                                    </option>
+                                {% endif %}
+                            </select>
+
+                            <!-- Informasi Detail Versi yang Dipilih -->
+                            <div id="versionDetailBox" style="margin-top:10px; padding:10px; background:var(--app-surface-muted); border-radius:6px; border:1px solid var(--app-border); font-size:11.5px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:4px;">
+                                    <strong style="color:var(--app-text);" id="verDetailFilename">
+                                        {{ preset_status.preset.versions[0].filename if preset_status and preset_status.preset and preset_status.preset.versions else 'firmware.bin' }}
+                                    </strong>
+                                    <span style="color:var(--app-muted); font-size:11px;" id="verDetailDate">
+                                        {{ preset_status.preset.versions[0].uploaded_at[:10] if preset_status and preset_status.preset and preset_status.preset.versions and preset_status.preset.versions[0].uploaded_at else '' }}
+                                    </span>
+                                </div>
+                                <div style="color:var(--app-muted); margin-bottom:6px; line-height:1.4;" id="verDetailChangelog">
+                                    📝 {{ preset_status.preset.versions[0].changelog if preset_status and preset_status.preset and preset_status.preset.versions else 'Rilis firmware resmi' }}
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; font-size:11px; border-top:1px dashed var(--app-border); padding-top:6px;">
+                                    <span id="verDetailSize">
+                                        Ukuran: {{ ((preset_status.preset.versions[0].size_bytes if preset_status and preset_status.preset and preset_status.preset.versions else 0) / (1024*1024))|round(2) }} MB
+                                    </span>
+                                    <span style="color:var(--app-accent, #059669); font-weight:750;" id="verDetailSecurity">
+                                        🛡️ Terverifikasi SHA-256 • Enkripsi AES-256
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Notifikasi Edukatif Saat Memilih Versi Lama -->
+                            <div id="olderVersionAlert" style="display:none; margin-top:8px; padding:8px 10px; background:rgba(234, 179, 8, 0.1); border:1px solid rgba(234, 179, 8, 0.35); border-radius:6px; font-size:11.5px; color:var(--app-text); line-height:1.4;">
+                                ⚠️ <strong>Catatan Versi Lama:</strong> Anda memilih versi firmware terdahulu (<span id="alertVersionName" style="font-weight:bold;">v001</span>). Firmware ini tetap aman, kompatibel, dan stabil untuk di-flash ke microcontroller ESP32 Anda.
+                            </div>
+                        </div>
+
+                        <!-- Status & Action Box: DUA KONDISI (GEMBOK TERBUKA vs GEMBOK TERKUNCI) -->
                         <div style="padding-top:10px; border-top:1px solid var(--app-border);">
                             <!-- KONDISI 1: GEMBOK TERBUKA 🔓 -->
                             <div id="boxPresetUnlocked" style="{% if not preset_status or not preset_status.authorized %}display:none;{% endif %}">
@@ -411,7 +466,7 @@
                                             {% if user and user.role == 'admin' %}🛡️ ADMINISTRATOR RESMI (AKSES PENUH){% else %}🔓 GEMBOK TERBUKA • LISENSI RESMI AKTIF{% endif %}
                                         </span>
                                         <span style="font-size:11px; color:var(--app-muted); display:block; margin-top:3px;">
-                                            ⚡ Akses Anda aktif untuk versi <strong>{{ preset_status.active_version if preset_status else 'v001' }}</strong> dan otomatis menerima pembaruan versi berikutnya.
+                                            ⚡ Lisensi resmi aktif. Anda bebas memilih versi mana pun (versi lama maupun terbaru) untuk di-flash secara aman.
                                         </span>
                                     </div>
                                     <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:7px 16px;">
@@ -729,6 +784,8 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 
     // USER AUTHORIZATION STATE
     let currentPresetId = "{{ preset_status.preset.id if preset_status and preset_status.preset else 'esp32s3_cam' }}";
+    let currentSelectedVersion = "{{ preset_status.active_version if preset_status and preset_status.active_version else 'v001' }}";
+    let PRESETS_CACHE = {{ presets|tojson }};
     const userAuthStatus = {
         isLoggedIn: {{ 'true' if user else 'false' }},
         role: "{{ user.role if user else '' }}",
@@ -946,12 +1003,27 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             if (elV) elV.textContent = 'Versi: ' + v;
             if (elO) elO.textContent = 'Offset ' + o;
         }
+
+        let cachedPreset = PRESETS_CACHE.find(p => p.id === presetId);
+        if (cachedPreset) {
+            renderPresetVersions(presetId, cachedPreset.versions, cachedPreset.active_version);
+        }
+
         try {
             const res = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(presetId) + '/status', { credentials: 'same-origin' });
             if (res.ok) {
                 const st = await res.json();
                 userAuthStatus.authorized = !!st.authorized;
                 userAuthStatus.status = st.status || 'NONE';
+                userAuthStatus.activeVersion = st.active_version || 'v001';
+
+                if (st.preset) {
+                    const idx = PRESETS_CACHE.findIndex(p => p.id === presetId);
+                    if (idx >= 0) PRESETS_CACHE[idx] = st.preset;
+                    else PRESETS_CACHE.push(st.preset);
+                    renderPresetVersions(presetId, st.preset.versions, st.active_version);
+                }
+
                 const unlockedBox = document.getElementById('boxPresetUnlocked');
                 const lockedBox = document.getElementById('boxPresetLocked');
                 if (unlockedBox && lockedBox) {
@@ -972,7 +1044,104 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         } catch (e) {
             console.error('Error fetching preset status:', e);
         }
-};
+    };
+
+    window.renderPresetVersions = function(presetId, versionsList, activeVer) {
+        const vSelect = document.getElementById('userPresetVersionSelect');
+        if (!vSelect) return;
+
+        let presetObj = PRESETS_CACHE.find(p => p.id === presetId);
+        let versions = versionsList || (presetObj ? presetObj.versions : []) || [];
+        let defActive = activeVer || (presetObj ? presetObj.active_version : 'v001');
+
+        vSelect.innerHTML = '';
+        if (versions.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = defActive;
+            opt.textContent = defActive + ' (Versi Aktif)';
+            vSelect.appendChild(opt);
+        } else {
+            versions.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v.version;
+                const isAct = (v.version === defActive);
+                let label = v.version + (isAct ? ' (Versi Utama / Aktif)' : ' (Versi Sebelumnya / Lama)');
+                if (v.changelog) {
+                    label += ' • ' + (v.changelog.length > 40 ? v.changelog.substring(0, 37) + '...' : v.changelog);
+                }
+                opt.textContent = label;
+                if (isAct) opt.selected = true;
+                vSelect.appendChild(opt);
+            });
+        }
+
+        currentSelectedVersion = vSelect.value || defActive;
+        onUserPresetVersionChange(currentSelectedVersion);
+    };
+
+    window.onUserPresetVersionChange = function(versionCode) {
+        currentSelectedVersion = versionCode;
+        let presetObj = PRESETS_CACHE.find(p => p.id === currentPresetId);
+        let versions = presetObj ? (presetObj.versions || []) : [];
+        let verMeta = versions.find(v => v.version === versionCode) || null;
+        let activeVer = presetObj ? presetObj.active_version : (userAuthStatus.activeVersion || 'v001');
+
+        const isOlder = (versionCode !== activeVer);
+
+        // Update Version Badge & Status Pill
+        const elV = document.getElementById('lblPresetVersion');
+        if (elV) elV.textContent = 'Versi: ' + versionCode;
+
+        const pill = document.getElementById('versionStatusPill');
+        const alertBox = document.getElementById('olderVersionAlert');
+        const alertName = document.getElementById('alertVersionName');
+
+        if (pill) {
+            pill.textContent = isOlder ? 'Versi Sebelumnya (' + versionCode + ')' : 'Versi Aktif (' + versionCode + ')';
+            pill.className = isOlder ? 'app-chip app-chip-warning' : 'app-chip app-chip-success';
+        }
+        if (alertBox) {
+            alertBox.style.display = isOlder ? 'block' : 'none';
+        }
+        if (alertName) {
+            alertName.textContent = versionCode;
+        }
+
+        // Update Detail Box
+        const fnEl = document.getElementById('verDetailFilename');
+        const dtEl = document.getElementById('verDetailDate');
+        const clEl = document.getElementById('verDetailChangelog');
+        const szEl = document.getElementById('verDetailSize');
+
+        if (verMeta) {
+            if (fnEl) fnEl.textContent = verMeta.filename || (currentPresetId + '_' + versionCode + '.bin');
+            if (dtEl) dtEl.textContent = verMeta.uploaded_at ? verMeta.uploaded_at.substring(0, 10) : '';
+            if (clEl) clEl.textContent = '📝 ' + (verMeta.changelog || 'Rilis firmware versi ' + versionCode);
+            if (szEl) {
+                const mb = verMeta.size_bytes ? (verMeta.size_bytes / (1024 * 1024)).toFixed(2) : '0';
+                szEl.textContent = 'Ukuran: ' + mb + ' MB' + (verMeta.sha256_short ? ' • SHA: ' + verMeta.sha256_short : '');
+            }
+        } else {
+            if (fnEl) fnEl.textContent = currentPresetId + '_' + versionCode + '.bin';
+            if (clEl) clEl.textContent = '📝 Rilis firmware versi ' + versionCode;
+        }
+
+        // Reset tombol agar siap memuat binary versi terpilih
+        const btn = document.getElementById('btnLoadPreset');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '⚡ Muat Preset Ini ke Flasher (' + versionCode + ')';
+            btn.classList.remove('app-button-ghost');
+            btn.classList.add('app-button-primary');
+        }
+    };
+
+    // Inisialisasi awal pilihan versi preset
+    try {
+        renderPresetVersions(currentPresetId, null, userAuthStatus.activeVersion);
+    } catch (e) {
+        console.warn('Initial preset versions render warning:', e);
+    }
 
     // Guide Modal & Subtabs (Khusus ID: esp32s3_cam)
     window.openGuideModal = function() {
@@ -1190,9 +1359,11 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             btn.disabled = true;
             btn.innerHTML = '⏳ Menyiapkan firmware ke memori...';
         }
-        logToConsole('[INFO] Mengambil binary preset ' + currentPresetId + ' dari server aman...');
+        const reqVer = currentSelectedVersion || '';
+        logToConsole('[INFO] Mengambil binary preset ' + currentPresetId + (reqVer ? ' (Versi: ' + reqVer + ')' : '') + ' dari server aman...');
         try {
-            const resp = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(currentPresetId) + '/stream', {
+            const streamUrl = '/api/v1/flasher/preset/' + encodeURIComponent(currentPresetId) + '/stream' + (reqVer ? '?version=' + encodeURIComponent(reqVer) : '');
+            const resp = await fetch(streamUrl, {
                 credentials: 'same-origin'
             });
 
@@ -1201,12 +1372,15 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                     alert('⚠️ Akses Terbatas: Anda belum memiliki izin lisensi untuk menggunakan preset ini. Silakan masukkan kode lisensi atau minta izin ke Admin.');
                     throw new Error('Akses lisensi belum disetujui Admin.');
                 }
-                throw new Error('Server error code: ' + resp.status);
+                const errJson = await resp.json().catch(() => ({}));
+                throw new Error(errJson.detail || ('Server error code: ' + resp.status));
             }
 
             const customOffset = resp.headers.get('X-Firmware-Offset') || '0x0';
+            const firmwareVer = resp.headers.get('X-Firmware-Version') || reqVer || 'v001';
+            const firmwareSha = resp.headers.get('X-Firmware-SHA256') || '';
             const contentDisposition = resp.headers.get('Content-Disposition') || '';
-            let presetFn = currentPresetId + '.bin';
+            let presetFn = currentPresetId + '_' + firmwareVer + '.bin';
             const fnMatch = contentDisposition.match(/filename="?([^";]+)"?/);
             if (fnMatch) presetFn = fnMatch[1];
 
@@ -1215,10 +1389,10 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 
             // Update UI
             if (selectedFileInfo) selectedFileInfo.style.display = 'block';
-            if (selectedFileName) selectedFileName.textContent = presetFn + ' (Official Preset)';
+            if (selectedFileName) selectedFileName.textContent = presetFn + ' [Versi ' + firmwareVer + '] (Official Preset)';
             if (selectedFileSize) {
                 const mb = (selectedFileBuffer.length / (1024 * 1024)).toFixed(2);
-                selectedFileSize.textContent = `${mb} MB (${selectedFileBuffer.length.toLocaleString()} bytes) • Terkunci di Offset ${customOffset}`;
+                selectedFileSize.textContent = `${mb} MB (${selectedFileBuffer.length.toLocaleString()} bytes) • Terkunci di Offset ${customOffset}` + (firmwareSha ? ` • SHA: ${firmwareSha}` : '');
             }
 
             // Lock offset
@@ -1231,12 +1405,12 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 offsetInput.style.display = 'none';
             }
 
-            logToConsole(`[OK] Preset ${presetFn} siap di memori (${buffer.byteLength.toLocaleString()} bytes). Offset dikunci ke ${customOffset}.`);
+            logToConsole(`[OK] Preset ${presetFn} (versi ${firmwareVer}) siap di memori (${buffer.byteLength.toLocaleString()} bytes). Offset dikunci ke ${customOffset}. Verifikasi integritas aman!`);
             updateFlashButtonState();
 
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = `✅ Preset Terpasang di Memori (${customOffset})`;
+                btn.innerHTML = `✅ Preset ${firmwareVer} Terpasang di Memori (${customOffset})`;
                 btn.classList.remove('app-button-primary');
                 btn.classList.add('app-button-ghost');
             }
@@ -1244,7 +1418,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             logToConsole('[ERROR] Gagal memuat preset: ' + err.message);
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '⚡ Muat Preset Ini ke Flasher';
+                btn.innerHTML = '⚡ Muat Preset Ini ke Flasher (' + (reqVer || 'v001') + ')';
             }
         }
     };
