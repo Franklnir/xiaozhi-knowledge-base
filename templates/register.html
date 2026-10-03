@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Daftar Akun & Hubungkan MCP - Xiaozhi Indonesia | xiaozhiscig{% endblock %}
-{% block meta_title %}Daftar Akun & Hubungkan MCP - Xiaozhi Indonesia | xiaozhiscig{% endblock %}
-{% block meta_desc %}Daftar akun gratis di platform Xiaozhi Indonesia untuk mengaktifkan AI Voice Assistant ESP32, 47 Tools MCP, dan Web Serial Flasher.{% endblock %}
+{% block title %}Daftar Akun & Hubungkan MCP - Xiaozhi Indonesia{% endblock %}
 
 {% block content_login %}
 <style>
@@ -41,14 +39,9 @@
 
 <section class="auth-layout">
     <div class="auth-card">
-        <div class="mb-6" style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px;">
-            <a href="/" style="display:inline-block; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                <img src="/static/img/logo.png" alt="Xiaozhi Logo" style="width:72px; height:72px; object-fit:contain; border-radius:18px; box-shadow:0 6px 18px rgba(0,0,0,0.12); border:2.5px solid #111;">
-            </a>
-            <div>
-                <p class="app-eyebrow" style="margin:0 0 2px;">Akun Baru</p>
-                <h1 class="app-title text-2xl" style="margin:0;">Daftar Xiaozhi Indonesia</h1>
-            </div>
+        <div class="mb-6">
+            <p class="app-eyebrow">Akun Baru</p>
+            <h1 class="app-title text-2xl">Daftar Xiaozhi Indonesia</h1>
         </div>
 
         <div id="authAlert" class="{% if not error and not success %}hidden {% endif %}mb-5 app-alert {% if error %}app-alert-danger{% else %}app-alert-success{% endif %}">

@@ -358,27 +358,27 @@ async def api_google_auth(body: GoogleAuthRequest, request: Request):
                 detail={"success": False, "data": None, "message": str(exc)}
             )
 
-    # ── Action: REGISTER vs LOGIN ──
-    if action == "register":
-        if not user_record:
-            from xiaozhi.routers.google_auth import generate_unique_username
-            username = generate_unique_username(google_email, google_name, store)
+    # ── Seamless LOGIN / REGISTER ──
+    # 1. Look up existing user by google_id or email
+    user_record = store.get_user_by_google_id(google_id)
+    if not user_record and google_email:
+        user_record = store.get_user_by_email(google_email)
+        if user_record:
             try:
-                user_record = store.create_google_user(username, google_id, google_email)
-            except ValueError as exc:
-                raise HTTPException(
-                    status_code=400,
-                    detail={"success": False, "data": None, "message": str(exc)}
-                )
-    else:  # action == "login"
-        if not user_record:
+                store.link_google_account(int(user_record["id"]), google_id, google_email)
+            except Exception:
+                pass
+
+    # 2. If user does not exist, auto-register them seamlessly!
+    if not user_record:
+        from xiaozhi.routers.google_auth import generate_unique_username
+        username = generate_unique_username(google_email, google_name, store)
+        try:
+            user_record = store.create_google_user(username, google_id, google_email)
+        except ValueError as exc:
             raise HTTPException(
                 status_code=400,
-                detail={
-                    "success": False,
-                    "data": None,
-                    "message": f"Akun Google ({google_email}) belum terdaftar. Silakan lakukan pendaftaran terlebih dahulu."
-                }
+                detail={"success": False, "data": None, "message": str(exc)}
             )
 
     user_id = int(user_record["id"])

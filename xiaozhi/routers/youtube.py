@@ -1,14 +1,12 @@
 from xiaozhi.services.playback_tracker import playback_tracker
-from xiaozhi.services.youtube_streamer import stream_video_to_websocket, extract_audio_url, get_cached_video_meta
+from xiaozhi.services.youtube_streamer import stream_video_to_websocket, extract_audio_url
 import asyncio
 import base64
-import collections
 import io
 import logging
 import re
 import shutil
 import subprocess
-import time
 from typing import Any, Dict, List, Optional, AsyncGenerator
 
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -103,36 +101,6 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
     return None
 
 
-def sanitize_youtube_query(raw_q: str) -> str:
-    """Membersihkan kata percakapan, imbuhan ASR terpotong, dan tanda baca dari query pencarian YouTube."""
-    if not raw_q:
-        return ""
-    q = raw_q.strip()
-    # 1. Bersihkan tanda kutip dan tanda baca di ujung awal/akhir
-    q = re.sub(r'^["\'\s.,!?;:-]+|["\'\s.,!?;:-]+$', '', q).strip()
-
-    # 2. Bersihkan awalan percakapan (termasuk token ASR terpotong seperti 'kan lagu', 'terin lagu')
-    prefix_pattern = (
-        r"(?i)^(?:(?:halo\s+|hi\s+|hai\s+)?(?:xiaozhi|asisten)\s*,?\s*)?"
-        r"(?:tolong\s+|coba\s+|bisa\s+|mohon\s+)?"
-        r"(?:(?:putar(?:kan)?|puter(?:in)?|setel(?:kan)?|main(?:kan)?|cari(?:kan)?|dengar(?:kan)?|play|nyala(?:kan)?|hidup(?:kan)?)\s+)?"
-        r"(?:kan\s+)?"
-        r"(?:lagu|musik|music|video|song|track)?\s*"
-        r"(?:yang\s+)?(?:judul(?:nya)?\s+|berjudul\s+|dari\s+)?"
-    )
-    q_stripped = re.sub(prefix_pattern, "", q).strip()
-    if q_stripped:
-        q = q_stripped
-
-    # 3. Bersihkan akhiran percakapan (misal 'di youtube music', 'di youtube', 'youtube', 'dari youtube')
-    suffix_pattern = r"(?i)\s*(?:di|dari|pada|lewat|via|on|from)?\s*youtube(?:\s+music)?[\s.,!?;:-]*$"
-    q = re.sub(suffix_pattern, "", q).strip()
-
-    # 4. Bersihkan sisa tanda baca di tepi
-    q = re.sub(r'^["\'\s.,!?;:-]+|["\'\s.,!?;:-]+$', '', q).strip()
-    return q or raw_q.strip()
-
-
 def youtube_search(query: str, max_results: int = 5) -> list:
     if not yt_dlp:
         raise ValueError("yt_dlp tidak tersedia.")
@@ -202,7 +170,12 @@ def youtube_search(query: str, max_results: int = 5) -> list:
             logger.warning("Playlist extraction for %s failed (%s), fallback to search", playlist_id, exc)
 
     # 3. Clean search keywords: strip conversational prefixes & suffixes
-    clean_q = sanitize_youtube_query(raw_q)
+    clean_q = re.sub(
+        r"(?i)^(?:tolong\s+)?(?:putar(?:kan)?|setel(?:kan)?|mainkan|cari(?:kan)?|dengarkan|play)\s+(?:lagu|musik|video)?\s*",
+        "",
+        raw_q,
+    ).strip()
+    clean_q = re.sub(r"(?i)\s+(?:di\s+)?youtube(?:\s+music)?$", "", clean_q).strip()
     target_q = clean_q if clean_q else raw_q
 
     ydl_opts = {
@@ -425,82 +398,49 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip
     """
     Intelligently select the optimal Opus bitrate based on requested value, ESP32 Wi-Fi RSSI, and chip profile.
     ESP32-S3 (Dual Core 240MHz, 8MB PSRAM):
-      - Maksimal dibatasi pada 30k (stabil, anti putus-putus, hemat bandwidth ~40-50%, audio tetap jernih mono)
-      - RSSI >= -65 dBm / Default: 30k
-      - -75 to -65 dBm: 24k
-      - -82 to -75 dBm: 20k
-      - -88 to -82 dBm: 16k
-      - < -88 dBm: 12k
+      - RSSI >= -65 dBm (Sinyal Sangat Kuat): 48k (Studio Quality Mono)
+      - -75 to -65 dBm (Sinyal Kuat): 32k (High Quality)
+      - -82 to -75 dBm (Sinyal Sedang): 24k
+      - -88 to -82 dBm (Sinyal Lemah): 16k
+      - < -88 dBm (Sinyal Sangat Lemah): 12k (Batas minimum aman S3)
     ESP32-C3 (Single Core 160MHz, No PSRAM):
-      - Ladder: paling kecil 6k -> 8k -> 10k -> 14k (Maksimal untuk C3 mini: 14k)
-      - RSSI >= -65 dBm: 14k (Maksimal untuk C3 mini)
-      - -75 to -65 dBm: 10k
+      - RSSI >= -65 dBm: 12k
+      - -75 to -65 dBm: 11k
       - -85 to -75 dBm: 8k
       - < -85 dBm: 6k
-      - Default jika tanpa RSSI: 10k
     """
     br_str = (requested_br or "").lower().strip()
-    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "14k", "16k", "20k", "24k", "28k", "30k", "32k", "40k", "48k"}
+    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "30k", "32k", "48k"}
+    if br_str and br_str in valid_bitrates and br_str != "auto":
+        return br_str
 
     is_s3 = bool(chip and "s3" in chip.lower())
     is_c3 = bool(chip and "c3" in chip.lower())
 
-    # Jika client meminta bitrate spesifik:
-    if br_str and br_str != "auto":
-        num_match = re.match(r"^(\d+)k?$", br_str)
-        if num_match:
-            val = int(num_match.group(1))
-            if is_c3:
-                # Maksimal untuk C3 mini adalah 14k
-                if val > 14:
-                    return "14k"
-                elif val in (11, 12, 13):
-                    return "10k"
-                elif f"{val}k" in valid_bitrates:
-                    return f"{val}k"
-            else:
-                # ESP32-S3 & chip default: batasi maksimal 30k
-                if val > 30:
-                    return "30k"
-                elif f"{val}k" in valid_bitrates:
-                    return f"{val}k"
-
     if is_s3:
         if rssi is not None and rssi < 0:
             if rssi >= -65:
-                return "30k"
+                return "48k"
             elif rssi >= -75:
-                return "24k"
+                return "32k"
             elif rssi >= -82:
-                return "20k"
+                return "24k"
             elif rssi >= -88:
                 return "16k"
             else:
                 return "12k"
-        return "30k"
-
-    if is_c3:
-        if rssi is not None and rssi < 0:
-            if rssi >= -65:
-                return "14k"
-            elif rssi >= -75:
-                return "10k"
-            elif rssi >= -85:
-                return "8k"
-            else:
-                return "6k"
-        return "10k"
+        return "48k"
 
     if rssi is not None and rssi < 0:
         if rssi >= -65:
-            return "24k"
-        elif rssi >= -75:
-            return "20k"
-        elif rssi >= -85:
-            return "16k"
-        else:
             return "12k"
-    return "24k"
+        elif rssi >= -75:
+            return "11k"
+        elif rssi >= -85:
+            return "8k"
+        else:
+            return "6k"
+    return "12k" if is_c3 else "24k"
 
 
 async def _stream_opus_audio(
@@ -515,9 +455,6 @@ async def _stream_opus_audio(
     title: str = "",
     device_mac: str = "",
     chip: str = "",
-    board: str = "",
-    duration: str = "",
-    duration_seconds: int = 0,
 ) -> AsyncGenerator[bytes, None]:
     br = resolve_adaptive_bitrate(bitrate, rssi, chip=chip)
     ffmpeg_bin = _FFMPEG_PATH or shutil.which("ffmpeg")
@@ -532,30 +469,19 @@ async def _stream_opus_audio(
         stream_type="HTTP Stream",
         device_mac=device_mac or "ESP32 Board",
         bitrate=f"{br}@{sample_rate//1000}kHz",
-        duration=duration,
-        duration_seconds=duration_seconds,
-        chip=chip or "",
-        board=board or "",
-        rssi=rssi,
+        chip=chip or ""
     )
-
-    # Immediately broadcast start of playback to all connected admin websockets
-    try:
-        from xiaozhi.routers.admin import broadcast_admin_users_update
-        asyncio.create_task(broadcast_admin_users_update())
-    except Exception:
-        pass
 
     cmd = [
         ffmpeg_bin,
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
-        "-user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     ]
     if start_sec > 0:
         cmd.extend(["-ss", f"{start_sec:.2f}"])
     cmd.extend([
+        "-re",
         "-i", source_url,
         "-vn",
         "-ac", "1",
@@ -564,10 +490,10 @@ async def _stream_opus_audio(
         "-b:a", br,
         "-vbr", "on",
         "-compression_level", "5",
-        "-application", "audio",
+        "-application", "voip",
         "-flush_packets", "1",
         "-frame_duration", "60",
-        "-page_duration", "200000",
+        "-page_duration", "60000",
         "-f", "ogg",
         "pipe:1"
     ])
@@ -575,134 +501,39 @@ async def _stream_opus_audio(
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.DEVNULL
     )
 
-    if session:
-        session.proc = proc
-
-    # Safe stderr draining to prevent pipe buffer deadlock and capture error details
-    stderr_lines = collections.deque(maxlen=30)
-
-    async def _drain_stderr(pipe):
-        try:
-            while True:
-                line = await pipe.readline()
-                if not line:
-                    break
-                decoded = line.decode("utf-8", errors="ignore").strip()
-                if decoded:
-                    stderr_lines.append(decoded)
-        except Exception:
-            pass
-
-    stderr_task = asyncio.create_task(_drain_stderr(proc.stderr))
-
     total_bytes = 0
-    last_logged_bytes = 0
-    end_reason = "finished"
-    loop_count = 0
     logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
-
-    is_c3 = bool(chip and "c3" in chip.lower())
-    # Nominal bytes/sec from bitrate (e.g. 10k -> 1250 B/s, 14k -> 1750 B/s)
-    br_num_match = re.match(r"^(\d+)", str(br).strip().lower())
-    bitrate_kbps = int(br_num_match.group(1)) if br_num_match else (10 if is_c3 else 24)
-    nominal_bps = (bitrate_kbps * 1000) // 8
-    # Give 45% delivery headroom above nominal bitrate to account for Ogg page headers,
-    # network jitter, and keep ESP32 ring buffer filled (anti-stutter / anti putus-putus)
-    bytes_per_sec = max(1800, int(nominal_bps * 1.45))
-    target_send_time = time.monotonic()
-
     try:
         while True:
-            loop_count += 1
             if session and session.abort_event.is_set():
                 logger.info(f"Stream aborted by admin for video {video_id}")
-                end_reason = "aborted"
                 break
-
-            # Periodically re-check user permission (every ~25 chunks, approx every 1.5-2 seconds)
-            if user_id and loop_count % 25 == 0:
-                try:
-                    store = get_store()
-                    if hasattr(store, "get_user_features"):
-                        features = store.get_user_features(user_id)
-                        if not features.get("youtube_music", True):
-                            logger.warning(
-                                f"YouTube stream aborted for user {user_id} ({username}): feature youtube_music disabled mid-stream."
-                            )
-                            end_reason = "aborted"
-                            if session:
-                                session.trigger_abort()
-                            break
-                except Exception as exc:
-                    logger.debug("Error checking user feature in stream loop: %s", exc)
-
             chunk = await proc.stdout.read(1536)
             if not chunk:
                 logger.info(f"YouTube stream for {video_id} reached EOF, total={total_bytes} bytes")
-                end_reason = "finished"
                 break
             total_bytes += len(chunk)
             if session:
                 session.record_chunk(len(chunk))
-            if total_bytes - last_logged_bytes >= 76800:
+            if total_bytes % (1536 * 50) == 0:
                 logger.info(f"YouTube stream for {video_id}: sent {total_bytes // 1024} KB")
-                last_logged_bytes = total_bytes
-
-            # Adaptive Pacing for ESP32-C3 / low RAM chips:
-            # Allows initial 10 chunks pre-buffer (~15KB / ~10 detik audio) agar buffer ESP32 terisi mantap,
-            # kemudian mengalirkan chunk dengan 45% delivery headroom agar buffer tidak pernah kering (anti putus-putus)
-            # tanpa membanjiri RAM (anti-OOM reset).
-            if is_c3 and loop_count > 10:
-                chunk_duration = len(chunk) / bytes_per_sec
-                target_send_time += chunk_duration
-                sleep_sec = target_send_time - time.monotonic()
-                if sleep_sec > 0:
-                    await asyncio.sleep(min(sleep_sec, 0.4))
-                elif sleep_sec < -1.5:
-                    target_send_time = time.monotonic()
-
             yield chunk
     except (asyncio.CancelledError, GeneratorExit) as exc:
-        end_reason = "cancelled"
         logger.warning(f"YouTube stream for {video_id} client disconnected or cancelled after {total_bytes} bytes")
     except Exception as exc:
-        end_reason = "error"
         logger.error(f"YouTube stream for {video_id} error after {total_bytes} bytes: {exc}")
     finally:
         if session:
-            playback_tracker.end_session(session.session_id, reason=end_reason, total_bytes=total_bytes)
-        try:
-            from xiaozhi.routers.admin import broadcast_admin_users_update
-            asyncio.create_task(broadcast_admin_users_update())
-        except Exception:
-            pass
+            playback_tracker.end_session(session.session_id)
         if proc.returncode is None:
             try:
                 proc.kill()
                 await proc.wait()
             except Exception:
                 pass
-
-        try:
-            await asyncio.wait_for(stderr_task, timeout=0.5)
-        except Exception:
-            stderr_task.cancel()
-
-        # Log detail jika terjadi kendala proses transcoding FFmpeg
-        if proc.returncode is not None and proc.returncode not in (0, -9, -15, 137) and end_reason != "aborted":
-            err_details = "\n  ".join(stderr_lines) if stderr_lines else "(Tidak ada output stderr dari FFmpeg)"
-            logger.error(
-                f"Kendala transcoding FFmpeg untuk video '{video_id}' (User: {username or user_id}, PID: {proc.pid}, Exit Code: {proc.returncode}):\n  {err_details}"
-            )
-        elif total_bytes == 0 and end_reason == "error":
-            err_details = "\n  ".join(stderr_lines) if stderr_lines else "(Tidak ada output stderr dari FFmpeg)"
-            logger.error(
-                f"Kendala transcoding FFmpeg sebelum streaming dimulai untuk video '{video_id}' (User: {username or user_id}):\n  {err_details}"
-            )
-
         logger.info(f"YouTube stream for {video_id} closed, proc_returncode={proc.returncode}")
 
 
@@ -712,8 +543,6 @@ async def audio_stream_ogg_opus(
     request: Request,
     br: str = "auto",
     chip: Optional[str] = Query(None),
-    board: Optional[str] = Query(None),
-    board_type: Optional[str] = Query(None),
     rssi: Optional[int] = Query(None),
     start: float = 0.0,
     owner_id: Optional[int] = Query(None),
@@ -721,11 +550,6 @@ async def audio_stream_ogg_opus(
     token: Optional[str] = Query(None),
 ):
     """Real-time Ogg/Opus transcoding stream for ESP32 hardware decoder with adaptive bitrate, chip profiling, and seek resume support."""
-    store = get_store()
-    user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request, owner_id=owner_id, mac=mac, token=token)
-    user_id = user["id"] if user else None
-    username = user["username"] if user else ""
-
     # Resolve chip from query or header
     detected_chip = (
         chip or
@@ -733,58 +557,6 @@ async def audio_stream_ogg_opus(
         request.headers.get("Device-Chip", "") or
         request.headers.get("X-Chip", "")
     ).strip().lower()
-
-    # Resolve board from query or header
-    detected_board = (
-        board or
-        board_type or
-        request.headers.get("X-Device-Board", "") or
-        request.headers.get("Device-Board", "") or
-        request.headers.get("X-Board-Type", "") or
-        request.headers.get("X-Board", "") or
-        request.headers.get("Board-Type", "") or
-        request.headers.get("Board", "") or
-        request.headers.get("X-Device-Type", "") or
-        request.headers.get("Device-Type", "")
-    ).strip()
-
-    # Auto-lookup hardware profile (chip & board) from store BEFORE computing sample rate and bitrate
-    if device_mac and hasattr(store, "find_device_by_mac"):
-        try:
-            clean_lookup_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
-            clean_lookup_mac = clean_lookup_mac.strip().upper()
-            dev = store.find_device_by_mac(clean_lookup_mac)
-            if dev:
-                d_type = (dev.get("device_type") or "").lower()
-                d_name = (dev.get("device_name") or "").lower()
-                if not detected_chip:
-                    if "c3" in d_type or "c3" in d_name:
-                        detected_chip = "esp32c3"
-                    elif "s3" in d_type or "s3" in d_name:
-                        detected_chip = "esp32s3"
-                    elif "p4" in d_type or "p4" in d_name:
-                        detected_chip = "esp32p4"
-                    elif d_type:
-                        detected_chip = d_type
-                if not detected_board:
-                    detected_board = dev.get("device_name") or dev.get("device_type") or ""
-        except Exception:
-            pass
-
-    # If chip still not identified, inspect user's registered devices list
-    if not detected_chip and user_id and hasattr(store, "get_user_devices"):
-        try:
-            for d in (store.get_user_devices(user_id) or []):
-                d_type = (d.get("device_type") or "").lower()
-                d_name = (d.get("device_name") or "").lower()
-                if "c3" in d_type or "c3" in d_name:
-                    detected_chip = "esp32c3"
-                    break
-                elif "s3" in d_type or "s3" in d_name:
-                    detected_chip = "esp32s3"
-                    break
-        except Exception:
-            pass
 
     # Read RSSI from query param or header
     if rssi is None:
@@ -798,6 +570,11 @@ async def audio_stream_ogg_opus(
     selected_br = resolve_adaptive_bitrate(br, rssi, chip=detected_chip)
     sample_rate = resolve_chip_audio_profile(detected_chip)
 
+    store = get_store()
+    user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request, owner_id=owner_id, mac=mac, token=token)
+    user_id = user["id"] if user else None
+    username = user["username"] if user else ""
+
     # Check YouTube Music permission for this user
     if user_id:
         features = store.get_user_features(user_id) if hasattr(store, "get_user_features") else {}
@@ -809,7 +586,7 @@ async def audio_stream_ogg_opus(
             )
 
     logger.info(
-        f"Stream request for {video_id}: chip={detected_chip or 'default'}, board={detected_board or 'default'} -> sample_rate={sample_rate}Hz, "
+        f"Stream request for {video_id}: chip={detected_chip or 'default'} -> sample_rate={sample_rate}Hz, "
         f"requested_br={br}, rssi={rssi} dBm -> selected_br={selected_br}"
     )
 
@@ -819,9 +596,6 @@ async def audio_stream_ogg_opus(
             raise ValueError("Direct audio stream tidak ditemukan.")
         if not title:
             title = extracted_title
-        meta = get_cached_video_meta(video_id)
-        dur_sec = meta.get("duration", 0)
-        dur_fmt = meta.get("duration_formatted", "")
     except Exception as exc:
         logger.warning("Extraction failed for video %s: %s", video_id, exc)
         raise HTTPException(status_code=404, detail=f"Gagal mengekstrak audio YouTube: {exc}")
@@ -838,10 +612,7 @@ async def audio_stream_ogg_opus(
             username=username,
             title=title,
             device_mac=device_mac,
-            chip=detected_chip,
-            board=detected_board,
-            duration=dur_fmt,
-            duration_seconds=dur_sec,
+            chip=detected_chip
         ),
         media_type="audio/ogg",
         headers={
@@ -853,7 +624,6 @@ async def audio_stream_ogg_opus(
             "X-Adaptive-RSSI": str(rssi if rssi is not None else "N/A"),
             "X-Device-MAC": device_mac or "none",
             "X-Device-Chip": detected_chip or "unknown",
-            "X-Device-Board": detected_board or detected_chip or "ESP32",
             "X-Audio-Sample-Rate": str(sample_rate),
             "X-MAC-Status": "Tersimpan OK" if device_mac else "none",
         }
@@ -1047,8 +817,15 @@ async def audio_play_direct(
     q = (q or "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Query required")
-
     try:
+        results = youtube_search(q, max_results=1)
+        if not results:
+            raise HTTPException(status_code=404, detail="Song not found")
+        
+        vid = results[0]["video_id"]
+        title = results[0]["title"]
+        store = get_store()
+
         # Extract device MAC
         device_mac = (mac or "").strip()
         if not device_mac and hasattr(request, "headers"):
@@ -1061,8 +838,7 @@ async def audio_play_direct(
                 request.headers.get("mac", "")
             ).strip()
 
-        # Resolve owner first so playlist intents can be handled
-        store = get_store()
+        # Resolve owner
         resolved_owner_id = owner_id
         if not resolved_owner_id and token:
             owner = store.find_user_by_mcp_token(token)
@@ -1077,45 +853,6 @@ async def audio_play_direct(
                     resolved_owner_id = su["id"]
             except Exception:
                 pass
-
-        vid = None
-        title = None
-
-        # Check if user requested playlist navigation (e.g. 'berikutnya di playlist', 'lagu selanjutnya', 'putar playlist')
-        if resolved_owner_id and (
-            re.search(r"(?i)\b(playlist|daftar\s*putar)\b", q) or
-            re.search(r"(?i)\b(lagu\s+)?(berikutnya|selanjutnya|next)\b", q)
-        ):
-            try:
-                user_tracks = store.get_user_playlist(resolved_owner_id) if hasattr(store, "get_user_playlist") else []
-                if user_tracks:
-                    picked_track = user_tracks[0]
-                    curr = store.get_current_audio(resolved_owner_id) if hasattr(store, "get_current_audio") else None
-                    if curr and curr.get("video_id"):
-                        curr_vid = curr["video_id"]
-                        for idx, trk in enumerate(user_tracks):
-                            if trk.get("video_id") == curr_vid:
-                                next_idx = (idx + 1) % len(user_tracks)
-                                picked_track = user_tracks[next_idx]
-                                break
-                    vid = picked_track.get("video_id")
-                    title = picked_track.get("title")
-                    if hasattr(store, "increment_playlist_play_count") and picked_track.get("id"):
-                        try:
-                            store.increment_playlist_play_count(resolved_owner_id, picked_track["id"])
-                        except Exception:
-                            pass
-                    logger.info(f"[PLAY DIRECT PLAYLIST] User {resolved_owner_id} requested playlist track: {title} ({vid})")
-            except Exception as e:
-                logger.warning("Failed to resolve playlist track: %s", e)
-
-        # Standard YouTube search if not resolved from playlist
-        if not vid:
-            results = youtube_search(q, max_results=1)
-            if not results:
-                raise HTTPException(status_code=404, detail="Song not found")
-            vid = results[0]["video_id"]
-            title = results[0]["title"]
 
         clean_mac = ""
         if device_mac:
@@ -1175,8 +912,6 @@ async def audio_play_direct(
             "stream_url": stream_url,
             "owner_id": resolved_owner_id,
         }
-    except HTTPException:
-        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

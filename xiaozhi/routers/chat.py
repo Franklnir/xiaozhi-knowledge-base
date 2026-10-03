@@ -1,23 +1,18 @@
 from fastapi import APIRouter, Query, Request, Form, WebSocket, WebSocketDisconnect, HTTPException, Response
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-import asyncio
-import json
-import logging
-import re
-from pathlib import Path
-from typing import Optional
-
 from xiaozhi.services.preset_approval_service import (
     get_user_status,
     is_user_authorized,
     get_decrypted_preset_binary,
-    get_preset_version_binary,
-    sanitize_preset_for_client,
     get_preset,
     list_presets,
     redeem_claim_code,
     PRESETS,
 )
+import asyncio
+import json
+import logging
+from typing import Optional
 
 from xiaozhi.config import CHAT_HISTORY_DEFAULT_LIMIT, ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
@@ -522,7 +517,6 @@ async def delete_chat_history_api(request: Request, chat_id: int):
 async def web_flasher_page(request: Request):
     user = get_current_user(request)
     all_presets = list_presets()
-    safe_presets = [sanitize_preset_for_client(p) for p in all_presets]
     default_preset_id = all_presets[0]["id"] if all_presets else "esp32s3_cam"
     preset_status = get_user_status(user, default_preset_id)
     return render(
@@ -533,7 +527,7 @@ async def web_flasher_page(request: Request):
             "page": "web_flasher",
             "active_page": "web_flasher",
             "preset_status": preset_status,
-            "presets": safe_presets,
+            "presets": all_presets,
             "mcp_required": False,
         },
     )
@@ -567,44 +561,25 @@ async def stream_preset_binary_api(request: Request, preset_id: str, version: Op
             status_code=403,
             detail="Akses Ditolak: Preset komersial ini membutuhkan izin lisensi dari Administrator atau klaim kode sekali pakai. Silakan masukkan kode lisensi atau ajukan izin akses.",
         )
-
-    clean_version = (version or "").strip()
-    if clean_version and not re.match(r"^[a-zA-Z0-9_\.-]+$", clean_version):
-        raise HTTPException(status_code=400, detail="Parameter versi firmware tidak valid.")
-
     try:
         preset_info = get_preset(preset_id) or PRESETS.get(preset_id)
         if not preset_info:
             raise HTTPException(status_code=404, detail="Preset tidak ditemukan.")
-
-        raw_bytes, ver_meta = get_preset_version_binary(preset_id, version=clean_version or None)
-        fn = Path(ver_meta.get("filename") or preset_info.get("filename", f"{preset_id}.bin")).name
+        raw_bytes = get_decrypted_preset_binary(preset_id, version=version)
+        fn = preset_info.get("filename", f"{preset_id}.bin")
         offset = preset_info.get("offset", "0x0")
-        actual_ver = ver_meta.get("version") or clean_version or preset_info.get("active_version", "v001")
-        sha = ver_meta.get("sha256", "")[:12]
-
         return Response(
             content=raw_bytes,
             media_type="application/octet-stream",
             headers={
                 "Content-Disposition": f'inline; filename="{fn}"',
                 "Content-Length": str(len(raw_bytes)),
-                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0, private",
-                "Pragma": "no-cache",
-                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
                 "X-Firmware-Offset": offset,
-                "X-Firmware-Version": actual_ver,
-                "X-Firmware-SHA256": sha,
             },
         )
     except HTTPException:
         raise
-    except ValueError as ve:
-        logger.warning(f"Validation error streaming preset binary '{preset_id}': {ve}")
-        raise HTTPException(status_code=404 if "tidak ditemukan" in str(ve).lower() else 400, detail=str(ve))
-    except FileNotFoundError as fnf:
-        logger.error(f"Preset file not found: {fnf}")
-        raise HTTPException(status_code=404, detail="File firmware terenkripsi versi ini belum tersedia di penyimpanan server.")
     except Exception as exc:
         logger.error(f"Error streaming preset binary: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Gagal memuat binary preset: {str(exc)}")

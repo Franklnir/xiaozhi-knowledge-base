@@ -167,11 +167,6 @@ def redirect_with_message(url: str, message: str, status_code: int = 303) -> Red
     return RedirectResponse(url=f"{url}{sep}{urlencode({'message': message})}", status_code=status_code)
 
 
-def redirect_with_error(url: str, error: str, status_code: int = 303) -> RedirectResponse:
-    sep = "&" if "?" in url else "?"
-    return RedirectResponse(url=f"{url}{sep}{urlencode({'error': error})}", status_code=status_code)
-
-
 def require_user(request: Request) -> Dict[str, Any]:
     user = get_current_user(request)
     if not user:

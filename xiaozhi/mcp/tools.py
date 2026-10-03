@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from xiaozhi.core.utils import clean_text
-from xiaozhi.mcp.context import mcp_active_owner_ctx, mcp_active_mac_ctx
+from xiaozhi.mcp.context import mcp_active_owner_ctx
 from xiaozhi.services.smarthome_service import (
     parse_smart_home_action,
     resolve_smart_home_target,
@@ -861,38 +861,6 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         record_mcp_tool_history(owner_id, "all_real_relays_off", "matikan semua relay nyata", {}, response)
         return response
 
-    def _resolve_chip_param(owner_id: Optional[int], user_mac: str = "") -> str:
-        """Resolve &chip=esp32c3 / &chip=esp32s3 to guarantee correct sample rate and prevent C3 OOM crashes."""
-        if user_mac and hasattr(store, "find_device_by_mac"):
-            try:
-                c_mac = user_mac[6:] if user_mac.lower().startswith("esp32-") else user_mac
-                dev = store.find_device_by_mac(c_mac.strip().upper())
-                if dev:
-                    dt = (dev.get("device_type") or "").lower()
-                    dn = (dev.get("device_name") or "").lower()
-                    if "c3" in dt or "c3" in dn:
-                        return "&chip=esp32c3"
-                    elif "s3" in dt or "s3" in dn:
-                        return "&chip=esp32s3"
-                    elif "p4" in dt or "p4" in dn:
-                        return "&chip=esp32p4"
-            except Exception:
-                pass
-        if owner_id and hasattr(store, "get_user_devices"):
-            try:
-                for d in (store.get_user_devices(owner_id) or []):
-                    dt = (d.get("device_type") or "").lower()
-                    dn = (d.get("device_name") or "").lower()
-                    if "c3" in dt or "c3" in dn:
-                        return "&chip=esp32c3"
-                    elif "s3" in dt or "s3" in dn:
-                        return "&chip=esp32s3"
-                    elif "p4" in dt or "p4" in dn:
-                        return "&chip=esp32p4"
-            except Exception:
-                pass
-        return ""
-
     @mcp_server.tool()
     def play_youtube_song(query: str) -> dict:
         """
@@ -918,10 +886,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     store.increment_playlist_play_count(owner_id, track_id=matched_track.get("id"))
                     user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
                     mac_param = f"&mac={user_mac}" if user_mac else ""
-                    chip_param = _resolve_chip_param(owner_id, user_mac)
                     vid = matched_track.get("video_id", "")
                     title = matched_track.get("title", "")
-                    stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}{chip_param}"
+                    stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
                     base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
                     full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
 
@@ -986,10 +953,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     return response
                 user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
                 mac_param = f"&mac={user_mac}" if user_mac else ""
-                chip_param = _resolve_chip_param(owner_id, user_mac)
                 for item in results:
                     vid = item.get("video_id", "")
-                    item["stream_url"] = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}{chip_param}"
+                    item["stream_url"] = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
                 np = results[0]
                 try:
                     base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
@@ -1045,10 +1011,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             store.increment_playlist_play_count(owner_id, track_id=matched["id"])
             user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
             mac_param = f"&mac={user_mac}" if user_mac else ""
-            chip_param = _resolve_chip_param(owner_id, user_mac)
             vid = matched.get("video_id", "")
             title = matched.get("title", "")
-            stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}{chip_param}"
+            stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
             base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
             full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
 
@@ -1187,24 +1152,10 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         - "Cukup lagunya"
         """
         owner_id = mcp_active_owner_ctx.get()
-        active_mac = mcp_active_mac_ctx.get()
-        if owner_id is None and not active_mac:
+        if owner_id is None:
             return {"success": False, "message": "Belum ada koneksi perangkat aktif."}
-
         from xiaozhi.services.playback_tracker import playback_tracker
-        stopped = False
-        if owner_id is not None:
-            stopped = playback_tracker.stop_user_playback(owner_id) or stopped
-        if active_mac:
-            stopped = playback_tracker.stop_device_playback(active_mac) or stopped
-
-        # Also expire any pending audio commands so queue does not resume next track
-        if owner_id is not None and hasattr(store, "expire_audio_commands"):
-            try:
-                store.expire_audio_commands(minutes=0)
-            except Exception:
-                pass
-
+        stopped = playback_tracker.stop_user_playback(owner_id)
         if stopped:
             response = {
                 "success": True,
@@ -1218,8 +1169,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 "stopped": False,
                 "message": "Saat ini memang tidak ada lagu YouTube yang sedang diputar.",
             }
-        if owner_id is not None:
-            record_mcp_tool_history(owner_id, "stop_youtube_song", "stop lagu", {}, response)
+        record_mcp_tool_history(owner_id, "stop_youtube_song", "stop lagu", {}, response)
         return response
 
     @mcp_server.tool()
