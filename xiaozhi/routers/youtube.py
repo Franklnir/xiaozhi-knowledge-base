@@ -432,13 +432,15 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip
       - -88 to -82 dBm: 16k
       - < -88 dBm: 12k
     ESP32-C3 (Single Core 160MHz, No PSRAM):
-      - RSSI >= -65 dBm: 12k (Maksimal 16k)
-      - -75 to -65 dBm: 11k
+      - Ladder: paling kecil 6k -> 8k -> 10k -> 14k (Maksimal untuk C3 mini: 14k)
+      - RSSI >= -65 dBm: 14k (Maksimal untuk C3 mini)
+      - -75 to -65 dBm: 10k
       - -85 to -75 dBm: 8k
       - < -85 dBm: 6k
+      - Default jika tanpa RSSI: 10k
     """
     br_str = (requested_br or "").lower().strip()
-    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "28k", "30k", "32k", "40k", "48k"}
+    valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "14k", "16k", "20k", "24k", "28k", "30k", "32k", "40k", "48k"}
 
     is_s3 = bool(chip and "s3" in chip.lower())
     is_c3 = bool(chip and "c3" in chip.lower())
@@ -449,8 +451,11 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip
         if num_match:
             val = int(num_match.group(1))
             if is_c3:
-                if val > 16:
-                    return "16k"
+                # Maksimal untuk C3 mini adalah 14k
+                if val > 14:
+                    return "14k"
+                elif val in (11, 12, 13):
+                    return "10k"
                 elif f"{val}k" in valid_bitrates:
                     return f"{val}k"
             else:
@@ -474,16 +479,28 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip
                 return "12k"
         return "30k"
 
+    if is_c3:
+        if rssi is not None and rssi < 0:
+            if rssi >= -65:
+                return "14k"
+            elif rssi >= -75:
+                return "10k"
+            elif rssi >= -85:
+                return "8k"
+            else:
+                return "6k"
+        return "10k"
+
     if rssi is not None and rssi < 0:
         if rssi >= -65:
-            return "12k"
+            return "24k"
         elif rssi >= -75:
-            return "11k"
+            return "20k"
         elif rssi >= -85:
-            return "8k"
+            return "16k"
         else:
-            return "6k"
-    return "12k" if is_c3 else "24k"
+            return "12k"
+    return "24k"
 
 
 async def _stream_opus_audio(
@@ -588,9 +605,9 @@ async def _stream_opus_audio(
     logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
 
     is_c3 = bool(chip and "c3" in chip.lower())
-    # Approximate bytes per second based on selected bitrate (e.g. 11k -> 1375 B/s, 12k -> 1500 B/s)
+    # Approximate bytes per second based on selected bitrate (e.g. 10k -> 1250 B/s, 14k -> 1750 B/s)
     br_num_match = re.match(r"^(\d+)", str(br).strip().lower())
-    bitrate_kbps = int(br_num_match.group(1)) if br_num_match else (12 if is_c3 else 24)
+    bitrate_kbps = int(br_num_match.group(1)) if br_num_match else (10 if is_c3 else 24)
     bytes_per_sec = max(800, (bitrate_kbps * 1000) // 8)
     target_send_time = time.monotonic()
 
