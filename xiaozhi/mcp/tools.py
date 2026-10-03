@@ -861,6 +861,38 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         record_mcp_tool_history(owner_id, "all_real_relays_off", "matikan semua relay nyata", {}, response)
         return response
 
+    def _resolve_chip_param(owner_id: Optional[int], user_mac: str = "") -> str:
+        """Resolve &chip=esp32c3 / &chip=esp32s3 to guarantee correct sample rate and prevent C3 OOM crashes."""
+        if user_mac and hasattr(store, "find_device_by_mac"):
+            try:
+                c_mac = user_mac[6:] if user_mac.lower().startswith("esp32-") else user_mac
+                dev = store.find_device_by_mac(c_mac.strip().upper())
+                if dev:
+                    dt = (dev.get("device_type") or "").lower()
+                    dn = (dev.get("device_name") or "").lower()
+                    if "c3" in dt or "c3" in dn:
+                        return "&chip=esp32c3"
+                    elif "s3" in dt or "s3" in dn:
+                        return "&chip=esp32s3"
+                    elif "p4" in dt or "p4" in dn:
+                        return "&chip=esp32p4"
+            except Exception:
+                pass
+        if owner_id and hasattr(store, "get_user_devices"):
+            try:
+                for d in (store.get_user_devices(owner_id) or []):
+                    dt = (d.get("device_type") or "").lower()
+                    dn = (d.get("device_name") or "").lower()
+                    if "c3" in dt or "c3" in dn:
+                        return "&chip=esp32c3"
+                    elif "s3" in dt or "s3" in dn:
+                        return "&chip=esp32s3"
+                    elif "p4" in dt or "p4" in dn:
+                        return "&chip=esp32p4"
+            except Exception:
+                pass
+        return ""
+
     @mcp_server.tool()
     def play_youtube_song(query: str) -> dict:
         """
@@ -886,9 +918,10 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     store.increment_playlist_play_count(owner_id, track_id=matched_track.get("id"))
                     user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
                     mac_param = f"&mac={user_mac}" if user_mac else ""
+                    chip_param = _resolve_chip_param(owner_id, user_mac)
                     vid = matched_track.get("video_id", "")
                     title = matched_track.get("title", "")
-                    stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
+                    stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}{chip_param}"
                     base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
                     full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
 
@@ -953,9 +986,10 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     return response
                 user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
                 mac_param = f"&mac={user_mac}" if user_mac else ""
+                chip_param = _resolve_chip_param(owner_id, user_mac)
                 for item in results:
                     vid = item.get("video_id", "")
-                    item["stream_url"] = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
+                    item["stream_url"] = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}{chip_param}"
                 np = results[0]
                 try:
                     base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
@@ -1011,9 +1045,10 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             store.increment_playlist_play_count(owner_id, track_id=matched["id"])
             user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
             mac_param = f"&mac={user_mac}" if user_mac else ""
+            chip_param = _resolve_chip_param(owner_id, user_mac)
             vid = matched.get("video_id", "")
             title = matched.get("title", "")
-            stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
+            stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}{chip_param}"
             base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
             full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
 

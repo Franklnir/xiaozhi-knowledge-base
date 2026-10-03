@@ -585,6 +585,14 @@ async def _stream_opus_audio(
     end_reason = "finished"
     loop_count = 0
     logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
+
+    is_c3 = bool(chip and "c3" in chip.lower())
+    # Approximate bytes per second based on selected bitrate (e.g. 11k -> 1375 B/s, 12k -> 1500 B/s)
+    br_num_match = re.match(r"^(\d+)", str(br).strip().lower())
+    bitrate_kbps = int(br_num_match.group(1)) if br_num_match else (12 if is_c3 else 24)
+    bytes_per_sec = max(800, (bitrate_kbps * 1000) // 8)
+    target_send_time = time.monotonic()
+
     try:
         while True:
             loop_count += 1
@@ -621,6 +629,19 @@ async def _stream_opus_audio(
             if total_bytes - last_logged_bytes >= 76800:
                 logger.info(f"YouTube stream for {video_id}: sent {total_bytes // 1024} KB")
                 last_logged_bytes = total_bytes
+
+            # Adaptive Pacing for ESP32-C3 / low RAM chips:
+            # Allows initial 3 chunks pre-buffer (~3-4 seconds) for instant playback,
+            # then paces chunks at real-time rate so RAM heap is never exhausted.
+            if is_c3 and loop_count > 3:
+                chunk_duration = len(chunk) / bytes_per_sec
+                target_send_time += chunk_duration
+                sleep_sec = target_send_time - time.monotonic()
+                if sleep_sec > 0:
+                    await asyncio.sleep(min(sleep_sec, 1.2))
+                elif sleep_sec < -2.0:
+                    target_send_time = time.monotonic()
+
             yield chunk
     except (asyncio.CancelledError, GeneratorExit) as exc:
         end_reason = "cancelled"
@@ -678,6 +699,11 @@ async def audio_stream_ogg_opus(
     token: Optional[str] = Query(None),
 ):
     """Real-time Ogg/Opus transcoding stream for ESP32 hardware decoder with adaptive bitrate, chip profiling, and seek resume support."""
+    store = get_store()
+    user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request, owner_id=owner_id, mac=mac, token=token)
+    user_id = user["id"] if user else None
+    username = user["username"] if user else ""
+
     # Resolve chip from query or header
     detected_chip = (
         chip or
@@ -700,6 +726,44 @@ async def audio_stream_ogg_opus(
         request.headers.get("Device-Type", "")
     ).strip()
 
+    # Auto-lookup hardware profile (chip & board) from store BEFORE computing sample rate and bitrate
+    if device_mac and hasattr(store, "find_device_by_mac"):
+        try:
+            clean_lookup_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+            clean_lookup_mac = clean_lookup_mac.strip().upper()
+            dev = store.find_device_by_mac(clean_lookup_mac)
+            if dev:
+                d_type = (dev.get("device_type") or "").lower()
+                d_name = (dev.get("device_name") or "").lower()
+                if not detected_chip:
+                    if "c3" in d_type or "c3" in d_name:
+                        detected_chip = "esp32c3"
+                    elif "s3" in d_type or "s3" in d_name:
+                        detected_chip = "esp32s3"
+                    elif "p4" in d_type or "p4" in d_name:
+                        detected_chip = "esp32p4"
+                    elif d_type:
+                        detected_chip = d_type
+                if not detected_board:
+                    detected_board = dev.get("device_name") or dev.get("device_type") or ""
+        except Exception:
+            pass
+
+    # If chip still not identified, inspect user's registered devices list
+    if not detected_chip and user_id and hasattr(store, "get_user_devices"):
+        try:
+            for d in (store.get_user_devices(user_id) or []):
+                d_type = (d.get("device_type") or "").lower()
+                d_name = (d.get("device_name") or "").lower()
+                if "c3" in d_type or "c3" in d_name:
+                    detected_chip = "esp32c3"
+                    break
+                elif "s3" in d_type or "s3" in d_name:
+                    detected_chip = "esp32s3"
+                    break
+        except Exception:
+            pass
+
     # Read RSSI from query param or header
     if rssi is None:
         header_rssi = request.headers.get("X-WiFi-RSSI", "")
@@ -711,22 +775,6 @@ async def audio_stream_ogg_opus(
 
     selected_br = resolve_adaptive_bitrate(br, rssi, chip=detected_chip)
     sample_rate = resolve_chip_audio_profile(detected_chip)
-
-    store = get_store()
-    user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request, owner_id=owner_id, mac=mac, token=token)
-    user_id = user["id"] if user else None
-    username = user["username"] if user else ""
-
-    # Auto-lookup board from store if not provided in request
-    if not detected_board and device_mac and hasattr(store, "find_device_by_mac"):
-        try:
-            clean_lookup_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
-            clean_lookup_mac = clean_lookup_mac.strip().upper()
-            dev = store.find_device_by_mac(clean_lookup_mac)
-            if dev:
-                detected_board = dev.get("device_name") or dev.get("device_type") or ""
-        except Exception:
-            pass
 
     # Check YouTube Music permission for this user
     if user_id:
