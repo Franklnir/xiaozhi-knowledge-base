@@ -1686,6 +1686,10 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         return {
             "success": True,
             "message": "Konten halaman web berhasil diambil.",
+            "instruksi_xiaozhi": (
+                "Pahami dan jelaskan isi artikel/halaman web ini secara lengkap, terstruktur (poin-poin penting), "
+                "dan mudah dipahami sesuai pertanyaan pengguna berdasarkan data 'isi_konten' di atas."
+            ),
             "url": res["url"],
             "judul": res.get("title", ""),
             "deskripsi": res.get("description", ""),

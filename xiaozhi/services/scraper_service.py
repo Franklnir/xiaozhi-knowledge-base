@@ -90,9 +90,11 @@ def _extract_page_data_bs4(html: str, max_length: int) -> Dict[str, Any]:
     for tag in soup(unwanted_tags):
         tag.decompose()
 
-    # Also remove common advertisement and cookie banners by class/id
-    for el in soup.find_all(attrs={"class": re.compile(r"(ad|ads|advertisement|cookie-banner|popup-banner)", re.I)}):
-        el.decompose()
+    # Also remove common advertisement and cookie banners by class/id (use word boundaries to avoid matching words like lead, ready, reading)
+    ad_pattern = re.compile(r"(\bads?\b|\badvertisement\b|cookie-banner|popup-banner)", re.I)
+    for el in soup.find_all(attrs={"class": ad_pattern}):
+        if el.name not in ("body", "main", "article", "html"):
+            el.decompose()
 
     # 1. Extract Title
     title = ""
