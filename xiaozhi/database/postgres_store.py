@@ -3338,13 +3338,31 @@ class PostgresStore:
                 )
                 return [dict(r) for r in cur.fetchall()]
 
+    def find_playlist_track_by_video_id(self, video_id: str, owner_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        if not video_id:
+            return None
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                if owner_id is not None:
+                    cur.execute(
+                        "SELECT * FROM user_playlists WHERE video_id = %s AND owner_id = %s LIMIT 1",
+                        (str(video_id).strip(), int(owner_id)),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT * FROM user_playlists WHERE video_id = %s LIMIT 1",
+                        (str(video_id).strip(),),
+                    )
+                row = cur.fetchone()
+                return dict(row) if row else None
+
     def find_playlist_track_by_query(self, owner_id: int, query: str) -> Optional[Dict[str, Any]]:
         raw_q = (query or "").strip()
         if not raw_q:
             return None
 
         import re
-        from xiaozhi.core.utils import extract_youtube_video_id
+        from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id
 
         # Check track number in query: ONLY if query is literally a number (e.g. "1") or has explicit keyword ("nomor 2", "track 3", "playlist 1")
         track_num = None
@@ -3366,8 +3384,9 @@ class PostgresStore:
                     if row:
                         return dict(row)
 
-                # Check if query is YouTube URL or Video ID
-                vid = extract_youtube_video_id(raw_q)
+                # Check if query is Media URL or Video ID (YouTube or TikTok)
+                media_info = detect_media_url_source(raw_q)
+                vid = media_info["video_id"] if media_info else extract_youtube_video_id(raw_q)
                 if vid:
                     cur.execute(
                         "SELECT * FROM user_playlists WHERE owner_id = %s AND video_id = %s",
@@ -3391,4 +3410,5 @@ class PostgresStore:
                 )
                 row = cur.fetchone()
                 return dict(row) if row else None
+
 

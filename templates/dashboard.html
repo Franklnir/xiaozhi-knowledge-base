@@ -460,6 +460,23 @@
                 </div>
                 <form action="/add_material" method="POST" class="app-form-section" id="addMaterialForm" onsubmit="return handleAddMaterialSubmit(event)">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <!-- Web Scraper Quick Tool -->
+                    <div class="app-muted-panel mb-2" style="border: 2px dashed var(--app-border, #cbd5e1); border-radius: 10px; padding: 12px 14px; background: rgba(34, 197, 94, 0.05);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                            <span style="font-size: 12.5px; font-weight: 800; display:flex; align-items:center; gap: 6px;">
+                                <span>🌐</span> Ambil Konten dari Link Web (Scraper)
+                            </span>
+                            <span class="app-chip app-chip-success app-chip-small" style="font-size: 10.5px;">Auto-Fill RAG</span>
+                        </div>
+                        <div style="display:flex; gap: 8px; flex-wrap: wrap;">
+                            <input id="scrape_target_url" type="url" placeholder="https://contoh.com/artikel-edukasi" class="app-input" style="flex: 1; min-width: 200px; font-size: 12.5px; padding: 7px 10px;">
+                            <button type="button" id="btnScrapeUrl" onclick="executeWebScraper()" class="app-button app-button-secondary" style="font-size: 12px; font-weight: 800; padding: 7px 14px; white-space: nowrap;">
+                                🚀 Scrape Sekarang
+                            </button>
+                        </div>
+                        <div id="scrapeStatusHint" style="font-size: 11px; color: var(--app-muted); margin-top: 6px; display:none;"></div>
+                    </div>
+
                     <div>
                         <label for="title" class="app-label">Judul</label>
                         <input id="title" type="text" name="title" required maxlength="160" placeholder="Contoh: Catatan pertemuan 6" class="app-input">
@@ -1333,5 +1350,74 @@ document.addEventListener("DOMContentLoaded", function() {
         }, 500);
     }
 });
+
+async function executeWebScraper() {
+    const urlInput = document.getElementById('scrape_target_url');
+    const statusHint = document.getElementById('scrapeStatusHint');
+    const btn = document.getElementById('btnScrapeUrl');
+    const url = (urlInput ? urlInput.value : '').trim();
+
+    if (!url) {
+        alert('Silakan masukkan link/URL website yang ingin di-scrape (contoh: https://...)');
+        if (urlInput) urlInput.focus();
+        return;
+    }
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        alert('URL harus diawali dengan http:// atau https://');
+        if (urlInput) urlInput.focus();
+        return;
+    }
+
+    btn.disabled = true;
+    const oldBtnText = btn.innerHTML;
+    btn.innerHTML = '⏳ Mengekstrak...';
+    statusHint.style.display = 'block';
+    statusHint.style.color = '#0284c7';
+    statusHint.textContent = 'Menghubungkan ke website dan mengekstrak artikel bersih...';
+
+    try {
+        const resp = await fetch('/api/materials/scrape-url', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ url: url })
+        });
+        const res = await resp.json();
+        if (res.success && res.data) {
+            const d = res.data;
+            const titleField = document.getElementById('title');
+            const contentField = document.getElementById('content');
+            const kwField = document.getElementById('keywords');
+
+            if (titleField && d.title) titleField.value = d.title;
+            if (contentField && d.content) {
+                contentField.value = `🌐 Sumber: ${d.url}\n\n${d.content}`;
+            }
+            if (kwField) {
+                kwField.value = d.keywords || `web, ${d.hostname || 'artikel'}`;
+            }
+
+            statusHint.style.color = '#059669';
+            statusHint.innerHTML = `✅ Berhasil mengekstrak <strong>${d.word_count || 0} kata</strong> dari <strong>${d.hostname}</strong>. Judul, konten, dan kata kunci telah terisi di form bawah.`;
+
+            if (titleField) {
+                titleField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                titleField.focus();
+            }
+        } else {
+            statusHint.style.color = '#dc2626';
+            statusHint.textContent = '❌ ' + (res.message || 'Gagal mengekstrak isi website.');
+        }
+    } catch (e) {
+        statusHint.style.color = '#dc2626';
+        statusHint.textContent = '❌ Terjadi kesalahan jaringan saat scrape: ' + e.message;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldBtnText;
+    }
+}
 </script>
 {% endblock %}

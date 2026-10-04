@@ -149,3 +149,47 @@ async def search_materials(request: Request, q: str = Query("", max_length=200))
         data={"results": results, "count": len(results), "query": q},
         message=f"Ditemukan {len(results)} hasil."
     )
+
+
+class MaterialScrapeRequest(BaseModel):
+    url: str = Field(..., min_length=4)
+    save_to_knowledge: bool = Field(False)
+    category: Optional[str] = Field("Web Scraping")
+    title: Optional[str] = Field("")
+
+
+@router.post("/scrape", response_model=ApiResponse)
+async def api_v1_scrape_material(request: Request, body: MaterialScrapeRequest):
+    """Scrape web content from URL with optional direct saving to Knowledge Base."""
+    user = require_user(request)
+    require_mcp_connected_if_not_admin(request, user)
+    store = get_store()
+
+    from xiaozhi.services.scraper_service import scrape_url_async, create_material_from_url
+    if body.save_to_knowledge:
+        res = create_material_from_url(body.url, title=body.title or "", category=body.category or "Web Scraping")
+        if not res.get("success"):
+            raise HTTPException(status_code=400, detail=ApiResponse(success=False, message=res.get("error", "Gagal scrape URL.")))
+        mat_id = store.add_material(
+            user["id"],
+            res["title"],
+            res["category"],
+            res["content"],
+            res.get("keywords", f"web, scraping, {body.url}"),
+            body.url,
+        )
+        signal_mcp_reload()
+        return ApiResponse(
+            success=True,
+            data={"material_id": mat_id, "title": res["title"], "category": res["category"], "url": body.url},
+            message=f"Artikel '{res['title']}' berhasil di-scrape dan disimpan ke Knowledge Base."
+        )
+    else:
+        res = await scrape_url_async(body.url)
+        if not res.get("success"):
+            raise HTTPException(status_code=400, detail=ApiResponse(success=False, message=res.get("error", "Gagal scrape URL.")))
+        return ApiResponse(
+            success=True,
+            data=res,
+            message="Konten halaman web berhasil di-scrape."
+        )

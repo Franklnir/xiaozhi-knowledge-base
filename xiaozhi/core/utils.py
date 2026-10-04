@@ -77,6 +77,83 @@ def extract_youtube_video_id(url_or_id: str) -> Optional[str]:
     return None
 
 
+def extract_tiktok_media_info(url_or_id: str) -> Optional[Dict[str, str]]:
+    """Extract TikTok video ID or shortcode from TikTok / Douyin URL."""
+    if not url_or_id:
+        return None
+    cleaned = str(url_or_id).strip()
+    if not re.search(r"(tiktok\.com|douyin\.com)", cleaned, re.IGNORECASE):
+        return None
+
+    # Full video link e.g. https://www.tiktok.com/@user/video/7106594312292453675
+    m_id = re.search(r"/(?:video|photo|v)/(\d{15,25})", cleaned)
+    if m_id:
+        raw_id = m_id.group(1)
+        return {
+            "platform": "tiktok",
+            "video_id": f"tt_{raw_id}",
+            "canonical_url": cleaned,
+            "raw_id": raw_id,
+        }
+
+    # Short link e.g. https://vt.tiktok.com/ZS.../ or https://vm.tiktok.com/...
+    m_short = re.search(r"(?:vt|vm)\.tiktok\.com/([a-zA-Z0-9_-]+)", cleaned)
+    if m_short:
+        shortcode = m_short.group(1)
+        return {
+            "platform": "tiktok",
+            "video_id": f"tt_{shortcode}",
+            "canonical_url": cleaned,
+            "raw_id": shortcode,
+        }
+
+    # Sound link e.g. https://www.tiktok.com/music/...-7106594312292453675
+    m_music = re.search(r"/music/[^/]+-(\d{10,25})", cleaned)
+    if m_music:
+        raw_id = m_music.group(1)
+        return {
+            "platform": "tiktok",
+            "video_id": f"tt_{raw_id}",
+            "canonical_url": cleaned,
+            "raw_id": raw_id,
+        }
+
+    # Fallback md5 hash of url if unrecognized subpath
+    hash_id = hashlib.md5(cleaned.encode()).hexdigest()[:16]
+    return {
+        "platform": "tiktok",
+        "video_id": f"tt_{hash_id}",
+        "canonical_url": cleaned,
+        "raw_id": hash_id,
+    }
+
+
+def detect_media_url_source(url_or_id: str) -> Optional[Dict[str, str]]:
+    """
+    Auto-detect whether input is a YouTube video URL/ID or a TikTok video URL.
+    Returns dict with keys: 'platform', 'video_id', 'canonical_url'.
+    """
+    if not url_or_id:
+        return None
+    cleaned = str(url_or_id).strip()
+
+    # 1. Check YouTube
+    yt_id = extract_youtube_video_id(cleaned)
+    if yt_id:
+        return {
+            "platform": "youtube",
+            "video_id": yt_id,
+            "canonical_url": f"https://www.youtube.com/watch?v={yt_id}",
+        }
+
+    # 2. Check TikTok
+    tt_info = extract_tiktok_media_info(cleaned)
+    if tt_info:
+        return tt_info
+
+    return None
+
+
 def content_size_metadata(content: str) -> Dict[str, Any]:
     size_bytes = utf8_size(content)
     return {

@@ -590,15 +590,34 @@ async def audio_stream_ogg_opus(
         f"requested_br={br}, rssi={rssi} dBm -> selected_br={selected_br}"
     )
 
+    target_url = None
+    if video_id.startswith("tt_"):
+        if hasattr(store, "find_recent_audio_command_by_video_id"):
+            try:
+                cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=60)
+                if cmd and cmd.get("video_url"):
+                    target_url = cmd.get("video_url")
+            except Exception:
+                pass
+        if not target_url and hasattr(store, "find_playlist_track_by_video_id"):
+            try:
+                trk = store.find_playlist_track_by_video_id(video_id, owner_id=user_id)
+                if trk and trk.get("youtube_url"):
+                    target_url = trk.get("youtube_url")
+            except Exception:
+                pass
+
     try:
-        source_url, extracted_title = await extract_audio_url(video_id)
+        source_url, extracted_title = await extract_audio_url(video_id, target_url=target_url)
         if not source_url:
             raise ValueError("Direct audio stream tidak ditemukan.")
         if not title:
             title = extracted_title
     except Exception as exc:
         logger.warning("Extraction failed for video %s: %s", video_id, exc)
-        raise HTTPException(status_code=404, detail=f"Gagal mengekstrak audio YouTube: {exc}")
+        media_name = "TikTok" if video_id.startswith("tt_") else "YouTube"
+        raise HTTPException(status_code=404, detail=f"Gagal mengekstrak audio {media_name}: {exc}")
+
 
     return StreamingResponse(
         _stream_opus_audio(
