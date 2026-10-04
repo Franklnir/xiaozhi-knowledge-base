@@ -1,6 +1,7 @@
 import hashlib
 import ipaddress
 import json
+import logging
 import re
 import secrets
 import socket
@@ -8,7 +9,10 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import HTTPRedirectHandler, Request as UrlRequest, build_opener
+from urllib.request import HTTPRedirectHandler, Request as UrlRequest, build_opener, urlopen
+
+logger = logging.getLogger("xiaozhi.utils")
+
 
 from xiaozhi.config import (
     API_IMPORT_MAX_BYTES,
