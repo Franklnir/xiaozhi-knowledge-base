@@ -2,6 +2,27 @@
 
 {% block content %}
 <style>
+    /* Neo-Brutalism Admin Green Theme Palette */
+    :root[data-theme="neo"] .app-eyebrow {
+        background: #4ade80 !important;
+        color: #111111 !important;
+    }
+    :root[data-theme="neo"] .app-table thead tr {
+        background: #4ade80 !important;
+        color: #111111 !important;
+    }
+    :root[data-theme="neo"] .app-button-primary {
+        background: #22c55e !important;
+        color: #111111 !important;
+    }
+    :root[data-theme="neo"] .app-button-primary:hover {
+        background: #16a34a !important;
+        color: #ffffff !important;
+    }
+    :root[data-theme="neo"] .app-table tr:hover td {
+        background: #f0fdf4 !important;
+    }
+
     .mcp-status-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -24,6 +45,8 @@
     }
     .block-badge-blocked { background: #fee2e2; color: #dc2626; }
     .block-badge-allowed { background: #ecfdf5; color: #047857; }
+    .mcp-stat-error { color: #dc2626; }
+    .mcp-stat-ok { color: #047857; }
 </style>
 
 <div class="app-page">
@@ -54,7 +77,7 @@
         </div>
         <div class="app-stat-card">
             <p class="app-stat-label">Error</p>
-            <p class="app-stat-value" style="color: {% if total_errors > 0 %}#dc2626{% else %}#047857{% endif %}">{{ total_errors }}</p>
+            <p class="app-stat-value {% if total_errors > 0 %}mcp-stat-error{% else %}mcp-stat-ok{% endif %}">{{ total_errors }}</p>
         </div>
     </section>
 

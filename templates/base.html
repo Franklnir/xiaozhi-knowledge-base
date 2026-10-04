@@ -1119,6 +1119,79 @@
             background: #fffbeb !important;
         }
 
+        /* ══════════════════════════════════════════════════════════════════
+           NEO-BRUTALISM ADMIN GREEN THEME SYSTEM (body.is-admin-page)
+           ══════════════════════════════════════════════════════════════════ */
+        :root[data-theme="neo"] body.is-admin-page {
+            --app-surface-muted: #86efac;
+            --app-soft: #dcfce7;
+            --app-accent: #059669;
+        }
+
+        /* 1. Admin Eyebrow Badge (Green) */
+        :root[data-theme="neo"] body.is-admin-page .app-eyebrow {
+            background: #4ade80 !important;
+            color: #111111 !important;
+            border: 2px solid #111111 !important;
+            box-shadow: 2px 2px 0 #111111 !important;
+        }
+
+        /* 2. Admin Tables: Vibrant Green Header */
+        :root[data-theme="neo"] body.is-admin-page .app-table thead tr {
+            background: #4ade80 !important;
+            border-bottom: 2.5px solid #111111 !important;
+        }
+        :root[data-theme="neo"] body.is-admin-page .app-table thead th {
+            color: #111111 !important;
+        }
+        :root[data-theme="neo"] body.is-admin-page .app-table tr:hover td {
+            background: #f0fdf4 !important;
+        }
+
+        /* 3. Admin Primary Buttons: Punchy Emerald Green */
+        :root[data-theme="neo"] body.is-admin-page .app-button-primary {
+            background: #22c55e !important;
+            color: #111111 !important;
+            border: 2px solid #111111 !important;
+            box-shadow: 3.5px 3.5px 0 #111111 !important;
+        }
+        :root[data-theme="neo"] body.is-admin-page .app-button-primary:hover {
+            background: #16a34a !important;
+            color: #ffffff !important;
+            box-shadow: 5px 5px 0 #111111 !important;
+        }
+
+        /* 4. Admin Sidebar Accents: Fresh Green */
+        :root[data-theme="neo"] body.is-admin-page .app-sidebar-header {
+            background: #86efac !important;
+            border-bottom: 2.5px solid #111111 !important;
+        }
+        :root[data-theme="neo"] body.is-admin-page .app-brand-mark {
+            background: #4ade80 !important;
+            border: 2px solid #111111 !important;
+            box-shadow: 2.5px 2.5px 0 #111111 !important;
+        }
+        :root[data-theme="neo"] body.is-admin-page .app-sidebar-link:hover {
+            background: #dcfce7 !important;
+            border: 1.5px solid #111111 !important;
+            box-shadow: 2.5px 2.5px 0 #111111 !important;
+            color: #111111 !important;
+        }
+
+        /* 5. Admin Panels & Steps */
+        :root[data-theme="neo"] body.is-admin-page .app-muted-panel {
+            background: #f0fdf4 !important;
+            border: 2px solid #111111 !important;
+            box-shadow: 3px 3px 0 #111111 !important;
+        }
+        :root[data-theme="neo"] body.is-admin-page .doc-step-number {
+            background: #4ade80 !important;
+            color: #111111 !important;
+        }
+        :root[data-theme="neo"] body.is-admin-page .app-button:hover {
+            background: #f0fdf4 !important;
+        }
+
         /* RESPONSIVE */
         @media (max-width: 900px) {
             .app-nav-aside {
@@ -1343,9 +1416,10 @@
     <script src="/static/js/app.js"></script>
 </head>
 {% set page = active_page|default('') %}
+{% set is_admin_page = (page.startswith('admin') or (request and request.url.path.startswith('/admin'))) %}
 {% set is_mcp_unlocked_page = (page in ['dashboard', 'dashboard_materi', 'chat', 'documentation', 'login', 'register', 'profile', 'admin', 'admin_mcp', 'admin_analytics', 'web_flasher', 'marketplace', 'marketplace_chats', '']) %}
 {% set show_mcp_block_overlay = (user and user.role != 'admin' and (mcp_required is not defined or mcp_required) and not mcp_connected and not is_mcp_unlocked_page) %}
-<body>
+<body class="{% if is_admin_page %}is-admin-page{% endif %}">
     {% if show_mcp_block_overlay %}
     <!-- Blocking Overlay: MCP Connection Required -->
     <div class="mcp-blocking-overlay" id="mcpRequiredOverlay" role="dialog" aria-modal="true" aria-labelledby="mcpModalTitle">
