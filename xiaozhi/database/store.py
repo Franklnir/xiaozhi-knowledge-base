@@ -3183,12 +3183,23 @@ class HFJsonStore:
             items.sort(key=lambda x: (int(x.get("play_count", 0)), str(x.get("last_played_at") or "")), reverse=True)
             return [dict(x) for x in items[:limit]]
 
+    def find_playlist_track_by_video_id(self, video_id: str, owner_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        if not video_id:
+            return None
+        with self._lock:
+            data = self._load()
+            for p in data.get("user_playlists", []):
+                if str(p.get("video_id", "")).strip() == str(video_id).strip():
+                    if owner_id is None or int(p.get("owner_id", 0)) == int(owner_id):
+                        return dict(p)
+            return None
+
     def find_playlist_track_by_query(self, owner_id: int, query: str) -> Optional[Dict[str, Any]]:
         raw_q = (query or "").strip()
         if not raw_q:
             return None
         import re
-        from xiaozhi.core.utils import extract_youtube_video_id
+        from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id
 
         user_tracks = self.get_user_playlist(owner_id)
         if not user_tracks:
@@ -3208,11 +3219,12 @@ class HFJsonStore:
                 if int(t.get("track_number", 0)) == track_num:
                     return t
 
-        # Check Video ID / URL
-        vid = extract_youtube_video_id(raw_q)
-        if vid:
+        # Check Video ID / URL (YouTube or TikTok)
+        media_info = detect_media_url_source(raw_q)
+        target_vid = media_info["video_id"] if media_info else extract_youtube_video_id(raw_q)
+        if target_vid:
             for t in user_tracks:
-                if str(t.get("video_id", "")).strip() == vid:
+                if str(t.get("video_id", "")).strip() == target_vid:
                     return t
 
         # Check by title / artist
@@ -3222,3 +3234,4 @@ class HFJsonStore:
             if target_q in str(t.get("title", "")).lower() or target_q in str(t.get("artist", "")).lower():
                 return t
         return None
+

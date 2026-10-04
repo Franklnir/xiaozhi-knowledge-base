@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Playlist Musik YouTube - Xiaozhi Voice AI Assistant{% endblock %}
+{% block title %}Playlist Musik (YouTube & TikTok) - Xiaozhi Voice AI Assistant{% endblock %}
 
 {% block content %}
 <style>
@@ -196,13 +196,13 @@
         <div>
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
                 <span class="app-eyebrow" style="margin:0;">Audio & Asisten Suara</span>
-                <span style="font-size:10px; background:#ef4444; color:#fff; font-weight:900; padding:2px 7px; border-radius:99px; text-transform:uppercase;">YouTube Stream</span>
+                <span style="font-size:10px; background:#ef4444; color:#fff; font-weight:900; padding:2px 7px; border-radius:99px; text-transform:uppercase;">YouTube & TikTok Stream</span>
             </div>
             <h1 class="app-title" style="display:flex; align-items:center; gap:10px;">
-                <span>🎵 Playlist Musik YouTube</span>
+                <span>🎵 Playlist Musik (YouTube & TikTok)</span>
             </h1>
             <p class="app-subtitle">
-                Atur daftar lagu favorit Anda. Panggil lagu berdasarkan <strong>nomor (#1, #2)</strong>, <strong>judul lagu</strong>, atau <strong>link YouTube</strong> melalui perintah suara Xiaozhi atau tombol play langsung ke ESP32.
+                Atur daftar lagu favorit Anda dari YouTube maupun TikTok. Panggil lagu berdasarkan <strong>nomor (#1, #2)</strong>, <strong>judul lagu</strong>, atau <strong>link video</strong> melalui perintah suara Xiaozhi atau tombol play langsung ke ESP32.
             </p>
         </div>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -214,6 +214,7 @@
             </button>
         </div>
     </header>
+
 
     <!-- Prominent Firmware Warning Overlay Reminder Banner -->
     <div class="firmware-warning-banner">
@@ -342,14 +343,20 @@
                                 {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}#{{ loop.index }}{% endif %}
                             </span>
                             <div class="track-thumb-box" style="width:48px; height:34px;">
+                                {% if t.video_id.startswith('tt_') %}
+                                <div style="width:100%; height:100%; background:linear-gradient(135deg, #000 50%, #fe2c55 100%); display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px;">
+                                    🎵
+                                </div>
+                                {% else %}
                                 <img src="https://img.youtube.com/vi/{{ t.video_id }}/default.jpg" class="track-thumb-img" alt="Thumb">
+                                {% endif %}
                             </div>
                             <div style="min-width:0;">
                                 <div style="font-size:13px; font-weight:800; color:var(--app-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ t.title }}">
                                     #{{ t.track_number }} {{ t.title }}
                                 </div>
                                 <div style="font-size:11px; color:var(--app-muted);">
-                                    {{ t.artist or 'YouTube Audio' }}
+                                    {{ t.artist or ('TikTok Creator' if t.video_id.startswith('tt_') else 'YouTube Audio') }}
                                 </div>
                             </div>
                         </div>
@@ -420,18 +427,38 @@
                             </td>
                             <td>
                                 <div class="track-thumb-box">
+                                    {% if track.video_id.startswith('tt_') %}
+                                    <div style="width:100%; height:100%; background:linear-gradient(135deg, #000 50%, #fe2c55 100%); display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px;">
+                                        🎵
+                                    </div>
+                                    <a href="{{ track.youtube_url }}" target="_blank" rel="noopener noreferrer" class="track-thumb-play-overlay" title="Buka video di TikTok">
+                                        ↗
+                                    </a>
+                                    {% else %}
                                     <img src="https://img.youtube.com/vi/{{ track.video_id }}/hqdefault.jpg" onerror="this.src='https://img.youtube.com/vi/{{ track.video_id }}/default.jpg'" class="track-thumb-img" alt="Thumbnail">
                                     <div class="track-thumb-play-overlay" onclick="previewYouTubeModal('{{ track.video_id }}', '{{ track.title|escape }}')" title="Pratinjau Video YouTube">
                                         ▶
                                     </div>
+                                    {% endif %}
                                 </div>
                             </td>
                             <td>
-                                <div style="font-weight:800; font-size:14px; color:var(--app-text); line-height:1.35;" id="track-title-{{ track.id }}">
-                                    {{ track.title }}
+                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    {% if track.video_id.startswith('tt_') %}
+                                    <span style="background:#000; color:#00f2fe; border:1px solid #fe2c55; font-size:10px; font-weight:800; padding:1px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;">
+                                        🎵 TikTok
+                                    </span>
+                                    {% else %}
+                                    <span style="background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.25); font-size:10px; font-weight:800; padding:1px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;">
+                                        📺 YouTube
+                                    </span>
+                                    {% endif %}
+                                    <span style="font-weight:800; font-size:14px; color:var(--app-text); line-height:1.35;" id="track-title-{{ track.id }}">
+                                        {{ track.title }}
+                                    </span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:8px; margin-top:4px; font-size:12px; color:var(--app-muted);">
-                                    <span id="track-artist-{{ track.id }}">{{ track.artist or 'YouTube Audio' }}</span>
+                                    <span id="track-artist-{{ track.id }}">{{ track.artist or ('TikTok Creator' if track.video_id.startswith('tt_') else 'YouTube Audio') }}</span>
                                     <span>•</span>
                                     <span style="font-family:monospace; font-size:11px; background:var(--app-surface-muted); padding:1px 5px; border-radius:4px; border:1px solid var(--app-border);">
                                         ID: {{ track.video_id }}
@@ -440,10 +467,10 @@
                             </td>
                             <td>
                                 <div style="display:flex; align-items:center; gap:6px;">
-                                    <a href="{{ track.youtube_url }}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px; color:#ef4444; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ track.youtube_url }}">
-                                        <span>📺</span> <span id="track-url-{{ track.id }}">{{ track.youtube_url }}</span> ↗
+                                    <a href="{{ track.youtube_url }}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px; color:{% if track.video_id.startswith('tt_') %}#fe2c55{% else %}#ef4444{% endif %}; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ track.youtube_url }}">
+                                        <span>{% if track.video_id.startswith('tt_') %}🎵{% else %}📺{% endif %}</span> <span id="track-url-{{ track.id }}">{{ track.youtube_url }}</span> ↗
                                     </a>
-                                    <button type="button" onclick="navigator.clipboard.writeText('{{ track.youtube_url }}'); if(window.App&&App.toast)App.toast.success('Link YouTube disalin!'); else alert('Link disalin!');" title="Salin Link" class="app-button" style="padding:2px 6px; font-size:11px;">
+                                    <button type="button" onclick="navigator.clipboard.writeText('{{ track.youtube_url }}'); if(window.App&&App.toast)App.toast.success('Link disalin!'); else alert('Link disalin!');" title="Salin Link" class="app-button" style="padding:2px 6px; font-size:11px;">
                                         📋
                                     </button>
                                 </div>
@@ -506,17 +533,20 @@
 
             <form id="formAddTrack" onsubmit="submitAddTrack(event)">
                 <div style="display:flex; flex-direction:column; gap:14px;">
-                    <!-- YouTube Link / ID -->
+                    <!-- YouTube / TikTok Link -->
                     <div>
-                        <label class="app-label" for="addYoutubeUrl">
-                            Link YouTube atau Video ID <span style="color:#ef4444;">*</span>
-                        </label>
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                            <label class="app-label" for="addYoutubeUrl" style="margin:0;">
+                                Link YouTube atau TikTok <span style="color:#ef4444;">*</span>
+                            </label>
+                            <span id="addDetectBadge" style="display:none; font-size:11px; font-weight:800; padding:2px 8px; border-radius:99px;"></span>
+                        </div>
                         <div style="display:flex; gap:8px;">
                             <input 
                                 type="text" 
                                 id="addYoutubeUrl" 
                                 required 
-                                placeholder="https://www.youtube.com/watch?v=... atau https://youtu.be/..." 
+                                placeholder="https://youtube.com/watch?v=... atau https://vt.tiktok.com/..." 
                                 class="app-input" 
                                 style="flex:1; font-family:monospace; font-size:12.5px;"
                                 oninput="onAddUrlChanged(this.value)"
@@ -525,22 +555,25 @@
                                 📋 Tempel
                             </button>
                         </div>
-                        <p class="app-field-hint">Mendukung format link YouTube biasa, youtu.be, YouTube Shorts, atau ID video 11 karakter.</p>
+                        <p class="app-field-hint">Auto-deteksi cerdas: Cukup tempel link YouTube (video, Shorts) atau TikTok (vt.tiktok.com, vm.tiktok.com, video link). Sistem otomatis mengenali platformnya.</p>
                     </div>
 
-                    <!-- Live Thumbnail Preview Box -->
+                    <!-- Live Media Preview Box -->
                     <div id="addPreviewBox" style="display:none; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px; padding:12px; align-items:center; gap:12px;">
-                        <img id="addPreviewThumb" src="" alt="Preview Thumbnail" style="width:80px; height:54px; object-fit:cover; border-radius:6px; border:1px solid var(--app-border);">
+                        <img id="addPreviewThumb" src="" alt="Preview Thumbnail" style="width:80px; height:54px; object-fit:cover; border-radius:6px; border:1px solid var(--app-border); display:none;">
+                        <div id="addPreviewIconBox" style="width:80px; height:54px; border-radius:6px; background:linear-gradient(135deg, #000 50%, #fe2c55 100%); display:none; align-items:center; justify-content:center; color:#fff; font-size:24px; border:1px solid #fe2c55; flex-shrink:0;">
+                            🎵
+                        </div>
                         <div style="min-width:0; flex:1;">
-                            <div style="font-size:11px; font-weight:800; color:#10b981; text-transform:uppercase;">✓ Video YouTube Terdeteksi</div>
-                            <div id="addPreviewId" style="font-family:monospace; font-size:12px; font-weight:700; color:var(--app-text);"></div>
+                            <div id="addPreviewTag" style="font-size:11px; font-weight:800; text-transform:uppercase;"></div>
+                            <div id="addPreviewId" style="font-family:monospace; font-size:12px; font-weight:700; color:var(--app-text); word-break:break-all;"></div>
                         </div>
                     </div>
 
                     <!-- Track Title -->
                     <div>
                         <label class="app-label" for="addTrackTitle">
-                            Judul Lagu <span style="font-size:11px; color:var(--app-muted); font-weight:normal;">(Opsional - otomatis diambil dari YouTube jika kosong)</span>
+                            Judul Lagu <span style="font-size:11px; color:var(--app-muted); font-weight:normal;">(Opsional - otomatis diambil dari YouTube / TikTok jika kosong)</span>
                         </label>
                         <input 
                             type="text" 
@@ -612,15 +645,16 @@
                         >
                     </div>
 
-                    <!-- YouTube Link -->
+                    <!-- YouTube / TikTok Link -->
                     <div>
                         <label class="app-label" for="editYoutubeUrl">
-                            Link YouTube / Video ID <span style="color:#ef4444;">*</span>
+                            Link YouTube / TikTok <span style="color:#ef4444;">*</span>
                         </label>
                         <input 
                             type="text" 
                             id="editYoutubeUrl" 
                             required 
+                            placeholder="https://youtube.com/watch?v=... atau https://vt.tiktok.com/..."
                             class="app-input" 
                             style="font-family:monospace; font-size:12.5px;"
                         >
@@ -681,14 +715,35 @@
 <script>
     const csrfToken = {{ csrf_token|tojson }};
 
-    // Helper: Extract YouTube video id
-    function extractYouTubeId(url) {
+    // Helper: Detect Media Source (YouTube or TikTok)
+    function detectMediaSource(url) {
         if (!url) return null;
         url = url.trim();
-        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
-        const regExp = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/|live\/|watch\?.+&v=))([\w-]{11})/;
-        const match = url.match(regExp);
-        return match ? match[1] : null;
+        // 1. YouTube direct ID
+        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+            return { platform: 'youtube', id: url, title: 'YouTube Video ID' };
+        }
+        // 2. YouTube URL
+        const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/|live\/|watch\?.+&v=))([\w-]{11})/);
+        if (ytMatch) {
+            return { platform: 'youtube', id: ytMatch[1], title: 'YouTube Video' };
+        }
+        // 3. TikTok URL
+        if (/tiktok\.com|douyin\.com/i.test(url)) {
+            const mFull = url.match(/\/(?:video|photo|v)\/(\d{15,25})/);
+            if (mFull) return { platform: 'tiktok', id: 'tt_' + mFull[1], title: 'TikTok Video (' + mFull[1] + ')' };
+            const mShort = url.match(/(?:vt|vm)\.tiktok\.com\/([a-zA-Z0-9_-]+)/);
+            if (mShort) return { platform: 'tiktok', id: 'tt_' + mShort[1], title: 'TikTok Shortlink (' + mShort[1] + ')' };
+            const mMusic = url.match(/\/music\/[^\/]+-(\d{10,25})/);
+            if (mMusic) return { platform: 'tiktok', id: 'tt_' + mMusic[1], title: 'TikTok Sound (' + mMusic[1] + ')' };
+            return { platform: 'tiktok', id: 'tt_link', title: 'TikTok Media Link' };
+        }
+        return null;
+    }
+
+    function extractYouTubeId(url) {
+        const info = detectMediaSource(url);
+        return (info && info.platform === 'youtube') ? info.id : null;
     }
 
     // Copy voice snippet to clipboard
@@ -713,18 +768,47 @@
         } catch (_) {}
     }
 
-    // Add URL live preview
+    // Add URL live preview with Auto-Detection
     function onAddUrlChanged(val) {
-        const vid = extractYouTubeId(val);
+        const info = detectMediaSource(val);
         const box = document.getElementById('addPreviewBox');
+        const badge = document.getElementById('addDetectBadge');
         const thumb = document.getElementById('addPreviewThumb');
+        const iconBox = document.getElementById('addPreviewIconBox');
+        const tagEl = document.getElementById('addPreviewTag');
         const idEl = document.getElementById('addPreviewId');
-        if (vid) {
-            thumb.src = "https://img.youtube.com/vi/" + vid + "/mqdefault.jpg";
-            idEl.textContent = "ID: " + vid + " (https://youtube.com/watch?v=" + vid + ")";
+
+        if (info) {
             box.style.display = 'flex';
+            if (info.platform === 'youtube') {
+                thumb.src = "https://img.youtube.com/vi/" + info.id + "/mqdefault.jpg";
+                thumb.style.display = 'block';
+                if (iconBox) iconBox.style.display = 'none';
+                tagEl.innerHTML = '<span style="color:#ef4444; font-weight:800;">✓ YouTube Terdeteksi (Auto)</span>';
+                idEl.textContent = "ID: " + info.id + " (https://youtube.com/watch?v=" + info.id + ")";
+                if (badge) {
+                    badge.style.display = 'inline-block';
+                    badge.style.background = 'rgba(239, 68, 68, 0.15)';
+                    badge.style.color = '#ef4444';
+                    badge.style.border = '1px solid #ef4444';
+                    badge.textContent = '📺 YouTube Terdeteksi';
+                }
+            } else if (info.platform === 'tiktok') {
+                thumb.style.display = 'none';
+                if (iconBox) iconBox.style.display = 'flex';
+                tagEl.innerHTML = '<span style="color:#00f2fe; font-weight:800;">✓ TikTok Terdeteksi (Auto)</span>';
+                idEl.textContent = info.title;
+                if (badge) {
+                    badge.style.display = 'inline-block';
+                    badge.style.background = '#000';
+                    badge.style.color = '#00f2fe';
+                    badge.style.border = '1px solid #fe2c55';
+                    badge.textContent = '🎵 TikTok Terdeteksi';
+                }
+            }
         } else {
             box.style.display = 'none';
+            if (badge) badge.style.display = 'none';
         }
     }
 
@@ -732,6 +816,8 @@
     function openAddTrackModal() {
         document.getElementById('formAddTrack').reset();
         document.getElementById('addPreviewBox').style.display = 'none';
+        const badge = document.getElementById('addDetectBadge');
+        if (badge) badge.style.display = 'none';
         document.getElementById('modalAddTrack').classList.add('is-active');
         setTimeout(() => document.getElementById('addYoutubeUrl').focus(), 50);
     }

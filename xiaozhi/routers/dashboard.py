@@ -23,8 +23,10 @@ from xiaozhi.dependencies import (
     validate_csrf,
     redirect_with_message,
 )
+import logging
 from xiaozhi.services.mcp_service import is_mcp_connected, mcp_status_payload, signal_mcp_reload
 
+logger = logging.getLogger("xiaozhi.dashboard")
 router = APIRouter()
 
 
@@ -110,6 +112,46 @@ async def add_material(
         return redirect_with_message("/dashboard", "Data materi berhasil ditambahkan.")
     except ValueError as exc:
         return redirect_with_message("/dashboard", f"Gagal: {exc}")
+
+
+@router.post("/api/materials/scrape-url")
+async def api_materials_scrape_url(request: Request):
+    """Scrape web content from public URL for auto-filling material in dashboard."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "message": "Sesi telah berakhir. Silakan login kembali."}, status_code=401)
+
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            payload = await request.json()
+            url = payload.get("url", "")
+        else:
+            form = await request.form()
+            url = form.get("url", "")
+
+        from xiaozhi.services.scraper_service import scrape_url_async
+        res = await scrape_url_async(str(url or "").strip(), max_length=15000)
+        if not res.get("success"):
+            return JSONResponse({"success": False, "message": res.get("error", "Gagal mengekstrak isi halaman web.")}, status_code=400)
+
+        return JSONResponse({
+            "success": True,
+            "data": {
+                "url": res["url"],
+                "hostname": res.get("hostname", ""),
+                "title": res.get("title", ""),
+                "description": res.get("description", ""),
+                "keywords": res.get("keywords", ""),
+                "content": res.get("content", ""),
+                "word_count": res.get("word_count", 0),
+                "is_truncated": res.get("is_truncated", False),
+            },
+            "message": "Konten halaman web berhasil di-scrape."
+        })
+    except Exception as e:
+        logger.exception("Error in api_materials_scrape_url")
+        return JSONResponse({"success": False, "message": f"Terjadi kesalahan: {str(e)[:100]}"}, status_code=500)
 
 
 @router.post("/api/materials/stream-index")

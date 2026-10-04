@@ -33,7 +33,7 @@ def get_ffmpeg_binary() -> Optional[str]:
     return _FFMPEG_PATH or shutil.which("ffmpeg")
 
 
-async def extract_audio_url(video_id: str) -> tuple[Optional[str], str]:
+async def extract_audio_url(video_id: str, target_url: Optional[str] = None) -> tuple[Optional[str], str]:
     if not yt_dlp:
         raise RuntimeError("yt_dlp tidak tersedia di server.")
 
@@ -45,10 +45,26 @@ async def extract_audio_url(video_id: str) -> tuple[Optional[str], str]:
             "no_warnings": True,
             "format": "bestaudio/best",
             "extractaudio": True,
+            "socket_timeout": 15,
         }
+        if target_url:
+            query = target_url
+        elif video_id.startswith("tt_"):
+            raw_id = video_id[3:]
+            query = f"https://www.tiktok.com/@video/video/{raw_id}"
+        else:
+            query = f"https://www.youtube.com/watch?v={video_id}"
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            return info.get("url"), info.get("title", "")
+            info = ydl.extract_info(query, download=False)
+            stream_url = info.get("url")
+            if not stream_url and info.get("formats"):
+                audio_formats = [f for f in info["formats"] if f.get("acodec") != "none" and f.get("url")]
+                if audio_formats:
+                    stream_url = audio_formats[-1]["url"]
+                else:
+                    stream_url = info["formats"][-1].get("url")
+            return stream_url, info.get("title", "")
 
     return await loop.run_in_executor(None, _extract)
 
@@ -114,10 +130,11 @@ async def stream_video_to_websocket(
     device_mac: str = "",
     bitrate: str = "auto",
     rssi: Optional[int] = None,
-    chip: str = ""
+    chip: str = "",
+    target_url: Optional[str] = None,
 ):
     """
-    Streams a YouTube video as paced Opus frames over a WebSocket connection.
+    Streams a YouTube or TikTok audio as paced Opus frames over a WebSocket connection.
     Formatted to XiaoZhi BinaryProtocol3 / standard audio frames with adaptive bitrate.
     """
     from xiaozhi.services.playback_tracker import playback_tracker
@@ -131,13 +148,14 @@ async def stream_video_to_websocket(
         return
 
     try:
-        source_url, extracted_title = await extract_audio_url(video_id)
+        source_url, extracted_title = await extract_audio_url(video_id, target_url=target_url)
         if not title:
             title = extracted_title
     except Exception as exc:
         logger.error("Gagal ekstrak direct audio URL: %s", exc)
         await websocket.send_json({"type": "error", "message": f"Gagal ekstrak audio: {exc}"})
         return
+
 
     session = None
     if user_id:

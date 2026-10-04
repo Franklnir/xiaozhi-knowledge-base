@@ -2755,13 +2755,29 @@ class SQLiteStore:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def find_playlist_track_by_video_id(self, video_id: str, owner_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        if not video_id:
+            return None
+        conn = self._get_conn()
+        if owner_id is not None:
+            row = conn.execute(
+                "SELECT * FROM user_playlists WHERE video_id = ? AND owner_id = ? LIMIT 1",
+                (str(video_id).strip(), int(owner_id)),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT * FROM user_playlists WHERE video_id = ? LIMIT 1",
+                (str(video_id).strip(),),
+            ).fetchone()
+        return dict(row) if row else None
+
     def find_playlist_track_by_query(self, owner_id: int, query: str) -> Optional[Dict[str, Any]]:
         raw_q = (query or "").strip()
         if not raw_q:
             return None
 
         import re
-        from xiaozhi.core.utils import extract_youtube_video_id
+        from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id
 
         # Check track number in query: ONLY if query is literally a number (e.g. "1") or has explicit keyword ("nomor 2", "track 3", "playlist 1")
         track_num = None
@@ -2781,8 +2797,9 @@ class SQLiteStore:
             if row:
                 return dict(row)
 
-        # Check if query is YouTube URL or Video ID
-        vid = extract_youtube_video_id(raw_q)
+        # Check if query is Media URL or Video ID (YouTube or TikTok)
+        media_info = detect_media_url_source(raw_q)
+        vid = media_info["video_id"] if media_info else extract_youtube_video_id(raw_q)
         if vid:
             row = conn.execute(
                 "SELECT * FROM user_playlists WHERE owner_id = ? AND video_id = ?",
@@ -2804,5 +2821,6 @@ class SQLiteStore:
             (int(owner_id), f"%{target_q.lower()}%", f"%{target_q.lower()}%", target_q.lower()),
         ).fetchone()
         return dict(row) if row else None
+
 
 

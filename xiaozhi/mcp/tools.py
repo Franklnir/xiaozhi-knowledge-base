@@ -1661,4 +1661,161 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             record_mcp_tool_history(owner_id, "get_prayer_and_worship_guide", q_str, {"religion": religion, "ritual_or_prayer_name": ritual_or_prayer_name, "occasion": occasion}, result)
         return result
 
+    @mcp_server.tool()
+    def scrape_webpage(url: str, max_chars: int = 4000) -> dict:
+        """
+        Baca dan ambil konten teks bersih dari link website / artikel / berita dari internet secara realtime.
+        Gunakan tool ini saat user memberikan link/URL (https://...) atau meminta membaca, merangkum,
+        atau mengekstrak isi dari suatu halaman web.
+
+        Args:
+            url: URL publik halaman web yang ingin dibaca (misal: "https://id.wikipedia.org/wiki/Kecerdasan_buatan").
+            max_chars: Batas maksimal karakter teks yang diekstrak (default: 4000).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.scraper_service import scrape_url
+        res = scrape_url(url, max_length=max_chars)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "scrape_webpage", url, {"url": url, "max_chars": max_chars}, res)
+        if not res.get("success"):
+            return {
+                "success": False,
+                "message": f"Gagal membaca link: {res.get('error')}",
+                "url": url
+            }
+        return {
+            "success": True,
+            "message": "Konten halaman web berhasil diambil.",
+            "url": res["url"],
+            "judul": res.get("title", ""),
+            "deskripsi": res.get("description", ""),
+            "jumlah_kata": res.get("word_count", 0),
+            "isi_konten": res.get("content", ""),
+            "terpotong": res.get("is_truncated", False)
+        }
+
+    @mcp_server.tool()
+    def scrape_and_save_to_knowledge(url: str, title: str = "", category: str = "Web Scraping") -> dict:
+        """
+        Scrape artikel atau konten halaman web dari URL dan langsung simpan ke Knowledge Base (RAG) milik user.
+        Gunakan tool ini saat user meminta menyimpan materi dari link web ke perpustakaan/knowledge base mereka.
+
+        Args:
+            url: Link URL halaman web yang ingin disimpan.
+            title: Judul materi kustom opsional (jika kosong, akan otomatis mengambil judul dari halaman web).
+            category: Kategori materi (default: "Web Scraping").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi akun Xiaozhi aktif.", "url": url}
+
+        from xiaozhi.services.scraper_service import create_material_from_url
+        res = create_material_from_url(url, title=title, category=category)
+        if not res.get("success"):
+            err_msg = f"Gagal scrape web: {res.get('error', 'Terjadi kesalahan')}"
+            if owner_id:
+                record_mcp_tool_history(owner_id, "scrape_and_save_to_knowledge", url, {"url": url, "title": title, "category": category}, {"success": False, "message": err_msg})
+            return {"success": False, "message": err_msg, "url": url}
+
+        try:
+            mat_id = store.add_material(
+                owner_id,
+                res["title"],
+                res.get("category", "Web Scraping"),
+                res["content"],
+                res.get("keywords", f"web, scraping, {url}"),
+                url
+            )
+            from xiaozhi.services.mcp_service import signal_mcp_reload
+            signal_mcp_reload()
+
+            ret = {
+                "success": True,
+                "message": f"Artikel '{res['title']}' berhasil di-scrape dan disimpan ke Knowledge Base (RAG) Anda.",
+                "material_id": mat_id,
+                "judul": res["title"],
+                "kategori": res.get("category", "Web Scraping"),
+                "url": url,
+                "jumlah_kata": res.get("word_count", 0)
+            }
+            record_mcp_tool_history(owner_id, "scrape_and_save_to_knowledge", url, {"url": url, "title": title, "category": category}, ret)
+            return ret
+        except Exception as e:
+            logger.exception("Error saving scraped material to knowledge base")
+            return {"success": False, "message": f"Gagal menyimpan ke database: {str(e)[:80]}", "url": url}
+
+    @mcp_server.tool()
+    def delete_course_material(search_keyword_or_title: str = "", delete_last_scraped: bool = False, material_id: int = 0) -> dict:
+        """
+        Hapus materi dari database Knowledge Base milik pengguna.
+        Gunakan tool ini saat pengguna berkata:
+        - "Salah website itu tadi, tolong hapus"
+        - "Batalkan materi yang barusan di-scrape"
+        - "Hapus materi terakhir"
+        - "Hapus materi tentang [judul/topik]"
+
+        Args:
+            search_keyword_or_title: Judul atau kata kunci materi yang ingin dihapus.
+            delete_last_scraped: Set True jika user meminta membatalkan/menghapus materi web yang baru saja di-scrape.
+            material_id: ID spesifik materi jika diketahui (default: 0).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi akun Xiaozhi aktif."}
+
+        try:
+            target_mat = None
+            all_mats = store.list_materials(owner_id)
+
+            if material_id and material_id > 0:
+                for m in all_mats:
+                    if int(m.get("id", 0)) == int(material_id):
+                        target_mat = m
+                        break
+            elif delete_last_scraped or any(kw in search_keyword_or_title.lower() for kw in ["terakhir", "barusan", "tadi", "salah website", "salah web", "batalkan"]):
+                # Prioritize last scraped material
+                for m in all_mats:
+                    if m.get("category") == "Web Scraping" or "Sumber: http" in str(m.get("content", "")):
+                        target_mat = m
+                        break
+                # Fallback to the very last material if no explicit web material
+                if not target_mat and all_mats:
+                    target_mat = all_mats[0]
+            elif search_keyword_or_title.strip():
+                clean_kw = search_keyword_or_title.strip().lower()
+                for m in all_mats:
+                    if clean_kw in str(m.get("title", "")).lower():
+                        target_mat = m
+                        break
+                if not target_mat:
+                    searched = store.search_materials(owner_id, clean_kw, limit=3)
+                    if searched:
+                        target_mat = searched[0]
+
+            if not target_mat:
+                return {
+                    "success": False,
+                    "message": "Tidak ditemukan materi yang cocok untuk dihapus dari Knowledge Base Anda."
+                }
+
+            del_id = target_mat["id"]
+            del_title = target_mat.get("title", "Materi")
+            deleted = store.delete_material(owner_id, del_id)
+            if deleted:
+                from xiaozhi.services.mcp_service import signal_mcp_reload
+                signal_mcp_reload()
+                res = {
+                    "success": True,
+                    "message": f"Materi '{del_title}' (ID: {del_id}) berhasil dihapus secara permanen dari Knowledge Base Anda.",
+                    "deleted_id": del_id,
+                    "deleted_title": del_title
+                }
+                record_mcp_tool_history(owner_id, "delete_course_material", f"delete {del_id} {del_title}", {"material_id": del_id, "title": del_title}, res)
+                return res
+            else:
+                return {"success": False, "message": f"Gagal menghapus materi '{del_title}' dari database."}
+        except Exception as e:
+            logger.exception("Error deleting material via MCP")
+            return {"success": False, "message": f"Terjadi kesalahan saat menghapus materi: {str(e)[:80]}"}
+
 

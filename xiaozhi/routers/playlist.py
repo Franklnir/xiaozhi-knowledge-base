@@ -8,7 +8,7 @@ from urllib.request import Request as UrlRequest, urlopen
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from xiaozhi.core.utils import extract_youtube_video_id
+from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id
 from xiaozhi.dependencies import get_current_user, get_store, render, require_user
 
 logger = logging.getLogger("xiaozhi.playlist")
@@ -27,6 +27,28 @@ def _fetch_youtube_title_oembed(video_url: str) -> Optional[str]:
     except Exception:
         pass
     return None
+
+
+def _fetch_tiktok_metadata(video_url: str) -> tuple[Optional[str], Optional[str]]:
+    """Fetch video title and artist/creator from TikTok URL using yt-dlp."""
+    try:
+        import yt_dlp
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "extract_flat": "in_playlist",
+            "socket_timeout": 6,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+            if info:
+                title = info.get("title") or info.get("description")
+                uploader = info.get("uploader") or info.get("creator") or info.get("channel") or ""
+                return title, uploader
+    except Exception as exc:
+        logger.debug("Failed to fetch TikTok metadata via yt-dlp: %s", exc)
+    return None, None
 
 
 @router.get("/playlist", response_class=HTMLResponse)
@@ -81,22 +103,31 @@ async def api_add_playlist_track(request: Request):
     artist = str(body.get("artist") or "").strip()
 
     if not raw_url:
-        raise HTTPException(status_code=400, detail="Link YouTube atau Video ID wajib diisi.")
+        raise HTTPException(status_code=400, detail="Link YouTube atau TikTok wajib diisi.")
 
-    video_id = extract_youtube_video_id(raw_url)
-    if not video_id:
+    media_info = detect_media_url_source(raw_url)
+    if not media_info:
         raise HTTPException(
             status_code=400,
-            detail="Format link YouTube tidak valid. Gunakan format seperti: https://www.youtube.com/watch?v=... atau https://youtu.be/...",
+            detail="Format link tidak valid. Masukkan link YouTube (youtube.com, youtu.be) atau TikTok (tiktok.com, vt.tiktok.com).",
         )
 
-    # Standardize full YouTube URL
-    full_url = f"https://www.youtube.com/watch?v={video_id}"
+    platform = media_info["platform"]
+    video_id = media_info["video_id"]
+    full_url = media_info["canonical_url"]
 
-    # Auto-fetch title if left blank
-    if not title:
-        fetched_title = _fetch_youtube_title_oembed(full_url)
-        title = fetched_title or f"YouTube Video ({video_id})"
+    # Auto-fetch title/artist if left blank
+    if platform == "youtube":
+        if not title:
+            fetched_title = _fetch_youtube_title_oembed(full_url)
+            title = fetched_title or f"YouTube Video ({video_id})"
+    elif platform == "tiktok":
+        if not title or not artist:
+            fetched_title, fetched_artist = _fetch_tiktok_metadata(full_url)
+            if not title:
+                title = fetched_title or f"TikTok Video ({video_id[3:] if video_id.startswith('tt_') else video_id})"
+            if not artist and fetched_artist:
+                artist = fetched_artist
 
     try:
         track = store.add_playlist_track(
@@ -108,8 +139,9 @@ async def api_add_playlist_track(request: Request):
         )
         return {
             "success": True,
-            "message": f"Lagu '{title}' berhasil ditambahkan ke Playlist (Nomor #{track.get('track_number')}).",
+            "message": f"Lagu '{title}' ({platform.capitalize()}) berhasil ditambahkan ke Playlist (Nomor #{track.get('track_number')}).",
             "track": track,
+            "platform": platform,
         }
     except Exception as exc:
         logger.exception("Error adding playlist track: %s", exc)
@@ -136,11 +168,14 @@ async def api_update_playlist_track(track_id: int, request: Request):
 
     if raw_url is not None:
         raw_url = str(raw_url).strip()
-        vid = extract_youtube_video_id(raw_url)
-        if not vid:
-            raise HTTPException(status_code=400, detail="Format link YouTube tidak valid.")
-        video_id = vid
-        raw_url = f"https://www.youtube.com/watch?v={vid}"
+        media_info = detect_media_url_source(raw_url)
+        if not media_info:
+            raise HTTPException(
+                status_code=400,
+                detail="Format link tidak valid. Masukkan link YouTube atau TikTok yang valid.",
+            )
+        video_id = media_info["video_id"]
+        raw_url = media_info["canonical_url"]
 
     updated = store.update_playlist_track(
         owner_id=user["id"],
