@@ -197,6 +197,14 @@ async def monitor_requests(request: Request, call_next):
     response.headers["X-Response-Time"] = f"{duration_ms:.0f}ms"
     response.headers["X-Request-ID"] = req_id
 
+    # Security headers
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("X-XSS-Protection", "1; mode=block")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    if IS_PRODUCTION or request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+
     return response
 
 
