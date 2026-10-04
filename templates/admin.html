@@ -2,6 +2,30 @@
 
 {% block content %}
 <style>
+    /* Neo-Brutalism Admin Green Theme Palette */
+    :root[data-theme="neo"] .app-eyebrow {
+        background: #4ade80 !important;
+        color: #111111 !important;
+    }
+    :root[data-theme="neo"] .app-table thead tr {
+        background: #4ade80 !important;
+        color: #111111 !important;
+    }
+    :root[data-theme="neo"] .app-button-primary {
+        background: #22c55e !important;
+        color: #111111 !important;
+    }
+    :root[data-theme="neo"] .app-button-primary:hover {
+        background: #16a34a !important;
+        color: #ffffff !important;
+    }
+    :root[data-theme="neo"] .app-table tr:hover td {
+        background: #f0fdf4 !important;
+    }
+    :root[data-theme="neo"] .pulse-green-dot {
+        background: #16a34a !important;
+    }
+
     .admin-user-table th { white-space: nowrap; }
     .admin-user-table td { vertical-align: middle; }
     .limit-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
@@ -227,12 +251,16 @@
         </div>
         <div class="app-stat-card">
             <p class="app-stat-label">YouTube Aktif</p>
-            <p class="app-stat-value" id="statYoutubeActive" style="color: {% if totals.youtube_active and totals.youtube_active > 0 %}#047857{% else %}inherit{% endif %}">
+            {% if totals.youtube_active and totals.youtube_active > 0 %}
+            <p class="app-stat-value" id="statYoutubeActive" style="color: #047857;">
                 {{ totals.youtube_active or 0 }}
-                {% if totals.youtube_active and totals.youtube_active > 0 %}
                 <span class="pulse-green-dot" style="margin-left: 4px;"></span>
-                {% endif %}
             </p>
+            {% else %}
+            <p class="app-stat-value" id="statYoutubeActive">
+                {{ totals.youtube_active or 0 }}
+            </p>
+            {% endif %}
         </div>
         <a href="/admin/firmware/finance" class="app-stat-card" style="text-decoration:none; cursor:pointer; border-color:var(--app-brand); transition:transform 0.15s ease;" title="Buka Manajemen Transaksi & Keuangan Marketplace">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -392,7 +420,11 @@
                             {% endif %}
                             
                             <!-- Aktivitas Stream YouTube -->
-                            <div id="user-playback-badge-{{ item.id }}" class="user-playback-badge" style="margin-top: 4px; {% if not item.youtube_stream and not item.is_playing %}display:none;{% endif %}">
+                            {% if not item.youtube_stream and not item.is_playing %}
+                            <div id="user-playback-badge-{{ item.id }}" class="user-playback-badge" style="margin-top: 4px; display: none;">
+                            {% else %}
+                            <div id="user-playback-badge-{{ item.id }}" class="user-playback-badge" style="margin-top: 4px;">
+                            {% endif %}
                                 <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 2px 6px;">
                                     <span class="music-bar-anim" style="height:10px"><span></span><span></span><span></span></span>
                                     <span class="playback-title">{% if item.youtube_stream %}{{ item.youtube_stream.title[:24] }}...{% elif item.current_track %}{{ item.current_track[:24] }}...{% else %}Sedang Stream YouTube{% endif %}</span>
