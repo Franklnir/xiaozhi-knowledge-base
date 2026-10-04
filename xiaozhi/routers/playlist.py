@@ -32,16 +32,17 @@ def _fetch_youtube_title_oembed(video_url: str) -> Optional[str]:
 def _fetch_tiktok_metadata(video_url: str) -> tuple[Optional[str], Optional[str]]:
     """Fetch video title and artist/creator from TikTok URL using yt-dlp."""
     try:
+        from xiaozhi.core.utils import normalize_tiktok_url_for_ytdlp
+        normalized_url = normalize_tiktok_url_for_ytdlp(video_url)
         import yt_dlp
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,
             "skip_download": True,
-            "extract_flat": "in_playlist",
-            "socket_timeout": 6,
+            "socket_timeout": 8,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
+            info = ydl.extract_info(normalized_url, download=False)
             if info:
                 title = info.get("title") or info.get("description")
                 uploader = info.get("uploader") or info.get("creator") or info.get("channel") or ""
@@ -49,6 +50,7 @@ def _fetch_tiktok_metadata(video_url: str) -> tuple[Optional[str], Optional[str]
     except Exception as exc:
         logger.debug("Failed to fetch TikTok metadata via yt-dlp: %s", exc)
     return None, None
+
 
 
 @router.get("/playlist", response_class=HTMLResponse)

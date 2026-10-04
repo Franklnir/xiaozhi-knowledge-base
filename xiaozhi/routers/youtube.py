@@ -477,6 +477,7 @@ async def _stream_opus_audio(
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
+        "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
     ]
     if start_sec > 0:
         cmd.extend(["-ss", f"{start_sec:.2f}"])
