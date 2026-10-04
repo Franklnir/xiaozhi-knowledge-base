@@ -128,3 +128,18 @@ def test_store_playlist_tiktok_support(tmp_path):
     q4 = store.find_playlist_track_by_query(user_id, "DJ TikTok")
     assert q4 is not None
     assert q4["id"] == tt_track["id"]
+
+
+def test_normalize_tiktok_url_for_ytdlp():
+    from xiaozhi.core.utils import normalize_tiktok_url_for_ytdlp
+
+    # Photo carousel link converted to /video/
+    photo_url = "https://www.tiktok.com/@user/photo/7520992939187932472?_r=1"
+    res = normalize_tiktok_url_for_ytdlp(photo_url)
+    assert "/video/7520992939187932472" in res
+
+    # tt_ raw ID converted to direct video endpoint
+    raw_vid = "tt_7520992939187932472"
+    res2 = normalize_tiktok_url_for_ytdlp(raw_vid)
+    assert res2 == "https://www.tiktok.com/@video/video/7520992939187932472"
+

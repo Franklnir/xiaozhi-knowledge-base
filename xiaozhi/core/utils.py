@@ -77,6 +77,47 @@ def extract_youtube_video_id(url_or_id: str) -> Optional[str]:
     return None
 
 
+def normalize_tiktok_url_for_ytdlp(url_or_id: str) -> str:
+    """
+    Normalizes any TikTok URL, shortlink, or video_id for yt-dlp extraction.
+    Follows shortlink redirects and converts /photo/ or /v/ to /video/
+    to prevent 'Unsupported URL' errors in yt-dlp.
+    """
+    if not url_or_id:
+        return url_or_id
+
+    cleaned = str(url_or_id).strip()
+
+    # If it's a raw video_id like tt_7520992939187932472 or tt_ZSb9BSQeT
+    if cleaned.startswith("tt_"):
+        raw_id = cleaned[3:]
+        if raw_id.isdigit():
+            cleaned = f"https://www.tiktok.com/@video/video/{raw_id}"
+        else:
+            cleaned = f"https://vt.tiktok.com/{raw_id}/"
+
+    # If it's a shortlink (vt.tiktok.com / vm.tiktok.com), follow redirect to canonical destination
+    if re.search(r"(?:vt|vm)\.tiktok\.com/", cleaned, re.IGNORECASE):
+        try:
+            req = UrlRequest(
+                cleaned,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+            )
+            with urlopen(req, timeout=5) as res:
+                resolved_url = res.geturl()
+                if resolved_url:
+                    cleaned = resolved_url
+        except Exception:
+            pass
+
+    # Convert /photo/ or /v/ to /video/ because yt-dlp does not match /photo/
+    cleaned = re.sub(r"/(?:photo|v)/(\d+)", r"/video/\1", cleaned)
+
+    return cleaned
+
+
 def extract_tiktok_media_info(url_or_id: str) -> Optional[Dict[str, str]]:
     """Extract TikTok video ID or shortcode from TikTok / Douyin URL."""
     if not url_or_id:
@@ -85,14 +126,15 @@ def extract_tiktok_media_info(url_or_id: str) -> Optional[Dict[str, str]]:
     if not re.search(r"(tiktok\.com|douyin\.com)", cleaned, re.IGNORECASE):
         return None
 
-    # Full video link e.g. https://www.tiktok.com/@user/video/7106594312292453675
+    # Full video or photo link e.g. https://www.tiktok.com/@user/video/7106594312292453675
     m_id = re.search(r"/(?:video|photo|v)/(\d{15,25})", cleaned)
     if m_id:
         raw_id = m_id.group(1)
+        canonical_url = re.sub(r"/(?:photo|v)/(\d+)", r"/video/\1", cleaned)
         return {
             "platform": "tiktok",
             "video_id": f"tt_{raw_id}",
-            "canonical_url": cleaned,
+            "canonical_url": canonical_url,
             "raw_id": raw_id,
         }
 
@@ -100,6 +142,30 @@ def extract_tiktok_media_info(url_or_id: str) -> Optional[Dict[str, str]]:
     m_short = re.search(r"(?:vt|vm)\.tiktok\.com/([a-zA-Z0-9_-]+)", cleaned)
     if m_short:
         shortcode = m_short.group(1)
+        # Try resolving redirect to obtain real video ID and canonical URL
+        try:
+            req = UrlRequest(
+                cleaned,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+            )
+            with urlopen(req, timeout=3) as res:
+                resolved_url = res.geturl()
+                if resolved_url:
+                    m_res = re.search(r"/(?:video|photo|v)/(\d{15,25})", resolved_url)
+                    if m_res:
+                        raw_id = m_res.group(1)
+                        canonical_url = re.sub(r"/(?:photo|v)/(\d+)", r"/video/\1", resolved_url)
+                        return {
+                            "platform": "tiktok",
+                            "video_id": f"tt_{raw_id}",
+                            "canonical_url": canonical_url,
+                            "raw_id": raw_id,
+                        }
+        except Exception:
+            pass
+
         return {
             "platform": "tiktok",
             "video_id": f"tt_{shortcode}",
@@ -126,6 +192,7 @@ def extract_tiktok_media_info(url_or_id: str) -> Optional[Dict[str, str]]:
         "canonical_url": cleaned,
         "raw_id": hash_id,
     }
+
 
 
 def detect_media_url_source(url_or_id: str) -> Optional[Dict[str, str]]:

@@ -37,6 +37,8 @@ async def extract_audio_url(video_id: str, target_url: Optional[str] = None) -> 
     if not yt_dlp:
         raise RuntimeError("yt_dlp tidak tersedia di server.")
 
+    from xiaozhi.core.utils import normalize_tiktok_url_for_ytdlp
+
     loop = asyncio.get_running_loop()
 
     def _extract():
@@ -48,15 +50,18 @@ async def extract_audio_url(video_id: str, target_url: Optional[str] = None) -> 
             "socket_timeout": 15,
         }
         if target_url:
-            query = target_url
+            if "tiktok.com" in target_url or "douyin.com" in target_url or video_id.startswith("tt_"):
+                query = normalize_tiktok_url_for_ytdlp(target_url)
+            else:
+                query = target_url
         elif video_id.startswith("tt_"):
-            raw_id = video_id[3:]
-            query = f"https://www.tiktok.com/@video/video/{raw_id}"
+            query = normalize_tiktok_url_for_ytdlp(video_id)
         else:
             query = f"https://www.youtube.com/watch?v={video_id}"
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(query, download=False)
+
             stream_url = info.get("url")
             if not stream_url and info.get("formats"):
                 audio_formats = [f for f in info["formats"] if f.get("acodec") != "none" and f.get("url")]
