@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [main]
+    branches: [main, verifikasi1]
 
 permissions:
   contents: read
@@ -92,7 +92,7 @@ jobs:
             done
 
             # Pull latest code and reset cleanly using GITHUB_TOKEN for private repo auth
-            git fetch https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
+            git fetch https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git ${{ github.ref_name }}
             git reset --hard FETCH_HEAD
 
             # Authenticate Docker to pull private GHCR image
