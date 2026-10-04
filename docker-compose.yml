@@ -9,21 +9,21 @@ services:
     ports:
       - "127.0.0.1:8080:7860"
     environment:
-      - APP_SECRET_KEY=${APP_SECRET_KEY:-Zb6fyD2dkYd7pSSGNk1RBqTt+DQXf18elJ7euA0r5qw=}
-      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:-dbaxtyENVdPRoCcRhWEArO2UhWWhx14nh6XE3+xQh0o=}
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-irsyad03}
-      - FIRMWARE_PRESET_SECRET=${FIRMWARE_PRESET_SECRET:-x8W_LBSsKQVbdEB0IUlCOLuA59QaYm3U2qoOCl4XS0OLG8_l-HMhNeejW18UhUETarOBk-Sel48JfZTxiRaF3g}
+      - APP_SECRET_KEY=${APP_SECRET_KEY}
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - FIRMWARE_PRESET_SECRET=${FIRMWARE_PRESET_SECRET}
       - DB_BACKEND=${DB_BACKEND:-postgres}
       - SQLITE_DB_PATH=${SQLITE_DB_PATH:-/app/data/xiaozhi.db}
       - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB:-xiaozhi}
       - POSTGRES_USER=${POSTGRES_USER:-xiaozhi_app}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-xiaozhi_secret}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - PG_POOL_MIN=${PG_POOL_MIN:-3}
       - PG_POOL_MAX=${PG_POOL_MAX:-10}
       - ENVIRONMENT=production
-      - ALLOWED_HOSTS=163.61.58.235,localhost,xiaozhiscig.biz.id,www.xiaozhiscig.biz.id
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-xiaozhiscig.biz.id,www.xiaozhiscig.biz.id,localhost}
       # S3 / Object Storage (NevaObjects / AWS / MinIO)
       - S3_ENDPOINT=${S3_ENDPOINT:-https://s3.nevaobjects.id}
       - S3_REGION=${S3_REGION:-us-east-1}
@@ -69,7 +69,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-xiaozhi}
       POSTGRES_USER: ${POSTGRES_USER:-xiaozhi_app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xiaozhi_secret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:

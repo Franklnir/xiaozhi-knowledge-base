@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from xiaozhi.config import APP_SECRET_KEY, FIRMWARE_PRESET_SECRET
 from xiaozhi.marketplace.storage import storage_service, LOCAL_STORAGE_DIR
 
 logger = logging.getLogger("xiaozhi.preset_approval")
@@ -59,26 +60,24 @@ def _get_data_file() -> Path:
     return p2
 
 
-DEFAULT_PRESET_SECRETS: List[str] = [
-    "x8W_LBSsKQVbdEB0IUlCOLuA59QaYm3U2qoOCl4XS0OLG8_l-HMhNeejW18UhUETarOBk-Sel48JfZTxiRaF3g",
-    "xiaozhi-esp32-preset-secure-token-2026-v1",
-]
-
-
 def _get_candidate_secrets() -> List[str]:
     secrets_list: List[str] = []
-    env_secret = os.getenv("FIRMWARE_PRESET_SECRET")
-    if env_secret and env_secret.strip():
-        secrets_list.append(env_secret.strip())
-    for s in DEFAULT_PRESET_SECRETS:
-        if s not in secrets_list:
-            secrets_list.append(s)
+    raw = os.getenv("FIRMWARE_PRESET_SECRET") or FIRMWARE_PRESET_SECRET or ""
+    for part in raw.split(","):
+        part = part.strip()
+        if part and part not in secrets_list:
+            secrets_list.append(part)
+    if APP_SECRET_KEY and APP_SECRET_KEY not in secrets_list:
+        secrets_list.append(APP_SECRET_KEY)
     return secrets_list
 
 
 def _get_aesgcm(secret: Optional[str] = None) -> AESGCM:
-    sec = secret or (os.getenv("FIRMWARE_PRESET_SECRET") or "").strip() or DEFAULT_PRESET_SECRETS[0]
-    key = hashlib.sha256(sec.encode()).digest()
+    candidate_secrets = _get_candidate_secrets()
+    sec = secret or (candidate_secrets[0] if candidate_secrets else None)
+    if not sec or not str(sec).strip():
+        raise RuntimeError("FIRMWARE_PRESET_SECRET atau APP_SECRET_KEY wajib diset untuk enkripsi/dekripsi firmware.")
+    key = hashlib.sha256(str(sec).strip().encode()).digest()
     return AESGCM(key)
 
 
