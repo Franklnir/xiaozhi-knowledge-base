@@ -296,13 +296,19 @@
                     </div>
                 </div>
 
-                <!-- Disconnected Notice -->
+                <!-- Live USB Plugged/Detected Indicator -->
+                <div id="usbPlugNotice" style="display:none; margin-top:12px; padding:10px 14px; background:#ecfdf5; border:1.5px solid #10b981; border-radius:var(--app-radius); font-size:12.5px; color:#065f46; font-weight:700; align-items:center; gap:8px;">
+                    <span style="font-size:16px;">🔌</span>
+                    <span id="usbPlugNoticeText">Perangkat USB terdeteksi! Silakan klik "Pilih &amp; Hubungkan Port COM".</span>
+                </div>
+
+                <!-- Disconnected Notice & Driver Helpers -->
                 <div id="connNotice" style="margin-top:14px; padding:12px 14px; background:var(--app-surface-muted); border:1px dashed var(--app-border-strong); border-radius:var(--app-radius); font-size:12px; color:var(--app-muted); line-height:1.5;">
-                    💡 <strong>Tips Sambungan (Desktop &amp; Mobile):</strong>
-                    <ul style="margin:4px 0 0; padding-left:18px; display:grid; gap:3px;">
-                        <li><strong>💻 PC / Laptop:</strong> Gunakan browser Chromium (Chrome, Edge, Opera, Brave).</li>
+                    💡 <strong>Tips Deteksi Port (Desktop &amp; Mobile):</strong>
+                    <ul style="margin:4px 0 0; padding-left:18px; display:grid; gap:4px;">
+                        <li><strong>💻 Port COM tidak muncul di daftar pop-up?</strong> Pastikan kabel USB adalah <strong>kabel data</strong> (bukan hanya charger 2 pin), atau unduh driver USB: <a href="https://www.wch.cn/downloads/CH341SER_EXE.html" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CH340 / CH9102 ↗</a> atau <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CP210x ↗</a>.</li>
                         <li><strong>📱 HP Android:</strong> Sambungkan ESP32 via kabel / adapter <strong>USB OTG</strong>. Saat muncul pop-up izin USB browser, pilih <em>Izinkan / OK</em>.</li>
-                        <li><strong>🔧 Mode Bootloader:</strong> Jika port tidak terdeteksi, tahan tombol <strong>BOOT (GPIO 0)</strong>, tekan <strong>RST</strong> 1x, lalu lepas tombol BOOT.</li>
+                        <li><strong>🔧 Mode Bootloader:</strong> Jika port gagal sync/koneksi, tahan tombol <strong>BOOT (GPIO 0)</strong> di board ESP32, tekan tombol <strong>RST/EN</strong> 1x, lalu lepas tombol BOOT sebelum klik tombol Hubungkan.</li>
                     </ul>
                 </div>
 
@@ -311,6 +317,10 @@
                     <div class="chip-info-item">
                         <span>Model Chip ESP32:</span>
                         <span id="chipModel" style="color:var(--app-accent, #059669); font-weight:800;">-</span>
+                    </div>
+                    <div class="chip-info-item">
+                        <span>Port &amp; Bridge USB:</span>
+                        <span id="chipUsbInfo" style="color:var(--app-accent, #059669); font-weight:800;">-</span>
                     </div>
                     <div class="chip-info-item">
                         <span>MAC Address:</span>
@@ -868,6 +878,9 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
     const chipMac = document.getElementById('chipMac');
     const chipFeatures = document.getElementById('chipFeatures');
     const chipCrystal = document.getElementById('chipCrystal');
+    const chipUsbInfo = document.getElementById('chipUsbInfo');
+    const usbPlugNotice = document.getElementById('usbPlugNotice');
+    const usbPlugNoticeText = document.getElementById('usbPlugNoticeText');
     const baudrateSelect = document.getElementById('baudrateSelect');
     const offsetPreset = document.getElementById('offsetPreset');
     const offsetInput = document.getElementById('offsetInput');
@@ -1515,7 +1528,8 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         try {
             logToConsole(`[INFO] Membuka dialog pemilih port serial (${serialObj.mode})...`);
             port = await serialObj.api.requestPort({});
-            logToConsole('[INFO] Port dipilih oleh pengguna. Menginisialisasi transport...');
+            const dev = identifyUsbDevice(port);
+            logToConsole(`[INFO] Port dipilih oleh pengguna: ${dev}. Menginisialisasi transport...`);
 
             const terminal = {
                 clean() {},
@@ -1536,17 +1550,19 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 
             logToConsole('[INFO] Menghubungkan ke bootloader ESP32 (sync)...');
             const chip = await esploader.main();
-            logToConsole(`[OK] Sukses terhubung ke chip: ${chip}`);
+            logToConsole(`[OK] Sukses terhubung ke chip: ${chip} via ${dev}`);
 
             // Update UI state
             connStatusBadge.className = 'app-status-pill is-online';
             connStatusText.textContent = `Terhubung: ${chip}`;
             connNotice.style.display = 'none';
+            if (usbPlugNotice) usbPlugNotice.style.display = 'none';
             btnConnect.style.display = 'none';
             btnDisconnect.style.display = 'inline-flex';
             chipInfoBox.style.display = 'grid';
 
             chipModel.textContent = chip;
+            if (chipUsbInfo) chipUsbInfo.textContent = dev;
             try {
                 const mac = await esploader.chip.readMac(esploader);
                 chipMac.textContent = mac || 'Tersedia';
@@ -1561,7 +1577,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             }
             chipFeatures.textContent = 'Wi-Fi, Bluetooth 5 (LE), Flash';
 
-            progressStatusText.textContent = `Port terhubung (${chip}). Pilih firmware untuk memulai flashing.`;
+            progressStatusText.textContent = `Port terhubung (${chip} - ${dev}). Pilih firmware untuk memulai flashing.`;
             updateFlashButtonState();
 
         } catch (err) {
@@ -1589,6 +1605,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         btnConnect.style.display = 'inline-flex';
         btnDisconnect.style.display = 'none';
         chipInfoBox.style.display = 'none';
+        if (chipUsbInfo) chipUsbInfo.textContent = '-';
         progressStatusText.textContent = 'Port diputuskan.';
         updateFlashButtonState();
         logToConsole('[INFO] Port serial diputuskan.');
@@ -1732,6 +1749,57 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             updateFlashButtonState();
         }
     });
+
+    // ── Auto-Detection Port & USB Device Identification ──
+    function identifyUsbDevice(p) {
+        if (!p || !p.getInfo) return 'Port Serial Standar';
+        try {
+            const info = p.getInfo();
+            const vid = info.usbVendorId;
+            const pid = info.usbProductId;
+            if (vid === 0x1A86) return 'WCH CH340 / CH9102 USB-UART';
+            if (vid === 0x10C4) return 'Silicon Labs CP210x USB Bridge';
+            if (vid === 0x303A) return 'Espressif USB JTAG/CDC (ESP32-S3/C3)';
+            if (vid === 0x0403) return 'FTDI FT232 USB Serial';
+            if (vid === 0x067B) return 'Prolific PL2303 USB Serial';
+            if (vid) return `USB Serial (VID: 0x${vid.toString(16).toUpperCase()})`;
+        } catch (_) {}
+        return 'Port Serial USB';
+    }
+
+    if (typeof navigator !== 'undefined' && 'serial' in navigator) {
+        // Deteksi Realtime saat kabel USB dicolokkan ke laptop/PC/HP OTG
+        navigator.serial.addEventListener('connect', (event) => {
+            const dev = identifyUsbDevice(event.port);
+            logToConsole(`⚡ [DETEKSI USB] Perangkat USB baru dicolokkan: ${dev}`);
+            if (usbPlugNotice && usbPlugNoticeText) {
+                usbPlugNoticeText.textContent = `Perangkat USB dicolokkan (${dev})! Klik "Pilih & Hubungkan Port COM" untuk menyambungkan.`;
+                usbPlugNotice.style.display = 'flex';
+            }
+        });
+
+        // Deteksi Realtime saat kabel USB dicabut
+        navigator.serial.addEventListener('disconnect', (event) => {
+            logToConsole('⚠️ [DETEKSI USB] Perangkat USB dicabut dari port.');
+            if (usbPlugNotice) usbPlugNotice.style.display = 'none';
+            if (port === event.port && esploader) {
+                logToConsole('[PERINGATAN] Port serial aktif terputus karena kabel USB dicabut!');
+                if (btnDisconnect) btnDisconnect.click();
+            }
+        });
+
+        // Deteksi Otomatis port yang sebelumnya pernah diizinkan pada sesi peramban
+        navigator.serial.getPorts().then(ports => {
+            if (ports && ports.length > 0) {
+                const dev = identifyUsbDevice(ports[0]);
+                logToConsole(`[INFO] Terdeteksi ${ports.length} port yang sebelumnya pernah diizinkan (${dev}).`);
+                if (usbPlugNotice && usbPlugNoticeText) {
+                    usbPlugNoticeText.textContent = `Port tersimpan terdeteksi (${dev})! Klik "Pilih & Hubungkan Port COM" untuk langsung menyambungkan.`;
+                    usbPlugNotice.style.display = 'flex';
+                }
+            }
+        }).catch(() => {});
+    }
 
 </script>
 {% endblock %}
