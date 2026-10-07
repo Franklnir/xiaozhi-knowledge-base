@@ -64,10 +64,8 @@ async def marketplace_product_detail(request: Request, product_id_or_slug: str):
     # MCP connection check for buyer
     mcp_connected = False
     if user:
-        from xiaozhi.services.mcp_service import mcp_status_payload
-        token_saved = bool(user.get("mcp_token"))
-        status_data = mcp_status_payload(int(user["id"]), token_saved=token_saved)
-        mcp_connected = bool(status_data.get("connected"))
+        from xiaozhi.services.mcp_service import is_mcp_connected
+        mcp_connected = bool(is_mcp_connected(int(user["id"])))
 
     return render(request, "marketplace/detail.html", {
         "user": user,

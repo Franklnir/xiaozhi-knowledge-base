@@ -226,10 +226,6 @@ async def chat_history_page(
     user = get_current_user(request)
     if not user:
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
-    role = str(user.get("role") or "user").lower()
-    if role != "admin" and not is_mcp_connected(user["id"]):
-        return redirect_with_message("/login", "Endpoint WebSocket MCP wajib dihubungkan sebelum mengakses Riwayat Chat.")
-
     store = get_store()
     user_tokens = store.list_user_xiaozhi_tokens(user["id"]) if hasattr(store, "list_user_xiaozhi_tokens") else []
     
