@@ -222,9 +222,14 @@
             <h1 class="app-title">Manajemen User</h1>
             <p class="app-subtitle">Kelola akun user, batas penggunaan, dan fitur.</p>
         </div>
-        <div class="app-status-pill is-online">
-            <span class="app-status-dot"></span>
-            {{ totals.users }} user
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <a href="/admin/activity-monitor" class="app-button" style="text-decoration:none; font-weight:800; font-size:12px; padding:6px 12px; background:#10b981; color:#fff; border:2px solid #111; box-shadow:2px 2px 0 #111;">
+                🎵 Monitor Aktivitas & Musik
+            </a>
+            <div class="app-status-pill is-online">
+                <span class="app-status-dot"></span>
+                {{ totals.users }} user
+            </div>
         </div>
     </header>
 
@@ -262,6 +267,15 @@
             </p>
             {% endif %}
         </div>
+        <a href="/admin/activity-monitor" class="app-stat-card" style="text-decoration:none; cursor:pointer; border-color:#0284c7; background:#f0f9ff; transition:transform 0.15s ease;" title="Buka Monitor Aktivitas Tools & Lagu YouTube">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <p class="app-stat-label" style="color:#0284c7; font-weight:800;">🔍 Log Harian</p>
+                <span style="font-size:11.5px; color:#0369a1; font-weight:700;">Buka →</span>
+            </div>
+            <p class="app-stat-value" style="font-size:15px; font-weight:800; color:#0369a1; margin-top:2px;">
+                Aktivitas & Musik
+            </p>
+        </a>
         <a href="/admin/firmware/finance" class="app-stat-card" style="text-decoration:none; cursor:pointer; border-color:var(--app-brand); transition:transform 0.15s ease;" title="Buka Manajemen Transaksi & Keuangan Marketplace">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <p class="app-stat-label" style="color:var(--app-brand); font-weight:800;">💰 Marketplace</p>
@@ -406,20 +420,23 @@
                         data-stream-today="{% if act.has_stream or item.is_playing or item.youtube_stream %}true{% else %}false{% endif %}"
                         data-tools-today="{% if act.has_tools %}true{% else %}false{% endif %}"
                         data-tools-count="{{ act.tools_count or 0 }}"
-                        data-search="{{ (item.username ~ ' ' ~ item.id ~ ' ' ~ (item.device_mac or '') ~ ' ' ~ (slot_labels|join(' ')) ~ ' ' ~ (slot_macs|join(' ')) ~ ' ' ~ ('mac tersimpan ada mac' if (item.device_mac or slot_macs|length > 0) else '') ~ ' ' ~ ('mcp konek terhubung' if item.mcp_status and item.mcp_status.connected else 'blom belum terhubung mcp') ~ ' ' ~ ('stream youtube playing memutar' if item.is_playing or item.youtube_stream else '') ~ ' ' ~ ('aktivitas hari ini aktif' if act.has_activity else '') ~ ' ' ~ ('mcp tools terpanggil ' ~ (act.tools_list|join(' ') if act.tools_list else '')))|lower|e }}">
+                        data-search="{{ (item.username ~ ' ' ~ item.id ~ ' ' ~ (item.device_mac or '') ~ ' ' ~ (slot_labels|join(' ')) ~ ' ' ~ (slot_macs|join(' ')) ~ ' ' ~ ('mac tersimpan ada mac' if (item.device_mac or slot_macs|length > 0) else '') ~ ' ' ~ ('mcp konek terhubung' if item.mcp_status and item.mcp_status.connected else 'blom belum terhubung mcp') ~ ' ' ~ ('stream youtube playing memutar' if item.is_playing or item.youtube_stream else '') ~ ' ' ~ ('aktivitas hari ini aktif' if act.has_activity else '') ~ ' ' ~ ('mcp tools terpanggil ' ~ (act.tools_list|join(' ') if act.tools_list else '')) ~ ' ' ~ (act.last_song or ''))|lower|e }}">
                         <td><span class="app-table-subtext">{{ item.id }}</span></td>
                         <td>
-                            <div style="display:flex; align-items:center; gap:6px;">
+                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 <span class="app-table-title">{{ item.username }}</span>
                                 {% if act.has_activity %}
                                 <span class="app-chip app-chip-small app-chip-success" style="font-size:9.5px; padding:1px 6px; font-weight:800;" title="User aktif hari ini">Aktif Hari Ini</span>
                                 {% endif %}
+                                <a href="/admin/activity-monitor?user_id={{ item.id }}" class="app-chip app-chip-small" style="font-size:9.5px; padding:1px 6px; font-weight:700; text-decoration:none; background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; transition:all 0.15s ease;" title="Buka riwayat tools & lagu user ini di Monitor Aktivitas">
+                                    🔍 Detail
+                                </a>
                             </div>
                             {% if item.created_at %}
                             <span class="app-table-subtext">Terdaftar: {{ (item.created_at|string)[:10] }}</span>
                             {% endif %}
                             
-                            <!-- Aktivitas Stream YouTube -->
+                            <!-- Aktivitas Stream YouTube Sedang Berjalan -->
                             {% if not item.youtube_stream and not item.is_playing %}
                             <div id="user-playback-badge-{{ item.id }}" class="user-playback-badge" style="margin-top: 4px; display: none;">
                             {% else %}
@@ -431,21 +448,22 @@
                                 </span>
                             </div>
 
-                            <!-- Aktivitas MCP Tools Hari Ini -->
-                            {% if act.has_tools %}
-                            <div style="margin-top: 4px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                            <!-- Aktivitas Riwayat Hari Ini (Tools MCP & Lagu YouTube) -->
+                            {% if act.has_tools or act.has_stream %}
+                            <div style="margin-top: 5px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                                {% if act.has_tools %}
                                 <span class="app-chip app-chip-small" style="font-size: 10px; padding: 2px 6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700;" title="Tools terpanggil hari ini: {{ act.tools_list|join(', ') }}">
-                                    ⚡ {{ act.tools_count }} Tool Hari Ini ({{ act.last_tool or 'MCP' }})
+                                    ⚡ {{ act.tools_count }} Tool ({{ act.last_tool or 'MCP' }})
                                 </span>
-                                {% if act.last_activity_time %}
-                                <span style="font-size:10px; color:#64748b;">jam {{ act.last_activity_time }}</span>
                                 {% endif %}
-                            </div>
-                            {% elif act.has_stream and not item.is_playing and not item.youtube_stream %}
-                            <div style="margin-top: 4px;">
-                                <span class="app-chip app-chip-small" style="font-size: 10px; padding: 2px 6px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-weight:700;">
-                                    🎵 Stream YouTube Hari Ini
+                                {% if act.has_stream %}
+                                <span class="app-chip app-chip-small" style="font-size: 10px; padding: 2px 6px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-weight:700;" title="Lagu diputar hari ini: {{ act.last_song or 'YouTube' }}">
+                                    🎵 {{ act.youtube_count or 1 }} Lagu{% if act.last_song %}: {{ act.last_song[:20] }}...{% endif %}
                                 </span>
+                                {% endif %}
+                                {% if act.last_activity_time %}
+                                <span style="font-size:10px; color:#64748b; font-weight:600;" title="Waktu aktivitas terakhir (WIB)">jam {{ act.last_activity_time }}</span>
+                                {% endif %}
                             </div>
                             {% endif %}
                         </td>
@@ -1319,13 +1337,28 @@
     function handleAdminDataUpdate(data) {
         if (!data) return;
 
-        // 1. Update metric stat cards
+        // 1. Update metric stat cards & filter pill badges
         if (data.totals) {
             const statYt = document.getElementById('statYoutubeActive');
             if (statYt) {
                 const count = data.totals.youtube_active || 0;
                 statYt.innerHTML = `${count} ${count > 0 ? '<span class="pulse-green-dot" style="margin-left:4px"></span>' : ''}`;
                 statYt.style.color = count > 0 ? '#047857' : 'inherit';
+            }
+            const activeTodayPill = document.querySelector('.filter-pill[data-filter="active_today"]');
+            if (activeTodayPill && data.totals.users_active_today !== undefined) {
+                const c = data.totals.users_active_today;
+                activeTodayPill.innerHTML = `⚡ Aktivitas Hari Ini ${c > 0 ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${c}</span>` : ''}`;
+            }
+            const streamTodayPill = document.querySelector('.filter-pill[data-filter="stream_youtube"]');
+            if (streamTodayPill && data.totals.users_stream_today !== undefined) {
+                const c = data.totals.users_stream_today;
+                streamTodayPill.innerHTML = `🎵 Stream YouTube ${c > 0 ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${c}</span>` : ''}`;
+            }
+            const toolsTodayPill = document.querySelector('.filter-pill[data-filter="tools_today"]');
+            if (toolsTodayPill && data.totals.users_tools_today !== undefined) {
+                const c = data.totals.users_tools_today;
+                toolsTodayPill.innerHTML = `🔧 MCP Tools Hari Ini ${c > 0 ? `<span class="app-chip app-chip-small app-chip-info" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${c}</span>` : ''}`;
             }
         }
 
@@ -1402,10 +1435,19 @@
                 const isConnected = u.mcp_status && u.mcp_status.connected;
                 const hasMac = Boolean(u.device_mac);
 
+                const act = u.activity_today || {};
+                const hasActivity = Boolean(act.has_activity || isPlaying || isStream);
+                const hasStreamToday = Boolean(act.has_stream || isPlaying || isStream);
+                const hasToolsToday = Boolean(act.has_tools);
+
                 row.dataset.playing = isPlaying ? "true" : "false";
                 row.dataset.mcp = isConnected ? "true" : "false";
                 row.dataset.hasMac = hasMac ? "true" : "false";
-                row.dataset.search = `${u.username} ${u.id} ${u.device_mac || ''} ${hasMac ? 'mac tersimpan ada mac' : ''} ${isConnected ? 'mcp konek terhubung' : 'blom belum terhubung mcp'} ${isPlaying ? 'stream youtube playing memutar' : ''}`.toLowerCase();
+                row.dataset.activeToday = hasActivity ? "true" : "false";
+                row.dataset.streamToday = hasStreamToday ? "true" : "false";
+                row.dataset.toolsToday = hasToolsToday ? "true" : "false";
+                row.dataset.toolsCount = act.tools_count || 0;
+                row.dataset.search = `${u.username} ${u.id} ${u.device_mac || ''} ${hasMac ? 'mac tersimpan ada mac' : ''} ${isConnected ? 'mcp konek terhubung' : 'blom belum terhubung mcp'} ${isPlaying ? 'stream youtube playing memutar' : ''} ${hasActivity ? 'aktivitas hari ini aktif' : ''} ${act.last_song || ''}`.toLowerCase();
 
                 // Update playback badge in username column
                 const badge = document.getElementById(`user-playback-badge-${uid}`);

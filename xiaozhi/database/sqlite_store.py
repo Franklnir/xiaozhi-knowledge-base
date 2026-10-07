@@ -1402,31 +1402,38 @@ class SQLiteStore:
     def get_today_users_activity(self, today_date: str = "") -> Dict[int, Dict[str, Any]]:
         """Ambil ringkasan aktivitas user hari ini (stream youtube, mcp tools yang terpanggil)."""
         if not today_date:
-            from datetime import datetime
-            today_date = datetime.now().strftime("%Y-%m-%d")
+            from datetime import datetime, timezone, timedelta
+            wib = timezone(timedelta(hours=7))
+            today_date = datetime.now(wib).strftime("%Y-%m-%d")
         conn = self._get_conn()
-        sql = """
+        activity: Dict[int, Dict[str, Any]] = {}
+
+        # 1. Chat history
+        sql_chat = """
             SELECT owner_id, tool_name, source, user_message, xiaozhi_answer, created_at
             FROM chat_history
             WHERE (DATE(created_at) = ? OR created_at LIKE ?)
             ORDER BY id DESC
         """
-        rows = conn.execute(sql, (today_date, f"{today_date}%")).fetchall()
-        activity: Dict[int, Dict[str, Any]] = {}
+        rows = conn.execute(sql_chat, (today_date, f"{today_date}%")).fetchall()
         for r in rows:
-            uid = int(r["owner_id"])
+            uid = int(r["owner_id"]) if r["owner_id"] is not None else 0
+            if not uid:
+                continue
             if uid not in activity:
                 activity[uid] = {
                     "tools_count": 0,
                     "youtube_count": 0,
                     "tools_list": [],
                     "last_tool": "",
+                    "last_song": "",
                     "last_activity_time": "",
+                    "last_activity_raw": "",
                     "last_message_preview": "",
                 }
             tname = str(r["tool_name"] or "").strip()
             source = str(r["source"] or "").strip()
-            is_yt = ("youtube" in tname.lower()) or ("youtube" in source.lower())
+            is_yt = ("youtube" in tname.lower()) or ("youtube" in source.lower()) or ("audio" in tname.lower()) or ("playlist" in tname.lower())
             if is_yt:
                 activity[uid]["youtube_count"] += 1
             if tname:
@@ -1435,14 +1442,308 @@ class SQLiteStore:
                     activity[uid]["tools_list"].append(tname)
             if not activity[uid]["last_tool"] and tname:
                 activity[uid]["last_tool"] = tname
-            if not activity[uid]["last_activity_time"] and r["created_at"]:
-                raw_time = str(r["created_at"])
+            raw_time = str(r["created_at"] or "")
+            if raw_time and raw_time > activity[uid].get("last_activity_raw", ""):
+                activity[uid]["last_activity_raw"] = raw_time
                 activity[uid]["last_activity_time"] = raw_time[11:16] if len(raw_time) >= 16 else raw_time
             if not activity[uid]["last_message_preview"]:
                 msg = str(r["user_message"] or r["xiaozhi_answer"] or "")
                 if msg:
                     activity[uid]["last_message_preview"] = msg[:60]
+
+        # 2. Audio queue
+        try:
+            sql_audio = """
+                SELECT owner_id, title, video_id, status, created_at
+                FROM audio_queue
+                WHERE (DATE(created_at) = ? OR created_at LIKE ?)
+                ORDER BY id DESC
+            """
+            audio_rows = conn.execute(sql_audio, (today_date, f"{today_date}%")).fetchall()
+            for a in audio_rows:
+                uid = int(a["owner_id"]) if a["owner_id"] is not None else 0
+                if not uid:
+                    continue
+                if uid not in activity:
+                    activity[uid] = {
+                        "tools_count": 0,
+                        "youtube_count": 0,
+                        "tools_list": [],
+                        "last_tool": "",
+                        "last_song": "",
+                        "last_activity_time": "",
+                        "last_activity_raw": "",
+                        "last_message_preview": "",
+                    }
+                activity[uid]["youtube_count"] += 1
+                if not activity[uid]["last_song"] and a["title"]:
+                    activity[uid]["last_song"] = str(a["title"])
+                raw_time = str(a["created_at"] or "")
+                if raw_time and raw_time > activity[uid].get("last_activity_raw", ""):
+                    activity[uid]["last_activity_raw"] = raw_time
+                    activity[uid]["last_activity_time"] = raw_time[11:16] if len(raw_time) >= 16 else raw_time
+        except Exception:
+            pass
+
         return activity
+
+    def get_daily_activity_monitor(
+        self,
+        target_date: str = "",
+        owner_id: Optional[int] = None,
+        activity_type: str = "all",
+        search_query: str = "",
+        limit: int = 500,
+    ) -> Dict[str, Any]:
+        """Ambil detail aktivitas per hari (alat/tool yang dipanggil, lagu youtube yang diputar) di SQLite."""
+        import re
+        from datetime import datetime, timezone, timedelta
+
+        wib = timezone(timedelta(hours=7))
+        now_wib = datetime.now(wib)
+        if not target_date or not re.match(r"^\d{4}-\d{2}-\d{2}$", str(target_date).strip()):
+            target_date = now_wib.strftime("%Y-%m-%d")
+        else:
+            target_date = str(target_date).strip()
+
+        search_clean = str(search_query or "").strip()
+        search_pattern = f"%{search_clean}%" if search_clean else ""
+
+        conn = self._get_conn()
+
+        # 1. Users map
+        user_rows = conn.execute("SELECT id, username, google_email, role FROM users;").fetchall()
+        users_map = {int(r["id"]): dict(r) for r in user_rows}
+
+        # 2. Devices map
+        dev_rows = conn.execute("SELECT owner_id, device_id, device_name, device_type FROM registered_devices;").fetchall()
+        device_map: Dict[Any, str] = {}
+        user_devices_map: Dict[int, List[str]] = {}
+        for d in dev_rows:
+            uid = int(d["owner_id"]) if d["owner_id"] is not None else None
+            mac = str(d["device_id"] or "").strip().upper()
+            name = d["device_name"] or d["device_type"] or mac
+            if uid is not None:
+                device_map[(uid, mac)] = name
+                if uid not in user_devices_map:
+                    user_devices_map[uid] = []
+                display_dev = f"{name} ({mac})" if mac and mac not in name else name
+                if display_dev not in user_devices_map[uid]:
+                    user_devices_map[uid].append(display_dev)
+            if mac:
+                device_map[mac] = name
+
+        # 3. Audio queue query
+        audio_sql = """
+            SELECT aq.id, aq.owner_id, aq.title, aq.video_id, aq.video_url, aq.stream_url, aq.status,
+                   aq.created_at as time_wib, strftime('%s', aq.created_at) as epoch
+            FROM audio_queue aq
+            WHERE (DATE(aq.created_at) = ? OR aq.created_at LIKE ?)
+        """
+        audio_params: List[Any] = [target_date, f"{target_date}%"]
+        if owner_id:
+            audio_sql += " AND aq.owner_id = ?"
+            audio_params.append(int(owner_id))
+        if search_clean:
+            audio_sql += " AND (aq.title LIKE ? OR aq.video_id LIKE ?)"
+            audio_params.extend([search_pattern, search_pattern])
+        audio_sql += " ORDER BY aq.id DESC LIMIT ?"
+        audio_params.append(int(limit))
+
+        raw_audio_rows = [dict(r) for r in conn.execute(audio_sql, tuple(audio_params)).fetchall()]
+
+        # 4. Chat history tool calls query
+        chat_sql = """
+            SELECT ch.id, ch.owner_id, ch.device_mac, ch.tool_name, ch.source,
+                   ch.user_message, ch.xiaozhi_answer, ch.request_payload, ch.response_payload,
+                   ch.created_at as time_wib, strftime('%s', ch.created_at) as epoch
+            FROM chat_history ch
+            WHERE (DATE(ch.created_at) = ? OR ch.created_at LIKE ?)
+              AND ((ch.tool_name IS NOT NULL AND ch.tool_name != '') OR ch.source = 'mcp')
+        """
+        chat_params: List[Any] = [target_date, f"{target_date}%"]
+        if owner_id:
+            chat_sql += " AND ch.owner_id = ?"
+            chat_params.append(int(owner_id))
+        if search_clean:
+            chat_sql += " AND (ch.user_message LIKE ? OR ch.tool_name LIKE ? OR ch.xiaozhi_answer LIKE ?)"
+            chat_params.extend([search_pattern, search_pattern, search_pattern])
+        chat_sql += " ORDER BY ch.id DESC LIMIT ?"
+        chat_params.append(int(limit))
+
+        raw_chat_rows = [dict(r) for r in conn.execute(chat_sql, tuple(chat_params)).fetchall()]
+
+        music_items: List[Dict[str, Any]] = []
+        for a in raw_audio_rows:
+            uid = int(a["owner_id"]) if a.get("owner_id") is not None else 0
+            u = users_map.get(uid, {})
+            stream_url = str(a.get("stream_url") or "")
+            mac_match = re.search(r"[?&]mac=([0-9a-fA-F:_-]+)", stream_url)
+            mac_str = mac_match.group(1).upper() if mac_match else ""
+            dev_name = device_map.get((uid, mac_str)) or device_map.get(mac_str) or (mac_str if mac_str else "-")
+
+            music_items.append({
+                "id": f"music_{a['id']}",
+                "raw_id": a["id"],
+                "category": "music",
+                "type": "music_stream",
+                "type_label": "Pemutaran Lagu",
+                "badge_color": "emerald",
+                "owner_id": uid,
+                "username": u.get("username", f"user-{uid}"),
+                "email": u.get("google_email", ""),
+                "title": a.get("title") or "Lagu Tanpa Judul",
+                "video_id": a.get("video_id") or "",
+                "video_url": a.get("video_url") or (f"https://www.youtube.com/watch?v={a['video_id']}" if a.get("video_id") else ""),
+                "thumbnail_url": f"https://img.youtube.com/vi/{a['video_id']}/mqdefault.jpg" if a.get("video_id") else "",
+                "stream_url": stream_url,
+                "status": a.get("status") or "pending",
+                "device_mac": mac_str,
+                "device_name": dev_name,
+                "time_wib": str(a.get("time_wib") or ""),
+                "time_short": str(a.get("time_wib") or "")[11:19],
+                "epoch": float(a.get("epoch") or 0),
+            })
+
+        tool_items: List[Dict[str, Any]] = []
+        for c in raw_chat_rows:
+            uid = int(c["owner_id"]) if c.get("owner_id") is not None else 0
+            u = users_map.get(uid, {})
+            tname = str(c.get("tool_name") or "").strip()
+            mac_str = str(c.get("device_mac") or "").strip().upper()
+            dev_name = device_map.get((uid, mac_str)) or device_map.get(mac_str) or (mac_str if mac_str else "-")
+            is_music_tool = any(m in tname.lower() for m in ["youtube", "playlist", "audio", "music", "playback"])
+
+            tool_items.append({
+                "id": f"tool_{c['id']}",
+                "raw_id": c["id"],
+                "category": "tool",
+                "type": "music_tool" if is_music_tool else "tool_call",
+                "type_label": f"Tool: {tname}" if tname else "MCP Tool",
+                "badge_color": "sky" if is_music_tool else "amber",
+                "owner_id": uid,
+                "username": u.get("username", f"user-{uid}"),
+                "email": u.get("google_email", ""),
+                "tool_name": tname,
+                "source": c.get("source") or "mcp",
+                "user_message": c.get("user_message") or "",
+                "xiaozhi_answer": c.get("xiaozhi_answer") or "",
+                "device_mac": mac_str,
+                "device_name": dev_name,
+                "time_wib": str(c.get("time_wib") or ""),
+                "time_short": str(c.get("time_wib") or "")[11:19],
+                "epoch": float(c.get("epoch") or 0),
+            })
+
+        if activity_type == "music":
+            timeline = list(music_items)
+        elif activity_type == "tools":
+            timeline = list(tool_items)
+        else:
+            timeline = music_items + tool_items
+            timeline.sort(key=lambda x: x["epoch"], reverse=True)
+
+        user_stats_dict: Dict[int, Dict[str, Any]] = {}
+        tool_popularity: Dict[str, int] = {}
+        song_popularity: Dict[str, int] = {}
+
+        for m in music_items:
+            uid = m["owner_id"]
+            if uid not in user_stats_dict:
+                user_stats_dict[uid] = {
+                    "owner_id": uid,
+                    "username": m["username"],
+                    "email": m["email"],
+                    "music_count": 0,
+                    "tools_count": 0,
+                    "total_events": 0,
+                    "devices": list(user_devices_map.get(uid, [])),
+                    "last_active_time": m["time_short"],
+                    "last_epoch": m["epoch"],
+                    "recent_songs": [],
+                    "tools_called": {},
+                }
+            st = user_stats_dict[uid]
+            st["music_count"] += 1
+            st["total_events"] += 1
+            if m["epoch"] > st["last_epoch"]:
+                st["last_epoch"] = m["epoch"]
+                st["last_active_time"] = m["time_short"]
+            if m["title"] not in st["recent_songs"] and len(st["recent_songs"]) < 5:
+                st["recent_songs"].append(m["title"])
+            if m["device_name"] and m["device_name"] != "-" and m["device_name"] not in st["devices"]:
+                st["devices"].append(m["device_name"])
+
+            song_popularity[m["title"]] = song_popularity.get(m["title"], 0) + 1
+
+        for t in tool_items:
+            uid = t["owner_id"]
+            if uid not in user_stats_dict:
+                user_stats_dict[uid] = {
+                    "owner_id": uid,
+                    "username": t["username"],
+                    "email": t["email"],
+                    "music_count": 0,
+                    "tools_count": 0,
+                    "total_events": 0,
+                    "devices": list(user_devices_map.get(uid, [])),
+                    "last_active_time": t["time_short"],
+                    "last_epoch": t["epoch"],
+                    "recent_songs": [],
+                    "tools_called": {},
+                }
+            st = user_stats_dict[uid]
+            st["tools_count"] += 1
+            st["total_events"] += 1
+            if t["epoch"] > st["last_epoch"]:
+                st["last_epoch"] = t["epoch"]
+                st["last_active_time"] = t["time_short"]
+            tname = t["tool_name"] or "mcp"
+            st["tools_called"][tname] = st["tools_called"].get(tname, 0) + 1
+            if t["device_name"] and t["device_name"] != "-" and t["device_name"] not in st["devices"]:
+                st["devices"].append(t["device_name"])
+
+            tool_popularity[tname] = tool_popularity.get(tname, 0) + 1
+
+        user_summaries = list(user_stats_dict.values())
+        user_summaries.sort(key=lambda u: u["total_events"], reverse=True)
+
+        for u in user_summaries:
+            u["top_tools"] = sorted(u["tools_called"].keys(), key=lambda k: u["tools_called"][k], reverse=True)[:4]
+
+        popular_tools_list = [
+            {"tool": k, "count": v}
+            for k, v in sorted(tool_popularity.items(), key=lambda item: item[1], reverse=True)[:10]
+        ]
+        popular_songs_list = [
+            {"song": k, "count": v}
+            for k, v in sorted(song_popularity.items(), key=lambda item: item[1], reverse=True)[:10]
+        ]
+
+        formatted_date = target_date
+        try:
+            formatted_date = datetime.strptime(target_date, "%Y-%m-%d").strftime("%d %b %Y")
+        except Exception:
+            pass
+
+        return {
+            "target_date": target_date,
+            "target_date_formatted": formatted_date,
+            "totals": {
+                "total_activities": len(timeline),
+                "total_music": len(music_items),
+                "total_tools": len(tool_items),
+                "active_users": len(user_summaries),
+            },
+            "user_summaries": user_summaries,
+            "timeline": timeline,
+            "popular_tools": popular_tools_list,
+            "popular_songs": popular_songs_list,
+            "users_list": [
+                {"id": u["id"], "username": u.get("username", f"user-{u['id']}")}
+                for u in sorted(users_map.values(), key=lambda x: str(x.get("username", "")))
+            ]
+        }
 
     # ── User Persona & Preferences ─────────────────────────────────────────
 
