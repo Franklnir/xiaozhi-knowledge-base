@@ -536,9 +536,26 @@ class PostgresStore:
                             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                         );
+                        ALTER TABLE user_playlists ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
                         CREATE INDEX IF NOT EXISTS idx_user_playlists_owner ON user_playlists(owner_id, track_number);
                         CREATE INDEX IF NOT EXISTS idx_user_playlists_video ON user_playlists(video_id);
                         CREATE INDEX IF NOT EXISTS idx_user_playlists_top ON user_playlists(owner_id, play_count DESC);
+                        CREATE INDEX IF NOT EXISTS idx_user_playlists_active ON user_playlists(owner_id, is_active);
+
+                        -- 16. Access Plus Settings
+                        ALTER TABLE xiaozhi_tokens ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+                        CREATE INDEX IF NOT EXISTS idx_tokens_active ON xiaozhi_tokens(user_id, slot_number, is_active);
+
+                        CREATE TABLE IF NOT EXISTS user_access_plus_settings (
+                            user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                            mcp_multislot_allowed BOOLEAN NOT NULL DEFAULT TRUE,
+                            playlist_quota_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                            max_playlist_tracks INT NOT NULL DEFAULT 15,
+                            notes TEXT DEFAULT '',
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_access_plus_user ON user_access_plus_settings(user_id);
                     """)
                 conn.commit()
                 logger.info("PostgreSQL database schema initialized successfully.")
@@ -1290,12 +1307,12 @@ class PostgresStore:
                 self.set_rls_context(cur, owner_id)
                 if slot is not None:
                     cur.execute(
-                        "SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
+                        "SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
                         (int(owner_id), int(slot)),
                     )
                 else:
                     cur.execute(
-                        "SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s ORDER BY slot_number ASC LIMIT 1",
+                        "SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s ORDER BY slot_number ASC LIMIT 1",
                         (int(owner_id),),
                     )
                 row = cur.fetchone()
@@ -1309,6 +1326,7 @@ class PostgresStore:
                     "device_label": row.get("device_label", "XiaoZhi 1") or "XiaoZhi 1",
                     "board_mac": board_mac,
                     "is_locked": bool(board_mac),
+                    "is_active": bool(row.get("is_active", True)),
                     "preview": preview,
                     "token_hash": row["token_hash"],
                     "created_at": _format_ts(row["created_at"]) if "created_at" in row else "",
@@ -1322,7 +1340,7 @@ class PostgresStore:
                 self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
-                    SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, created_at, updated_at
+                    SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active, created_at, updated_at
                     FROM xiaozhi_tokens
                     WHERE user_id = %s
                     ORDER BY slot_number ASC
@@ -1340,6 +1358,7 @@ class PostgresStore:
                 "device_label": row.get("device_label", f"XiaoZhi {row.get('slot_number', 1)}") or f"XiaoZhi {row.get('slot_number', 1)}",
                 "board_mac": board_mac,
                 "is_locked": bool(board_mac),
+                "is_active": bool(row.get("is_active", True)),
                 "preview": preview,
                 "token_hash": row["token_hash"],
                 "created_at": _format_ts(row["created_at"]) if "created_at" in row else "",
@@ -1425,7 +1444,7 @@ class PostgresStore:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 self.set_rls_context(cur, user_id=None, user_role="system")
-                cur.execute("SELECT user_id, slot_number, device_label, token_ciphertext, token_hash FROM xiaozhi_tokens ORDER BY user_id, slot_number")
+                cur.execute("SELECT user_id, slot_number, device_label, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active FROM xiaozhi_tokens ORDER BY user_id, slot_number")
                 rows = cur.fetchall()
         result = []
         for row in rows:
@@ -1437,6 +1456,7 @@ class PostgresStore:
                     "device_label": row.get("device_label", "XiaoZhi 1") or "XiaoZhi 1",
                     "token": token,
                     "token_hash": row["token_hash"],
+                    "is_active": bool(row.get("is_active", True)),
                 })
         return result
 
@@ -3729,5 +3749,209 @@ class PostgresStore:
                 )
                 row = cur.fetchone()
                 return dict(row) if row else None
+
+    # ── Akses Plus Management (Multi-Slot & Playlist Quotas) ───────────────────
+
+    def get_user_access_plus(self, user_id: int) -> Dict[str, Any]:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT mcp_multislot_allowed, playlist_quota_enabled, max_playlist_tracks, notes, updated_at FROM user_access_plus_settings WHERE user_id = %s",
+                    (int(user_id),),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return {
+                        "user_id": int(user_id),
+                        "mcp_multislot_allowed": True,
+                        "playlist_quota_enabled": False,
+                        "max_playlist_tracks": 15,
+                        "notes": "",
+                    }
+                return {
+                    "user_id": int(user_id),
+                    "mcp_multislot_allowed": bool(row["mcp_multislot_allowed"]),
+                    "playlist_quota_enabled": bool(row["playlist_quota_enabled"]),
+                    "max_playlist_tracks": int(row["max_playlist_tracks"] or 15),
+                    "notes": row.get("notes") or "",
+                }
+
+    def set_user_access_plus(
+        self,
+        user_id: int,
+        mcp_multislot_allowed: Optional[bool] = None,
+        playlist_quota_enabled: Optional[bool] = None,
+        max_playlist_tracks: Optional[int] = None,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        current = self.get_user_access_plus(user_id)
+        new_multislot = current["mcp_multislot_allowed"] if mcp_multislot_allowed is None else bool(mcp_multislot_allowed)
+        new_quota_enabled = current["playlist_quota_enabled"] if playlist_quota_enabled is None else bool(playlist_quota_enabled)
+        new_max_tracks = current["max_playlist_tracks"] if max_playlist_tracks is None else int(max_playlist_tracks)
+        new_notes = current["notes"] if notes is None else str(notes).strip()
+
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO user_access_plus_settings (user_id, mcp_multislot_allowed, playlist_quota_enabled, max_playlist_tracks, notes, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        mcp_multislot_allowed = EXCLUDED.mcp_multislot_allowed,
+                        playlist_quota_enabled = EXCLUDED.playlist_quota_enabled,
+                        max_playlist_tracks = EXCLUDED.max_playlist_tracks,
+                        notes = EXCLUDED.notes,
+                        updated_at = EXCLUDED.updated_at
+                    """,
+                    (int(user_id), new_multislot, new_quota_enabled, new_max_tracks, new_notes, now, now),
+                )
+                
+                # Apply multislot flag on xiaozhi_tokens
+                if not new_multislot:
+                    cur.execute(
+                        "UPDATE xiaozhi_tokens SET is_active = FALSE, updated_at = %s WHERE user_id = %s AND slot_number IN (2, 3)",
+                        (now, int(user_id)),
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE xiaozhi_tokens SET is_active = TRUE, updated_at = %s WHERE user_id = %s AND slot_number IN (2, 3)",
+                        (now, int(user_id)),
+                    )
+
+                # Apply playlist quota on user_playlists
+                if new_quota_enabled:
+                    cur.execute(
+                        """
+                        UPDATE user_playlists
+                        SET is_active = (track_number <= %s), updated_at = %s
+                        WHERE owner_id = %s
+                        """,
+                        (new_max_tracks, now, int(user_id)),
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE user_playlists SET is_active = TRUE, updated_at = %s WHERE owner_id = %s",
+                        (now, int(user_id)),
+                    )
+            conn.commit()
+
+        return {
+            "user_id": int(user_id),
+            "mcp_multislot_allowed": new_multislot,
+            "playlist_quota_enabled": new_quota_enabled,
+            "max_playlist_tracks": new_max_tracks,
+            "notes": new_notes,
+        }
+
+    def set_user_slot_active(self, user_id: int, slot: int, is_active: bool) -> bool:
+        now = utc_now()
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE xiaozhi_tokens SET is_active = %s, updated_at = %s WHERE user_id = %s AND slot_number = %s",
+                    (bool(is_active), now, int(user_id), int(slot)),
+                )
+                affected = cur.rowcount > 0
+            conn.commit()
+        return affected
+
+    def set_user_playlist_track_active(self, user_id: int, track_id: int, is_active: bool) -> bool:
+        now = utc_now()
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE user_playlists SET is_active = %s, updated_at = %s WHERE owner_id = %s AND id = %s",
+                    (bool(is_active), now, int(user_id), int(track_id)),
+                )
+                affected = cur.rowcount > 0
+            conn.commit()
+        return affected
+
+    def count_user_playlist_tracks(self, owner_id: int, active_only: bool = False) -> int:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                if active_only:
+                    cur.execute("SELECT COUNT(*) as cnt FROM user_playlists WHERE owner_id = %s AND COALESCE(is_active, TRUE) = TRUE", (int(owner_id),))
+                else:
+                    cur.execute("SELECT COUNT(*) as cnt FROM user_playlists WHERE owner_id = %s", (int(owner_id),))
+                row = cur.fetchone()
+                return int(row["cnt"]) if row else 0
+
+    def list_access_plus_overview(self) -> List[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, username, role, created_at FROM users WHERE role != 'admin' ORDER BY id ASC")
+                users = [dict(r) for r in cur.fetchall()]
+
+                cur.execute("SELECT * FROM user_access_plus_settings")
+                settings_map = {int(r["user_id"]): dict(r) for r in cur.fetchall()}
+
+                cur.execute("SELECT user_id, slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active FROM xiaozhi_tokens")
+                token_rows = cur.fetchall()
+                tokens_by_user = {}
+                for r in token_rows:
+                    uid = int(r["user_id"])
+                    tokens_by_user.setdefault(uid, []).append(dict(r))
+
+                cur.execute("""
+                    SELECT owner_id,
+                           COUNT(*) as total_tracks,
+                           COUNT(*) FILTER (WHERE COALESCE(is_active, TRUE) = TRUE) as active_tracks,
+                           COUNT(*) FILTER (WHERE COALESCE(is_active, TRUE) = FALSE) as disabled_tracks
+                    FROM user_playlists
+                    GROUP BY owner_id
+                """)
+                playlist_map = {int(r["owner_id"]): dict(r) for r in cur.fetchall()}
+
+        result = []
+        for u in users:
+            uid = u["id"]
+            plus_cfg = settings_map.get(uid, {})
+            u_tokens = tokens_by_user.get(uid, [])
+            pl_stats = playlist_map.get(uid, {"total_tracks": 0, "active_tracks": 0, "disabled_tracks": 0})
+
+            slot_map = {}
+            for t in u_tokens:
+                s_num = int(t.get("slot_number", 1) or 1)
+                cipher = t.get("token_ciphertext", "")
+                plain = decrypt_secret(cipher) if cipher else ""
+                preview = f"{plain[:4]}...{plain[-4:]}" if len(plain) > 8 else plain
+                slot_map[s_num] = {
+                    "slot_number": s_num,
+                    "device_label": t.get("device_label") or f"Slot {s_num}",
+                    "board_mac": (t.get("board_mac") or "").upper(),
+                    "preview": preview,
+                    "token_hash": t.get("token_hash", ""),
+                    "is_active": bool(t.get("is_active", True)),
+                }
+
+            has_multislot = len(u_tokens) > 1 or 2 in slot_map or 3 in slot_map
+            mcp_multislot_allowed = bool(plus_cfg.get("mcp_multislot_allowed", True))
+            playlist_quota_enabled = bool(plus_cfg.get("playlist_quota_enabled", False))
+            max_playlist_tracks = int(plus_cfg.get("max_playlist_tracks", 15) or 15)
+
+            result.append({
+                "user_id": uid,
+                "username": u["username"],
+                "role": u["role"],
+                "created_at": _format_ts(u.get("created_at")),
+                "mcp_multislot_allowed": mcp_multislot_allowed,
+                "playlist_quota_enabled": playlist_quota_enabled,
+                "max_playlist_tracks": max_playlist_tracks,
+                "notes": plus_cfg.get("notes", ""),
+                "slots": slot_map,
+                "total_slots": len(u_tokens),
+                "has_multislot": has_multislot,
+                "playlist": {
+                    "has_playlist": int(pl_stats["total_tracks"]) > 0,
+                    "total_tracks": int(pl_stats["total_tracks"]),
+                    "active_tracks": int(pl_stats["active_tracks"]),
+                    "disabled_tracks": int(pl_stats["disabled_tracks"]),
+                },
+                "is_restricted": (not mcp_multislot_allowed) or playlist_quota_enabled,
+            })
+        return result
+
 
 

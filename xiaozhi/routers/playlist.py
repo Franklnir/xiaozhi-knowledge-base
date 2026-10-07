@@ -61,6 +61,12 @@ async def playlist_page(request: Request):
     top_tracks = store.get_top_played_playlist(user["id"], limit=5)
     total_plays = sum(int(t.get("play_count", 0)) for t in tracks)
 
+    plus_cfg = store.get_user_access_plus(user["id"]) if hasattr(store, "get_user_access_plus") else {}
+    quota_enabled = plus_cfg.get("playlist_quota_enabled", False)
+    max_tracks = plus_cfg.get("max_playlist_tracks", 15)
+    active_tracks_count = sum(1 for t in tracks if t.get("is_active", True))
+    disabled_tracks_count = len(tracks) - active_tracks_count
+
     return render(
         request,
         "playlist.html",
@@ -72,6 +78,11 @@ async def playlist_page(request: Request):
             "top_tracks": top_tracks,
             "total_tracks": len(tracks),
             "total_plays": total_plays,
+            "plus_cfg": plus_cfg,
+            "quota_enabled": quota_enabled,
+            "max_tracks": max_tracks,
+            "active_tracks_count": active_tracks_count,
+            "disabled_tracks_count": disabled_tracks_count,
         },
     )
 
@@ -82,10 +93,18 @@ async def api_get_playlist(request: Request):
     store = get_store()
     tracks = store.get_user_playlist(user["id"])
     top_tracks = store.get_top_played_playlist(user["id"], limit=5)
+    plus_cfg = store.get_user_access_plus(user["id"]) if hasattr(store, "get_user_access_plus") else {}
+    quota_enabled = plus_cfg.get("playlist_quota_enabled", False)
+    max_tracks = plus_cfg.get("max_playlist_tracks", 15)
+    active_tracks_count = sum(1 for t in tracks if t.get("is_active", True))
     return {
         "success": True,
         "total": len(tracks),
         "total_plays": sum(int(t.get("play_count", 0)) for t in tracks),
+        "active_tracks_count": active_tracks_count,
+        "disabled_tracks_count": len(tracks) - active_tracks_count,
+        "quota_enabled": quota_enabled,
+        "max_tracks": max_tracks,
         "tracks": tracks,
         "top_tracks": top_tracks,
     }
@@ -99,6 +118,16 @@ async def api_add_playlist_track(request: Request):
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Data JSON tidak valid.")
+
+    plus_cfg = store.get_user_access_plus(user["id"]) if hasattr(store, "get_user_access_plus") else {}
+    if plus_cfg.get("playlist_quota_enabled", False):
+        max_limit = int(plus_cfg.get("max_playlist_tracks", 15))
+        active_count = store.count_user_playlist_tracks(user["id"], active_only=True)
+        if active_count >= max_limit:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Batas penambahan playlist telah tercapai (maksimal {max_limit} lagu). Silakan hubungi admin untuk membuka paket langganan Akses Plus."
+            )
 
     raw_url = str(body.get("youtube_url") or "").strip()
     title = str(body.get("title") or "").strip()
@@ -216,6 +245,12 @@ async def api_play_playlist_track(track_id: int, request: Request):
     track = store.get_playlist_track(user["id"], track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Lagu tidak ditemukan di playlist Anda.")
+
+    if not track.get("is_active", True):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Lagu '{track.get('title')}' telah dinonaktifkan oleh admin. Silakan hubungi admin untuk membuka paket langganan Akses Plus."
+        )
 
     # Increment play count
     updated_track = store.increment_playlist_play_count(user["id"], track_id=track_id) or track

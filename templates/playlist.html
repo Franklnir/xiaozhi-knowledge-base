@@ -236,6 +236,28 @@
         </button>
     </div>
 
+    {% if quota_enabled %}
+    <!-- Access Plus Quota Restriction Banner -->
+    <div style="background: rgba(245, 158, 11, 0.08); border: 2px solid #f59e0b; border-radius: 12px; padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+        <div style="display:flex; align-items:center; gap:14px; flex:1 1 320px;">
+            <div style="width:40px; height:40px; border-radius:50%; background:rgba(245, 158, 11, 0.2); border:1.5px solid #f59e0b; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">
+                ⭐
+            </div>
+            <div>
+                <strong style="color:#d97706; font-size:14px; display:block; line-height:1.4;">
+                    Batas Kuota Playlist Aktif: {{ active_tracks_count }} / {{ max_tracks }} Lagu
+                </strong>
+                <span style="color:var(--app-muted); font-size:12.5px; line-height:1.4; display:block; margin-top:2px;">
+                    Akun Anda dibatasi hingga maksimal {{ max_tracks }} lagu aktif.{% if disabled_tracks_count > 0 %} Sebanyak <strong style="color:#ef4444;">{{ disabled_tracks_count }} lagu dinonaktifkan</strong>.{% endif %} Silakan hubungi admin untuk membuka paket langganan Akses Plus!
+                </span>
+            </div>
+        </div>
+        <a href="https://wa.me/6289531832365?text=Halo%20Admin%2C%20saya%20ingin%20membuka%20akses%20plus%20playlist%20musik" target="_blank" class="app-button" style="font-size:12.5px; padding:7px 16px; background:#f59e0b; color:#fff; border:none; font-weight:800; text-decoration:none;">
+            Buka Akses Plus ↗
+        </a>
+    </div>
+    {% endif %}
+
     <!-- Stats Grid -->
     <section class="app-stat-grid" style="margin-bottom:24px;">
         <div class="app-stat-card">
@@ -456,6 +478,11 @@
                                     <span style="font-weight:800; font-size:14px; color:var(--app-text); line-height:1.35;" id="track-title-{{ track.id }}">
                                         {{ track.title }}
                                     </span>
+                                    {% if not track.is_active %}
+                                    <span class="app-chip app-chip-small" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:10px; font-weight:800; padding:1px 6px;">
+                                        🔒 Nonaktif (Paket Plus)
+                                    </span>
+                                    {% endif %}
                                 </div>
                                 <div style="display:flex; align-items:center; gap:8px; margin-top:4px; font-size:12px; color:var(--app-muted);">
                                     <span id="track-artist-{{ track.id }}">{{ track.artist or ('TikTok Creator' if track.video_id.startswith('tt_') else 'YouTube Audio') }}</span>
@@ -482,9 +509,15 @@
                             </td>
                             <td style="text-align:right;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
+                                    {% if not track.is_active %}
+                                    <button type="button" onclick="alert('Lagu ini dinonaktifkan karena kuota Akses Plus. Silakan hubungi admin untuk membuka paket langganan Plus.');" class="app-button" style="background:var(--app-surface-muted); color:var(--app-muted); border:1px solid var(--app-border); padding:5px 10px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:4px; opacity:0.8;" title="Lagu ini dinonaktifkan (Paket Plus)">
+                                        <span>🔒</span> Nonaktif
+                                    </button>
+                                    {% else %}
                                     <button type="button" onclick="playTrackOnEsp32({{ track.id }}, '{{ track.title|escape }}')" class="app-button app-button-primary" style="background:#10b981; border-color:#059669; padding:5px 10px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:4px;" title="Kirim instruksi putar lagu ini ke speaker ESP32 sekarang">
                                         <span>▶️</span> Putar
                                     </button>
+                                    {% endif %}
                                     <button type="button" onclick="openEditTrackModal({{ track.id }}, '{{ track.title|escape }}', '{{ track.youtube_url|escape }}', '{{ track.artist|escape }}')" class="app-button" style="padding:5px 9px; font-size:12px; font-weight:700;" title="Edit Judul & Link">
                                         ✏️
                                     </button>

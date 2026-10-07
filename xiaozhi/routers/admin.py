@@ -895,3 +895,166 @@ async def api_get_active_announcement():
     if ann:
         return {"success": True, "active": True, "data": ann}
     return {"success": True, "active": False, "data": None}
+
+
+# ── Akses Plus Management (Multi-Slot & Playlist Quotas) ───────────────────
+
+@router.get("/admin/access-plus", response_class=HTMLResponse)
+async def admin_access_plus_page(request: Request):
+    """Admin dashboard page to monitor and restrict user MCP multi-slots and playlist quotas."""
+    admin = require_admin(request)
+    store = get_store()
+    overview = store.list_access_plus_overview() if hasattr(store, "list_access_plus_overview") else []
+
+    total_users = len(overview)
+    multislot_users_count = sum(1 for u in overview if u.get("has_multislot"))
+    playlist_users_count = sum(1 for u in overview if u.get("playlist", {}).get("has_playlist"))
+    restricted_users_count = sum(1 for u in overview if u.get("is_restricted"))
+
+    csrf_token = make_csrf_token(admin)
+    return render(
+        request,
+        "admin/access_plus.html",
+        {
+            "user": admin,
+            "page": "admin_access_plus",
+            "active_page": "access_plus",
+            "overview": overview,
+            "total_users": total_users,
+            "multislot_users_count": multislot_users_count,
+            "playlist_users_count": playlist_users_count,
+            "restricted_users_count": restricted_users_count,
+            "csrf_token": csrf_token,
+        },
+    )
+
+
+@router.get("/admin/api/access-plus/users")
+async def admin_api_access_plus_users(request: Request):
+    """API endpoint to get real-time Access Plus status of all users."""
+    require_admin(request)
+    store = get_store()
+    overview = store.list_access_plus_overview() if hasattr(store, "list_access_plus_overview") else []
+    return {"success": True, "users": overview}
+
+
+@router.post("/admin/api/access-plus/set-slots/{target_user_id}")
+async def admin_api_access_plus_set_slots(
+    request: Request,
+    target_user_id: int,
+    allowed: str = Form("true"),
+    csrf_token: str = Form(...),
+):
+    """Restrict or allow multi-slot MCP access for a user."""
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    is_allowed = allowed.lower() in ("true", "1", "yes", "on")
+
+    # When restricting to 1 slot: disconnect any running tasks for slot 2 and slot 3
+    if not is_allowed:
+        for s in (2, 3):
+            task = mcp_bridge_tasks.pop(f"{target_user_id}:{s}", None)
+            if task and not task.done():
+                task.cancel()
+            set_mcp_connection_state(target_user_id, "", connected=False, message="Dinonaktifkan oleh Admin (Akses Plus)", slot=s)
+
+    cfg = store.set_user_access_plus(target_user_id, mcp_multislot_allowed=is_allowed)
+
+    # When re-enabling multi-slot: signal bridge to auto-connect
+    if is_allowed:
+        signal_mcp_reload()
+
+    msg = f"Akses Multi-Slot untuk user {target_user_id} telah " + (
+        "dibuka (diizinkan hingga 3 slot)." if is_allowed else "dibatasi (hanya diizinkan 1 slot). Slot 2 & 3 dinonaktifkan."
+    )
+    return {"success": True, "message": msg, "config": cfg}
+
+
+@router.post("/admin/api/access-plus/set-playlist-quota/{target_user_id}")
+async def admin_api_access_plus_set_playlist_quota(
+    request: Request,
+    target_user_id: int,
+    enabled: str = Form("false"),
+    max_tracks: int = Form(15),
+    csrf_token: str = Form(...),
+):
+    """Enable or disable playlist quota restriction for a user."""
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    is_enabled = enabled.lower() in ("true", "1", "yes", "on")
+    quota_limit = max(1, int(max_tracks or 15))
+
+    cfg = store.set_user_access_plus(target_user_id, playlist_quota_enabled=is_enabled, max_playlist_tracks=quota_limit)
+
+    msg = f"Kuota playlist user {target_user_id} telah " + (
+        f"dibatasi maksimal {quota_limit} lagu aktif (kelebihan lagu dinonaktifkan)."
+        if is_enabled
+        else "dibebaskan tanpa batas kuota (semua lagu diaktifkan)."
+    )
+    return {"success": True, "message": msg, "config": cfg}
+
+
+@router.post("/admin/api/access-plus/toggle-slot/{target_user_id}/{slot_number}")
+async def admin_api_access_plus_toggle_slot(
+    request: Request,
+    target_user_id: int,
+    slot_number: int,
+    is_active: str = Form("true"),
+    csrf_token: str = Form(...),
+):
+    """Toggle individual slot active/disabled state."""
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    active_bool = is_active.lower() in ("true", "1", "yes", "on")
+    store.set_user_slot_active(target_user_id, slot_number, active_bool)
+
+    if not active_bool:
+        task = mcp_bridge_tasks.pop(f"{target_user_id}:{slot_number}", None)
+        if task and not task.done():
+            task.cancel()
+        set_mcp_connection_state(target_user_id, "", connected=False, message="Dinonaktifkan oleh Admin (Akses Plus)", slot=slot_number)
+    else:
+        signal_mcp_reload()
+
+    return {
+        "success": True,
+        "message": f"Slot {slot_number} user {target_user_id} berhasil " + ("diaktifkan." if active_bool else "dinonaktifkan."),
+    }
+
+
+@router.get("/admin/api/access-plus/user-playlist/{target_user_id}")
+async def admin_api_access_plus_user_playlist(request: Request, target_user_id: int):
+    """Get all playlist tracks and Access Plus quota configuration for a user."""
+    require_admin(request)
+    store = get_store()
+    tracks = store.get_user_playlist(target_user_id) if hasattr(store, "get_user_playlist") else []
+    plus_cfg = store.get_user_access_plus(target_user_id) if hasattr(store, "get_user_access_plus") else {}
+    return {"success": True, "tracks": tracks, "config": plus_cfg}
+
+
+@router.post("/admin/api/access-plus/toggle-track/{target_user_id}/{track_id}")
+async def admin_api_access_plus_toggle_track(
+    request: Request,
+    target_user_id: int,
+    track_id: int,
+    is_active: str = Form("true"),
+    csrf_token: str = Form(...),
+):
+    """Toggle individual playlist track active/disabled state without deleting it."""
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    active_bool = is_active.lower() in ("true", "1", "yes", "on")
+    updated = store.set_user_playlist_track_active(target_user_id, track_id, active_bool)
+    return {
+        "success": updated,
+        "message": f"Status lagu berhasil " + ("diaktifkan." if active_bool else "dinonaktifkan (Paket Plus)."),
+    }
+

@@ -1121,22 +1121,41 @@ function renderActiveSlotForm() {
         if (saveBtn) saveBtn.textContent = "Simpan Slot " + currentSlot;
     }
 
-    if (alertBox) {
-        alertBox.className = "app-alert " + (s.connected ? "app-alert-success" : s.saved ? "app-alert-info" : "app-alert-warning");
-        alertBox.textContent = s.connected ? (s.label + " Terhubung (" + s.statusText + ")") : s.saved ? (s.statusText || "Menghubungkan...") : ("Slot " + currentSlot + " belum tersimpan.");
+    if (s.is_restricted || (s.saved && !s.is_active)) {
+        if (alertBox) {
+            alertBox.className = "app-alert app-alert-danger";
+            alertBox.innerHTML = `<strong>⚠️ Slot ${currentSlot} Dinonaktifkan oleh Admin (Akses Plus)</strong><br><span style="font-size:12px;">Slot 2 & 3 dibatasi untuk akun Anda. Silakan hubungi admin untuk membuka paket langganan Akses Plus.</span>`;
+        }
+        if (bar) {
+            bar.className = "mcp-bar-fill idle";
+        }
+        if (detail) {
+            detail.textContent = `Slot ${currentSlot} (${s.label}): Dinonaktifkan oleh Admin (Akses Plus)`;
+            detail.style.color = "#ef4444";
+        }
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.title = "Dibatasi oleh Admin";
+        }
+        if (reconnectBtn) reconnectBtn.disabled = true;
+        if (deleteBtn) deleteBtn.disabled = mcpBusy;
+    } else {
+        if (alertBox) {
+            alertBox.className = "app-alert " + (s.connected ? "app-alert-success" : s.saved ? "app-alert-info" : "app-alert-warning");
+            alertBox.textContent = s.connected ? (s.label + " Terhubung (" + s.statusText + ")") : s.saved ? (s.statusText || "Menghubungkan...") : ("Slot " + currentSlot + " belum tersimpan.");
+        }
+        if (bar) {
+            bar.className = "mcp-bar-fill " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
+        }
+        if (detail) {
+            const reqStr = latestRequestId ? ` | ID: ${latestRequestId}` : "";
+            detail.textContent = "Slot " + currentSlot + " (" + s.label + "): " + s.statusText + " | " + (s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("id-ID") : "-") + reqStr;
+            detail.style.color = s.connected ? "#047857" : mcpBusy ? "#0369a1" : "#64748b";
+        }
+        if (saveBtn) saveBtn.disabled = mcpBusy;
+        if (reconnectBtn) reconnectBtn.disabled = mcpBusy;
+        if (deleteBtn) deleteBtn.disabled = mcpBusy;
     }
-    if (bar) {
-        bar.className = "mcp-bar-fill " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
-    }
-    if (detail) {
-        const reqStr = latestRequestId ? ` | ID: ${latestRequestId}` : "";
-        detail.textContent = "Slot " + currentSlot + " (" + s.label + "): " + s.statusText + " | " + (s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("id-ID") : "-") + reqStr;
-        detail.style.color = s.connected ? "#047857" : mcpBusy ? "#0369a1" : "#64748b";
-    }
-
-    if (saveBtn) saveBtn.disabled = mcpBusy;
-    if (reconnectBtn) reconnectBtn.disabled = mcpBusy;
-    if (deleteBtn) deleteBtn.disabled = mcpBusy;
 }
 
 async function quickSaveLabel() {
@@ -1187,11 +1206,20 @@ function updateSlotsUI(data) {
         const tabBtn = document.getElementById("slotTab" + i);
 
         if (dot && s) {
-            dot.className = "slot-radar-dot " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
+            if (s.is_restricted || (!s.is_active && s.saved)) {
+                dot.className = "slot-radar-dot idle";
+            } else {
+                dot.className = "slot-radar-dot " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
+            }
         }
         if (statusText && s) {
-            statusText.textContent = s.connected ? "Online" : s.saved ? "Tersimpan" : "Kosong";
-            statusText.style.color = s.connected ? "#059669" : s.saved ? "#0284c7" : "#94a3b8";
+            if (s.is_restricted || (!s.is_active && s.saved)) {
+                statusText.textContent = "Dibatasi";
+                statusText.style.color = "#ef4444";
+            } else {
+                statusText.textContent = s.connected ? "Online" : s.saved ? "Tersimpan" : "Kosong";
+                statusText.style.color = s.connected ? "#059669" : s.saved ? "#0284c7" : "#94a3b8";
+            }
         }
         if (label && s) {
             const displayLabel = s.label || ("XiaoZhi " + i);

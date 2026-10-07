@@ -1,0 +1,770 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .app-page {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    .access-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 20px;
+        width: 100%;
+        min-width: 0;
+    }
+    .access-title-group {
+        min-width: 0;
+        max-width: 100%;
+        flex: 1 1 300px;
+    }
+    .access-title-group h1 {
+        font-size: clamp(20px, 2.2vw, 26px);
+        font-weight: 900;
+        letter-spacing: -0.5px;
+        margin: 4px 0 6px 0;
+        color: var(--app-text);
+        word-break: break-word;
+    }
+
+    .access-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+        width: 100%;
+        min-width: 0;
+    }
+    .access-stat-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong, #1e293b);
+        border-radius: 12px;
+        padding: 16px 18px;
+        box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.7);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 100px;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    :root[data-theme="neo"] .access-stat-card {
+        box-shadow: 4px 4px 0px #000;
+        background: #fff;
+    }
+    .access-stat-label {
+        font-size: 12.5px;
+        font-weight: 750;
+        color: var(--app-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .access-stat-value {
+        font-size: 28px;
+        font-weight: 900;
+        color: var(--app-text);
+        margin-top: 8px;
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+    }
+
+    .access-filter-card {
+        background: var(--app-surface);
+        border: 2px solid var(--app-border-strong, #1e293b);
+        border-radius: 14px;
+        box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.8);
+        padding: 16px 18px;
+        margin-bottom: 24px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        min-width: 0;
+    }
+    :root[data-theme="neo"] .access-filter-card {
+        background: #fff;
+        box-shadow: 5px 5px 0px #000;
+    }
+
+    .access-user-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+    }
+    .access-user-table th {
+        padding: 13px 14px;
+        font-weight: 850;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--app-muted);
+        border-bottom: 2px solid var(--app-border-strong, #334155);
+        background: var(--app-surface-muted, rgba(0,0,0,0.02));
+        text-align: left;
+        white-space: nowrap;
+    }
+    .access-user-table td {
+        padding: 14px 14px;
+        border-bottom: 1px solid var(--app-border);
+        vertical-align: middle;
+    }
+    .access-user-table tbody tr:hover {
+        background: rgba(0, 0, 0, 0.02);
+    }
+    :root[data-theme="dark"] .access-user-table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .slot-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 700;
+        border: 1px solid var(--app-border);
+        background: var(--app-surface);
+        margin: 2px 0;
+    }
+    .slot-pill.is-connected {
+        border-color: #10b981;
+        background: rgba(16, 185, 129, 0.1);
+        color: #047857;
+    }
+    .slot-pill.is-saved {
+        border-color: #0284c7;
+        background: rgba(2, 132, 199, 0.1);
+        color: #0369a1;
+    }
+    .slot-pill.is-disabled {
+        border-color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+        color: #b91c1c;
+    }
+    .slot-pill.is-empty {
+        border-color: var(--app-border);
+        color: var(--app-muted);
+        opacity: 0.6;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(3px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 16px;
+        box-sizing: border-box;
+    }
+    .modal-box {
+        background: var(--app-surface);
+        border: 2px solid #111;
+        border-radius: 14px;
+        box-shadow: 6px 6px 0px #000;
+        max-width: 580px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 24px;
+        box-sizing: border-box;
+    }
+    :root[data-theme="neo"] .modal-box {
+        background: #fff;
+    }
+</style>
+
+<div class="app-page">
+    <!-- Header -->
+    <header class="access-header">
+        <div class="access-title-group">
+            <span class="app-eyebrow" style="color:#d97706; display:flex; align-items:center; gap:6px;">
+                <span>⭐</span> PANEL KONTROL AKSES PLUS
+            </span>
+            <h1>Manajemen Akses Plus (Multi-Slot & Playlist)</h1>
+            <p class="app-subtitle" style="margin-bottom:0;">
+                Pantau penggunaan <strong>Slot MCP 2 & 3</strong> dan <strong>Playlist Musik</strong> per akun. Batasi atau aktifkan kembali fitur Akses Plus secara aman tanpa menghapus data pengguna.
+            </p>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <a href="/admin" class="app-button" style="text-decoration:none; font-weight:700; font-size:12px; padding:7px 14px;">
+                ← Kembali ke User
+            </a>
+            <button type="button" onclick="loadAccessPlusData()" class="app-button" style="background:#f59e0b; color:#fff; border:2px solid #111; box-shadow:2px 2px 0 #111; font-weight:800; font-size:12px; padding:7px 14px; display:inline-flex; align-items:center; gap:6px;">
+                <span id="refreshIcon">🔄</span> Refresh Data
+            </button>
+        </div>
+    </header>
+
+    <!-- Info Banner -->
+    <div style="background: rgba(245, 158, 11, 0.08); border: 2px dashed #f59e0b; border-radius: 12px; padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: flex-start; gap: 14px; box-sizing: border-box;">
+        <div style="font-size:24px; line-height:1; flex-shrink:0;">💡</div>
+        <div style="font-size:13px; line-height:1.55; color:var(--app-text);">
+            <strong>Kebijakan Akses Plus & Auto-Connect:</strong>
+            <ul style="margin:4px 0 0 16px; padding:0; color:var(--app-muted);">
+                <li>User baru secara default <strong>bebas (Akses Penuh)</strong> sampai Anda membatasinya secara spesifik di bawah.</li>
+                <li>Jika Slot 2 & 3 dibatasi, token <strong>TIDAK dihapus</strong> melainkan dinonaktifkan. Saat Anda mengaktifkannya kembali, koneksi bridge XiaoZhi akan <strong>otomatis terhubung kembali (auto-connect)</strong> tanpa user perlu memasukkan token ulang.</li>
+                <li>Jika kuota playlist dibatasi (misal maks 15 lagu), lagu di atas batas kuota <strong>dinonaktifkan (bukan dihapus)</strong>. Ketika user meminta memutar lagu nonaktif lewat perintah suara, XiaoZhi akan merespon: <em>"Lagu ini telah dinonaktifkan oleh admin. Silakan buka paket langganan Akses Plus."</em></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Stat Grid -->
+    <div class="access-stat-grid">
+        <div class="access-stat-card">
+            <span class="access-stat-label">Total User Terdaftar</span>
+            <div class="access-stat-value">
+                <span id="statTotalUsers">{{ total_users }}</span>
+                <span style="font-size:13px; color:var(--app-muted); font-weight:normal;">user</span>
+            </div>
+        </div>
+        <div class="access-stat-card" style="border-color:#3b82f6;">
+            <span class="access-stat-label" style="color:#0284c7;">Pengguna Multi-Slot (S2 & S3)</span>
+            <div class="access-stat-value" style="color:#0284c7;">
+                <span id="statMultislotUsers">{{ multislot_users_count }}</span>
+                <span style="font-size:13px; color:var(--app-muted); font-weight:normal;">user aktif</span>
+            </div>
+        </div>
+        <div class="access-stat-card" style="border-color:#10b981;">
+            <span class="access-stat-label" style="color:#047857;">Pengguna Playlist Musik</span>
+            <div class="access-stat-value" style="color:#047857;">
+                <span id="statPlaylistUsers">{{ playlist_users_count }}</span>
+                <span style="font-size:13px; color:var(--app-muted); font-weight:normal;">user</span>
+            </div>
+        </div>
+        <div class="access-stat-card" style="border-color:#ef4444;">
+            <span class="access-stat-label" style="color:#b91c1c;">Status Dibatasi (Restricted)</span>
+            <div class="access-stat-value" style="color:#b91c1c;">
+                <span id="statRestrictedUsers">{{ restricted_users_count }}</span>
+                <span style="font-size:13px; color:var(--app-muted); font-weight:normal;">user</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Card -->
+    <div class="access-filter-card">
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;">
+            <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; flex:1 1 320px;">
+                <div style="position:relative; flex:1 1 200px;">
+                    <input type="text" id="searchInput" placeholder="Cari username atau User ID..." oninput="filterUserTable()" class="app-input" style="padding-left:32px; font-size:13px;">
+                    <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:14px; opacity:0.5;">🔍</span>
+                </div>
+                <select id="filterType" onchange="filterUserTable()" class="app-select" style="width:auto; font-size:13px; font-weight:700;">
+                    <option value="all">Semua User</option>
+                    <option value="multislot">Pengguna Multi-Slot (>1 Slot)</option>
+                    <option value="playlist">Pengguna Playlist Musik</option>
+                    <option value="restricted">Status Dibatasi Admin</option>
+                    <option value="free">Status Bebas (Akses Penuh)</option>
+                </select>
+            </div>
+            <div style="font-size:12.5px; font-weight:750; color:var(--app-muted);" id="userCounterLabel">
+                Menampilkan {{ overview|length }} user
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table Card -->
+    <div class="app-card" style="padding:0; overflow:hidden; border:2px solid var(--app-border-strong, #1e293b); box-shadow:4px 4px 0px rgba(0,0,0,0.8);">
+        <div class="app-table-wrap" style="border:none; margin:0;">
+            <table class="access-user-table" id="accessTable">
+                <thead>
+                    <tr>
+                        <th style="width:60px; text-align:center;">ID</th>
+                        <th style="width:200px;">User & Akun</th>
+                        <th>Status Slot MCP (Slot 1, 2, 3)</th>
+                        <th style="width:240px;">Playlist Musik & Kuota</th>
+                        <th style="width:220px; text-align:right;">Aksi Kontrol Akses Plus</th>
+                    </tr>
+                </thead>
+                <tbody id="accessTableBody">
+                    {% for item in overview %}
+                    <tr id="user-row-{{ item.user_id }}" 
+                        data-user-id="{{ item.user_id }}" 
+                        data-username="{{ item.username|lower }}" 
+                        data-has-multislot="{{ 'true' if item.has_multislot else 'false' }}"
+                        data-has-playlist="{{ 'true' if item.playlist.has_playlist else 'false' }}"
+                        data-is-restricted="{{ 'true' if item.is_restricted else 'false' }}">
+                        <td style="text-align:center; font-weight:800; color:var(--app-muted);">
+                            #{{ item.user_id }}
+                        </td>
+                        <td>
+                            <div style="font-weight:900; font-size:14px; color:var(--app-text);">
+                                {{ item.username }}
+                            </div>
+                            <div style="font-size:11.5px; color:var(--app-muted); margin-top:2px;">
+                                Role: <span class="app-chip app-chip-small" style="font-size:10px; padding:1px 6px;">{{ item.role }}</span>
+                                {% if item.is_restricted %}
+                                <span class="app-chip app-chip-small" style="background:#fee2e2; color:#b91c1c; font-size:10px; padding:1px 6px; font-weight:800;">Dibatasi</span>
+                                {% else %}
+                                <span class="app-chip app-chip-small" style="background:#ecfdf5; color:#047857; font-size:10px; padding:1px 6px; font-weight:800;">Bebas</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <!-- Slot 1 -->
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    {% set s1 = item.slots.get(1) %}
+                                    <span class="slot-pill {% if s1 and s1.preview %}is-saved{% else %}is-empty{% endif %}">
+                                        <strong>S1:</strong> {{ s1.device_label if s1 else 'Slot 1' }}
+                                        {% if s1 and s1.preview %}
+                                            <code>({{ s1.preview }})</code>
+                                        {% else %}
+                                            <em>(Kosong)</em>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <!-- Slot 2 -->
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    {% set s2 = item.slots.get(2) %}
+                                    <span class="slot-pill {% if s2 and not s2.is_active %}is-disabled{% elif s2 and s2.preview %}is-saved{% else %}is-empty{% endif %}">
+                                        <strong>S2:</strong> {{ s2.device_label if s2 else 'Slot 2' }}
+                                        {% if s2 and s2.preview %}
+                                            <code>({{ s2.preview }})</code>
+                                            {% if not s2.is_active %}<strong style="color:#ef4444;">[NONAKTIF]</strong>{% endif %}
+                                        {% else %}
+                                            <em>(Kosong)</em>
+                                        {% endif %}
+                                    </span>
+                                    {% if s2 and s2.preview %}
+                                    <button type="button" onclick="toggleSlotActive({{ item.user_id }}, 2, {{ 'false' if s2.is_active else 'true' }})" class="app-button" style="padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:4px;">
+                                        {{ 'Matikan' if s2.is_active else 'Aktifkan' }}
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                <!-- Slot 3 -->
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    {% set s3 = item.slots.get(3) %}
+                                    <span class="slot-pill {% if s3 and not s3.is_active %}is-disabled{% elif s3 and s3.preview %}is-saved{% else %}is-empty{% endif %}">
+                                        <strong>S3:</strong> {{ s3.device_label if s3 else 'Slot 3' }}
+                                        {% if s3 and s3.preview %}
+                                            <code>({{ s3.preview }})</code>
+                                            {% if not s3.is_active %}<strong style="color:#ef4444;">[NONAKTIF]</strong>{% endif %}
+                                        {% else %}
+                                            <em>(Kosong)</em>
+                                        {% endif %}
+                                    </span>
+                                    {% if s3 and s3.preview %}
+                                    <button type="button" onclick="toggleSlotActive({{ item.user_id }}, 3, {{ 'false' if s3.is_active else 'true' }})" class="app-button" style="padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:4px;">
+                                        {{ 'Matikan' if s3.is_active else 'Aktifkan' }}
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div style="margin-top:6px; font-size:11.5px; font-weight:700;">
+                                Izin Multi-Slot: 
+                                {% if item.mcp_multislot_allowed %}
+                                <span style="color:#059669;">Bebas (Boleh Slot 2 & 3)</span>
+                                {% else %}
+                                <span style="color:#dc2626;">Dibatasi (Hanya Slot 1)</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div>
+                                <strong style="font-size:13.5px; color:var(--app-text);">
+                                    {% if item.playlist.has_playlist %}
+                                    🎵 {{ item.playlist.total_tracks }} Lagu
+                                    {% else %}
+                                    <span style="color:var(--app-muted); font-weight:normal;">Belum memakai playlist</span>
+                                    {% endif %}
+                                </strong>
+                            </div>
+                            <div style="font-size:12px; color:var(--app-muted); margin-top:2px;">
+                                Aktif: <strong style="color:#059669;">{{ item.playlist.active_tracks }}</strong>
+                                {% if item.playlist.disabled_tracks > 0 %}
+                                • Nonaktif: <strong style="color:#dc2626;">{{ item.playlist.disabled_tracks }}</strong>
+                                {% endif %}
+                            </div>
+                            <div style="margin-top:4px; font-size:11.5px;">
+                                Kuota: 
+                                {% if item.playlist_quota_enabled %}
+                                <span class="app-chip app-chip-small" style="background:#fee2e2; color:#b91c1c; font-weight:800; font-size:10px; padding:1px 6px;">
+                                    Maks {{ item.max_playlist_tracks }} Lagu
+                                </span>
+                                {% else %}
+                                <span class="app-chip app-chip-small" style="background:#ecfdf5; color:#047857; font-weight:800; font-size:10px; padding:1px 6px;">
+                                    Tanpa Batas
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% if item.playlist.has_playlist %}
+                            <div style="margin-top:6px;">
+                                <button type="button" onclick="openPlaylistManagerModal({{ item.user_id }}, '{{ item.username|escape }}')" class="app-button" style="padding:2px 8px; font-size:11px; font-weight:800;">
+                                    📑 Kelola Lagu
+                                </button>
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:inline-flex; flex-direction:column; gap:6px; align-items:flex-end;">
+                                <!-- Toggle Multi-slot -->
+                                {% if item.mcp_multislot_allowed %}
+                                <button type="button" onclick="setMultiSlotAllowed({{ item.user_id }}, false)" class="app-button app-button-danger" style="font-size:11.5px; font-weight:800; padding:5px 10px; width:100%; justify-content:center;" title="Kunci user ini hanya boleh memakai 1 slot saja">
+                                    🔒 Batasi ke 1 Slot
+                                </button>
+                                {% else %}
+                                <button type="button" onclick="setMultiSlotAllowed({{ item.user_id }}, true)" class="app-button" style="background:#10b981; color:#fff; font-size:11.5px; font-weight:800; padding:5px 10px; width:100%; justify-content:center; border-color:#059669;" title="Buka akses multi-slot untuk user ini">
+                                    🔓 Buka Akses Multi-Slot
+                                </button>
+                                {% endif %}
+
+                                <!-- Set Playlist Quota -->
+                                <button type="button" onclick="openQuotaModal({{ item.user_id }}, '{{ item.username|escape }}', {{ 'true' if item.playlist_quota_enabled else 'false' }}, {{ item.max_playlist_tracks }})" class="app-button" style="font-size:11.5px; font-weight:800; padding:5px 10px; width:100%; justify-content:center;">
+                                    ⚙️ Atur Kuota Playlist
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 1: ATUR KUOTA PLAYLIST MUSIK -->
+<!-- ========================================== -->
+<div class="modal-overlay" id="quotaModal">
+    <div class="modal-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="margin:0; font-size:16px; font-weight:900; color:var(--app-text);" id="quotaModalTitle">
+                Atur Batasan Kuota Playlist
+            </h3>
+            <button type="button" onclick="closeQuotaModal()" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:var(--app-muted);">✕</button>
+        </div>
+
+        <p style="font-size:13px; color:var(--app-muted); margin-bottom:18px; line-height:1.5;">
+            Pengaturan batasan jumlah lagu yang boleh ditambahkan oleh user <strong id="quotaUsernameDisplay" style="color:var(--app-text);"></strong>.
+        </p>
+
+        <form id="quotaForm" onsubmit="submitQuotaForm(event)">
+            <input type="hidden" id="quotaUserId" value="">
+            
+            <div style="margin-bottom:16px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:800; font-size:13.5px; color:var(--app-text);">
+                    <input type="checkbox" id="quotaEnabledCheck" onchange="toggleQuotaInputState()" style="width:18px; height:18px;">
+                    <span>Aktifkan Batasan Kuota Playlist</span>
+                </label>
+                <p style="margin:4px 0 0 26px; font-size:12px; color:var(--app-muted);">
+                    Jika dicentang, user tidak dapat menambah lagu melebihi jumlah batas, dan lagu yang berada di atas nomor batas akan dinonaktifkan sementara (bukan dihapus).
+                </p>
+            </div>
+
+            <div style="margin-bottom:20px;" id="quotaInputWrapper">
+                <label class="app-label">Jumlah Maksimal Lagu Aktif</label>
+                <input type="number" id="quotaMaxTracksInput" min="1" max="1000" value="15" class="app-input" style="font-size:15px; font-weight:800;">
+                <p class="app-field-hint">
+                    Contoh: Masukkan <strong>15</strong>. Lagu ke-16 dan seterusnya akan dinonaktifkan statusnya sampai admin menaikkan batas atau membuka paket Plus.
+                </p>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" onclick="closeQuotaModal()" class="app-button">Batal</button>
+                <button type="submit" class="app-button app-button-primary" style="background:#f59e0b; border-color:#d97706; color:#fff; font-weight:800;">
+                    Simpan Pengaturan Kuota
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 2: KELOLA LAGU PLAYLIST USER -->
+<!-- ========================================== -->
+<div class="modal-overlay" id="playlistManagerModal">
+    <div class="modal-box" style="max-width:760px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div>
+                <h3 style="margin:0; font-size:16px; font-weight:900; color:var(--app-text);" id="playlistManagerTitle">
+                    Daftar Lagu Playlist User
+                </h3>
+                <p style="margin:2px 0 0; font-size:12px; color:var(--app-muted);" id="playlistManagerSubtitle"></p>
+            </div>
+            <button type="button" onclick="closePlaylistManagerModal()" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:var(--app-muted);">✕</button>
+        </div>
+
+        <div style="max-height:420px; overflow-y:auto; border:1px solid var(--app-border); border-radius:8px; margin-bottom:18px;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead>
+                    <tr style="background:var(--app-surface-muted); border-bottom:1px solid var(--app-border);">
+                        <th style="padding:10px 12px; text-align:center; width:45px;">No</th>
+                        <th style="padding:10px 12px; text-align:left;">Judul Lagu & Info</th>
+                        <th style="padding:10px 12px; text-align:center; width:90px;">Putar</th>
+                        <th style="padding:10px 12px; text-align:center; width:120px;">Status</th>
+                        <th style="padding:10px 12px; text-align:right; width:100px;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="userTracksTableBody">
+                    <tr>
+                        <td colspan="5" style="text-align:center; padding:24px; color:var(--app-muted);">
+                            Memuat daftar lagu...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <span style="font-size:12px; color:var(--app-muted);">
+                💡 Lagu nonaktif tidak akan diputar oleh XiaoZhi dan akan diberi respon suara paket Plus.
+            </span>
+            <button type="button" onclick="closePlaylistManagerModal()" class="app-button" style="font-weight:700;">
+                Tutup
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const CSRF_TOKEN = {{ csrf_token|tojson }};
+    let currentModalUserId = null;
+
+    function filterUserTable() {
+        const q = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+        const type = document.getElementById("filterType").value;
+        const rows = document.querySelectorAll("#accessTableBody tr");
+
+        let visibleCount = 0;
+        rows.forEach(r => {
+            const username = r.getAttribute("data-username") || "";
+            const uid = r.getAttribute("data-user-id") || "";
+            const hasMultislot = r.getAttribute("data-has-multislot") === "true";
+            const hasPlaylist = r.getAttribute("data-has-playlist") === "true";
+            const isRestricted = r.getAttribute("data-is-restricted") === "true";
+
+            let matchText = username.includes(q) || uid.includes(q);
+            let matchType = true;
+
+            if (type === "multislot") matchType = hasMultislot;
+            else if (type === "playlist") matchType = hasPlaylist;
+            else if (type === "restricted") matchType = isRestricted;
+            else if (type === "free") matchType = !isRestricted;
+
+            if (matchText && matchType) {
+                r.style.display = "";
+                visibleCount++;
+            } else {
+                r.style.display = "none";
+            }
+        });
+
+        document.getElementById("userCounterLabel").textContent = `Menampilkan ${visibleCount} dari ${rows.length} user`;
+    }
+
+    async function setMultiSlotAllowed(userId, allowed) {
+        const actionLabel = allowed ? "membuka akses multi-slot (hingga 3 slot)" : "membatasi user hanya boleh memakai 1 slot (Slot 2 & 3 dinonaktifkan)";
+        if (!confirm(`Apakah Anda yakin ingin ${actionLabel} untuk user #${userId}?`)) {
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append("allowed", allowed ? "true" : "false");
+        fd.append("csrf_token", CSRF_TOKEN);
+
+        try {
+            const resp = await fetch(`/admin/api/access-plus/set-slots/${userId}`, {
+                method: "POST",
+                body: fd,
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data.success) {
+                if (window.App && App.toast) App.toast.success(data.message || "Akses slot berhasil diperbarui.");
+                else alert(data.message || "Akses slot berhasil diperbarui.");
+                location.reload();
+            } else {
+                alert(`Gagal: ${data.detail || data.message || "Terjadi kesalahan"}`);
+            }
+        } catch (err) {
+            alert("Kesalahan jaringan: " + err.message);
+        }
+    }
+
+    async function toggleSlotActive(userId, slotNum, targetActive) {
+        const actionLabel = targetActive ? `mengaktifkan kembali Slot ${slotNum}` : `menonaktifkan Slot ${slotNum}`;
+        if (!confirm(`Yakin ingin ${actionLabel} user #${userId}?`)) {
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append("is_active", targetActive ? "true" : "false");
+        fd.append("csrf_token", CSRF_TOKEN);
+
+        try {
+            const resp = await fetch(`/admin/api/access-plus/toggle-slot/${userId}/${slotNum}`, {
+                method: "POST",
+                body: fd,
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data.success) {
+                if (window.App && App.toast) App.toast.success(data.message);
+                else alert(data.message);
+                location.reload();
+            } else {
+                alert(`Gagal: ${data.detail || data.message || "Terjadi kesalahan"}`);
+            }
+        } catch (err) {
+            alert("Kesalahan jaringan: " + err.message);
+        }
+    }
+
+    function openQuotaModal(userId, username, quotaEnabled, maxTracks) {
+        document.getElementById("quotaUserId").value = userId;
+        document.getElementById("quotaUsernameDisplay").textContent = `${username} (#${userId})`;
+        document.getElementById("quotaEnabledCheck").checked = quotaEnabled;
+        document.getElementById("quotaMaxTracksInput").value = maxTracks || 15;
+        toggleQuotaInputState();
+        document.getElementById("quotaModal").style.display = "flex";
+    }
+
+    function closeQuotaModal() {
+        document.getElementById("quotaModal").style.display = "none";
+    }
+
+    function toggleQuotaInputState() {
+        const checked = document.getElementById("quotaEnabledCheck").checked;
+        const input = document.getElementById("quotaMaxTracksInput");
+        input.disabled = !checked;
+        input.style.opacity = checked ? "1" : "0.5";
+    }
+
+    async function submitQuotaForm(e) {
+        e.preventDefault();
+        const userId = document.getElementById("quotaUserId").value;
+        const enabled = document.getElementById("quotaEnabledCheck").checked;
+        const maxTracks = document.getElementById("quotaMaxTracksInput").value;
+
+        const fd = new FormData();
+        fd.append("enabled", enabled ? "true" : "false");
+        fd.append("max_tracks", maxTracks || 15);
+        fd.append("csrf_token", CSRF_TOKEN);
+
+        try {
+            const resp = await fetch(`/admin/api/access-plus/set-playlist-quota/${userId}`, {
+                method: "POST",
+                body: fd,
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data.success) {
+                closeQuotaModal();
+                if (window.App && App.toast) App.toast.success(data.message);
+                else alert(data.message);
+                location.reload();
+            } else {
+                alert(`Gagal: ${data.detail || data.message || "Terjadi kesalahan"}`);
+            }
+        } catch (err) {
+            alert("Kesalahan jaringan: " + err.message);
+        }
+    }
+
+    async function openPlaylistManagerModal(userId, username) {
+        currentModalUserId = userId;
+        document.getElementById("playlistManagerTitle").textContent = `Daftar Lagu Playlist: ${username}`;
+        document.getElementById("playlistManagerSubtitle").textContent = `User ID #${userId}`;
+        document.getElementById("playlistManagerModal").style.display = "flex";
+
+        const tbody = document.getElementById("userTracksTableBody");
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--app-muted);">Memuat lagu...</td></tr>`;
+
+        try {
+            const resp = await fetch(`/admin/api/access-plus/user-playlist/${userId}`);
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data.success) {
+                const tracks = data.tracks || [];
+                if (!tracks.length) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--app-muted);">Playlist kosong.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = tracks.map(t => {
+                    const isActive = t.is_active !== false && t.is_active !== 0;
+                    return `
+                        <tr style="border-bottom:1px solid var(--app-border);">
+                            <td style="padding:10px 12px; text-align:center; font-weight:800; color:var(--app-muted);">
+                                #${t.track_number}
+                            </td>
+                            <td style="padding:10px 12px;">
+                                <div style="font-weight:800; color:var(--app-text);">${escapeHtml(t.title)}</div>
+                                <div style="font-size:11.5px; color:var(--app-muted); margin-top:2px;">
+                                    ${escapeHtml(t.artist || '-')} &bull; <a href="${escapeHtml(t.youtube_url)}" target="_blank" style="color:#ef4444; text-decoration:none;">Link ↗</a>
+                                </div>
+                            </td>
+                            <td style="padding:10px 12px; text-align:center; font-weight:700;">
+                                ${t.play_count || 0}x
+                            </td>
+                            <td style="padding:10px 12px; text-align:center;">
+                                ${isActive 
+                                    ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px; padding:1px 6px;">Aktif</span>`
+                                    : `<span class="app-chip app-chip-small app-chip-danger" style="font-size:10px; padding:1px 6px;">Nonaktif</span>`}
+                            </td>
+                            <td style="padding:10px 12px; text-align:right;">
+                                <button type="button" onclick="toggleTrackActive(${userId}, ${t.id}, ${isActive ? 'false' : 'true'})" class="app-button" style="padding:3px 8px; font-size:11px; font-weight:800;">
+                                    ${isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join("");
+            } else {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:#ef4444;">Gagal memuat playlist: ${data.detail || 'Error'}</td></tr>`;
+            }
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:#ef4444;">Kesalahan jaringan: ${err.message}</td></tr>`;
+        }
+    }
+
+    function closePlaylistManagerModal() {
+        document.getElementById("playlistManagerModal").style.display = "none";
+        currentModalUserId = null;
+    }
+
+    async function toggleTrackActive(userId, trackId, targetActive) {
+        const fd = new FormData();
+        fd.append("is_active", targetActive ? "true" : "false");
+        fd.append("csrf_token", CSRF_TOKEN);
+
+        try {
+            const resp = await fetch(`/admin/api/access-plus/toggle-track/${userId}/${trackId}`, {
+                method: "POST",
+                body: fd,
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data.success) {
+                if (window.App && App.toast) App.toast.success(data.message);
+                // Refresh modal list
+                const uRow = document.getElementById(`user-row-${userId}`);
+                const uName = uRow ? uRow.getAttribute("data-username") : "User";
+                openPlaylistManagerModal(userId, uName);
+            } else {
+                alert(`Gagal: ${data.detail || data.message || "Terjadi kesalahan"}`);
+            }
+        } catch (err) {
+            alert("Kesalahan jaringan: " + err.message);
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return "";
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function loadAccessPlusData() {
+        location.reload();
+    }
+</script>
+{% endblock %}
