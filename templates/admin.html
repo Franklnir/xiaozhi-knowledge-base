@@ -366,7 +366,7 @@
                 </span>
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <input type="search" id="adminUserSearch" class="app-input" style="width:280px" placeholder="Cari username, MAC, ID...">
+                <input type="search" id="adminUserSearch" class="app-input" style="width:280px" placeholder="Cari username, email, MAC, ID...">
             </div>
         </div>
 
@@ -432,11 +432,14 @@
                         data-stream-today="{% if act.has_stream or item.is_playing or item.youtube_stream %}true{% else %}false{% endif %}"
                         data-tools-today="{% if act.has_tools %}true{% else %}false{% endif %}"
                         data-tools-count="{{ act.tools_count or 0 }}"
-                        data-search="{{ (item.username ~ ' ' ~ item.id ~ ' ' ~ (item.device_mac or '') ~ ' ' ~ (slot_labels|join(' ')) ~ ' ' ~ (slot_macs|join(' ')) ~ ' ' ~ ('mac tersimpan ada mac' if (item.device_mac or slot_macs|length > 0) else '') ~ ' ' ~ ('mcp konek terhubung' if item.mcp_status and item.mcp_status.connected else 'blom belum terhubung mcp') ~ ' ' ~ ('stream youtube playing memutar' if item.is_playing or item.youtube_stream else '') ~ ' ' ~ ('aktivitas hari ini aktif' if act.has_activity else '') ~ ' ' ~ ('mcp tools terpanggil ' ~ (act.tools_list|join(' ') if act.tools_list else '')) ~ ' ' ~ (act.last_song or ''))|lower|e }}">
+                        data-search="{{ (item.username ~ ' ' ~ (item.email or '') ~ ' ' ~ item.id ~ ' ' ~ (item.device_mac or '') ~ ' ' ~ (slot_labels|join(' ')) ~ ' ' ~ (slot_macs|join(' ')) ~ ' ' ~ ('mac tersimpan ada mac' if (item.device_mac or slot_macs|length > 0) else '') ~ ' ' ~ ('mcp konek terhubung' if item.mcp_status and item.mcp_status.connected else 'blom belum terhubung mcp') ~ ' ' ~ ('stream youtube playing memutar' if item.is_playing or item.youtube_stream else '') ~ ' ' ~ ('aktivitas hari ini aktif' if act.has_activity else '') ~ ' ' ~ ('mcp tools terpanggil ' ~ (act.tools_list|join(' ') if act.tools_list else '')) ~ ' ' ~ (act.last_song or ''))|lower|e }}">
                         <td><span class="app-table-subtext">{{ item.id }}</span></td>
                         <td>
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 <span class="app-table-title">{{ item.username }}</span>
+                                {% if item.email %}
+                                <span class="app-table-subtext" style="font-size:11px; color:#64748b; font-weight:600;" title="Email akun: {{ item.email }}">✉️ {{ item.email }}</span>
+                                {% endif %}
                                 {% if act.has_activity %}
                                 <span class="app-chip app-chip-small app-chip-success" style="font-size:9.5px; padding:1px 6px; font-weight:800;" title="User aktif hari ini">Aktif Hari Ini</span>
                                 {% endif %}
@@ -1459,7 +1462,7 @@
                 row.dataset.streamToday = hasStreamToday ? "true" : "false";
                 row.dataset.toolsToday = hasToolsToday ? "true" : "false";
                 row.dataset.toolsCount = act.tools_count || 0;
-                row.dataset.search = `${u.username} ${u.id} ${u.device_mac || ''} ${hasMac ? 'mac tersimpan ada mac' : ''} ${isConnected ? 'mcp konek terhubung' : 'blom belum terhubung mcp'} ${isPlaying ? 'stream youtube playing memutar' : ''} ${hasActivity ? 'aktivitas hari ini aktif' : ''} ${act.last_song || ''}`.toLowerCase();
+                row.dataset.search = `${u.username} ${u.email || ''} ${u.id} ${u.device_mac || ''} ${hasMac ? 'mac tersimpan ada mac' : ''} ${isConnected ? 'mcp konek terhubung' : 'blom belum terhubung mcp'} ${isPlaying ? 'stream youtube playing memutar' : ''} ${hasActivity ? 'aktivitas hari ini aktif' : ''} ${act.last_song || ''}`.toLowerCase();
 
                 // Update playback badge in username column
                 const badge = document.getElementById(`user-playback-badge-${uid}`);
