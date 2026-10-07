@@ -2539,9 +2539,13 @@ class SQLiteStore:
             has_token = len(user_slots) > 0
             is_connected = any(s["connected"] for s in user_slots) if user_slots else mcp_state.get("connected", False)
 
+            user_email = (row["google_email"] if "google_email" in row.keys() and row["google_email"] else "") or (row["firebase_email"] if "firebase_email" in row.keys() and row["firebase_email"] else "") or ""
             result.append({
                 "id": user_id,
                 "username": row["username"],
+                "email": user_email.strip().lower(),
+                "google_email": row["google_email"] if "google_email" in row.keys() and row["google_email"] else "",
+                "firebase_email": row["firebase_email"] if "firebase_email" in row.keys() and row["firebase_email"] else "",
                 "role": row["role"],
                 "created_at": row["created_at"],
                 "limits": limits,
@@ -3267,7 +3271,7 @@ class SQLiteStore:
 
     def list_access_plus_overview(self) -> List[Dict[str, Any]]:
         conn = self._get_conn()
-        users = [dict(r) for r in conn.execute("SELECT id, username, role, created_at FROM users WHERE role != 'admin' ORDER BY id ASC").fetchall()]
+        users = [dict(r) for r in conn.execute("SELECT id, username, role, google_email, firebase_email, created_at FROM users WHERE role != 'admin' ORDER BY id ASC").fetchall()]
         settings_map = {int(r["user_id"]): dict(r) for r in conn.execute("SELECT * FROM user_access_plus_settings").fetchall()}
         
         token_rows = [dict(r) for r in conn.execute("SELECT user_id, slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, 1) as is_active FROM xiaozhi_tokens").fetchall()]
@@ -3292,6 +3296,7 @@ class SQLiteStore:
             plus_cfg = settings_map.get(uid, {})
             u_tokens = tokens_by_user.get(uid, [])
             pl_stats = playlist_map.get(uid, {"total_tracks": 0, "active_tracks": 0, "disabled_tracks": 0})
+            u_email = ((u.get("google_email") or "") or (u.get("firebase_email") or "")).strip().lower()
 
             slot_map = {}
             for t in u_tokens:
@@ -3316,6 +3321,7 @@ class SQLiteStore:
             result.append({
                 "user_id": uid,
                 "username": u["username"],
+                "email": u_email,
                 "role": u["role"],
                 "created_at": u.get("created_at", ""),
                 "mcp_multislot_allowed": mcp_multislot_allowed,

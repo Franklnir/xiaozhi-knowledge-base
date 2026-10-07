@@ -35,10 +35,17 @@ def test_access_plus_store_functionality(tmp_path):
     overview = store.list_access_plus_overview()
     user_entry = next((u for u in overview if u["user_id"] == user_id), None)
     assert user_entry is not None
+    assert "email" in user_entry
     assert user_entry["total_slots"] == 3
     assert user_entry["has_multislot"] is True
     assert user_entry["playlist"]["total_tracks"] == 2
     assert user_entry["playlist"]["has_playlist"] is True
+
+    # Check list_admin_manageable_users includes email
+    manageable = store.list_admin_manageable_users()
+    m_user = next((u for u in manageable if u["id"] == user_id), None)
+    assert m_user is not None
+    assert "email" in m_user
 
     # 5. Restrict user (mcp_multislot_allowed=False, playlist_quota_enabled=True, max_playlist_tracks=15)
     store.set_user_access_plus(user_id, mcp_multislot_allowed=False, playlist_quota_enabled=True, max_playlist_tracks=15, notes="Dibatasi admin")

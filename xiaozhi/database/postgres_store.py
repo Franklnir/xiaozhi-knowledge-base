@@ -3115,9 +3115,13 @@ class PostgresStore:
                     has_token = len(user_slots) > 0
                     is_connected = any(s["connected"] for s in user_slots) if user_slots else mcp_state.get("connected", False)
 
+                    user_email = (row.get("google_email") or row.get("firebase_email") or row.get("email") or "").strip().lower()
                     result.append({
                         "id": user_id,
                         "username": row["username"],
+                        "email": user_email,
+                        "google_email": row.get("google_email") or "",
+                        "firebase_email": row.get("firebase_email") or "",
                         "role": row["role"],
                         "created_at": _format_ts(row.get("created_at")) or "",
                         "limits": limits,
@@ -3881,7 +3885,7 @@ class PostgresStore:
     def list_access_plus_overview(self) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT id, username, role, created_at FROM users WHERE role != 'admin' ORDER BY id ASC")
+                cur.execute("SELECT id, username, role, google_email, firebase_email, created_at FROM users WHERE role != 'admin' ORDER BY id ASC")
                 users = [dict(r) for r in cur.fetchall()]
 
                 cur.execute("SELECT * FROM user_access_plus_settings")
@@ -3910,6 +3914,7 @@ class PostgresStore:
             plus_cfg = settings_map.get(uid, {})
             u_tokens = tokens_by_user.get(uid, [])
             pl_stats = playlist_map.get(uid, {"total_tracks": 0, "active_tracks": 0, "disabled_tracks": 0})
+            u_email = (u.get("google_email") or u.get("firebase_email") or "").strip().lower()
 
             slot_map = {}
             for t in u_tokens:
@@ -3934,6 +3939,7 @@ class PostgresStore:
             result.append({
                 "user_id": uid,
                 "username": u["username"],
+                "email": u_email,
                 "role": u["role"],
                 "created_at": _format_ts(u.get("created_at")),
                 "mcp_multislot_allowed": mcp_multislot_allowed,
