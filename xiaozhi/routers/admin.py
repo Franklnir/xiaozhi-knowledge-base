@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import re
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import APIRouter, HTTPException, Request, Form, WebSocket, WebSocketDisconnect
@@ -72,11 +74,14 @@ def get_admin_dashboard_snapshot() -> Dict[str, Any]:
             "youtube_count": 0,
             "tools_list": [],
             "last_tool": "",
+            "last_song": "",
             "last_activity_time": "",
             "last_message_preview": "",
         }))
         if stream or u.get("is_playing"):
             user_act["youtube_count"] = max(1, user_act.get("youtube_count", 0))
+            if stream and stream.get("title") and not user_act.get("last_song"):
+                user_act["last_song"] = stream.get("title")
 
         has_stream_today = bool(user_act.get("youtube_count", 0) > 0 or u.get("is_playing") or stream)
         has_tools_today = bool(user_act.get("tools_count", 0) > 0)
@@ -301,6 +306,78 @@ async def admin_mcp_monitor(request: Request):
             "active_page": "admin_mcp",
         },
     )
+
+
+# ── Activity & Music Monitor (Detail Harian) ───────────────────────────────
+
+@router.get("/admin/activity-monitor", response_class=HTMLResponse)
+async def admin_activity_monitor_page(
+    request: Request,
+    date: str = "",
+    user_id: Optional[int] = None,
+    type: str = "all",
+    q: str = "",
+):
+    """Halaman monitor harian: panggilan tools & pemutaran lagu YouTube per user."""
+    admin = require_admin(request)
+    store = get_store()
+
+    wib = timezone(timedelta(hours=7))
+    now_wib = datetime.now(wib)
+    clean_date = date.strip() if date and re.match(r"^\d{4}-\d{2}-\d{2}$", date.strip()) else now_wib.strftime("%Y-%m-%d")
+
+    monitor_data = store.get_daily_activity_monitor(
+        target_date=clean_date,
+        owner_id=user_id,
+        activity_type=type,
+        search_query=q,
+    )
+
+    return render(
+        request,
+        "admin/activity_monitor.html",
+        {
+            "user": admin,
+            "csrf_token": make_csrf_token(admin),
+            "target_date": clean_date,
+            "selected_user_id": user_id,
+            "selected_type": type,
+            "search_query": q,
+            "monitor": monitor_data,
+            "active_page": "admin_activity_monitor",
+            "page": "admin_activity_monitor",
+            "message": request.query_params.get("message", ""),
+        },
+    )
+
+
+@router.get("/admin/api/activity-monitor")
+async def admin_api_activity_monitor(
+    request: Request,
+    date: str = "",
+    user_id: Optional[int] = None,
+    type: str = "all",
+    q: str = "",
+):
+    """Endpoint API JSON untuk filter interaktif & live polling monitor aktivitas."""
+    require_admin(request)
+    store = get_store()
+
+    wib = timezone(timedelta(hours=7))
+    now_wib = datetime.now(wib)
+    clean_date = date.strip() if date and re.match(r"^\d{4}-\d{2}-\d{2}$", date.strip()) else now_wib.strftime("%Y-%m-%d")
+
+    monitor_data = store.get_daily_activity_monitor(
+        target_date=clean_date,
+        owner_id=user_id,
+        activity_type=type,
+        search_query=q,
+    )
+
+    return {
+        "success": True,
+        "data": monitor_data,
+    }
 
 
 @router.get("/admin/api/mcp/connections")

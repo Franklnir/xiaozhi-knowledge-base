@@ -1682,8 +1682,9 @@ class HFJsonStore:
     def get_today_users_activity(self, today_date: str = "") -> Dict[int, Dict[str, Any]]:
         """Ambil ringkasan aktivitas user hari ini (stream youtube, mcp tools yang terpanggil)."""
         if not today_date:
-            from datetime import datetime
-            today_date = datetime.now().strftime("%Y-%m-%d")
+            from datetime import datetime, timezone, timedelta
+            wib = timezone(timedelta(hours=7))
+            today_date = datetime.now(wib).strftime("%Y-%m-%d")
         data = self._load()
         activity: Dict[int, Dict[str, Any]] = {}
         for r in data.get("chat_history", []):
@@ -1699,12 +1700,14 @@ class HFJsonStore:
                     "youtube_count": 0,
                     "tools_list": [],
                     "last_tool": "",
+                    "last_song": "",
                     "last_activity_time": "",
+                    "last_activity_raw": "",
                     "last_message_preview": "",
                 }
             tname = str(r.get("tool_name") or "").strip()
             source = str(r.get("source") or "").strip()
-            is_yt = ("youtube" in tname.lower()) or ("youtube" in source.lower())
+            is_yt = ("youtube" in tname.lower()) or ("youtube" in source.lower()) or ("audio" in tname.lower()) or ("playlist" in tname.lower())
             if is_yt:
                 activity[uid]["youtube_count"] += 1
             if tname:
@@ -1713,13 +1716,237 @@ class HFJsonStore:
                     activity[uid]["tools_list"].append(tname)
             if not activity[uid]["last_tool"] and tname:
                 activity[uid]["last_tool"] = tname
-            if not activity[uid]["last_activity_time"] and created_at:
+            if created_at and created_at > activity[uid].get("last_activity_raw", ""):
+                activity[uid]["last_activity_raw"] = created_at
                 activity[uid]["last_activity_time"] = created_at[11:16] if len(created_at) >= 16 else created_at
             if not activity[uid]["last_message_preview"]:
                 msg = str(r.get("user_message") or r.get("xiaozhi_answer") or "")
                 if msg:
                     activity[uid]["last_message_preview"] = msg[:60]
+
+        for a in data.get("audio_queue", []):
+            created_at = str(a.get("created_at") or "")
+            if not (created_at.startswith(today_date)):
+                continue
+            uid = int(a.get("owner_id", 0))
+            if not uid:
+                continue
+            if uid not in activity:
+                activity[uid] = {
+                    "tools_count": 0,
+                    "youtube_count": 0,
+                    "tools_list": [],
+                    "last_tool": "",
+                    "last_song": "",
+                    "last_activity_time": "",
+                    "last_activity_raw": "",
+                    "last_message_preview": "",
+                }
+            activity[uid]["youtube_count"] += 1
+            if not activity[uid]["last_song"] and a.get("title"):
+                activity[uid]["last_song"] = str(a["title"])
+            if created_at and created_at > activity[uid].get("last_activity_raw", ""):
+                activity[uid]["last_activity_raw"] = created_at
+                activity[uid]["last_activity_time"] = created_at[11:16] if len(created_at) >= 16 else created_at
+
         return activity
+
+    def get_daily_activity_monitor(
+        self,
+        target_date: str = "",
+        owner_id: Optional[int] = None,
+        activity_type: str = "all",
+        search_query: str = "",
+        limit: int = 500,
+    ) -> Dict[str, Any]:
+        """Ambil detail aktivitas per hari (alat/tool yang dipanggil, lagu youtube yang diputar) di Base Store."""
+        import re
+        from datetime import datetime, timezone, timedelta
+
+        wib = timezone(timedelta(hours=7))
+        now_wib = datetime.now(wib)
+        if not target_date or not re.match(r"^\d{4}-\d{2}-\d{2}$", str(target_date).strip()):
+            target_date = now_wib.strftime("%Y-%m-%d")
+        else:
+            target_date = str(target_date).strip()
+
+        data = self._load()
+        users_map = {int(u["id"]): dict(u) for u in data.get("users", [])}
+        device_map: Dict[Any, str] = {}
+        user_devices_map: Dict[int, List[str]] = {}
+        for d in data.get("registered_devices", []):
+            uid = int(d["owner_id"]) if d.get("owner_id") is not None else None
+            mac = str(d.get("device_id") or "").strip().upper()
+            name = d.get("device_name") or d.get("device_type") or mac
+            if uid is not None:
+                device_map[(uid, mac)] = name
+                if uid not in user_devices_map:
+                    user_devices_map[uid] = []
+                display_dev = f"{name} ({mac})" if mac and mac not in name else name
+                if display_dev not in user_devices_map[uid]:
+                    user_devices_map[uid].append(display_dev)
+            if mac:
+                device_map[mac] = name
+
+        music_items: List[Dict[str, Any]] = []
+        for a in data.get("audio_queue", []):
+            created_at = str(a.get("created_at") or "")
+            if not created_at.startswith(target_date):
+                continue
+            uid = int(a.get("owner_id") or 0)
+            if owner_id and uid != int(owner_id):
+                continue
+            title = str(a.get("title") or "")
+            vid = str(a.get("video_id") or "")
+            if search_query and search_query.lower() not in title.lower() and search_query.lower() not in vid.lower():
+                continue
+            u = users_map.get(uid, {})
+            stream_url = str(a.get("stream_url") or "")
+            mac_match = re.search(r"[?&]mac=([0-9a-fA-F:_-]+)", stream_url)
+            mac_str = mac_match.group(1).upper() if mac_match else ""
+            dev_name = device_map.get((uid, mac_str)) or device_map.get(mac_str) or (mac_str if mac_str else "-")
+
+            music_items.append({
+                "id": f"music_{a.get('id', 0)}",
+                "raw_id": a.get("id", 0),
+                "category": "music",
+                "type": "music_stream",
+                "type_label": "Pemutaran Lagu",
+                "badge_color": "emerald",
+                "owner_id": uid,
+                "username": u.get("username", f"user-{uid}"),
+                "email": u.get("google_email", ""),
+                "title": title or "Lagu Tanpa Judul",
+                "video_id": vid,
+                "video_url": a.get("video_url") or (f"https://www.youtube.com/watch?v={vid}" if vid else ""),
+                "thumbnail_url": f"https://img.youtube.com/vi/{vid}/mqdefault.jpg" if vid else "",
+                "stream_url": stream_url,
+                "status": a.get("status") or "pending",
+                "device_mac": mac_str,
+                "device_name": dev_name,
+                "time_wib": created_at,
+                "time_short": created_at[11:19] if len(created_at) >= 19 else created_at,
+                "epoch": 0.0,
+            })
+
+        tool_items: List[Dict[str, Any]] = []
+        for c in data.get("chat_history", []):
+            created_at = str(c.get("created_at") or "")
+            if not created_at.startswith(target_date):
+                continue
+            tname = str(c.get("tool_name") or "").strip()
+            source = str(c.get("source") or "").strip()
+            if not tname and source != "mcp":
+                continue
+            uid = int(c.get("owner_id") or 0)
+            if owner_id and uid != int(owner_id):
+                continue
+            umsg = str(c.get("user_message") or "")
+            ans = str(c.get("xiaozhi_answer") or "")
+            if search_query and search_query.lower() not in umsg.lower() and search_query.lower() not in tname.lower() and search_query.lower() not in ans.lower():
+                continue
+            u = users_map.get(uid, {})
+            mac_str = str(c.get("device_mac") or "").strip().upper()
+            dev_name = device_map.get((uid, mac_str)) or device_map.get(mac_str) or (mac_str if mac_str else "-")
+            is_music_tool = any(m in tname.lower() for m in ["youtube", "playlist", "audio", "music", "playback"])
+
+            tool_items.append({
+                "id": f"tool_{c.get('id', 0)}",
+                "raw_id": c.get("id", 0),
+                "category": "tool",
+                "type": "music_tool" if is_music_tool else "tool_call",
+                "type_label": f"Tool: {tname}" if tname else "MCP Tool",
+                "badge_color": "sky" if is_music_tool else "amber",
+                "owner_id": uid,
+                "username": u.get("username", f"user-{uid}"),
+                "email": u.get("google_email", ""),
+                "tool_name": tname,
+                "source": source or "mcp",
+                "user_message": umsg,
+                "xiaozhi_answer": ans,
+                "device_mac": mac_str,
+                "device_name": dev_name,
+                "time_wib": created_at,
+                "time_short": created_at[11:19] if len(created_at) >= 19 else created_at,
+                "epoch": 0.0,
+            })
+
+        if activity_type == "music":
+            timeline = list(music_items)
+        elif activity_type == "tools":
+            timeline = list(tool_items)
+        else:
+            timeline = music_items + tool_items
+
+        user_stats_dict: Dict[int, Dict[str, Any]] = {}
+        tool_popularity: Dict[str, int] = {}
+        song_popularity: Dict[str, int] = {}
+
+        for m in music_items:
+            uid = m["owner_id"]
+            if uid not in user_stats_dict:
+                user_stats_dict[uid] = {
+                    "owner_id": uid,
+                    "username": m["username"],
+                    "email": m["email"],
+                    "music_count": 0,
+                    "tools_count": 0,
+                    "total_events": 0,
+                    "devices": list(user_devices_map.get(uid, [])),
+                    "last_active_time": m["time_short"],
+                    "recent_songs": [],
+                    "tools_called": {},
+                }
+            st = user_stats_dict[uid]
+            st["music_count"] += 1
+            st["total_events"] += 1
+            if m["title"] not in st["recent_songs"] and len(st["recent_songs"]) < 5:
+                st["recent_songs"].append(m["title"])
+            song_popularity[m["title"]] = song_popularity.get(m["title"], 0) + 1
+
+        for t in tool_items:
+            uid = t["owner_id"]
+            if uid not in user_stats_dict:
+                user_stats_dict[uid] = {
+                    "owner_id": uid,
+                    "username": t["username"],
+                    "email": t["email"],
+                    "music_count": 0,
+                    "tools_count": 0,
+                    "total_events": 0,
+                    "devices": list(user_devices_map.get(uid, [])),
+                    "last_active_time": t["time_short"],
+                    "recent_songs": [],
+                    "tools_called": {},
+                }
+            st = user_stats_dict[uid]
+            st["tools_count"] += 1
+            st["total_events"] += 1
+            tname = t["tool_name"] or "mcp"
+            st["tools_called"][tname] = st["tools_called"].get(tname, 0) + 1
+            tool_popularity[tname] = tool_popularity.get(tname, 0) + 1
+
+        user_summaries = list(user_stats_dict.values())
+        user_summaries.sort(key=lambda u: u["total_events"], reverse=True)
+
+        return {
+            "target_date": target_date,
+            "target_date_formatted": target_date,
+            "totals": {
+                "total_activities": len(timeline),
+                "total_music": len(music_items),
+                "total_tools": len(tool_items),
+                "active_users": len(user_summaries),
+            },
+            "user_summaries": user_summaries,
+            "timeline": timeline,
+            "popular_tools": [{"tool": k, "count": v} for k, v in sorted(tool_popularity.items(), key=lambda x: x[1], reverse=True)[:10]],
+            "popular_songs": [{"song": k, "count": v} for k, v in sorted(song_popularity.items(), key=lambda x: x[1], reverse=True)[:10]],
+            "users_list": [
+                {"id": u["id"], "username": u.get("username", f"user-{u['id']}")}
+                for u in sorted(users_map.values(), key=lambda x: str(x.get("username", "")))
+            ]
+        }
 
     # ── User Persona & Preferences ─────────────────────────────────────────
 
