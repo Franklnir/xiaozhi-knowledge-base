@@ -354,29 +354,9 @@ async def google_callback(
             set_session_cookie(redirect, request, user)
             return redirect
 
-        # Non-admin: MCP is mandatory!
-        if is_mcp_connected(user["id"]):
-            redirect = RedirectResponse(url="/dashboard", status_code=303)
-            set_session_cookie(redirect, request, user)
-            return redirect
-
-        # Non-admin without MCP: show gating card
-        token_info = store.get_xiaozhi_token_info(user["id"])
-        response = render(
-            request,
-            "login.html",
-            {
-                "user": user,
-                "error": None,
-                "success": f"Pendaftaran Google berhasil! Halo @{user['username']}, silakan masukkan dan hubungkan endpoint MCP untuk mengakses Dashboard.",
-                "active_mode": "mcp_gating",
-                "active_page": "login",
-                "mcp_pending": True,
-                "mcp_token_preview": token_info.get("preview", "") if token_info else "",
-            }
-        )
-        set_session_cookie(response, request, user)
-        return response
+        redirect = RedirectResponse(url="/dashboard", status_code=303)
+        set_session_cookie(redirect, request, user)
+        return redirect
 
     # ── Action: LOGIN DENGAN GOOGLE ────────────────────────────────────────
     # 1. Check if user exists by google_id
@@ -428,29 +408,9 @@ async def google_callback(
         set_session_cookie(redirect, request, user)
         return redirect
 
-    # Non-admin: check MCP connection
-    if is_mcp_connected(user["id"]):
-        redirect = RedirectResponse(url="/dashboard", status_code=303)
-        set_session_cookie(redirect, request, user)
-        return redirect
-
-    # Non-admin without MCP: show gating card
-    token_info = store.get_xiaozhi_token_info(user["id"])
-    response = render(
-        request,
-        "login.html",
-        {
-            "user": user,
-            "error": None,
-            "success": f"Masuk sebagai @{user['username']} berhasil! Silakan masukkan dan hubungkan endpoint MCP untuk mengakses Dashboard.",
-            "active_mode": "mcp_gating",
-            "active_page": "login",
-            "mcp_pending": True,
-            "mcp_token_preview": token_info.get("preview", "") if token_info else "",
-        }
-    )
-    set_session_cookie(response, request, user)
-    return response
+    redirect = RedirectResponse(url="/dashboard", status_code=303)
+    set_session_cookie(redirect, request, user)
+    return redirect
 
 
 @router.post("/unlink")

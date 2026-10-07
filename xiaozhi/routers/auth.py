@@ -108,29 +108,9 @@ async def login_post(
                 except Exception:
                     pass
 
-            # Admin always bypasses MCP gating
-            if role == "admin" or is_mcp_connected(user["id"]):
-                redirect = RedirectResponse(url="/admin" if role == "admin" else "/dashboard", status_code=303)
-                set_session_cookie(redirect, request, user)
-                return redirect
-
-            # If user has not connected MCP, show MCP gating panel
-            token_info = store.get_xiaozhi_token_info(user["id"])
-            response = render(
-                request,
-                "login.html",
-                {
-                    "user": user,
-                    "error": None,
-                    "success": "Sesi aktif. Masukkan endpoint WebSocket MCP untuk melanjutkan ke Dashboard.",
-                    "active_mode": "mcp_gating",
-                    "active_page": "login",
-                    "mcp_pending": True,
-                    "mcp_token_preview": token_info.get("preview", "") if token_info else "",
-                }
-            )
-            set_session_cookie(response, request, user)
-            return response
+            redirect = RedirectResponse(url="/admin" if role == "admin" else "/dashboard", status_code=303)
+            set_session_cookie(redirect, request, user)
+            return redirect
 
         return render(
             request,

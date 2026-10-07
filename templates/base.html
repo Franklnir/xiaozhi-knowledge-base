@@ -1420,10 +1420,11 @@
     </style>
     <script src="/static/js/app.js"></script>
 </head>
-{% set page = active_page|default('') %}
+{% set page = active_page|default(page|default('')) %}
 {% set is_admin_page = (page.startswith('admin') or (request and request.url.path.startswith('/admin'))) %}
-{% set is_mcp_unlocked_page = (page in ['dashboard', 'dashboard_materi', 'chat', 'documentation', 'login', 'register', 'profile', 'admin', 'admin_mcp', 'admin_analytics', 'web_flasher', 'marketplace', 'marketplace_chats', '']) %}
-{% set show_mcp_block_overlay = (user and user.role != 'admin' and (mcp_required is not defined or mcp_required) and not mcp_connected and not is_mcp_unlocked_page) %}
+{% set is_doc_page = (page in ['documentation', 'dokumentasi'] or (request and (request.url.path.startswith('/dokumentasi') or request.url.path.startswith('/documentation')))) %}
+{% set is_auth_page = (page in ['login', 'register', 'forgot_password', 'reset_password'] or (request and (request.url.path.startswith('/login') or request.url.path.startswith('/register') or request.url.path.startswith('/logout') or request.url.path.startswith('/auth/')))) %}
+{% set show_mcp_block_overlay = (user and user.role != 'admin' and not mcp_connected and not is_doc_page and not is_auth_page) %}
 <body class="{% if is_admin_page %}is-admin-page{% endif %}">
     {% if show_mcp_block_overlay %}
     <!-- Blocking Overlay: MCP Connection Required -->
@@ -1439,17 +1440,17 @@
 
             <!-- Compact Badge -->
             <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:#fef3c7; color:#92400e; border:2px solid #d97706; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:12px;">
-                <span>⚠️</span> KONEKSI MCP DIPERLUKAN
+                <span>⚠️</span> KONEKSI MCP WAJIB
             </div>
 
             <!-- Header -->
-            <h2 id="mcpModalTitle" style="font-size:21px; font-weight:900; color:var(--app-text); margin:0 0 8px; line-height:1.3;">
-                Akses Dibatasi — Hubungkan MCP
+            <h2 id="mcpModalTitle" style="font-size:22px; font-weight:900; color:var(--app-text); margin:0 0 8px; line-height:1.3;">
+                Wajib Hubungkan MCP XiaoZhi
             </h2>
 
             <!-- Concise & Direct Instruction -->
             <p style="font-size:13.5px; line-height:1.55; color:var(--app-muted); margin:0 0 16px;">
-                Salin endpoint MCP milik Anda di <a href="https://xiaozhi.me" target="_blank" rel="noopener noreferrer" style="color:var(--app-primary, #047857); font-weight:800; text-decoration:underline;">xiaozhi.me ↗</a> lalu tempelkan di bawah ini:
+                Untuk dapat mengakses semua fitur dan menu XiaoZhi AI, Anda wajib menghubungkan endpoint MCP terlebih dahulu. Salin endpoint atau token MCP Anda di <a href="https://xiaozhi.me" target="_blank" rel="noopener noreferrer" style="color:var(--app-primary, #047857); font-weight:800; text-decoration:underline;">xiaozhi.me ↗</a> lalu tempelkan di bawah ini:
             </p>
 
             <!-- Direct MCP Input Area -->
@@ -1460,7 +1461,7 @@
                             type="text" 
                             id="reqOverlayMcpInput" 
                             class="app-input" 
-                            placeholder="wss://api.xiaozhi.me/mcp/?token=..." 
+                            placeholder="wss://api.xiaozhi.me/mcp/?token=... atau tempel token" 
                             style="width:100%; font-family:monospace; font-size:12.5px; padding-right:42px; box-sizing:border-box;"
                             onkeydown="if(event.key==='Enter') window.submitMcpDirect('reqOverlay')"
                         >
@@ -1479,7 +1480,7 @@
                         id="reqOverlaySubmitBtn" 
                         onclick="window.submitMcpDirect('reqOverlay')" 
                         class="app-button app-button-primary" 
-                        style="width:100%; font-size:14px; font-weight:800; padding:11px 18px; justify-content:center; border:2px solid #111827; box-shadow:3px 3px 0 #111827;"
+                        style="width:100%; font-size:14px; font-weight:800; padding:11px 18px; justify-content:center; border:2px solid #111827; box-shadow:3px 3px 0 #111827; background:#047857; color:#fff;"
                     >
                         ⚡ Hubungkan Sekarang
                     </button>
@@ -1497,16 +1498,13 @@
                 </div>
             </div>
 
-            <!-- Secondary Navigation Links -->
-            <div style="display:flex; gap:8px; justify-content:center; margin-top:6px;">
-                <a href="/dashboard" class="app-button" style="flex:1; font-size:12.5px; font-weight:700; padding:8px 12px; text-decoration:none; justify-content:center; border:1.5px solid var(--app-border-strong);">
-                    🏠 Dashboard
+            <!-- Action Navigation Links -->
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:8px;">
+                <a href="/dokumentasi" class="app-button" style="flex:2; font-size:13px; font-weight:800; padding:9px 14px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); background:var(--app-surface-muted);">
+                    📖 Buka Panduan di Dokumentasi
                 </a>
-                <a href="/dokumentasi" class="app-button" style="flex:1; font-size:12.5px; font-weight:700; padding:8px 12px; text-decoration:none; justify-content:center; border:1.5px solid var(--app-border-strong);">
-                    📖 Dokumentasi
-                </a>
-                <a href="/profil" class="app-button" style="flex:1; font-size:12.5px; font-weight:700; padding:8px 12px; text-decoration:none; justify-content:center; border:1.5px solid var(--app-border-strong);">
-                    👤 Profil Saya
+                <a href="/logout" class="app-button" style="flex:1; font-size:13px; font-weight:700; padding:9px 14px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); color:#dc2626;">
+                    🚪 Keluar
                 </a>
             </div>
         </div>
@@ -1677,12 +1675,12 @@
                 </div>
                 <span id="navChatBadge" style="display:none;background:#ef4444;color:#ffffff;font-size:10.5px;font-weight:900;padding:2px 7px;border-radius:999px;box-shadow:0 0 8px rgba(239,68,68,0.6);border:1.5px solid #000;">0</span>
             </a>
-            <a href="/relay-nyata" class="app-sidebar-link {% if page in ['relay_nyata', 'smarthome'] or active_page in ['relay_nyata', 'smarthome'] %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Relay Nyata')" {% endif %}>
+            <a href="/relay-nyata" class="app-sidebar-link {% if page in ['relay_nyata', 'smarthome'] or active_page in ['relay_nyata', 'smarthome'] %}is-active{% endif %}">
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
                 Relay Nyata
                 {% if user and user.role != 'admin' and not mcp_connected %}<span class="app-mcp-lock-badge">🔒 Perlu MCP</span>{% endif %}
             </a>
-            <a href="/riwayat-chat" class="app-sidebar-link {% if page == 'chat_history' %}is-active{% endif %}" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Riwayat Chat')" {% endif %}>
+            <a href="/riwayat-chat" class="app-sidebar-link {% if page == 'chat_history' %}is-active{% endif %}">
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
                 Riwayat Chat
                 {% if user and user.role != 'admin' and not mcp_connected %}<span class="app-mcp-lock-badge">🔒 Perlu MCP</span>{% endif %}
@@ -1903,16 +1901,24 @@
             const coreIcon = document.getElementById(prefix + 'CoreIcon');
 
             if (errorEl) { errorEl.style.display = 'none'; errorEl.textContent = ''; }
-            const token = (input ? input.value : '').trim();
+            let token = (input ? input.value : '').trim();
             if (!token) {
-                if (errorEl) { errorEl.textContent = 'Harap tempelkan endpoint MCP Anda.'; errorEl.style.display = 'block'; }
+                if (errorEl) { errorEl.textContent = 'Harap tempelkan endpoint atau token MCP Anda.'; errorEl.style.display = 'block'; }
                 if (input) input.focus();
                 return;
             }
             if (!token.startsWith('wss://')) {
-                if (errorEl) { errorEl.textContent = 'Endpoint MCP harus diawali dengan wss://'; errorEl.style.display = 'block'; }
-                if (input) input.focus();
-                return;
+                if (token.startsWith('http://') || token.startsWith('https://')) {
+                    token = token.replace(/^https?:\/\//, 'wss://');
+                } else if (token.includes('api.xiaozhi.me')) {
+                    token = 'wss://' + token.replace(/^\/+/, '');
+                } else if (/^[a-zA-Z0-9_\-\.]{8,}$/.test(token)) {
+                    token = 'wss://api.xiaozhi.me/mcp/?token=' + encodeURIComponent(token);
+                } else {
+                    if (errorEl) { errorEl.textContent = 'Format endpoint tidak valid. Contoh: wss://api.xiaozhi.me/mcp/?token=...'; errorEl.style.display = 'block'; }
+                    if (input) input.focus();
+                    return;
+                }
             }
 
             // Start Connecting Animation
