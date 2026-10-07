@@ -51,6 +51,11 @@ def test_mcp_overlay_gating_behavior():
     assert res_doc.status_code == 200
     assert "id=\"mcpRequiredOverlay\"" not in res_doc.text
 
+    # Access /web-flasher without MCP connection -> MUST NOT show mcpRequiredOverlay
+    res_flasher = client.get("/web-flasher", cookies={SESSION_COOKIE: user_token})
+    assert res_flasher.status_code == 200
+    assert "id=\"mcpRequiredOverlay\"" not in res_flasher.text
+
     # 2. Admin user without MCP connection -> MUST NOT show mcpRequiredOverlay
     admin_user = store.ensure_admin_user("overlay_admin", "password123")
     admin_token = session_serializer.dumps({

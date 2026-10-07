@@ -1423,8 +1423,9 @@
 {% set page = active_page|default(page|default('')) %}
 {% set is_admin_page = (page.startswith('admin') or (request and request.url.path.startswith('/admin'))) %}
 {% set is_doc_page = (page in ['documentation', 'dokumentasi'] or (request and (request.url.path.startswith('/dokumentasi') or request.url.path.startswith('/documentation')))) %}
+{% set is_flasher_page = (page in ['web_flasher', 'flasher'] or (request and request.url.path.startswith('/web-flasher'))) %}
 {% set is_auth_page = (page in ['login', 'register', 'forgot_password', 'reset_password'] or (request and (request.url.path.startswith('/login') or request.url.path.startswith('/register') or request.url.path.startswith('/logout') or request.url.path.startswith('/auth/')))) %}
-{% set show_mcp_block_overlay = (user and user.role != 'admin' and not mcp_connected and not is_doc_page and not is_auth_page) %}
+{% set show_mcp_block_overlay = (user and user.role != 'admin' and not mcp_connected and not is_doc_page and not is_flasher_page and not is_auth_page) %}
 <body class="{% if is_admin_page %}is-admin-page{% endif %}">
     {% if show_mcp_block_overlay %}
     <!-- Blocking Overlay: MCP Connection Required -->
@@ -1499,11 +1500,14 @@
             </div>
 
             <!-- Action Navigation Links -->
-            <div style="display:flex; gap:10px; justify-content:center; margin-top:8px;">
-                <a href="/dokumentasi" class="app-button" style="flex:2; font-size:13px; font-weight:800; padding:9px 14px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); background:var(--app-surface-muted);">
-                    📖 Buka Panduan di Dokumentasi
+            <div style="display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap;">
+                <a href="/dokumentasi" class="app-button" style="flex:1; min-width:130px; font-size:12.5px; font-weight:800; padding:9px 12px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); background:var(--app-surface-muted);">
+                    📖 Dokumentasi
                 </a>
-                <a href="/logout" class="app-button" style="flex:1; font-size:13px; font-weight:700; padding:9px 14px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); color:#dc2626;">
+                <a href="/web-flasher" class="app-button" style="flex:1; min-width:130px; font-size:12.5px; font-weight:800; padding:9px 12px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); background:var(--app-surface-muted);">
+                    ⚡ Web Flasher
+                </a>
+                <a href="/logout" class="app-button" style="font-size:12.5px; font-weight:700; padding:9px 14px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); color:#dc2626;">
                     🚪 Keluar
                 </a>
             </div>
