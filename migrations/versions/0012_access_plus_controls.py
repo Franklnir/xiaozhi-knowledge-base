@@ -1,7 +1,7 @@
-"""0011_access_plus_controls
+"""0012_access_plus_controls
 
-Revision ID: 0011_access_plus_controls
-Revises: 0010_slot_board_mac_binding
+Revision ID: 0012_access_plus_controls
+Revises: 0011_add_rls_tenant_role
 Create Date: 2026-10-07 18:00:00.000000
 
 """
@@ -11,8 +11,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '0011_access_plus_controls'
-down_revision: Union[str, None] = '0010_slot_board_mac_binding'
+revision: str = '0012_access_plus_controls'
+down_revision: Union[str, None] = '0011_add_rls_tenant_role'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
