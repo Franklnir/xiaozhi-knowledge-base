@@ -314,7 +314,7 @@ async def admin_mcp_monitor(request: Request):
 async def admin_activity_monitor_page(
     request: Request,
     date: str = "",
-    user_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     type: str = "all",
     q: str = "",
 ):
@@ -322,13 +322,19 @@ async def admin_activity_monitor_page(
     admin = require_admin(request)
     store = get_store()
 
+    clean_uid: Optional[int] = None
+    if user_id:
+        uid_str = str(user_id).strip()
+        if uid_str.isdigit():
+            clean_uid = int(uid_str)
+
     wib = timezone(timedelta(hours=7))
     now_wib = datetime.now(wib)
     clean_date = date.strip() if date and re.match(r"^\d{4}-\d{2}-\d{2}$", date.strip()) else now_wib.strftime("%Y-%m-%d")
 
     monitor_data = store.get_daily_activity_monitor(
         target_date=clean_date,
-        owner_id=user_id,
+        owner_id=clean_uid,
         activity_type=type,
         search_query=q,
     )
@@ -340,7 +346,7 @@ async def admin_activity_monitor_page(
             "user": admin,
             "csrf_token": make_csrf_token(admin),
             "target_date": clean_date,
-            "selected_user_id": user_id,
+            "selected_user_id": clean_uid,
             "selected_type": type,
             "search_query": q,
             "monitor": monitor_data,
@@ -355,7 +361,7 @@ async def admin_activity_monitor_page(
 async def admin_api_activity_monitor(
     request: Request,
     date: str = "",
-    user_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     type: str = "all",
     q: str = "",
 ):
@@ -363,13 +369,19 @@ async def admin_api_activity_monitor(
     require_admin(request)
     store = get_store()
 
+    clean_uid: Optional[int] = None
+    if user_id:
+        uid_str = str(user_id).strip()
+        if uid_str.isdigit():
+            clean_uid = int(uid_str)
+
     wib = timezone(timedelta(hours=7))
     now_wib = datetime.now(wib)
     clean_date = date.strip() if date and re.match(r"^\d{4}-\d{2}-\d{2}$", date.strip()) else now_wib.strftime("%Y-%m-%d")
 
     monitor_data = store.get_daily_activity_monitor(
         target_date=clean_date,
-        owner_id=user_id,
+        owner_id=clean_uid,
         activity_type=type,
         search_query=q,
     )
