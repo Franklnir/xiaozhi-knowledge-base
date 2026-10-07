@@ -2,9 +2,9 @@
 
 {% block title %}Web Flasher ESP32 Online - Flash Firmware Xiaozhi dari Browser | xiaozhiscig{% endblock %}
 {% block meta_title %}Web Flasher ESP32 Online - Flash Firmware Xiaozhi dari Browser | xiaozhiscig{% endblock %}
-{% block meta_desc %}Flash firmware Xiaozhi ESP32-C3, ESP32-S3, dan ESP32 Audio langsung dari browser via Web Serial API USB OTG tanpa instal driver. Cepat, aman, dan otomatis.{% endblock %}
+{% block meta_desc %}Flash firmware Xiaozhi ESP32-C3, ESP32-S3, dan ESP32 Audio langsung dari peramban PC/Laptop via Web Serial API tanpa instal driver. Cepat, aman, dan otomatis.{% endblock %}
 {% block og_title %}Web Flasher ESP32 Online - Flash Firmware Xiaozhi dari Browser | xiaozhiscig{% endblock %}
-{% block og_desc %}Flash firmware Xiaozhi ESP32 langsung dari browser via Web Serial API. Dukungan Android OTG & Desktop PC.{% endblock %}
+{% block og_desc %}Flash firmware Xiaozhi ESP32 langsung dari peramban PC / Laptop via Web Serial API.{% endblock %}
 {% block tw_title %}Web Flasher ESP32 Online - Flash Firmware Xiaozhi dari Browser | xiaozhiscig{% endblock %}
 {% block tw_desc %}Flash firmware Xiaozhi ESP32 langsung dari browser via Web Serial API. Cepat dan praktis tanpa tools tambahan.{% endblock %}
 
@@ -16,7 +16,7 @@
   "@type": "WebApplication",
   "name": "Web Serial Flasher ESP32 Xiaozhi",
   "applicationCategory": "UtilitiesApplication",
-  "operatingSystem": "Web, Android (Chrome/OTG), Windows, macOS, Linux",
+  "operatingSystem": "Web, Windows, macOS, Linux",
   "url": "https://xiaozhiscig.biz.id/web-flasher",
   "description": "Alat flash firmware ESP32 online langsung dari browser Google Chrome/Edge melalui Web Serial API untuk peranti Xiaozhi AI Voice Assistant.",
   "offers": {
@@ -248,7 +248,7 @@
             <p class="app-subtitle">Flash firmware binary langsung ke peranti ESP32 via peramban Web Serial API tanpa perlu instalasi driver atau tools Python.</p>
             <div style="display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap;">
                 <span class="app-chip app-chip-success" style="font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
-                    <span>📱</span> Android OTG &amp; <span>💻</span> Desktop Ready
+                    <span>💻</span> PC / Laptop Browser Ready
                 </span>
                 <span id="wakeLockBadge" class="app-chip app-chip-info" style="font-size:11px; font-weight:800; display:none; align-items:center; gap:4px;">
                     <span>🛡️</span> Screen Keep-Awake Aktif
@@ -274,7 +274,7 @@
                         <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
                             <span>🔌</span> 1. Koneksi Port Serial (COM)
                         </h2>
-                        <p class="app-section-subtitle">Sambungkan kabel USB ESP32 ke Komputer PC/Laptop atau HP Android (via kabel OTG).</p>
+                        <p class="app-section-subtitle">Sambungkan kabel data USB ESP32 ke Komputer PC atau Laptop.</p>
                     </div>
                     <span class="app-chip app-chip-info" style="font-size:11px;">Web Serial API</span>
                 </div>
@@ -304,10 +304,9 @@
 
                 <!-- Disconnected Notice & Driver Helpers -->
                 <div id="connNotice" style="margin-top:14px; padding:12px 14px; background:var(--app-surface-muted); border:1px dashed var(--app-border-strong); border-radius:var(--app-radius); font-size:12px; color:var(--app-muted); line-height:1.5;">
-                    💡 <strong>Tips Deteksi Port (Desktop &amp; Mobile):</strong>
+                    💡 <strong>Tips Deteksi Port (PC / Laptop):</strong>
                     <ul style="margin:4px 0 0; padding-left:18px; display:grid; gap:4px;">
                         <li><strong>💻 Port COM tidak muncul di daftar pop-up?</strong> Pastikan kabel USB adalah <strong>kabel data</strong> (bukan hanya charger 2 pin), atau unduh driver USB: <a href="https://www.wch.cn/downloads/CH341SER_EXE.html" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CH340 / CH9102 ↗</a> atau <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CP210x ↗</a>.</li>
-                        <li><strong>📱 HP Android:</strong> Sambungkan ESP32 via kabel / adapter <strong>USB OTG</strong>. Saat muncul pop-up izin USB browser, pilih <em>Izinkan / OK</em>.</li>
                         <li><strong>🔧 Mode Bootloader:</strong> Jika port gagal sync/koneksi, tahan tombol <strong>BOOT (GPIO 0)</strong> di board ESP32, tekan tombol <strong>RST/EN</strong> 1x, lalu lepas tombol BOOT sebelum klik tombol Hubungkan.</li>
                     </ul>
                 </div>
@@ -604,8 +603,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 </div>
                 <ul style="padding-left:18px; margin:0; display:grid; gap:4px;">
                     <li>Gunakan <strong>Preset Resmi (ESP32-S3)</strong> dengan offset <strong>0x0</strong> untuk peranti yang masih baru.</li>
-                    <li><strong>💻 Desktop:</strong> Gunakan peramban Chromium (Google Chrome, Microsoft Edge, Opera, Brave).</li>
-                    <li><strong>📱 Mobile:</strong> Flashing langsung via HP Android dengan kabel USB OTG (Screen Keep-Awake otomatis aktif).</li>
+                    <li><strong>💻 Peramban:</strong> Gunakan peramban Chromium di PC/Laptop (Google Chrome, Microsoft Edge, Opera, Brave).</li>
                     <li>Pastikan kabel USB mendukung transfer data (bukan sekadar kabel charging biasa).</li>
                     <li>Panduan lengkap pinout layar/audio dapat dibuka lewat tombol panduan di dalam panel Preset.</li>
                 </ul>
@@ -721,7 +719,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 <div style="padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--app-radius); color:#1e3a8a;">
                     <strong>📶 Konfigurasi Wi-Fi Awal Setelah Flashing:</strong>
                     <p style="margin:4px 0 0; font-size:12px;">
-                        Setelah chip restart, sambungkan HP/Laptop ke hotspot Wi-Fi <strong>Xiaozhi-XXXX</strong>. Buka browser ke <strong>192.168.4.1</strong> untuk menyambungkan asisten suara ke Wi-Fi rumah/kantor Anda dan memilih tipe layar Anda di portal Wi-Fi.
+                        Setelah chip restart, sambungkan perangkat Anda ke hotspot Wi-Fi <strong>Xiaozhi-XXXX</strong>. Buka browser ke <strong>192.168.4.1</strong> untuk menyambungkan asisten suara ke Wi-Fi rumah/kantor Anda dan memilih tipe layar Anda di portal Wi-Fi.
                     </p>
                 </div>
             </div>
@@ -778,7 +776,6 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 <script type="module">
     import { ESPLoader, Transport } from '/static/js/esptool-bundle.js';
-    import { serial as polyfillSerial } from '/static/js/serial-polyfill.js';
 
     // Check if running inside Hugging Face Spaces iframe
     if (window.self !== window.top) {
@@ -806,20 +803,15 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         activeVersion: "{{ preset_status.active_version if preset_status and preset_status.active_version else 'v001' }}"
     };
 
-    // Multi-platform Serial Resolver (Desktop & Android OTG WebUSB)
+    // Web Serial API Resolver (PC / Laptop Chromium)
     function getSerialApi() {
-        if (typeof navigator !== 'undefined') {
-            if ('serial' in navigator && navigator.serial) {
-                return { api: navigator.serial, mode: 'Native (Desktop/Android)' };
-            }
-            if (polyfillSerial) {
-                return { api: polyfillSerial, mode: 'WebUSB Polyfill (Mobile OTG)' };
-            }
+        if (typeof navigator !== 'undefined' && 'serial' in navigator && navigator.serial) {
+            return { api: navigator.serial, mode: 'Native Web Serial' };
         }
         return null;
     }
 
-    // Screen Wake Lock API for Mobile (mencegah layar HP mati/sleep di tengah flashing)
+    // Screen Wake Lock API (mencegah layar monitor mati/sleep di tengah flashing)
     let wakeLock = null;
     async function requestScreenWakeLock() {
         if ('wakeLock' in navigator) {
@@ -827,7 +819,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 wakeLock = await navigator.wakeLock.request('screen');
                 const b = document.getElementById('wakeLockBadge');
                 if (b) b.style.display = 'inline-flex';
-                logToConsole('[INFO] Screen Wake Lock aktif: Layar HP/laptop dijaga tetap menyala selama proses transfer.');
+                logToConsole('[INFO] Screen Wake Lock aktif: Layar monitor dijaga tetap menyala selama proses transfer.');
             } catch (e) {
                 console.warn('Wake Lock request:', e);
             }
@@ -1513,15 +1505,11 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         });
     }
 
-    // Connect Web Serial Port (Desktop & Mobile)
+    // Connect Web Serial Port (PC / Laptop Chromium)
     btnConnect.addEventListener('click', async () => {
         const serialObj = getSerialApi();
         if (!serialObj || !serialObj.api) {
-            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                alert('Perangkat iOS (iPhone / iPad) tidak mengizinkan akses hardware USB Serial di peramban web karena kebijakan sistem Apple.\n\nSilakan gunakan HP Android (Google Chrome dengan kabel USB OTG) atau Laptop/PC (Chrome/Edge).');
-            } else {
-                alert('Browser ini tidak mendukung Web Serial atau WebUSB.\n\nHarap gunakan:\n- HP Android: Google Chrome (dengan kabel USB OTG)\n- PC / Laptop: Google Chrome, MS Edge, Opera, atau Brave.');
-            }
+            alert('Browser ini tidak mendukung Web Serial API.\n\nHarap buka Web Flasher di Komputer PC atau Laptop menggunakan peramban:\n- Google Chrome\n- Microsoft Edge\n- Opera\n- Brave Browser');
             return;
         }
 
@@ -1639,7 +1627,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         progressPercent.textContent = '0%';
         progressStatusText.textContent = 'Memulai proses flashing...';
 
-        // Aktifkan WakeLock agar HP tidak sleep
+        // Aktifkan WakeLock agar layar tidak sleep
         await requestScreenWakeLock();
         if (window.innerWidth <= 768) {
             progressBar.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1730,7 +1718,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 updateFlashButtonState();
             }
 
-            alert('Flashing Berhasil 100%! Seluruh binary firmware (9.2 MB) berhasil ditulis ke ESP32 dan chip telah di-reboot.\n\nJika ini board baru, sambungkan HP/laptop ke Wi-Fi "Xiaozhi-XXXX" lalu buka 192.168.4.1 untuk konfigurasi Wi-Fi awal.');
+            alert('Flashing Berhasil 100%! Seluruh binary firmware (9.2 MB) berhasil ditulis ke ESP32 dan chip telah di-reboot.\n\nJika ini board baru, sambungkan perangkat ke Wi-Fi "Xiaozhi-XXXX" lalu buka 192.168.4.1 untuk konfigurasi Wi-Fi awal.');
 
         } catch (err) {
             logToConsole(`[ERROR] Flashing gagal: ${err.message}`);
@@ -1768,7 +1756,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
     }
 
     if (typeof navigator !== 'undefined' && 'serial' in navigator) {
-        // Deteksi Realtime saat kabel USB dicolokkan ke laptop/PC/HP OTG
+        // Deteksi Realtime saat kabel USB dicolokkan ke laptop/PC
         navigator.serial.addEventListener('connect', (event) => {
             const dev = identifyUsbDevice(event.port);
             logToConsole(`⚡ [DETEKSI USB] Perangkat USB baru dicolokkan: ${dev}`);

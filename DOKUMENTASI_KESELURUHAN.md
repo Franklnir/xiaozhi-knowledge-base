@@ -1500,8 +1500,8 @@ Setelah pembayaran berhasil diverifikasi oleh admin, lisensi preset firmware aka
 #### Q: Bagaimana cara melakukan flash Preset Firmware ke board ESP32?
 **Jawaban:**
 Proses flashing dilakukan sangat mudah dan instan langsung dari peramban (browser) tanpa instalasi aplikasi tambahan:
-1. Buka menu **Web Flasher** (`/web-flasher`) menggunakan browser **Google Chrome** atau **Microsoft Edge** di PC/Laptop (atau ponsel Android via kabel USB OTG).
-2. Sambungkan board ESP32 ke komputer/ponsel menggunakan kabel data USB Type-C berkualitas.
+1. Buka menu **Web Flasher** (`/web-flasher`) menggunakan browser **Google Chrome** atau **Microsoft Edge** di PC/Laptop.
+2. Sambungkan board ESP32 ke komputer PC/Laptop menggunakan kabel data USB Type-C berkualitas.
 3. Pada halaman Web Flasher, pilih tab **"🎯 Preset Firmware (ESP32-S3 / C3)"**.
 4. Pilih preset resmi yang telah diaktifkan pada akun Anda (atau masukkan kode klaim lisensi), lalu **pilih versi firmware yang diinginkan** (tersedia opsi versi terbaru maupun arsip versi sebelumnya lengkap dengan catatan rilis changelog). Seluruh versi dilindungi enkripsi AES-256 dan verifikasi otomatis hash SHA-256 sebelum ditulis ke memori chip.
 5. Klik tombol **"⚡ Muat Preset Ini ke Flasher"**.
