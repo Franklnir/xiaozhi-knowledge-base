@@ -313,10 +313,13 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            min-width: 0;
+            max-width: calc(100vw - var(--sidebar-width));
         }
         .app-main-wrapper.is-guest {
             margin-left: 0;
             padding-top: 60px;
+            max-width: 100vw;
         }
         .app-main {
             flex: 1;
@@ -324,6 +327,8 @@
             padding-bottom: 40px;
             max-width: var(--app-wide-max);
             width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
         }
         .app-main.is-guest {
             max-width: var(--app-normal-max);

@@ -3,39 +3,87 @@
 {% block content %}
 <style>
     /* Activity Monitor Specific Styles */
+    .app-page {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
     .monitor-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
         flex-wrap: wrap;
         gap: 16px;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
+        width: 100%;
+        min-width: 0;
+    }
+    .monitor-title-group {
+        min-width: 0;
+        max-width: 100%;
+        flex: 1 1 300px;
     }
     .monitor-title-group h1 {
-        font-size: 26px;
+        font-size: clamp(20px, 2.2vw, 26px);
         font-weight: 900;
         letter-spacing: -0.5px;
         margin: 4px 0 6px 0;
         color: var(--app-text);
+        word-break: break-word;
     }
     .monitor-filter-card {
         background: var(--app-surface);
         border: 2px solid var(--app-border-strong, #1e293b);
         border-radius: 14px;
         box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.8);
-        padding: 18px 20px;
+        padding: 16px 18px;
         margin-bottom: 24px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        min-width: 0;
     }
     .filter-grid {
-        display: grid;
-        grid-template-columns: auto auto 1fr auto;
+        display: flex;
+        flex-wrap: wrap;
         gap: 14px;
-        align-items: center;
+        align-items: flex-end;
+        width: 100%;
+        min-width: 0;
     }
-    @media (max-width: 900px) {
-        .filter-grid {
-            grid-template-columns: 1fr;
-        }
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+    }
+    .filter-pill {
+        padding: 5px 12px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1.5px solid var(--app-border, #cbd5e1);
+        background: var(--app-surface, #ffffff);
+        color: var(--app-muted, #475569);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        user-select: none;
+    }
+    .filter-pill:hover {
+        background: var(--app-soft, #f1f5f9);
+        border-color: #cbd5e1;
+        color: var(--app-text, #0f172a);
+    }
+    .filter-pill.active {
+        background: #0f172a;
+        color: #ffffff !important;
+        border-color: #0f172a;
+        box-shadow: 0 2px 5px rgba(15, 23, 42, 0.15);
     }
     .stat-badge {
         display: inline-flex;
@@ -61,6 +109,14 @@
         color: #b45309;
         border: 1px solid #f59e0b;
     }
+    .user-summaries-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+        gap: 14px;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
     .user-pill-card {
         background: var(--app-surface);
         border: 1.5px solid var(--app-border-strong, #334155);
@@ -68,6 +124,10 @@
         padding: 12px 14px;
         transition: transform 0.15s, box-shadow 0.15s;
         cursor: pointer;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
     }
     .user-pill-card:hover {
         transform: translateY(-2px);
@@ -82,16 +142,24 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
     }
     .activity-card {
         display: flex;
-        gap: 16px;
+        gap: 14px;
         padding: 14px 18px;
         background: var(--app-surface);
         border: 1.5px solid var(--app-border-strong, #e2e8f0);
         border-radius: 12px;
         transition: all 0.2s ease;
         position: relative;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        min-width: 0;
+        overflow: hidden;
     }
     .activity-card:hover {
         border-color: #0f172a;
@@ -105,8 +173,8 @@
     }
     .yt-thumb-box {
         position: relative;
-        width: 100px;
-        height: 62px;
+        width: 88px;
+        height: 55px;
         border-radius: 8px;
         overflow: hidden;
         background: #0f172a;
@@ -129,8 +197,8 @@
         transition: opacity 0.2s;
     }
     .yt-thumb-play-icon svg {
-        width: 24px;
-        height: 24px;
+        width: 22px;
+        height: 22px;
         fill: #ffffff;
     }
     .activity-card:hover .yt-thumb-play-icon {
@@ -147,6 +215,7 @@
         font-weight: 800;
         letter-spacing: 0.3px;
         text-transform: uppercase;
+        white-space: nowrap;
     }
     .type-pill-music {
         background: #dcfce7;
@@ -158,11 +227,11 @@
     }
     .time-badge {
         font-family: monospace;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
         background: #f1f5f9;
         color: #334155;
-        padding: 3px 8px;
+        padding: 2px 7px;
         border-radius: 6px;
         white-space: nowrap;
         border: 1px solid #cbd5e1;
@@ -172,6 +241,7 @@
         display: inline-block;
         width: 44px;
         height: 24px;
+        flex-shrink: 0;
     }
     .toggle-switch input { opacity: 0; width: 0; height: 0; }
     .toggle-slider {
@@ -198,19 +268,6 @@
     }
     input:checked + .toggle-slider:before {
         transform: translateX(20px);
-    }
-    .code-accordion {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 8px 12px;
-        font-family: monospace;
-        font-size: 12px;
-        margin-top: 6px;
-        max-height: 180px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-        word-break: break-word;
     }
 </style>
 
@@ -254,19 +311,19 @@
         <form method="GET" action="/admin/activity-monitor" id="filterForm">
             <div class="filter-grid">
                 <!-- Date Selector -->
-                <div style="display:flex; flex-direction:column; gap:6px;">
+                <div class="filter-item" style="flex: 1 1 240px;">
                     <label style="font-size:11.5px; font-weight:900; text-transform:uppercase; color:var(--app-muted);">Pilih Tanggal</label>
-                    <div style="display:flex; gap:6px; align-items:center;">
-                        <input type="date" name="date" id="dateInput" value="{{ target_date }}" class="app-input" style="font-size:13px; padding:6px 10px; font-weight:700; width:150px;" onchange="submitFilter()">
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <input type="date" name="date" id="dateInput" value="{{ target_date }}" class="app-input" style="font-size:13px; padding:6px 10px; font-weight:700; flex:1; min-width:130px;" onchange="submitFilter()">
                         <button type="button" class="app-button" style="font-size:11px; padding:6px 9px;" onclick="setQuickDate('today')">Hari Ini</button>
                         <button type="button" class="app-button" style="font-size:11px; padding:6px 9px;" onclick="setQuickDate('yesterday')">Kemarin</button>
                     </div>
                 </div>
 
                 <!-- User Dropdown Filter -->
-                <div style="display:flex; flex-direction:column; gap:6px;">
+                <div class="filter-item" style="flex: 1 1 200px;">
                     <label style="font-size:11.5px; font-weight:900; text-transform:uppercase; color:var(--app-muted);">Filter User</label>
-                    <select name="user_id" id="userSelect" class="app-select" style="font-size:13px; padding:7px 10px; font-weight:600; min-width:180px;" onchange="submitFilter()">
+                    <select name="user_id" id="userSelect" class="app-select" style="font-size:13px; padding:7px 10px; font-weight:600; width:100%; box-sizing:border-box;" onchange="submitFilter()">
                         <option value="">-- Semua Pengguna ({{ monitor.totals.active_users }} aktif) --</option>
                         {% for u in monitor.users_list %}
                         <option value="{{ u.id }}" {% if selected_user_id and selected_user_id|int == u.id %}selected{% endif %}>
@@ -277,17 +334,18 @@
                 </div>
 
                 <!-- Search Query -->
-                <div style="display:flex; flex-direction:column; gap:6px;">
+                <div class="filter-item" style="flex: 2 1 240px;">
                     <label style="font-size:11.5px; font-weight:900; text-transform:uppercase; color:var(--app-muted);">Cari Lagu / Tools / Query</label>
-                    <div style="position:relative;">
-                        <input type="text" name="q" id="searchInput" value="{{ search_query }}" placeholder="Ketik judul lagu, tool name, atau apa yang diucapkan..." class="app-input" style="width:100%; font-size:13px; padding:7px 12px; box-sizing:border-box;">
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" name="q" id="searchInput" value="{{ search_query }}" placeholder="Ketik judul lagu, tool name, atau ucapan..." class="app-input" style="width:100%; font-size:13px; padding:7px 12px; box-sizing:border-box;">
+                        <button type="submit" class="app-button app-button-primary" style="font-size:12px; padding:6px 14px; font-weight:800; white-space:nowrap;">Cari</button>
                     </div>
                 </div>
 
                 <!-- Activity Type Filter Tabs -->
-                <div style="display:flex; flex-direction:column; gap:6px;">
+                <div class="filter-item" style="flex: 1 1 260px;">
                     <label style="font-size:11.5px; font-weight:900; text-transform:uppercase; color:var(--app-muted);">Tipe Aktivitas</label>
-                    <div style="display:flex; gap:6px;">
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
                         <input type="hidden" name="type" id="typeInput" value="{{ selected_type }}">
                         <button type="button" class="filter-pill {% if selected_type == 'all' %}active{% endif %}" onclick="setTypeFilter('all')">
                             Semua ({{ monitor.totals.total_activities }})
@@ -333,7 +391,7 @@
 
     <!-- User Summaries Grid (Siapa saja yang aktif hari ini) -->
     <div style="margin-bottom:28px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
             <h2 style="font-size:18px; font-weight:900; margin:0; display:flex; align-items:center; gap:8px;">
                 <span>👥 Rangkuman Pengguna Aktif</span>
                 <span class="stat-badge stat-badge-user">{{ monitor.user_summaries|length }} Pengguna</span>
@@ -342,26 +400,26 @@
         </div>
 
         {% if monitor.user_summaries %}
-        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:14px;" id="userSummariesGrid">
+        <div class="user-summaries-grid" id="userSummariesGrid">
             {% for u in monitor.user_summaries %}
             <div class="user-pill-card {% if selected_user_id and selected_user_id|int == u.owner_id %}is-active{% endif %}" onclick="filterByUser('{{ u.owner_id }}')">
-                <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px;">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <div style="width:36px; height:36px; border-radius:50%; background:#10b981; color:#ffffff; font-weight:900; font-size:15px; display:flex; align-items:center; justify-content:center; border:2px solid #111;">
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                        <div style="width:36px; height:36px; border-radius:50%; background:#10b981; color:#ffffff; font-weight:900; font-size:15px; display:flex; align-items:center; justify-content:center; border:2px solid #111; flex-shrink:0;">
                             {{ u.username[0]|upper }}
                         </div>
-                        <div>
-                            <div style="font-weight:900; font-size:14.5px; color:var(--app-text);">
+                        <div style="min-width:0;">
+                            <div style="font-weight:900; font-size:14.5px; color:var(--app-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 {{ u.username }}
                                 <span style="font-size:11px; font-weight:700; color:var(--app-muted); margin-left:4px;">#{{ u.owner_id }}</span>
                             </div>
-                            <div style="font-size:11.5px; color:var(--app-muted);">{{ u.email or 'Tanpa Email' }}</div>
+                            <div style="font-size:11.5px; color:var(--app-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ u.email or 'Tanpa Email' }}</div>
                         </div>
                     </div>
-                    <span class="time-badge" title="Waktu aktivitas terakhir">{{ u.last_active_time }} WIB</span>
+                    <span class="time-badge" style="flex-shrink:0;" title="Waktu aktivitas terakhir">{{ u.last_active_time }} WIB</span>
                 </div>
 
-                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
                     <span class="stat-badge stat-badge-music">🎵 {{ u.music_count }} Lagu</span>
                     <span class="stat-badge stat-badge-tool">🛠️ {{ u.tools_count }} Tools</span>
                 </div>
@@ -391,7 +449,7 @@
                 <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #cbd5e1; font-size:11.5px;">
                     <div style="font-weight:700; color:#047857; margin-bottom:3px;">Lagu yang diputar:</div>
                     {% for s in u.recent_songs[:2] %}
-                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--app-text); font-size:11.5px;">
+                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--app-text); font-size:11.5px; min-width:0; max-width:100%;" title="{{ s }}">
                         • {{ s }}
                     </div>
                     {% endfor %}
@@ -451,7 +509,7 @@
                 {% endif %}
 
                 <!-- Center Content -->
-                <div style="flex:1; min-width:0;">
+                <div style="flex:1; min-width:0; overflow-wrap:anywhere; word-break:break-word;">
                     <!-- Top meta line -->
                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
                         <span class="type-pill {% if item.category == 'music' %}type-pill-music{% else %}type-pill-tool{% endif %}">
@@ -475,8 +533,8 @@
 
                     <!-- Main Content (Song Title or Tool Call) -->
                     {% if item.category == 'music' %}
-                    <div style="margin-top:4px;">
-                        <a href="{{ item.video_url or '#' }}" target="_blank" rel="noopener noreferrer" style="font-size:15px; font-weight:800; color:var(--app-text); text-decoration:none; line-height:1.3; display:inline-block;" title="Putar di YouTube">
+                    <div style="margin-top:4px; min-width:0;">
+                        <a href="{{ item.video_url or '#' }}" target="_blank" rel="noopener noreferrer" style="font-size:14.5px; font-weight:800; color:var(--app-text); text-decoration:none; line-height:1.35; display:inline-block; overflow-wrap:anywhere; word-break:break-word; max-width:100%;" title="Putar di YouTube">
                             {{ item.title }} ↗
                         </a>
 
@@ -500,17 +558,17 @@
                     </div>
                     {% else %}
                     <!-- Tool Calls & Chat History -->
-                    <div style="margin-top:4px;">
+                    <div style="margin-top:4px; min-width:0;">
                         {% if item.user_message %}
-                        <div style="font-size:14px; font-weight:800; color:var(--app-text); margin-bottom:4px;">
+                        <div style="font-size:13.5px; font-weight:800; color:var(--app-text); margin-bottom:4px; overflow-wrap:anywhere; word-break:break-word;">
                             🗣️ Ucapan User: <span style="color:#0369a1;">"{{ item.user_message }}"</span>
                         </div>
                         {% endif %}
 
                         {% if item.xiaozhi_answer %}
-                        <div style="font-size:12.5px; color:#334155; line-height:1.45; background:#f8fafc; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; margin-top:6px;">
+                        <div style="font-size:12.5px; color:#334155; line-height:1.45; background:#f8fafc; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; margin-top:6px; overflow-wrap:anywhere; word-break:break-word;">
                             🤖 <strong>Respon XiaoZhi:</strong>
-                            <div style="margin-top:2px; word-break:break-word;">{{ item.xiaozhi_answer[:300] }}{% if item.xiaozhi_answer|length > 300 %}...{% endif %}</div>
+                            <div style="margin-top:2px;">{{ item.xiaozhi_answer[:300] }}{% if item.xiaozhi_answer|length > 300 %}...{% endif %}</div>
                         </div>
                         {% endif %}
                     </div>
