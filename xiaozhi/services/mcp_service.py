@@ -154,6 +154,9 @@ def mcp_slots_payload(owner_id: int, store: Any) -> Dict[str, Any]:
     any_connected = False
     total_saved = 0
 
+    access_plus = store.get_user_access_plus(user_id) if hasattr(store, "get_user_access_plus") else {}
+    multislot_allowed = access_plus.get("mcp_multislot_allowed", True)
+
     with mcp_state_lock:
         for s in (1, 2, 3):
             t_info = token_map.get(s)
@@ -168,7 +171,12 @@ def mcp_slots_payload(owner_id: int, store: Any) -> Dict[str, Any]:
             state = dict(mcp_connection_states.get(_slot_key(user_id, s), {}))
             label = (t_info.get("device_label") if t_info else "") or f"XiaoZhi {s}"
 
-            if connected:
+            is_slot_restricted = (s in (2, 3)) and not multislot_allowed
+            is_active = bool(t_info.get("is_active", True)) if t_info else True
+            if is_slot_restricted:
+                is_active = False
+                status_text = f"Slot {s} dinonaktifkan oleh Admin (Akses Plus)"
+            elif connected:
                 status_text = f"Slot {s} ({label}) terhubung"
             elif saved:
                 status_text = state.get("message") or f"Slot {s} tersimpan, menunggu bridge"
@@ -184,6 +192,8 @@ def mcp_slots_payload(owner_id: int, store: Any) -> Dict[str, Any]:
                     "label": label,
                     "saved": saved,
                     "connected": connected,
+                    "is_active": is_active,
+                    "is_restricted": is_slot_restricted,
                     "board_mac": board_mac,
                     "is_locked": is_locked,
                     "preview": t_info.get("preview", "") if t_info else "",

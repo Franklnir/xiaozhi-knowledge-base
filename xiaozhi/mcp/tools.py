@@ -877,6 +877,20 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             if owner_id and hasattr(store, "find_playlist_track_by_query"):
                 matched_track = store.find_playlist_track_by_query(owner_id, query)
                 if matched_track:
+                    if not bool(matched_track.get("is_active", True)):
+                        track_no = matched_track.get("track_number", 1)
+                        title = matched_track.get("title", "")
+                        plus_msg = f"Lagu playlist nomor {track_no} '{title}' telah dinonaktifkan oleh admin. Silakan buka paket langganan Akses Plus untuk memutar kembali lagu ini."
+                        response = {
+                            "success": False,
+                            "source": "playlist",
+                            "is_disabled": True,
+                            "message": plus_msg,
+                            "query": query,
+                        }
+                        record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query}, response)
+                        return response
+
                     features = store.get_user_features(owner_id)
                     if not features.get("youtube_music", True):
                         response = {"success": False, "message": "Anda tidak diizinkan putar lagu YouTube. Fitur YouTube Music telah dinonaktifkan oleh administrator.", "results": []}
@@ -1008,6 +1022,22 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     "total_tracks": total,
                 }
 
+            # Cek apakah lagu dinonaktifkan oleh Admin (Akses Plus)
+            if not matched.get("is_active", True):
+                track_no = matched.get("track_number", 1)
+                title = matched.get("title", "")
+                plus_msg = f"Lagu playlist nomor {track_no} '{title}' telah dinonaktifkan oleh admin. Silakan buka paket langganan Akses Plus untuk memutar kembali lagu ini."
+                response = {
+                    "success": False,
+                    "message": plus_msg,
+                    "is_disabled_by_plus": True,
+                    "track_number": track_no,
+                    "title": title,
+                    "instructions": f"Katakan langsung kepada pengguna dengan suara jelas: '{plus_msg}' Jangan memanggil tool pemutar audio.",
+                }
+                record_mcp_tool_history(owner_id, "play_playlist_song", query, {"query": query}, response)
+                return response
+
             store.increment_playlist_play_count(owner_id, track_id=matched["id"])
             user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
             mac_param = f"&mac={user_mac}" if user_mac else ""
@@ -1073,7 +1103,10 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     "total": 0,
                     "playlist": [],
                 }
-            summary = [f"{t.get('track_number', i+1)}. {t.get('title')} (diputar {t.get('play_count', 0)}x)" for i, t in enumerate(tracks)]
+            summary = [
+                f"{t.get('track_number', i+1)}. {t.get('title')}" + (" [Dinonaktifkan - Akses Plus]" if not t.get("is_active", True) else f" (diputar {t.get('play_count', 0)}x)")
+                for i, t in enumerate(tracks)
+            ]
             response = {
                 "success": True,
                 "message": f"Ditemukan {len(tracks)} lagu di playlist Anda:\n" + "\n".join(summary[:10]),

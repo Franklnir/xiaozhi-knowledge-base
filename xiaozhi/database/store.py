@@ -3462,3 +3462,150 @@ class HFJsonStore:
                 return t
         return None
 
+    # ── Akses Plus Management (Multi-Slot & Playlist Quotas) ───────────────────
+
+    def get_user_access_plus(self, user_id: int) -> Dict[str, Any]:
+        with self._lock:
+            data = self._load()
+            cfg = data.get("access_plus_settings", {}).get(str(user_id), {})
+            return {
+                "user_id": int(user_id),
+                "mcp_multislot_allowed": bool(cfg.get("mcp_multislot_allowed", True)),
+                "playlist_quota_enabled": bool(cfg.get("playlist_quota_enabled", False)),
+                "max_playlist_tracks": int(cfg.get("max_playlist_tracks", 15) or 15),
+                "notes": cfg.get("notes", ""),
+            }
+
+    def set_user_access_plus(
+        self,
+        user_id: int,
+        mcp_multislot_allowed: Optional[bool] = None,
+        playlist_quota_enabled: Optional[bool] = None,
+        max_playlist_tracks: Optional[int] = None,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        with self._lock:
+            data = self._load()
+            settings = data.setdefault("access_plus_settings", {})
+            current = settings.get(str(user_id), {})
+            new_multislot = current.get("mcp_multislot_allowed", True) if mcp_multislot_allowed is None else bool(mcp_multislot_allowed)
+            new_quota_enabled = current.get("playlist_quota_enabled", False) if playlist_quota_enabled is None else bool(playlist_quota_enabled)
+            new_max_tracks = current.get("max_playlist_tracks", 15) if max_playlist_tracks is None else int(max_playlist_tracks)
+            new_notes = current.get("notes", "") if notes is None else str(notes).strip()
+
+            settings[str(user_id)] = {
+                "user_id": int(user_id),
+                "mcp_multislot_allowed": new_multislot,
+                "playlist_quota_enabled": new_quota_enabled,
+                "max_playlist_tracks": new_max_tracks,
+                "notes": new_notes,
+                "updated_at": utc_now().isoformat(),
+            }
+
+            # Update slot tokens is_active
+            for item in data.get("xiaozhi_tokens", []):
+                if int(item.get("user_id", 0)) == int(user_id) and int(item.get("slot_number", 1)) in (2, 3):
+                    item["is_active"] = new_multislot
+
+            # Update playlists is_active
+            user_playlists = data.get("user_playlists", {}).get(str(user_id), [])
+            for track in user_playlists:
+                if new_quota_enabled:
+                    track["is_active"] = int(track.get("track_number", 1)) <= new_max_tracks
+                else:
+                    track["is_active"] = True
+
+            self._commit(data, f"Update access plus settings for user {user_id}")
+            return settings[str(user_id)]
+
+    def set_user_slot_active(self, user_id: int, slot: int, is_active: bool) -> bool:
+        with self._lock:
+            data = self._load()
+            changed = False
+            for item in data.get("xiaozhi_tokens", []):
+                if int(item.get("user_id", 0)) == int(user_id) and int(item.get("slot_number", 1)) == int(slot):
+                    item["is_active"] = bool(is_active)
+                    changed = True
+            if changed:
+                self._commit(data, f"Set slot {slot} active={is_active} for user {user_id}")
+            return changed
+
+    def set_user_playlist_track_active(self, user_id: int, track_id: int, is_active: bool) -> bool:
+        with self._lock:
+            data = self._load()
+            user_playlists = data.get("user_playlists", {}).get(str(user_id), [])
+            changed = False
+            for t in user_playlists:
+                if int(t.get("id", 0)) == int(track_id):
+                    t["is_active"] = bool(is_active)
+                    changed = True
+            if changed:
+                self._commit(data, f"Set track {track_id} active={is_active} for user {user_id}")
+            return changed
+
+    def count_user_playlist_tracks(self, owner_id: int, active_only: bool = False) -> int:
+        tracks = self.get_user_playlist(owner_id)
+        if active_only:
+            return sum(1 for t in tracks if t.get("is_active", True))
+        return len(tracks)
+
+    def list_access_plus_overview(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            users = [u for u in data.get("users", []) if u.get("role") != "admin"]
+            settings = data.get("access_plus_settings", {})
+            tokens = data.get("xiaozhi_tokens", [])
+            playlists = data.get("user_playlists", {})
+
+            result = []
+            for u in users:
+                uid = int(u["id"])
+                plus_cfg = settings.get(str(uid), {})
+                u_tokens = [t for t in tokens if int(t.get("user_id", 0)) == uid]
+                u_tracks = playlists.get(str(uid), [])
+
+                slot_map = {}
+                for t in u_tokens:
+                    s_num = int(t.get("slot_number", 1) or 1)
+                    cipher = t.get("token_ciphertext", "")
+                    plain = decrypt_secret(cipher) if cipher else ""
+                    preview = f"{plain[:4]}...{plain[-4:]}" if len(plain) > 8 else plain
+                    slot_map[s_num] = {
+                        "slot_number": s_num,
+                        "device_label": t.get("device_label") or f"Slot {s_num}",
+                        "board_mac": (t.get("board_mac") or "").upper(),
+                        "preview": preview,
+                        "token_hash": t.get("token_hash", ""),
+                        "is_active": bool(t.get("is_active", True)),
+                    }
+
+                has_multislot = len(u_tokens) > 1 or 2 in slot_map or 3 in slot_map
+                mcp_multislot_allowed = bool(plus_cfg.get("mcp_multislot_allowed", True))
+                playlist_quota_enabled = bool(plus_cfg.get("playlist_quota_enabled", False))
+                max_playlist_tracks = int(plus_cfg.get("max_playlist_tracks", 15) or 15)
+                active_cnt = sum(1 for tr in u_tracks if tr.get("is_active", True))
+                disabled_cnt = len(u_tracks) - active_cnt
+
+                result.append({
+                    "user_id": uid,
+                    "username": u.get("username", f"user_{uid}"),
+                    "role": u.get("role", "user"),
+                    "created_at": u.get("created_at", ""),
+                    "mcp_multislot_allowed": mcp_multislot_allowed,
+                    "playlist_quota_enabled": playlist_quota_enabled,
+                    "max_playlist_tracks": max_playlist_tracks,
+                    "notes": plus_cfg.get("notes", ""),
+                    "slots": slot_map,
+                    "total_slots": len(u_tokens),
+                    "has_multislot": has_multislot,
+                    "playlist": {
+                        "has_playlist": len(u_tracks) > 0,
+                        "total_tracks": len(u_tracks),
+                        "active_tracks": active_cnt,
+                        "disabled_tracks": disabled_cnt,
+                    },
+                    "is_restricted": (not mcp_multislot_allowed) or playlist_quota_enabled,
+                })
+            return result
+
+

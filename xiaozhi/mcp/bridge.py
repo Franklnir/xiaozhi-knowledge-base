@@ -168,6 +168,11 @@ async def mcp_background_task(store, mcp_server):
                         logger.info("MCP blocked for user_id=%s, skipping", user_id)
                         continue
 
+                    # Check if token slot is active (Akses Plus)
+                    if not token_info.get("is_active", True):
+                        logger.info("Slot %s user %s dinonaktifkan admin (Akses Plus), skipping", slot, user_id)
+                        continue
+
                     url = token_info["token"]
                     if not url.startswith("wss://"):
                         logger.warning("Token bukan wss://: user_id=%s slot=%s", user_id, slot)

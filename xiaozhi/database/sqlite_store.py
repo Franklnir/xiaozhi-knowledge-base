@@ -447,6 +447,27 @@ class SQLiteStore:
                     conn.execute("ALTER TABLE board_binding_history ADD COLUMN request_id TEXT;")
                 if "action" not in bbh_cols:
                     conn.execute("ALTER TABLE board_binding_history ADD COLUMN action TEXT NOT NULL DEFAULT 'bind';")
+
+            # Migration check Access Plus
+            tok_cols = [r["name"] for r in conn.execute("PRAGMA table_info(xiaozhi_tokens)").fetchall()]
+            if tok_cols and "is_active" not in tok_cols:
+                conn.execute("ALTER TABLE xiaozhi_tokens ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;")
+
+            pl_cols = [r["name"] for r in conn.execute("PRAGMA table_info(user_playlists)").fetchall()]
+            if pl_cols and "is_active" not in pl_cols:
+                conn.execute("ALTER TABLE user_playlists ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;")
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_access_plus_settings (
+                    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    mcp_multislot_allowed INTEGER NOT NULL DEFAULT 1,
+                    playlist_quota_enabled INTEGER NOT NULL DEFAULT 0,
+                    max_playlist_tracks INTEGER NOT NULL DEFAULT 15,
+                    notes TEXT DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+            """)
         except Exception as exc:
             logger.warning("SQLite xiaozhi_tokens migration error: %s", exc)
 
@@ -1065,6 +1086,7 @@ class SQLiteStore:
             "device_label": r.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
             "board_mac": board_mac,
             "is_locked": bool(board_mac),
+            "is_active": bool(r.get("is_active", 1)),
             "token_hash": r["token_hash"],
             "preview": f"{token[:4]}...{token[-4:]}" if token and len(token) > 8 else token,
             "created_at": r.get("created_at", ""),
@@ -1089,6 +1111,7 @@ class SQLiteStore:
                 "device_label": r.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
                 "board_mac": board_mac,
                 "is_locked": bool(board_mac),
+                "is_active": bool(r.get("is_active", 1)),
                 "preview": f"{token[:4]}...{token[-4:]}" if token and len(token) > 8 else token,
                 "token_hash": r["token_hash"],
                 "created_at": r.get("created_at", ""),
@@ -1143,6 +1166,7 @@ class SQLiteStore:
                     "device_label": r.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
                     "token": token,
                     "token_hash": r["token_hash"],
+                    "is_active": bool(r.get("is_active", 1)),
                 })
         return result
 
@@ -3122,6 +3146,195 @@ class SQLiteStore:
             (int(owner_id), f"%{target_q.lower()}%", f"%{target_q.lower()}%", target_q.lower()),
         ).fetchone()
         return dict(row) if row else None
+
+    # ── Akses Plus Management (Multi-Slot & Playlist Quotas) ───────────────────
+
+    def get_user_access_plus(self, user_id: int) -> Dict[str, Any]:
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT mcp_multislot_allowed, playlist_quota_enabled, max_playlist_tracks, notes, updated_at FROM user_access_plus_settings WHERE user_id = ?",
+            (int(user_id),),
+        ).fetchone()
+        if not row:
+            return {
+                "user_id": int(user_id),
+                "mcp_multislot_allowed": True,
+                "playlist_quota_enabled": False,
+                "max_playlist_tracks": 15,
+                "notes": "",
+            }
+        r = dict(row)
+        return {
+            "user_id": int(user_id),
+            "mcp_multislot_allowed": bool(r["mcp_multislot_allowed"]),
+            "playlist_quota_enabled": bool(r["playlist_quota_enabled"]),
+            "max_playlist_tracks": int(r["max_playlist_tracks"] or 15),
+            "notes": r.get("notes") or "",
+        }
+
+    def set_user_access_plus(
+        self,
+        user_id: int,
+        mcp_multislot_allowed: Optional[bool] = None,
+        playlist_quota_enabled: Optional[bool] = None,
+        max_playlist_tracks: Optional[int] = None,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        current = self.get_user_access_plus(user_id)
+        new_multislot = current["mcp_multislot_allowed"] if mcp_multislot_allowed is None else bool(mcp_multislot_allowed)
+        new_quota_enabled = current["playlist_quota_enabled"] if playlist_quota_enabled is None else bool(playlist_quota_enabled)
+        new_max_tracks = current["max_playlist_tracks"] if max_playlist_tracks is None else int(max_playlist_tracks)
+        new_notes = current["notes"] if notes is None else str(notes).strip()
+
+        conn = self._get_conn()
+        conn.execute(
+            """
+            INSERT INTO user_access_plus_settings (user_id, mcp_multislot_allowed, playlist_quota_enabled, max_playlist_tracks, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                mcp_multislot_allowed = excluded.mcp_multislot_allowed,
+                playlist_quota_enabled = excluded.playlist_quota_enabled,
+                max_playlist_tracks = excluded.max_playlist_tracks,
+                notes = excluded.notes,
+                updated_at = excluded.updated_at
+            """,
+            (int(user_id), 1 if new_multislot else 0, 1 if new_quota_enabled else 0, new_max_tracks, new_notes, now, now),
+        )
+
+        if not new_multislot:
+            conn.execute(
+                "UPDATE xiaozhi_tokens SET is_active = 0, updated_at = ? WHERE user_id = ? AND slot_number IN (2, 3)",
+                (now, int(user_id)),
+            )
+        else:
+            conn.execute(
+                "UPDATE xiaozhi_tokens SET is_active = 1, updated_at = ? WHERE user_id = ? AND slot_number IN (2, 3)",
+                (now, int(user_id)),
+            )
+
+        if new_quota_enabled:
+            conn.execute(
+                """
+                UPDATE user_playlists
+                SET is_active = CASE WHEN track_number <= ? THEN 1 ELSE 0 END, updated_at = ?
+                WHERE owner_id = ?
+                """,
+                (new_max_tracks, now, int(user_id)),
+            )
+        else:
+            conn.execute(
+                "UPDATE user_playlists SET is_active = 1, updated_at = ? WHERE owner_id = ?",
+                (now, int(user_id)),
+            )
+        conn.commit()
+
+        return {
+            "user_id": int(user_id),
+            "mcp_multislot_allowed": new_multislot,
+            "playlist_quota_enabled": new_quota_enabled,
+            "max_playlist_tracks": new_max_tracks,
+            "notes": new_notes,
+        }
+
+    def set_user_slot_active(self, user_id: int, slot: int, is_active: bool) -> bool:
+        now = utc_now()
+        conn = self._get_conn()
+        cur = conn.execute(
+            "UPDATE xiaozhi_tokens SET is_active = ?, updated_at = ? WHERE user_id = ? AND slot_number = ?",
+            (1 if is_active else 0, now, int(user_id), int(slot)),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+    def set_user_playlist_track_active(self, user_id: int, track_id: int, is_active: bool) -> bool:
+        now = utc_now()
+        conn = self._get_conn()
+        cur = conn.execute(
+            "UPDATE user_playlists SET is_active = ?, updated_at = ? WHERE owner_id = ? AND id = ?",
+            (1 if is_active else 0, now, int(user_id), int(track_id)),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+    def count_user_playlist_tracks(self, owner_id: int, active_only: bool = False) -> int:
+        conn = self._get_conn()
+        if active_only:
+            row = conn.execute("SELECT COUNT(*) as cnt FROM user_playlists WHERE owner_id = ? AND COALESCE(is_active, 1) = 1", (int(owner_id),)).fetchone()
+        else:
+            row = conn.execute("SELECT COUNT(*) as cnt FROM user_playlists WHERE owner_id = ?", (int(owner_id),)).fetchone()
+        return int(row["cnt"]) if row else 0
+
+    def list_access_plus_overview(self) -> List[Dict[str, Any]]:
+        conn = self._get_conn()
+        users = [dict(r) for r in conn.execute("SELECT id, username, role, created_at FROM users WHERE role != 'admin' ORDER BY id ASC").fetchall()]
+        settings_map = {int(r["user_id"]): dict(r) for r in conn.execute("SELECT * FROM user_access_plus_settings").fetchall()}
+        
+        token_rows = [dict(r) for r in conn.execute("SELECT user_id, slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, 1) as is_active FROM xiaozhi_tokens").fetchall()]
+        tokens_by_user = {}
+        for r in token_rows:
+            uid = int(r["user_id"])
+            tokens_by_user.setdefault(uid, []).append(r)
+
+        playlist_rows = [dict(r) for r in conn.execute("""
+            SELECT owner_id,
+                   COUNT(*) as total_tracks,
+                   SUM(CASE WHEN COALESCE(is_active, 1) = 1 THEN 1 ELSE 0 END) as active_tracks,
+                   SUM(CASE WHEN COALESCE(is_active, 1) = 0 THEN 1 ELSE 0 END) as disabled_tracks
+            FROM user_playlists
+            GROUP BY owner_id
+        """).fetchall()]
+        playlist_map = {int(r["owner_id"]): r for r in playlist_rows}
+
+        result = []
+        for u in users:
+            uid = u["id"]
+            plus_cfg = settings_map.get(uid, {})
+            u_tokens = tokens_by_user.get(uid, [])
+            pl_stats = playlist_map.get(uid, {"total_tracks": 0, "active_tracks": 0, "disabled_tracks": 0})
+
+            slot_map = {}
+            for t in u_tokens:
+                s_num = int(t.get("slot_number", 1) or 1)
+                cipher = t.get("token_ciphertext", "")
+                plain = decrypt_secret(cipher) if cipher else ""
+                preview = f"{plain[:4]}...{plain[-4:]}" if len(plain) > 8 else plain
+                slot_map[s_num] = {
+                    "slot_number": s_num,
+                    "device_label": t.get("device_label") or f"Slot {s_num}",
+                    "board_mac": (t.get("board_mac") or "").upper(),
+                    "preview": preview,
+                    "token_hash": t.get("token_hash", ""),
+                    "is_active": bool(t.get("is_active", 1)),
+                }
+
+            has_multislot = len(u_tokens) > 1 or 2 in slot_map or 3 in slot_map
+            mcp_multislot_allowed = bool(plus_cfg.get("mcp_multislot_allowed", 1))
+            playlist_quota_enabled = bool(plus_cfg.get("playlist_quota_enabled", 0))
+            max_playlist_tracks = int(plus_cfg.get("max_playlist_tracks", 15) or 15)
+
+            result.append({
+                "user_id": uid,
+                "username": u["username"],
+                "role": u["role"],
+                "created_at": u.get("created_at", ""),
+                "mcp_multislot_allowed": mcp_multislot_allowed,
+                "playlist_quota_enabled": playlist_quota_enabled,
+                "max_playlist_tracks": max_playlist_tracks,
+                "notes": plus_cfg.get("notes", ""),
+                "slots": slot_map,
+                "total_slots": len(u_tokens),
+                "has_multislot": has_multislot,
+                "playlist": {
+                    "has_playlist": int(pl_stats["total_tracks"] or 0) > 0,
+                    "total_tracks": int(pl_stats["total_tracks"] or 0),
+                    "active_tracks": int(pl_stats["active_tracks"] or 0),
+                    "disabled_tracks": int(pl_stats["disabled_tracks"] or 0),
+                },
+                "is_restricted": (not mcp_multislot_allowed) or playlist_quota_enabled,
+            })
+        return result
+
 
 
 
