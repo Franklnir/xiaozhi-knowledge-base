@@ -4,6 +4,7 @@ import asyncio
 import base64
 import io
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -108,7 +109,11 @@ def youtube_search(query: str, max_results: int = 5) -> list:
     if not raw_q:
         return []
 
-    from xiaozhi.core.utils import extract_youtube_video_id
+    from xiaozhi.core.utils import (
+        extract_youtube_video_id,
+        extract_tiktok_media_info,
+        normalize_tiktok_url_for_ytdlp,
+    )
 
     # 1. Direct YouTube Video URL or 11-character Video ID
     direct_vid = extract_youtube_video_id(raw_q)
@@ -136,6 +141,49 @@ def youtube_search(query: str, max_results: int = 5) -> list:
                     }]
         except Exception as exc:
             logger.warning("Direct video extraction for %s failed (%s), fallback to search", direct_vid, exc)
+
+    # 2. TikTok Video URL, Shortlink, or tt_ ID
+    is_tiktok = (
+        raw_q.startswith("tt_")
+        or "tiktok.com" in raw_q.lower()
+        or "douyin.com" in raw_q.lower()
+    )
+    if is_tiktok:
+        tt_info = extract_tiktok_media_info(raw_q)
+        tt_vid = tt_info.get("video_id") if tt_info else (raw_q if raw_q.startswith("tt_") else f"tt_{raw_q[-10:]}")
+        norm_url = normalize_tiktok_url_for_ytdlp(tt_info.get("canonical_url") if tt_info else raw_q)
+        try:
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": True,
+                "socket_timeout": 15,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(norm_url, download=False)
+                if info:
+                    v_title = info.get("title", "") or f"TikTok Video ({tt_vid})"
+                    v_dur = info.get("duration_string", "")
+                    thumbs = info.get("thumbnails", [])
+                    v_thumb = thumbs[-1].get("url", "") if thumbs else ""
+                    return [{
+                        "title": v_title,
+                        "video_id": tt_vid,
+                        "video_url": norm_url,
+                        "duration": v_dur,
+                        "thumbnail": v_thumb,
+                        "stream_url": f"/api/audio/stream/{tt_vid}",
+                    }]
+        except Exception as exc:
+            logger.warning("Direct TikTok extraction for %s failed (%s)", norm_url, exc)
+            return [{
+                "title": f"TikTok Audio ({tt_vid})",
+                "video_id": tt_vid,
+                "video_url": norm_url,
+                "duration": "",
+                "thumbnail": "",
+                "stream_url": f"/api/audio/stream/{tt_vid}",
+            }]
 
     # 2. YouTube Playlist URL
     m_list = re.search(r"[?&]list=([a-zA-Z0-9_-]+)", raw_q)
@@ -837,77 +885,110 @@ async def audio_play_direct(
     q = (q or "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Query required")
+    store = get_store()
+
+    # Extract device MAC
+    device_mac = (mac or "").strip()
+    if not device_mac and hasattr(request, "headers"):
+        device_mac = (
+            request.headers.get("Device-Id", "") or
+            request.headers.get("X-Device-Mac", "") or
+            request.headers.get("X-MAC-Address", "") or
+            request.headers.get("X-Device-Id", "") or
+            request.headers.get("device_id", "") or
+            request.headers.get("mac", "")
+        ).strip()
+
+    # Resolve owner
+    resolved_owner_id = owner_id
+    if not resolved_owner_id and token:
+        owner = store.find_user_by_mcp_token(token)
+        if owner and owner.get("user_id"):
+            resolved_owner_id = owner["user_id"]
+    if not resolved_owner_id and device_mac:
+        resolved_owner_id = _resolve_owner_for_device(store, device_mac)
+    if not resolved_owner_id:
+        try:
+            su = get_current_user(request)
+            if su and su.get("id"):
+                resolved_owner_id = su["id"]
+        except Exception:
+            pass
+
+    clean_mac = ""
+    if device_mac:
+        clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+        clean_mac = clean_mac.strip().upper()
+
+    base_url = os.getenv("SERVER_BASE_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
+
+    # Auto-register device MAC only if MCP is connected
+    if resolved_owner_id and clean_mac and len(clean_mac) >= 11 and hasattr(store, "register_device"):
+        try:
+            if _can_bind_device_to_user(resolved_owner_id):
+                detected_chip = (
+                    request.query_params.get("chip", "") or
+                    request.headers.get("X-Device-Chip", "") or
+                    request.headers.get("Device-Chip", "") or
+                    request.headers.get("X-Chip", "") or
+                    request.headers.get("X-Chip-Type", "")
+                ).strip().lower()
+                dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
+                store.register_device(
+                    resolved_owner_id,
+                    device_id=clean_mac,
+                    name=dev_name,
+                    device_type=dev_type,
+                    notes="Tertaut saat play direct audio (MCP Terhubung)"
+                )
+                logger.info(f"[PLAY DIRECT MAC] Device {clean_mac} ({dev_type}) diikat ke user {resolved_owner_id} [MCP AKTIF]")
+            elif hasattr(store, "record_device_activity"):
+                store.record_device_activity(clean_mac, resolved_owner_id)
+                logger.warning(f"[PLAY DIRECT MAC] Board {clean_mac} TIDAK diikat ke user {resolved_owner_id} karena MCP tidak terhubung")
+        except Exception as exc:
+            logger.error(f"[PLAY DIRECT MAC ERROR] {exc}")
+
     try:
-        results = youtube_search(q, max_results=1)
-        if not results:
-            raise HTTPException(status_code=404, detail="Song not found")
-        
-        vid = results[0]["video_id"]
-        title = results[0]["title"]
-        store = get_store()
+        vid = ""
+        title = ""
+        target_video_url = ""
 
-        # Extract device MAC
-        device_mac = (mac or "").strip()
-        if not device_mac and hasattr(request, "headers"):
-            device_mac = (
-                request.headers.get("Device-Id", "") or
-                request.headers.get("X-Device-Mac", "") or
-                request.headers.get("X-MAC-Address", "") or
-                request.headers.get("X-Device-Id", "") or
-                request.headers.get("device_id", "") or
-                request.headers.get("mac", "")
-            ).strip()
-
-        # Resolve owner
-        resolved_owner_id = owner_id
-        if not resolved_owner_id and token:
-            owner = store.find_user_by_mcp_token(token)
-            if owner and owner.get("user_id"):
-                resolved_owner_id = owner["user_id"]
-        if not resolved_owner_id and device_mac:
-            resolved_owner_id = _resolve_owner_for_device(store, device_mac)
-        if not resolved_owner_id:
+        # 1. Cek apakah query cocok dengan lagu di Playlist milik user (nomor lagu, judul, atau link video)
+        if resolved_owner_id and hasattr(store, "find_playlist_track_by_query"):
             try:
-                su = get_current_user(request)
-                if su and su.get("id"):
-                    resolved_owner_id = su["id"]
-            except Exception:
-                pass
+                matched_track = store.find_playlist_track_by_query(resolved_owner_id, q)
+                if matched_track:
+                    vid = matched_track.get("video_id", "")
+                    title = matched_track.get("title", "")
+                    target_video_url = matched_track.get("youtube_url", "")
+                    if hasattr(store, "increment_playlist_play_count") and matched_track.get("id"):
+                        try:
+                            store.increment_playlist_play_count(resolved_owner_id, track_id=matched_track["id"])
+                        except Exception:
+                            pass
+                    logger.info(f"[PLAY DIRECT] Ditemukan di playlist user {resolved_owner_id}: #{matched_track.get('track_number')} {title} ({vid})")
+            except Exception as exc:
+                logger.debug(f"[PLAY DIRECT] Playlist lookup error: {exc}")
 
-        clean_mac = ""
-        if device_mac:
-            clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
-            clean_mac = clean_mac.strip().upper()
+        # 2. Jika tidak ditemukan di playlist, lakukan ekstraksi / pencarian audio (YouTube atau TikTok)
+        if not vid:
+            results = youtube_search(q, max_results=1)
+            if not results:
+                raise HTTPException(status_code=404, detail="Song not found")
+            vid = results[0]["video_id"]
+            title = results[0]["title"]
+            target_video_url = results[0].get("video_url", "")
 
-        base_url = str(request.base_url).rstrip("/")
+        # Tentukan URL video yang valid
+        if not target_video_url:
+            if vid.startswith("tt_"):
+                raw_tt = vid[3:]
+                target_video_url = f"https://www.tiktok.com/@video/video/{raw_tt}" if raw_tt.isdigit() else f"https://vt.tiktok.com/{raw_tt}/"
+            else:
+                target_video_url = f"https://www.youtube.com/watch?v={vid}"
+
+        # Queue command jika owner dikenali
         if resolved_owner_id:
-            # Auto-register device MAC only if MCP is connected
-            if clean_mac and len(clean_mac) >= 11 and hasattr(store, "register_device"):
-                try:
-                    if _can_bind_device_to_user(resolved_owner_id):
-                        detected_chip = (
-                            request.query_params.get("chip", "") or
-                            request.headers.get("X-Device-Chip", "") or
-                            request.headers.get("Device-Chip", "") or
-                            request.headers.get("X-Chip", "") or
-                            request.headers.get("X-Chip-Type", "")
-                        ).strip().lower()
-                        dev_name, dev_type = _format_chip_name_and_type(detected_chip, clean_mac)
-                        store.register_device(
-                            resolved_owner_id,
-                            device_id=clean_mac,
-                            name=dev_name,
-                            device_type=dev_type,
-                            notes="Tertaut saat play direct audio (MCP Terhubung)"
-                        )
-                        logger.info(f"[PLAY DIRECT MAC] Device {clean_mac} ({dev_type}) diikat ke user {resolved_owner_id} [MCP AKTIF]")
-                    elif hasattr(store, "record_device_activity"):
-                        store.record_device_activity(clean_mac, resolved_owner_id)
-                        logger.warning(f"[PLAY DIRECT MAC] Board {clean_mac} TIDAK diikat ke user {resolved_owner_id} karena MCP tidak terhubung")
-                except Exception as exc:
-                    logger.error(f"[PLAY DIRECT MAC ERROR] {exc}")
-
-            # Queue command so streaming and tracker recognize the user
             mac_param = f"&mac={clean_mac}" if clean_mac else ""
             stream_url = f"/api/audio/stream/{vid}?owner_id={resolved_owner_id}{mac_param}"
             full_stream = f"{base_url}{stream_url}"
@@ -916,7 +997,7 @@ async def audio_play_direct(
                     resolved_owner_id,
                     title=title,
                     stream_url=full_stream,
-                    video_url=f"https://www.youtube.com/watch?v={vid}",
+                    video_url=target_video_url,
                     video_id=vid
                 )
             except Exception:
@@ -932,8 +1013,12 @@ async def audio_play_direct(
             "stream_url": stream_url,
             "owner_id": resolved_owner_id,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
+        logger.error(f"[PLAY DIRECT ERROR] {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
+
 
 
 @router.get("/api/device/audio/commands")
