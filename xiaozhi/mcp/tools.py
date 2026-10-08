@@ -36,8 +36,130 @@ def format_material_for_xiaozhi(item: dict, keyword: str = "") -> dict:
 
 
 
-def _scrape_page_content(url: str, max_chars: int = 2500) -> str:
-    """Scrape clean structured textual content from a webpage with SSRF protection."""
+def _clean_search_query(raw_query: str) -> str:
+    """Bersihkan filler percakapan bahasa Indonesia agar query pencarian tajam dan terfokus."""
+    q = raw_query.strip()
+    filler_patterns = [
+        r'^(tolong|coba|mohon|bisakah|bisa|harap)\s+(carikan|cari|cek|temukan|lihat|tanya|info)\s+(dong|kan|tentang|mengenai)?\s*',
+        r'^(apakah\s+kamu\s+tahu|kamu\s+tahu\s+nggak|tau\s+gak|tahu\s+kah)\s+(tentang|mengenai)?\s*',
+        r'^(apa\s+itu|siapa\s+itu|di\s+mana|dimana|bagaimana|kapan)\s*',
+        r'^(beritahu\s+saya|kasih\s+tahu|jelaskan\s+tentang|info\s+tentang|mencari\s+informasi\s+tentang)\s*',
+    ]
+    for pattern in filler_patterns:
+        q = re.sub(pattern, '', q, flags=re.IGNORECASE).strip()
+    q = re.sub(r'[\?\!\.\,]+$', '', q).strip()
+    return q if len(q) >= 2 else raw_query.strip()
+
+
+def _calculate_domain_authority(url: str, query: str) -> tuple:
+    """
+    Hitung skor reputasi & otoritas domain untuk memprioritaskan situs resmi dan referensi terpercaya.
+    Mengembalikan (skor, label_otoritas).
+    """
+    score = 50
+    label = "Web Publik"
+    try:
+        parsed = urllib.parse.urlparse(url)
+        domain = (parsed.hostname or "").lower()
+
+        # Ekstensi Domain Otoritas Tinggi
+        if domain.endswith(".ac.id") or domain.endswith(".edu"):
+            score += 45
+            label = "Situs Resmi Akademik / Kampus (.ac.id)"
+        elif domain.endswith(".go.id"):
+            score += 50
+            label = "Situs Resmi Pemerintah (.go.id)"
+        elif domain.endswith(".or.id") or domain.endswith(".org"):
+            score += 25
+            label = "Organisasi / Lembaga Resmi (.org)"
+        elif domain.endswith(".sch.id"):
+            score += 35
+            label = "Situs Resmi Sekolah (.sch.id)"
+        elif "wikipedia.org" in domain:
+            score += 30
+            label = "Ensiklopedia Wikipedia"
+
+        # Kata kunci domain cocok dengan query (misal pelitabangsa.ac.id untuk query pelita bangsa)
+        query_words = [w.lower() for w in re.split(r'\s+', query) if len(w) > 3]
+        matched_words = [w for w in query_words if w in domain]
+        if matched_words:
+            score += (len(matched_words) * 15)
+            if "Situs Resmi" not in label:
+                label = "Website Relevan Institusi"
+
+        # Media berita kredibel nasional
+        news_authoritative = ("kompas.com", "detik.com", "tempo.co", "antaranews.com", "cnnindonesia.com", "republika.co.id")
+        if any(domain.endswith(n) for n in news_authoritative):
+            score += 20
+            label = "Media Berita Terverifikasi"
+
+        # Penalti untuk situs spam / forum Q&A / agregator rendah kualitas
+        low_quality_domains = ("brainly.co.id", "quora.com", "pinterest.com", "scribd.com", "coursehero.com")
+        if any(domain.endswith(bad) for bad in low_quality_domains):
+            score -= 35
+            label = "Forum / Agregator Komunitas"
+
+    except Exception:
+        pass
+    return score, label
+
+
+def _extract_high_relevance_sections(text: str, query: str, max_chars: int = 2500) -> str:
+    """
+    Memilih bagian teks artikel dengan densitas relevansi tertinggi terhadap kata kunci:
+    1. Mempertahankan ringkasan pembuka dan heading utama.
+    2. Memprioritaskan paragraf, tabel data Markdown, dan daftar poin yang memuat kata kunci query.
+    """
+    if len(text) <= max_chars:
+        return text
+
+    blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
+    if not blocks:
+        return text[:max_chars]
+
+    query_tokens = [w.lower() for w in re.split(r'[\s\W]+', query) if len(w) >= 3]
+
+    scored_blocks = []
+    for idx, block in enumerate(blocks):
+        b_lower = block.lower()
+        score = 0
+        if idx < 2:
+            score += 5  # Pengantar artikel penting
+        if block.startswith("###"):
+            score += 8  # Subjudul bab
+        if "|" in block and "---" in block:
+            score += 15  # Tabel data sangat bernilai informatif
+        if block.startswith("•"):
+            score += 8   # Poin daftar
+
+        for token in query_tokens:
+            if token in b_lower:
+                score += 12
+        scored_blocks.append((score, idx, block))
+
+    scored_blocks.sort(key=lambda x: x[0], reverse=True)
+
+    selected = []
+    total_len = 0
+    intro_block = next((b for b in scored_blocks if b[1] == 0), None)
+    if intro_block:
+        selected.append(intro_block)
+        total_len += len(intro_block[2])
+
+    for item in scored_blocks:
+        if item in selected:
+            continue
+        if total_len + len(item[2]) > max_chars:
+            continue
+        selected.append(item)
+        total_len += len(item[2])
+
+    selected.sort(key=lambda x: x[1])
+    return "\n\n".join(b[2] for b in selected)
+
+
+def _scrape_page_content(url: str, query: str = "", max_chars: int = 2500) -> str:
+    """Scrape clean structured textual content from a webpage with SSRF protection and keyword relevance chunking."""
     if not url or not url.startswith("http"):
         return ""
     try:
@@ -57,7 +179,11 @@ def _scrape_page_content(url: str, max_chars: int = 2500) -> str:
         if "text/html" not in content_type and "application/xhtml" not in content_type:
             return ""
         soup = BeautifulSoup(r.text, "html.parser")
-        text = extract_structured_text_bs4(soup, max_chars=max_chars)
+        text = extract_structured_text_bs4(soup, max_chars=25000)
+        if query:
+            text = _extract_high_relevance_sections(text, query, max_chars=max_chars)
+        else:
+            text = text[:max_chars]
         return text
     except Exception:
         return ""
@@ -168,14 +294,19 @@ def _search_duckduckgo(query: str, max_results: int = 5) -> list:
 
 def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True) -> dict:
     """
-    Pencarian web mendalam multi-sumber:
-    1. Wikipedia Ensiklopedia (Definisi & latar belakang)
-    2. DuckDuckGo Web Engine (Situs resmi, artikel web umum, dokumentasi, panduan)
-    3. Google News RSS (Berita terkini)
-    4. Multi-Page Parallel Scraper (ThreadPoolExecutor membaca 3-4 web sekaligus secara terstruktur)
+    Pencarian web mendalam multi-sumber cerdas & presisi:
+    1. Smart Query Sanitizer: Membersihkan filler suara/chat bahasa Indonesia agar pencarian tajam.
+    2. Wikipedia Ensiklopedia: Definisi formal & latar belakang.
+    3. DuckDuckGo Web Engine: Situs resmi, profil kampus/lembaga, panduan.
+    4. Domain Authority Scoring: Memprioritaskan domain bereputasi tinggi (.ac.id, .go.id, .org).
+    5. Multi-Page Parallel Scraper: Membaca 3-4 web secara paralel dengan ThreadPoolExecutor.
+    6. Keyword Relevance Density: Ekstraksi paragraf dan tabel paling relevan terhadap pertanyaan.
     """
     results = []
     seen_urls = set()
+
+    clean_q = _clean_search_query(query)
+    search_q = clean_q or query
 
     # 1. Wikipedia Search & Intro Extract
     try:
@@ -183,7 +314,7 @@ def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True
         w_params = {
             "action": "query",
             "list": "search",
-            "srsearch": query,
+            "srsearch": search_q,
             "format": "json",
             "utf8": 1,
             "srlimit": 2
@@ -219,9 +350,14 @@ def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True
     except Exception:
         pass
 
-    # 2. DuckDuckGo Web Engine (Pencarian web umum & situs resmi)
+    # 2. DuckDuckGo Web Engine (Query bersih terfokus)
     try:
-        ddg_items = _search_duckduckgo(query, max_results=max(max_results, 5))
+        ddg_items = _search_duckduckgo(search_q, max_results=max(max_results, 6))
+        # Jika hasil sedikit dan kata query awal berbeda, coba query asli
+        if len(ddg_items) < 3 and search_q != query:
+            extra_items = _search_duckduckgo(query, max_results=3)
+            ddg_items.extend(extra_items)
+
         for item in ddg_items:
             u = item.get("url", "")
             if u and u not in seen_urls:
@@ -232,7 +368,7 @@ def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True
 
     # 3. Google News RSS (Berita & topik terkini)
     try:
-        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=id&gl=ID&ceid=ID:id"
+        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(search_q)}&hl=id&gl=ID&ceid=ID:id"
         resp = requests.get(url, timeout=4, headers={"User-Agent": "Mozilla/5.0"})
         if resp.status_code == 200:
             items = re.findall(r'<item>(.*?)</item>', resp.text, re.DOTALL)
@@ -259,15 +395,25 @@ def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True
     except Exception:
         pass
 
-    # 4. Multi-Page Parallel Scraper (ThreadPoolExecutor membaca 3-4 web sekaligus secara terstruktur)
+    # Beri skor otoritas domain untuk setiap hasil
+    for item in results:
+        u = item.get("url", "")
+        sc, lbl = _calculate_domain_authority(u, search_q)
+        item["authority_score"] = sc
+        item["authority_label"] = lbl
+
+    # 4. Multi-Page Parallel Scraper (ThreadPoolExecutor diprioritaskan berdasarkan skor otoritas)
     if read_content and results:
-        to_scrape = [
+        candidates = [
             r for r in results
             if not r.get("is_deep_content")
             and r.get("url")
             and not r.get("url", "").startswith("https://news.google.com")
             and "wikipedia.org" not in r.get("url", "")
-        ][:4]
+        ]
+        # Urutkan kandidat: domain berotoritas tinggi (.ac.id, .go.id, situs institusi) diekstrak lebih dulu!
+        candidates.sort(key=lambda x: x.get("authority_score", 0), reverse=True)
+        to_scrape = candidates[:4]
 
         if len(to_scrape) < 2:
             to_scrape = [r for r in results if not r.get("is_deep_content") and r.get("url")][:3]
@@ -275,7 +421,7 @@ def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True
         if to_scrape:
             with ThreadPoolExecutor(max_workers=min(4, len(to_scrape))) as executor:
                 future_to_item = {
-                    executor.submit(_scrape_page_content, item.get("url", ""), max_chars=2500): item
+                    executor.submit(_scrape_page_content, item.get("url", ""), query=search_q, max_chars=2500): item
                     for item in to_scrape
                 }
                 for future in as_completed(future_to_item):
@@ -288,10 +434,19 @@ def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True
                     except Exception as err:
                         logger.debug("Failed parallel scrape for %s: %s", target_item.get("url"), err)
 
+    # Urutkan hasil akhir agar sumber paling otoritatif dan mendalam berada di posisi paling atas untuk AI
+    results.sort(key=lambda x: (x.get("is_deep_content", False), x.get("authority_score", 0)), reverse=True)
+
     return {
         "success": bool(results),
         "query": query,
-        "message": f"Ditemukan {len(results)} sumber informasi mendalam di internet.",
+        "clean_query": search_q,
+        "message": f"Ditemukan {len(results)} sumber informasi terverifikasi di internet.",
+        "instruksi_ai": (
+            "Rangkum jawaban secara lengkap dan akurat berdasarkan data 'snippet' di atas. "
+            "Prioritaskan fakta dari sumber resmi/kampus/pemerintah, sebutkan nama website/sumber referensi, "
+            "pertahankan format daftar poin dan tabel data jika ada, dan hindari spekulasi yang tidak tercantum pada data."
+        ),
         "results": results[:max_results]
     }
 
