@@ -297,6 +297,14 @@ ALL_MCP_TOOLS_CATALOG = [
         "description": "Pencarian web mendalam multi-sumber (Wikipedia, Google News, Full Scraper) untuk riset komprehensif.",
     },
     {
+        "name": "search_places",
+        "title": "Pencarian Tempat & Kuliner",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "📍",
+        "description": "Rekomendasi tempat, cafe, kuliner, wisata, dan fasilitas publik dengan rating tertinggi, terpopuler, dan nama akurat.",
+    },
+    {
         "name": "search_social_media",
         "title": "Pencarian Media Sosial",
         "category": "media",
