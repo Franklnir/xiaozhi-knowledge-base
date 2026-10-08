@@ -903,7 +903,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     vid = matched_track.get("video_id", "")
                     title = matched_track.get("title", "")
                     stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
-                    base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
+                    base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
                     full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
 
                     try:
@@ -972,7 +972,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     item["stream_url"] = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
                 np = results[0]
                 try:
-                    base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
+                    base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
                     stream_path = np.get("stream_url", "")
                     full_stream = f"{base}{stream_path}" if stream_path.startswith("/") else stream_path
                     response["instructions"] = f"Panggil tool perangkat `self.audio.play` dengan url='{full_stream}' atau `self.audio.play_youtube` dengan video_id='{np.get('video_id', '')}' dan title='{np.get('title', '')}' agar speaker XiaoZhi langsung memutar lagunya."
@@ -1044,7 +1044,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             vid = matched.get("video_id", "")
             title = matched.get("title", "")
             stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
-            base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
+            base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
             full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
 
             try:

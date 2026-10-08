@@ -262,7 +262,7 @@ async def api_play_playlist_track(track_id: int, request: Request):
     user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
     mac_param = f"&mac={user_mac}" if user_mac else ""
     stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
-    base = os.getenv("SERVER_BASE_URL", "").rstrip("/")
+    base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
     full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
 
     try:

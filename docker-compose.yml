@@ -24,6 +24,7 @@ services:
       - PG_POOL_MAX=${PG_POOL_MAX:-10}
       - ENVIRONMENT=production
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-xiaozhiscig.biz.id,www.xiaozhiscig.biz.id,localhost}
+      - SERVER_BASE_URL=${SERVER_BASE_URL:-https://xiaozhiscig.biz.id}
       # S3 / Object Storage (NevaObjects / AWS / MinIO)
       - S3_ENDPOINT=${S3_ENDPOINT:-https://s3.nevaobjects.id}
       - S3_REGION=${S3_REGION:-us-east-1}
