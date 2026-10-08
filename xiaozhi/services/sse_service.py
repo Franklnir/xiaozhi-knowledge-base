@@ -442,7 +442,10 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                 "sholat": "get_prayer_and_worship_guide", "doa": "get_prayer_and_worship_guide",
                 "hadits": "lookup_scripture_and_verse", "ayat": "lookup_scripture_and_verse",
                 "berita": "search_news", "web search": "search_web", "pengingat": "set_reminder",
-                "memori": "recall_chat_memory", "ingat": "recall_chat_memory", "relay": "control_real_relay_by_voice"
+                "memori": "recall_chat_memory", "ingat": "recall_chat_memory", "relay": "control_real_relay_by_voice",
+                "tempat": "search_places", "cafe": "search_places", "kuliner": "search_places",
+                "restoran": "search_places", "wisata": "search_places", "hotel": "search_places",
+                "nongkrong": "search_places"
             }
             for kw, t_name in tool_keywords.items():
                 if kw in q_lower:
@@ -469,8 +472,8 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                 f"Server FastMCP mengeksekusi fungsi ini dan menyajikan hasilnya secara instan ke XiaoZhi."
             )
 
-    # ── All 47 FastMCP Tools Catalog Inquiry ─────────────────────────────────
-    elif any(k in q_lower for k in ["apa saja tool", "daftar tool", "katalog tool", "41 tool", "47 tool", "sebutkan tool", "tool apa saja", "tools mcp", "tools yang ada"]):
+    # ── All FastMCP Tools Catalog Inquiry ─────────────────────────────────
+    elif any(k in q_lower for k in ["apa saja tool", "daftar tool", "katalog tool", "41 tool", "47 tool", "48 tool", "sebutkan tool", "tool apa saja", "tools mcp", "tools yang ada"]):
         from xiaozhi.config import ALL_MCP_TOOLS_CATALOG
         cat_groups = {}
         for t in ALL_MCP_TOOLS_CATALOG:
@@ -479,7 +482,7 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                 cat_groups[c] = []
             cat_groups[c].append(f"{t.get('icon', '•')} **{t.get('title')}** (`{t.get('name')}`): {t.get('description')}")
 
-        lines = [f"🛠️ **Katalog Resmi 47 Tools FastMCP XiaoZhi Indonesia**\n\nXiaoZhi terhubung dengan **47 tools cerdas** berstandar ilmiah dan realtime:"]
+        lines = [f"🛠️ **Katalog Resmi {len(ALL_MCP_TOOLS_CATALOG)} Tools FastMCP XiaoZhi Indonesia**\n\nXiaoZhi terhubung dengan **{len(ALL_MCP_TOOLS_CATALOG)} tools cerdas** berstandar ilmiah dan realtime:"]
         for c_name, items in cat_groups.items():
             lines.append(f"\n📂 **{c_name}**:")
             for item in items:
