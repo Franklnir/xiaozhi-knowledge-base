@@ -205,6 +205,7 @@ def rank_chat_history_semantically(
 
 VALID_PERSONA_CATEGORIES = {
     "gaya_bicara": "Gaya & Nada Bicara yang Disukai (Santai, Formal, Hangat, Singkat/Padat)",
+    "mood_ekspresi": "Suasana Hati (Mood), Ekspresi Vokal & Nada Suara Persona",
     "minat_hobi": "Hobi, Minat & Ketertarikan Pribadi",
     "tujuan_belajar": "Target Akademik, Karir & Fokus Pembelajaran",
     "informasi_pribadi": "Identitas & Fakta Penting (Panggilan, Kampus/Sekolah, Domisili)",
@@ -632,6 +633,10 @@ def format_user_persona_for_prompt(
             lines.append(f"\n[{cat_label}]")
             lines.extend(items)
 
-    lines.append("\nInstruksi untuk Xiaozhi: Sesuaikan nada bicara, empati, dan saran Anda agar selaras dengan profil dan masalah yang sedang dihadapi user di atas.")
+    lines.append(
+        "\nInstruksi untuk Xiaozhi: Sesuaikan nada bicara, empati, dan gaya ekspresi vokal Anda agar selaras dengan profil, "
+        "suasana hati (mood), dan emosi percakapan di atas. Berekspresilah secara hidup dengan nada tawa, senyuman suara, "
+        "atau seruan emosional yang wajar!"
+    )
     return "\n".join(lines)
 
