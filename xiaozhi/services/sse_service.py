@@ -445,7 +445,9 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                 "memori": "recall_chat_memory", "ingat": "recall_chat_memory", "relay": "control_real_relay_by_voice",
                 "tempat": "search_places", "cafe": "search_places", "kuliner": "search_places",
                 "restoran": "search_places", "wisata": "search_places", "hotel": "search_places",
-                "nongkrong": "search_places"
+                "nongkrong": "search_places",
+                "osint": "osint_recon", "recon": "osint_recon", "intelijen": "osint_recon",
+                "jejak digital": "osint_recon", "ip lookup": "osint_recon", "cek domain": "osint_recon"
             }
             for kw, t_name in tool_keywords.items():
                 if kw in q_lower:

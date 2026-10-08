@@ -476,6 +476,31 @@ def _auto_save_to_knowledge_base(store, owner_id: int, title: str, category: str
         logger.info("Auto-saved knowledge material id=%s ('%s') for owner_id=%s", mat_id, clean_title, owner_id)
         return mat_id
     except Exception as exc:
+        if "Batas materi" in str(exc) and hasattr(store, "_get_conn"):
+            try:
+                # Pangkas cache pencarian/OSINT terlama untuk memberi ruang bagi pencarian baru
+                with store._get_conn() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "SELECT id FROM materials WHERE owner_id = %s AND source_type = 'auto_search_cache' ORDER BY created_at ASC LIMIT 1",
+                            (int(owner_id),)
+                        )
+                        row = cur.fetchone()
+                        if row:
+                            del_id = row["id"]
+                            cur.execute("DELETE FROM materials WHERE id = %s AND owner_id = %s", (del_id, int(owner_id)))
+                            conn.commit()
+                            logger.info("Pruned oldest auto_search_cache id=%s for owner_id=%s", del_id, owner_id)
+                            return store.add_material(
+                                owner_id=owner_id,
+                                title=clean_title,
+                                category=clean_cat,
+                                content=content.strip()[:10000],
+                                keywords=keywords.strip()[:200],
+                                source_type="auto_search_cache"
+                            )
+            except Exception as e2:
+                logger.debug("Prune cache retry error: %s", e2)
         logger.warning("Gagal auto-save ke knowledge base: %s", exc)
         return None
 
@@ -795,7 +820,13 @@ def _osint_recon(target: str, target_type: str = "auto") -> dict:
             "success": True,
             "type": "IP Address Intelligence",
             "target": target,
-            "ip_intel": data
+            "ip_intel": data,
+            "instruksi_ai": (
+                "PANDUAN MENJAWAB SPEAKER XIAOZHI (VOICE TTS RAMAH PENGGUNA):\n"
+                "1. Jawab secara ringkas dalam 2-3 kalimat: sebutkan lokasi negara, kota, ISP/organisasi, dan reverse DNS/hostname.\n"
+                "2. JANGAN membacakan angka koordinat garis lintang/bujur (lat/lon) yang membosankan di speaker.\n"
+                "3. Sampaikan bahwa laporan investigasi lengkap sudah tersimpan ke database memori."
+            )
         }
 
     elif target_type == "domain" or (target_type == "auto" and is_domain):
@@ -837,7 +868,13 @@ def _osint_recon(target: str, target_type: str = "auto") -> dict:
             "success": True,
             "type": "Domain Reconnaissance",
             "target": target,
-            "domain_recon": data
+            "domain_recon": data,
+            "instruksi_ai": (
+                "PANDUAN MENJAWAB SPEAKER XIAOZHI (VOICE TTS RAMAH PENGGUNA):\n"
+                "1. Jawab secara ringkas dalam 2-3 kalimat: sebutkan IP tujuan, teknologi server web atau proteksi WAF (misal Cloudflare), dan 2-3 subdomain utama.\n"
+                "2. JANGAN membacakan seluruh daftar subdomain satu per satu.\n"
+                "3. Sampaikan bahwa laporan investigasi domain lengkap sudah tersimpan ke database memori."
+            )
         }
 
     else:
@@ -873,7 +910,12 @@ def _osint_recon(target: str, target_type: str = "auto") -> dict:
             "type": "Username Digital Footprint (OSINT)",
             "username": username,
             "profiles_found_count": len(found_profiles),
-            "profiles": found_profiles
+            "profiles": found_profiles,
+            "instruksi_ai": (
+                "PANDUAN MENJAWAB SPEAKER XIAOZHI (VOICE TTS RAMAH PENGGUNA):\n"
+                "1. Jawab secara ringkas dalam 2 kalimat: sebutkan berapa banyak profil yang ditemukan dan sebutkan 2-3 platform utama tempat akun tersebut terdeteksi aktif (misal GitHub, Telegram, Pinterest).\n"
+                "2. Sampaikan bahwa jejak digital username terkonfirmasi dan rincian tautannya sudah otomatis disimpan ke database memori."
+            )
         }
 
 
@@ -2016,6 +2058,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         """
         Lakukan penyelidikan intelijen sumber terbuka (OSINT - Open Source Intelligence) pasif.
         Mendukung profiling jejak digital username (di 12+ platform), intelijen alamat IP (geolokasi, ISP, ASN), dan recon domain (DNS, subdomain, header server).
+        Laporan investigasi otomatis tersimpan ke database Knowledge Base pengguna agar dapat diingat kembali.
 
         Args:
             target: Username (@username), IP address (misal 8.8.8.8), atau domain (misal github.com).
@@ -2024,7 +2067,59 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         owner_id = mcp_active_owner_ctx.get()
         try:
             target = clean_text(target, max_len=150, min_len=1, field="Target OSINT")
+
+            memory_hits = []
+            if owner_id and store:
+                try:
+                    memory_hits = store.search_materials(owner_id, f"OSINT {target}", limit=1)
+                except Exception:
+                    pass
+
             response = _osint_recon(target, target_type=target_type)
+
+            if memory_hits and response.get("success"):
+                mem = memory_hits[0]
+                response["laporan_tersimpan_sebelumnya"] = {
+                    "title": mem.get("title"),
+                    "summary": mem.get("content", "")[:500]
+                }
+
+            if owner_id and store and response.get("success"):
+                t_type = response.get("type", "OSINT Recon")
+                compiled = f"# Laporan {t_type}: {target}\n\n"
+                if "ip_intel" in response:
+                    ip_data = response["ip_intel"]
+                    compiled += f"- **Target IP**: `{target}`\n"
+                    compiled += f"- **Negara & Kota**: {ip_data.get('country')}, {ip_data.get('city')}\n"
+                    compiled += f"- **ISP & Organisasi**: {ip_data.get('isp')} ({ip_data.get('org')})\n"
+                    compiled += f"- **Reverse DNS / PTR**: {ip_data.get('reverse_dns')}\n"
+                    compiled += f"- **Zona Waktu**: {ip_data.get('timezone')}\n"
+                elif "domain_recon" in response:
+                    d_data = response["domain_recon"]
+                    compiled += f"- **Target Domain**: `{target}`\n"
+                    compiled += f"- **Resolved IP(s)**: {', '.join(d_data.get('resolved_ips', []))}\n"
+                    th = d_data.get("tech_headers", {})
+                    compiled += f"- **Web Server & WAF**: {th.get('server')} (WAF: {th.get('waf_or_cdn')})\n"
+                    if d_data.get("discovered_subdomains"):
+                        compiled += f"- **Subdomain Ditemukan**: {', '.join(d_data.get('discovered_subdomains', []))}\n"
+                elif "profiles" in response:
+                    compiled += f"- **Target Username**: `@{response.get('username')}`\n"
+                    compiled += f"- **Total Akun Ditemukan**: {response.get('profiles_found_count')}\n"
+                    for p in response.get("profiles", []):
+                        compiled += f"  • **{p['platform']}**: {p['url']}\n"
+
+                mat_id = _auto_save_to_knowledge_base(
+                    store=store,
+                    owner_id=owner_id,
+                    title=f"OSINT Recon: {target}",
+                    category="Investigasi & OSINT",
+                    content=compiled,
+                    keywords=f"osint, intelijen, {target}, recon, profiling, jejak digital"
+                )
+                if mat_id:
+                    response["tersimpan_ke_database"] = True
+                    response["catatan_memori"] = f"Laporan investigasi OSINT untuk '{target}' otomatis tersimpan ke Knowledge Base Anda (ID #{mat_id})."
+
             if owner_id:
                 record_mcp_tool_history(owner_id, "osint_recon", target, {"target": target, "type": target_type}, response)
             return response
