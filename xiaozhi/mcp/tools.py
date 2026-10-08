@@ -1262,6 +1262,181 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return {"success": False, "message": "Gagal mengambil daftar device.", "devices": []}
 
     @mcp_server.tool()
+    def express_emotion(
+        emotion: str,
+        intensity: str = "sedang",
+        reason: str = "",
+        custom_message: str = "",
+        custom_interjection: str = "",
+    ) -> dict:
+        """
+        Mengekspresikan emosi vokal dan animasi wajah untuk XiaoZhi atau AI Persona saat sedang marah, senyum, bahagia, bingung, senang, teriak, ketawa, sedih, kaget, bisik, sarkas, bangga, ngantuk, tenang, atau takut.
+        Panggil tool ini secara otomatis ketika:
+        - User meminta XiaoZhi berekspresi: "coba kamu ketawa dong", "teriak sekerasnya", "marah dong", "senyum buat aku", "kamu bingung ya?"
+        - Percakapan memicu emosi nyata: lelucon lucu (ketawa), kabar gembira/sukses (senang/bahagia/teriak gembira), hal aneh/paradoks (bingung), perlakuan kasar/kesal (marah), kabar duka (sedih/menangis), rahasia (bisik), dll.
+        - Ingin memodulasi nada bicara, intonasi suara, onomatopoeia suara, dan ekspresi layar ESP32/display.
+
+        Args:
+            emotion: Nama emosi/ekspresi ("marah", "senyum", "bahagia", "bingung", "senang", "teriak", "ketawa", "sedih", "kaget", "bisik", "sarkas", "bangga", "ngantuk", "tenang", "takut").
+            intensity: Tingkat intensitas emosi ("ringan", "sedang", "tinggi", "ekstrem" / default: "sedang").
+            reason: Alasan atau konteks pemicu emosi (contoh: "User menceritakan lelucon lucu", "Merayakan kelulusan user").
+            custom_message: Kalimat respons atau kata-kata yang ingin diucapkan bersamaan dengan nada emosi ini (opsional).
+            custom_interjection: Kata seru kustom jika ingin suara vokal khusus (contoh: "Wkwkwk", "Hahaha", "WAAAH!", "Grrr!").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.expression_service import build_expression_payload
+        result = build_expression_payload(
+            emotion=emotion,
+            intensity=intensity,
+            reason=reason,
+            custom_message=custom_message,
+            custom_interjection=custom_interjection,
+        )
+        if owner_id:
+            q_str = f"{emotion} ({intensity}): {reason or custom_message or 'ekspresi vokal'}".strip()
+            record_mcp_tool_history(owner_id, "express_emotion", q_str, {
+                "emotion": emotion,
+                "intensity": intensity,
+                "reason": reason,
+                "custom_message": custom_message,
+            }, result)
+        return result
+
+    @mcp_server.tool()
+    def set_persona_mood(
+        mood: str,
+        expressiveness: str = "tinggi",
+        persistent: bool = True,
+        notes: str = "",
+    ) -> dict:
+        """
+        Mengatur suasana hati (mood) dasar dan gaya ekspresi vokal persona XiaoZhi agar percakapan memiliki pembawaan kepribadian tertentu secara konsisten.
+        Gunakan tool ini ketika user meminta gaya kepribadian tertentu:
+        - "Kamu jadi asisten yang ceria dan suka ketawa ya" -> mood="ceria_humoris"
+        - "Bicara dengan nada yang hangat dan lembut penuh senyum" -> mood="hangat_penyayang"
+        - "Santai aja bicaranya pakai bahasa gaul" -> mood="santai_cuek"
+        - "Coba jadi tsundere yang galak tapi perhatian" -> mood="galak_tsundere"
+        - "Jadilah mentor yang bijak dan tenang" -> mood="bijak_tenang"
+        - "Semangatin aku dengan antusias tinggi!" -> mood="antusias_eksploratif"
+        - "Bicara manja dan lucu dong" -> mood="manja_akrab"
+        - "Gunakan gaya profesional dan tegas" -> mood="tegas_profesional"
+
+        Args:
+            mood: Mood persona pilihan ('ceria_humoris', 'hangat_penyayang', 'santai_cuek', 'galak_tsundere', 'bijak_tenang', 'antusias_eksploratif', 'manja_akrab', 'tegas_profesional').
+            expressiveness: Frekuensi ekspresi vokal suara ('tinggi', 'sedang', 'natural' / default: 'tinggi').
+            persistent: Jika True, disimpan permanen ke preferensi user persona profil di database (default: True).
+            notes: Catatan tambahan preferensi gaya bicara dari user.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.expression_service import format_persona_mood_guidelines
+        guidelines = format_persona_mood_guidelines(mood, expressiveness=expressiveness)
+
+        saved = False
+        if owner_id and persistent:
+            try:
+                store.save_user_preference(
+                    owner_id,
+                    "gaya_bicara",
+                    "mood_persona",
+                    f"{guidelines['title']} ({guidelines['voice_style']})"
+                )
+                store.save_user_preference(
+                    owner_id,
+                    "gaya_bicara",
+                    "tingkat_ekspresif_vokal",
+                    expressiveness
+                )
+                if notes.strip():
+                    store.save_user_preference(
+                        owner_id,
+                        "gaya_bicara",
+                        "catatan_khusus_bicara",
+                        notes.strip()
+                    )
+                saved = True
+            except Exception:
+                logger.exception("Error saving persona mood preference to store")
+
+        response = {
+            "success": True,
+            "message": f"Mood persona XiaoZhi berhasil disetel ke '{guidelines['title']}' ({guidelines['icon']}).",
+            "mood": guidelines["mood_key"],
+            "title": guidelines["title"],
+            "icon": guidelines["icon"],
+            "voice_style": guidelines["voice_style"],
+            "expressiveness": expressiveness,
+            "persistent_saved": saved,
+            "prompt_guidance": guidelines["prompt_context"],
+            "instruksi_xiaozhi": (
+                f"Mulai sekarang dan untuk percakapan seterusnya, adopsi kepribadian '{guidelines['title']}'! "
+                f"Bicaralah dengan gaya: {guidelines['voice_style']}. "
+                f"Tunjukkan ekspresi vokal nyata (tawa, nada ceria, seruan, senyuman) secara konsisten."
+            ),
+            "metadata": {
+                "face": guidelines["base_emotion"],
+                "emoji": guidelines["base_emoji"],
+                "mood": guidelines["mood_key"],
+            }
+        }
+        if owner_id:
+            record_mcp_tool_history(owner_id, "set_persona_mood", f"{guidelines['title']} ({expressiveness})", {
+                "mood": mood,
+                "expressiveness": expressiveness,
+                "persistent": persistent,
+                "notes": notes,
+            }, response)
+        return response
+
+    @mcp_server.tool()
+    def get_available_expressions() -> dict:
+        """
+        Melihat katalog lengkap seluruh ekspresi emosi, variasi seruan suara (vocal cues), modulasi nada, dan mood persona yang didukung XiaoZhi.
+        Gunakan tool ini ketika user bertanya:
+        - "Ekspresi apa saja yang bisa kamu lakukan?"
+        - "Bisa berekspresi apa aja kamu?"
+        - "Bagaimana cara menyuruhmu ketawa atau teriak?"
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.expression_service import SUPPORTED_EMOTIONS, SUPPORTED_PERSONA_MOODS
+        formatted_emotions = []
+        for key, data in SUPPORTED_EMOTIONS.items():
+            cues = data.get("vocal_cues", {}).get("sedang", [])
+            formatted_emotions.append({
+                "emotion": key,
+                "title": data["title"],
+                "emoji": data["emoji"],
+                "contoh_suara": cues[:3] if cues else [],
+                "panduan_nada": data["tone_guidance"],
+                "sample_dialogue": data["sample_dialogue"],
+            })
+
+        formatted_moods = []
+        for k, m in SUPPORTED_PERSONA_MOODS.items():
+            formatted_moods.append({
+                "mood": k,
+                "title": m["title"],
+                "icon": m["icon"],
+                "deskripsi": m["description"],
+                "gaya_suara": m["voice_style"],
+            })
+
+        response = {
+            "success": True,
+            "total_ekspresi": len(formatted_emotions),
+            "total_mood_persona": len(formatted_moods),
+            "daftar_ekspresi": formatted_emotions,
+            "daftar_mood_persona": formatted_moods,
+            "instruksi_xiaozhi": (
+                "Jelaskan kepada pengguna dengan ceria dan ramah bahwa kamu bisa berekspresi nyata dalam percakapan: "
+                "bisa ketawa (wkwk/hahaha), berteriak kagum/kaget, marah/kesal, tersenyum hangat, bingung, bahagia, "
+                "berbisik rahasia, sedih menangis, bangga, ngantuk, dll. Ajak pengguna mencoba salah satu ekspresi tersebut!"
+            )
+        }
+        if owner_id:
+            record_mcp_tool_history(owner_id, "get_available_expressions", "katalog ekspresi", {}, response)
+        return response
+
+    @mcp_server.tool()
     def control_relay(channel: int, action: str) -> dict:
         """
         Kontrol relay pada simulasi smarthome virtual.

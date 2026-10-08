@@ -156,6 +156,30 @@ ALL_MCP_TOOLS_CATALOG = [
         "icon": "📟",
         "description": "Melihat daftar perangkat keras ESP32 dan MAC address yang terhubung.",
     },
+    {
+        "name": "express_emotion",
+        "title": "Ekspresi Wajah & Nada Suara AI",
+        "category": "persona",
+        "category_label": "Karakter & Device",
+        "icon": "🎭",
+        "description": "Mengekspresikan emosi vokal (marah, senyum, bahagia, bingung, senang, teriak, ketawa, dll) dengan nada bicara dan interjeksi alami.",
+    },
+    {
+        "name": "set_persona_mood",
+        "title": "Mood Persona & Gaya Nada Bicara",
+        "category": "persona",
+        "category_label": "Karakter & Device",
+        "icon": "🌈",
+        "description": "Mengatur suasana hati (mood) dasar dan tingkat ekspresif persona XiaoZhi (ceria, santai, humoris, galak, hangat, dll).",
+    },
+    {
+        "name": "get_available_expressions",
+        "title": "Katalog Ekspresi & Reaksi Suara",
+        "category": "persona",
+        "category_label": "Karakter & Device",
+        "icon": "🗣️",
+        "description": "Melihat daftar seluruh ekspresi emosi, efek seruan suara, dan tag modulasi nada yang didukung XiaoZhi.",
+    },
 
     # 3. Smart Home Virtual & Relay Nyata
     {
@@ -489,18 +513,124 @@ ALL_MCP_TOOL_NAMES = [t["name"] for t in ALL_MCP_TOOLS_CATALOG]
 
 # ── Emote Aliases ──────────────────────────────────────────────────────────
 EMOTE_ALIASES = {
-    "angry": "\U0001f620",
-    "confused": "\U0001f615",
-    "cry": "\U0001f622",
-    "happy": "\U0001f60a",
-    "laugh": "\U0001f604",
-    "love": "\U0001f60d",
-    "neutral": "\U0001f610",
-    "sad": "\U0001f622",
-    "smile": "\U0001f60a",
-    "surprised": "\U0001f62e",
-    "thinking": "\U0001f914",
-    "wink": "\U0001f609",
+    # Marah & Kesal
+    "angry": "😠",
+    "marah": "😠",
+    "kesal": "😠",
+    "geram": "😠",
+    "jengkel": "😠",
+    "murka": "😠",
+    "ngamuk": "😠",
+    "mad": "😠",
+
+    # Senyum & Ramah
+    "smile": "😊",
+    "senyum": "😊",
+    "tersenyum": "😊",
+    "ramah": "😊",
+    "hangat": "😊",
+
+    # Bahagia & Sukacita
+    "happy": "🥰",
+    "bahagia": "🥰",
+    "sukacita": "🥰",
+    "gembira": "🥰",
+    "penuh_cinta": "🥰",
+
+    # Bingung & Bertanya-tanya
+    "confused": "🤔",
+    "bingung": "🤔",
+    "heran": "🤔",
+    "pusing": "🤔",
+    "linglung": "🤔",
+    "thinking": "🤔",
+
+    # Senang & Antusias
+    "excited": "😄",
+    "senang": "😄",
+    "riang": "😄",
+    "girang": "😄",
+    "bersemangat": "😄",
+
+    # Teriak & Berseru
+    "shout": "📢",
+    "scream": "📢",
+    "teriak": "📢",
+    "berseru": "📢",
+    "pekik": "📢",
+    "histeris": "📢",
+
+    # Ketawa & Tertawa
+    "laugh": "😆",
+    "ketawa": "😆",
+    "tertawa": "😆",
+    "ngakak": "😆",
+    "wkwk": "😆",
+    "giggle": "😆",
+    "chuckle": "😆",
+
+    # Sedih & Menangis
+    "sad": "😢",
+    "cry": "😢",
+    "sedih": "😢",
+    "nangis": "😢",
+    "menangis": "😢",
+    "terharu": "😢",
+
+    # Kaget & Terkejut
+    "surprised": "😲",
+    "kaget": "😲",
+    "terkejut": "😲",
+    "syok": "😲",
+    "shock": "😲",
+
+    # Bisik-bisik & Rahasia
+    "whisper": "🤫",
+    "bisik": "🤫",
+    "berbisik": "🤫",
+    "rahasia": "🤫",
+
+    # Sarkas & Usil
+    "sarcastic": "😏",
+    "sarkas": "😏",
+    "usil": "😏",
+    "julid": "😏",
+    "menggoda": "😏",
+
+    # Bangga & Percaya Diri
+    "proud": "😎",
+    "bangga": "😎",
+    "percaya_diri": "😎",
+    "pede": "😎",
+    "keren": "😎",
+
+    # Ngantuk & Lelah
+    "sleepy": "🥱",
+    "ngantuk": "🥱",
+    "capek": "🥱",
+    "lelah": "🥱",
+    "tidur": "🥱",
+
+    # Tenang & Damai
+    "neutral": "😌",
+    "calm": "😌",
+    "tenang": "😌",
+    "kalem": "😌",
+    "damai": "😌",
+    "santai": "😌",
+
+    # Takut & Panik
+    "scared": "😨",
+    "takut": "😨",
+    "panik": "😨",
+    "cemas": "😨",
+
+    # Cinta & Kedip
+    "love": "😍",
+    "cinta": "😍",
+    "sayang": "😍",
+    "wink": "😉",
+    "kedip": "😉",
 }
 
 # ── Search ─────────────────────────────────────────────────────────────────
