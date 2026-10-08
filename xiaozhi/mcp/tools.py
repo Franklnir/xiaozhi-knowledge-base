@@ -3,13 +3,14 @@ import os
 import re
 import socket
 import urllib.parse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, Optional
 import requests
 from bs4 import BeautifulSoup
 
 from xiaozhi.core.utils import clean_text
 from xiaozhi.mcp.context import mcp_active_owner_ctx
+from xiaozhi.services.scraper_service import extract_structured_text_bs4, validate_scrape_url
 from xiaozhi.services.smarthome_service import (
     parse_smart_home_action,
     resolve_smart_home_target,
@@ -35,33 +36,148 @@ def format_material_for_xiaozhi(item: dict, keyword: str = "") -> dict:
 
 
 
-def _scrape_page_content(url: str, max_chars: int = 1500) -> str:
-    """Scrape clean textual content from a webpage."""
+def _scrape_page_content(url: str, max_chars: int = 2500) -> str:
+    """Scrape clean structured textual content from a webpage with SSRF protection."""
     if not url or not url.startswith("http"):
         return ""
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        r = requests.get(url, headers=headers, timeout=5)
+        val = validate_scrape_url(url)
+        if not val.get("valid"):
+            return ""
+        safe_url = val.get("url", url)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+        }
+        r = requests.get(safe_url, headers=headers, timeout=5)
         if r.status_code != 200:
             return ""
-        soup = BeautifulSoup(r.text, "html.parser")
-        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "form", "noscript"]):
-            tag.decompose()
-        main = soup.find("article") or soup.find("main") or soup.body
-        if not main:
+        content_type = r.headers.get("content-type", "").lower()
+        if "text/html" not in content_type and "application/xhtml" not in content_type:
             return ""
-        text = main.get_text(separator=" ", strip=True)
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text[:max_chars]
+        soup = BeautifulSoup(r.text, "html.parser")
+        text = extract_structured_text_bs4(soup, max_chars=max_chars)
+        return text
     except Exception:
         return ""
 
 
-def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True) -> dict:
-    """Multi-source deep web search: Wikipedia + Google News + Web Scraper."""
+def _search_duckduckgo(query: str, max_results: int = 5) -> list:
+    """
+    DuckDuckGo Web Engine: Pencarian web umum tanpa batasan berita, gratis tanpa kuota API.
+    Mendukung format HTML dan fallback Lite untuk reliabilitas tinggi.
+    """
+    url = "https://html.duckduckgo.com/html/"
+    data = urllib.parse.urlencode({"q": query}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": "https://html.duckduckgo.com/",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+    )
+    html = ""
+    try:
+        with urllib.request.urlopen(req, timeout=7) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        logger.debug("DuckDuckGo HTML query gagal: %s, mencoba endpoint Lite", e)
+        try:
+            url_lite = f"https://lite.duckduckgo.com/lite/?q={urllib.parse.quote(query)}"
+            req_lite = urllib.request.Request(
+                url_lite,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                }
+            )
+            with urllib.request.urlopen(req_lite, timeout=7) as resp_lite:
+                html = resp_lite.read().decode("utf-8", errors="replace")
+        except Exception as e2:
+            logger.warning("DuckDuckGo search error: %s", e2)
+            return []
+
+    if not html:
+        return []
+
+    soup = BeautifulSoup(html, "html.parser")
     results = []
-    
-    # 1. Wikipedia Search & Full Intro Extract
+
+    # 1. Parsing dari endpoint HTML
+    for r in soup.select(".result"):
+        title_el = r.select_one(".result__title a")
+        snippet_el = r.select_one(".result__snippet")
+        if title_el:
+            href = title_el.get("href", "")
+            if "uddg=" in href:
+                parsed = urllib.parse.parse_qs(urllib.parse.urlparse(href).query)
+                real_url = parsed.get("uddg", [href])[0]
+            else:
+                real_url = href
+            title = title_el.get_text(strip=True)
+            snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+            if real_url and real_url.startswith("http"):
+                results.append({
+                    "title": title,
+                    "url": real_url,
+                    "snippet": snippet,
+                    "source": "DuckDuckGo Web",
+                    "is_deep_content": False
+                })
+        if len(results) >= max_results:
+            break
+
+    # 2. Parsing fallback dari endpoint Lite
+    if not results:
+        rows = soup.select("table tbody tr") or soup.select("table tr")
+        current_title = ""
+        current_url = ""
+        for tr in rows:
+            link = tr.select_one("a.result-link")
+            snippet_td = tr.select_one("td.result-snippet")
+            if link:
+                href = link.get("href", "")
+                if "uddg=" in href:
+                    parsed = urllib.parse.parse_qs(urllib.parse.urlparse(href).query)
+                    real_url = parsed.get("uddg", [href])[0]
+                else:
+                    real_url = href
+                current_title = link.get_text(strip=True)
+                current_url = real_url
+            elif snippet_td and current_url:
+                snippet = snippet_td.get_text(strip=True)
+                if current_url.startswith("http"):
+                    results.append({
+                        "title": current_title,
+                        "url": current_url,
+                        "snippet": snippet,
+                        "source": "DuckDuckGo Web",
+                        "is_deep_content": False
+                    })
+                current_title = ""
+                current_url = ""
+            if len(results) >= max_results:
+                break
+
+    return results
+
+
+def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True) -> dict:
+    """
+    Pencarian web mendalam multi-sumber:
+    1. Wikipedia Ensiklopedia (Definisi & latar belakang)
+    2. DuckDuckGo Web Engine (Situs resmi, artikel web umum, dokumentasi, panduan)
+    3. Google News RSS (Berita terkini)
+    4. Multi-Page Parallel Scraper (ThreadPoolExecutor membaca 3-4 web sekaligus secara terstruktur)
+    """
+    results = []
+    seen_urls = set()
+
+    # 1. Wikipedia Search & Intro Extract
     try:
         w_url = "https://id.wikipedia.org/w/api.php"
         w_params = {
@@ -90,53 +206,87 @@ def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True
                 if er.status_code == 200:
                     pages = er.json().get("query", {}).get("pages", {})
                     extract = pages.get(str(pageid), {}).get("extract", "")
-                    if extract:
+                    wiki_url = f"https://id.wikipedia.org/?curid={pageid}"
+                    if extract and len(extract) > 40:
                         results.append({
                             "title": hit["title"],
-                            "url": f"https://id.wikipedia.org/?curid={pageid}",
+                            "url": wiki_url,
                             "snippet": extract[:1000],
                             "source": "Wikipedia Ensiklopedia",
                             "is_deep_content": True
                         })
+                        seen_urls.add(wiki_url)
     except Exception:
         pass
 
-    # 2. Google News & Web RSS
+    # 2. DuckDuckGo Web Engine (Pencarian web umum & situs resmi)
+    try:
+        ddg_items = _search_duckduckgo(query, max_results=max(max_results, 5))
+        for item in ddg_items:
+            u = item.get("url", "")
+            if u and u not in seen_urls:
+                results.append(item)
+                seen_urls.add(u)
+    except Exception as exc:
+        logger.warning("DuckDuckGo search warning: %s", exc)
+
+    # 3. Google News RSS (Berita & topik terkini)
     try:
         url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=id&gl=ID&ceid=ID:id"
-        resp = requests.get(url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+        resp = requests.get(url, timeout=4, headers={"User-Agent": "Mozilla/5.0"})
         if resp.status_code == 200:
             items = re.findall(r'<item>(.*?)</item>', resp.text, re.DOTALL)
-            for item in items[:max_results]:
+            for item in items[:3]:
                 t = re.search(r'<title>(.*?)</title>', item)
                 l = re.search(r'<link>(.*?)</link>', item)
                 d = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
                 src = re.search(r'<source.*?>(.*?)</source>', item)
-                if t:
-                    raw_link = l.group(1) if l else ""
+                if t and l:
+                    raw_link = l.group(1)
+                    if raw_link in seen_urls:
+                        continue
                     raw_desc = re.sub(r'<[^>]+>', '', d.group(1)) if d else ""
                     clean_desc = re.sub(r'&[a-zA-Z]+;', ' ', raw_desc).strip()
                     
-                    item_data = {
+                    results.append({
                         "title": t.group(1),
                         "url": raw_link,
                         "snippet": clean_desc[:300],
-                        "source": src.group(1) if src else "Web / Berita",
+                        "source": src.group(1) if src else "Berita Terkini",
                         "is_deep_content": False
-                    }
-                    results.append(item_data)
+                    })
+                    seen_urls.add(raw_link)
     except Exception:
         pass
 
-    # 3. Deep Page Reader: For top non-wiki result, attempt to scrape deeper text if requested
-    if read_content:
-        for r in results:
-            if r.get("source") != "Wikipedia Ensiklopedia" and r.get("url"):
-                deep_text = _scrape_page_content(r["url"], max_chars=1500)
-                if deep_text and len(deep_text) > len(r.get("snippet", "")):
-                    r["snippet"] = deep_text
-                    r["is_deep_content"] = True
-                    break
+    # 4. Multi-Page Parallel Scraper (ThreadPoolExecutor membaca 3-4 web sekaligus secara terstruktur)
+    if read_content and results:
+        to_scrape = [
+            r for r in results
+            if not r.get("is_deep_content")
+            and r.get("url")
+            and not r.get("url", "").startswith("https://news.google.com")
+            and "wikipedia.org" not in r.get("url", "")
+        ][:4]
+
+        if len(to_scrape) < 2:
+            to_scrape = [r for r in results if not r.get("is_deep_content") and r.get("url")][:3]
+
+        if to_scrape:
+            with ThreadPoolExecutor(max_workers=min(4, len(to_scrape))) as executor:
+                future_to_item = {
+                    executor.submit(_scrape_page_content, item.get("url", ""), max_chars=2500): item
+                    for item in to_scrape
+                }
+                for future in as_completed(future_to_item):
+                    target_item = future_to_item[future]
+                    try:
+                        scraped_text = future.result()
+                        if scraped_text and len(scraped_text) > 100:
+                            target_item["snippet"] = scraped_text
+                            target_item["is_deep_content"] = True
+                    except Exception as err:
+                        logger.debug("Failed parallel scrape for %s: %s", target_item.get("url"), err)
 
     return {
         "success": bool(results),
@@ -1208,11 +1358,12 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def search_web(query: str, max_results: int = 5) -> dict:
         """
-        Cari informasi terkini dari internet.
-        Gunakan tool ini saat user bertanya tentang berita terbaru, informasi umum, fakta, atau hal apapun yang butuh pencarian web real-time.
+        Pencarian internet real-time multi-mesin (DuckDuckGo Web Engine umum tanpa kuota, Wikipedia, & Berita).
+        Membaca konten 3-4 website secara paralel dengan format terstruktur (judul, daftar poin, dan tabel).
+        Gunakan tool ini saat user bertanya tentang institusi, universitas, profil, fakta, berita, atau pertanyaan umum web.
 
         Args:
-            query: Kata kunci pencarian.
+            query: Kata kunci pencarian (misal: "universitas pelita bangsa cikarang", "jadwal buka kantor pos").
             max_results: Jumlah hasil (1-10, default 5).
         """
         owner_id = mcp_active_owner_ctx.get()
@@ -1233,13 +1384,14 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def search_web_deep(query: str, max_results: int = 5, read_content: bool = True) -> dict:
         """
-        Pencarian web mendalam multi-sumber (Wikipedia, berita terkini, web artikel) dan membaca isi artikel utuh.
-        Gunakan tool ini untuk riset topik mendalam, fakta ilmiah, sejarah, panduan teknis, tutorial, atau pertanyaan kompleks.
+        Pencarian web mendalam tingkat tinggi: DuckDuckGo Web Engine + Wikipedia + Scraper paralel multi-halaman.
+        Mengekstrak isi halaman lengkap termasuk tabel data, daftar poin penting, dan subjudul untuk rangkuman mendalam.
+        Gunakan tool ini untuk riset topik mendalam, profil kampus/lembaga, panduan teknis, tutorial, kurikulum, atau pertanyaan analitis.
 
         Args:
             query: Kata kunci atau topik riset mendalam.
             max_results: Jumlah sumber yang dikumpulkan (default 5).
-            read_content: Ekstrak dan baca isi artikel secara mendalam (default True).
+            read_content: Ekstrak dan baca isi artikel/halaman secara mendalam (default True).
         """
         owner_id = mcp_active_owner_ctx.get()
         try:

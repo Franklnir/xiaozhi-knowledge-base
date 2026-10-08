@@ -78,11 +78,33 @@ def validate_scrape_url(url: str) -> Dict[str, Any]:
         return {"valid": False, "error": f"URL tidak valid: {str(e)[:80]}"}
 
 
-def _extract_page_data_bs4(html: str, max_length: int) -> Dict[str, Any]:
-    """Extract clean title, description, keywords, and body text using BeautifulSoup."""
-    soup = BeautifulSoup(html, "html.parser")
+def format_html_table_to_markdown(table_el) -> str:
+    """Konversi elemen tabel HTML menjadi format tabel Markdown terstruktur."""
+    rows = table_el.find_all("tr")
+    if not rows:
+        return ""
+    table_lines = []
+    for tr in rows:
+        cols = [td.get_text(separator=" ", strip=True).replace("\n", " ").strip() for td in tr.find_all(["th", "td"])]
+        if cols and any(cols):
+            table_lines.append("| " + " | ".join(cols) + " |")
+    if not table_lines:
+        return ""
+    if len(table_lines) > 1:
+        first_row_cols = max(1, len(table_lines[0].split("|")) - 2)
+        divider = "| " + " | ".join(["---"] * first_row_cols) + " |"
+        table_lines.insert(1, divider)
+    return "\n" + "\n".join(table_lines) + "\n"
 
-    # Remove unwanted tags
+
+def extract_structured_text_bs4(soup: Any, max_chars: int = 25000) -> str:
+    """
+    Ekstraksi konten artikel web dengan mempertahankan struktur elemen penting:
+    - Judul & Subjudul (H1-H4 sebagai Markdown Heading ###)
+    - Daftar poin & nomor (UL/OL sebagai bullet points •)
+    - Tabel data (TABLE sebagai Markdown Table)
+    - Paragraf & kutipan
+    """
     unwanted_tags = [
         "script", "style", "nav", "footer", "header", "aside", "noscript",
         "iframe", "form", "svg", "button", "input", "select", "textarea"
@@ -90,11 +112,70 @@ def _extract_page_data_bs4(html: str, max_length: int) -> Dict[str, Any]:
     for tag in soup(unwanted_tags):
         tag.decompose()
 
-    # Also remove common advertisement and cookie banners by class/id (use word boundaries to avoid matching words like lead, ready, reading)
     ad_pattern = re.compile(r"(\bads?\b|\badvertisement\b|cookie-banner|popup-banner)", re.I)
     for el in soup.find_all(attrs={"class": ad_pattern}):
         if el.name not in ("body", "main", "article", "html"):
             el.decompose()
+
+    main_el = (
+        soup.find("article")
+        or soup.find("main")
+        or soup.find(attrs={"role": "main"})
+        or soup.find(class_=re.compile(r"(article-content|post-content|entry-content|story-body|main-content|content-area)", re.I))
+        or soup.find(id=re.compile(r"(content|main|article)", re.I))
+        or soup.body
+        or soup
+    )
+
+    blocks = []
+    seen_tables = set()
+    seen_lists = set()
+
+    for el in main_el.find_all(["h1", "h2", "h3", "h4", "p", "ul", "ol", "table", "blockquote"]):
+        tag = el.name.lower()
+        if tag in ("h1", "h2", "h3", "h4"):
+            text = el.get_text(strip=True)
+            if text and len(text) > 2:
+                blocks.append(f"\n### {text}\n")
+        elif tag == "table":
+            if id(el) in seen_tables:
+                continue
+            seen_tables.add(id(el))
+            tbl_md = format_html_table_to_markdown(el)
+            if tbl_md:
+                blocks.append(tbl_md)
+        elif tag in ("ul", "ol"):
+            if id(el) in seen_lists:
+                continue
+            seen_lists.add(id(el))
+            items = []
+            for li in el.find_all("li", recursive=False):
+                lit = li.get_text(strip=True)
+                if lit:
+                    items.append(f"• {lit}")
+            if items:
+                blocks.append("\n" + "\n".join(items) + "\n")
+        elif tag in ("p", "blockquote"):
+            if el.find_parent(["table", "ul", "ol"]):
+                continue
+            pt = el.get_text(strip=True)
+            if pt and len(pt) > 15:
+                blocks.append(pt)
+
+    if blocks:
+        text = "\n\n".join(blocks)
+    else:
+        text = main_el.get_text(separator="\n", strip=True)
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        text = "\n".join(lines)
+
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text[:max_chars]
+
+
+def _extract_page_data_bs4(html: str, max_length: int) -> Dict[str, Any]:
+    """Extract clean title, description, keywords, and body text using BeautifulSoup."""
+    soup = BeautifulSoup(html, "html.parser")
 
     # 1. Extract Title
     title = ""
@@ -121,42 +202,11 @@ def _extract_page_data_bs4(html: str, max_length: int) -> Dict[str, Any]:
     if meta_kw and meta_kw.get("content"):
         keywords = meta_kw["content"].strip()
 
-    # 3. Extract Main Content
-    main_el = (
-        soup.find("article")
-        or soup.find("main")
-        or soup.find(attrs={"role": "main"})
-        or soup.find(class_=re.compile(r"(article-content|post-content|entry-content|story-body|main-content)", re.I))
-        or soup.find(id=re.compile(r"(content|main|article)", re.I))
-        or soup.body
-        or soup
-    )
-
-    # Get structured paragraphs or text blocks
-    paragraphs = []
-    for p in main_el.find_all(["p", "h1", "h2", "h3", "h4", "li", "blockquote"]):
-        t = p.get_text(strip=True)
-        if t and len(t) > 15:
-            # Prefix headers with markdown formatting for better AI readability
-            if p.name in ("h1", "h2", "h3"):
-                paragraphs.append(f"\n### {t}")
-            elif p.name == "li":
-                paragraphs.append(f"• {t}")
-            else:
-                paragraphs.append(t)
-
-    if paragraphs:
-        text = "\n\n".join(paragraphs)
-    else:
-        text = main_el.get_text(separator="\n", strip=True)
-        lines = [line.strip() for line in text.split("\n") if line.strip()]
-        text = "\n".join(lines)
-
-    # Clean redundant whitespace
-    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    # 3. Extract Main Content with structured elements (headings, tables, lists)
+    text = extract_structured_text_bs4(soup, max_chars=max_length)
 
     is_truncated = False
-    if len(text) > max_length:
+    if len(text) >= max_length:
         text = text[:max_length] + "\n\n[...Konten dipotong untuk batas memori...]"
         is_truncated = True
 
