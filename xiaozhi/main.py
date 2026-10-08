@@ -140,6 +140,9 @@ async def lifespan(app: FastAPI):
     add_alert("info", "Application shutting down", "system")
 
 
+enable_docs = os.getenv("ENABLE_API_DOCS", "false").lower() in ("true", "1", "yes")
+openapi_url = "/openapi.json" if (not IS_PRODUCTION or enable_docs) else None
+
 app = FastAPI(
     title="Xiaozhi Indonesia",
     description="Platform knowledge base Xiaozhi Indonesia dengan integrasi MCP. "
@@ -147,8 +150,9 @@ app = FastAPI(
                 "YouTube audio streaming, and REST API for mobile clients.",
     version="2.0.0",
     lifespan=lifespan,
-    docs_url=None,  # Custom docs
+    docs_url=None,  # Custom docs handled in setup_api_docs
     redoc_url=None,
+    openapi_url=openapi_url,
 )
 
 # Static files

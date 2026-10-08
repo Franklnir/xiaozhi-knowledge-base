@@ -6,6 +6,9 @@ from fastapi.responses import HTMLResponse
 
 def setup_api_docs(app: FastAPI) -> None:
     """Setup OpenAPI/Swagger documentation."""
+    # Matikan Swagger UI dan ReDoc jika openapi_url dinonaktifkan (Production)
+    if not app.openapi_url:
+        return
 
     @app.get("/docs", include_in_schema=False)
     async def custom_swagger_ui_html():
