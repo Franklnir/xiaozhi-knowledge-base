@@ -1200,7 +1200,31 @@ class PostgresStore:
                         "is_locked": True,
                     }
 
-                # Kunci MAC ke slot
+                # Dapatkan username untuk audit log
+                cur.execute("SELECT username FROM users WHERE id = %s", (int(owner_id),))
+                u_row = cur.fetchone()
+                username = u_row["username"] if u_row else f"user_{owner_id}"
+
+                # Jika MAC ini sebelumnya ada di slot user lain, lepaskan dari user lain
+                cur.execute(
+                    """
+                    UPDATE xiaozhi_tokens
+                    SET board_mac = '', updated_at = %s
+                    WHERE user_id != %s AND (LOWER(board_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(board_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
+                    """,
+                    (now, int(owner_id), norm_mac, norm_mac),
+                )
+                cur.execute(
+                    """
+                    UPDATE board_binding_history
+                    SET status = 'DETACHED', unlinked_at = %s,
+                        notes = notes || ' | Dialihkan ke user ' || %s || ' (ID: ' || %s || ')'
+                    WHERE user_id != %s AND (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', ''))) AND status = 'ACTIVE'
+                    """,
+                    (now, username, str(owner_id), int(owner_id), norm_mac, norm_mac),
+                )
+
+                # Kunci MAC ke slot user saat ini
                 cur.execute(
                     """
                     UPDATE xiaozhi_tokens
@@ -1210,19 +1234,38 @@ class PostgresStore:
                     (norm_mac, now, int(owner_id), slot_num),
                 )
 
-                # Dapatkan username untuk audit log
-                cur.execute("SELECT username FROM users WHERE id = %s", (int(owner_id),))
-                u_row = cur.fetchone()
-                username = u_row["username"] if u_row else f"user_{owner_id}"
-
-                # Rekam ke audit history
+                # Rekam ke audit history jika belum aktif
                 cur.execute(
                     """
-                    INSERT INTO board_binding_history 
-                    (device_mac, user_id, username, device_name, device_type, slot_number, request_id, linked_at, last_active_at, status, notes)
-                    VALUES (%s, %s, %s, %s, 'ESP32_SLOT', %s, %s, %s, %s, 'ACTIVE', %s)
+                    SELECT id FROM board_binding_history
+                    WHERE (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
+                      AND user_id = %s AND status = 'ACTIVE'
+                    LIMIT 1
                     """,
-                    (norm_mac, int(owner_id), username, label, slot_num, request_id or "", now, now, f"Terkunci ke Slot {slot_num} ({label})"),
+                    (norm_mac, norm_mac, int(owner_id)),
+                )
+                hist_active = cur.fetchone()
+                if not hist_active:
+                    cur.execute(
+                        """
+                        INSERT INTO board_binding_history 
+                        (device_mac, user_id, username, device_name, device_type, slot_number, request_id, linked_at, last_active_at, status, notes)
+                        VALUES (%s, %s, %s, %s, 'ESP32_SLOT', %s, %s, %s, %s, 'ACTIVE', %s)
+                        """,
+                        (norm_mac, int(owner_id), username, label, slot_num, request_id or "", now, now, f"Terkunci ke Slot {slot_num} ({label})"),
+                    )
+
+                # Pastikan registered_devices terhubung ke owner_id ini
+                cur.execute(
+                    """
+                    INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, is_protected, status, created_at, last_active_at)
+                    VALUES (%s, %s, %s, 'esp32', FALSE, 'ACTIVE', %s, %s)
+                    ON CONFLICT(device_id) DO UPDATE SET
+                        owner_id = EXCLUDED.owner_id,
+                        status = 'ACTIVE',
+                        last_active_at = EXCLUDED.last_active_at
+                    """,
+                    (int(owner_id), norm_mac, label, now, now),
                 )
             conn.commit()
         return {"success": True, "slot": slot_num, "board_mac": norm_mac, "label": label, "is_locked": True, "request_id": request_id}
@@ -1255,9 +1298,19 @@ class PostgresStore:
                     UPDATE board_binding_history
                     SET unlinked_at = %s, status = 'DETACHED', action = 'detach',
                         notes = notes || ' | Dilepas dari Slot ' || %s || ' [Req: ' || %s || ']'
-                    WHERE user_id = %s AND LOWER(device_mac) = LOWER(%s) AND status = 'ACTIVE'
+                    WHERE user_id = %s AND (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', ''))) AND status = 'ACTIVE'
                     """,
-                    (now, str(slot_num), request_id or "manual", int(owner_id), old_mac),
+                    (now, str(slot_num), request_id or "manual", int(owner_id), old_mac, old_mac),
+                )
+                # Lepaskan juga dari registered_devices untuk user ini
+                cur.execute(
+                    """
+                    UPDATE registered_devices
+                    SET owner_id = NULL, status = 'DETACHED', last_active_at = %s
+                    WHERE (LOWER(device_id) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
+                      AND owner_id = %s
+                    """,
+                    (now, old_mac, old_mac, int(owner_id)),
                 )
             conn.commit()
         return {"success": True, "slot": slot_num, "detached": True, "device_mac": old_mac, "request_id": request_id}
@@ -1376,14 +1429,25 @@ class PostgresStore:
                     cur.execute("SELECT board_mac FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s", (int(owner_id), int(slot)))
                     row = cur.fetchone()
                     if row and row.get("board_mac"):
+                        b_mac = row["board_mac"]
                         cur.execute(
                             """
                             UPDATE board_binding_history
                             SET unlinked_at = %s, status = 'UNLINKED',
-                                notes = notes || ' | Slot dihapus [Req: ' || %s || ']'
-                            WHERE user_id = %s AND device_mac = %s AND status = 'ACTIVE'
+                                notes = notes || ' | Slot ' || %s || ' dihapus [Req: ' || %s || ']'
+                            WHERE user_id = %s AND (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', ''))) AND status = 'ACTIVE'
                             """,
-                            (now, request_id or "delete_slot", int(owner_id), row["board_mac"]),
+                            (now, str(slot), request_id or "delete_slot", int(owner_id), b_mac, b_mac),
+                        )
+                        # Lepaskan juga board dari registered_devices untuk user ini
+                        cur.execute(
+                            """
+                            UPDATE registered_devices
+                            SET owner_id = NULL, status = 'DETACHED', last_active_at = %s
+                            WHERE (LOWER(device_id) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
+                              AND owner_id = %s
+                            """,
+                            (now, b_mac, b_mac, int(owner_id)),
                         )
                     cur.execute("DELETE FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s", (int(owner_id), int(slot)))
                 else:
@@ -1391,14 +1455,24 @@ class PostgresStore:
                     rows = cur.fetchall()
                     for r in rows:
                         if r.get("board_mac"):
+                            b_mac = r["board_mac"]
                             cur.execute(
                                 """
                                 UPDATE board_binding_history
                                 SET unlinked_at = %s, status = 'UNLINKED',
                                     notes = notes || ' | Semua slot dihapus [Req: ' || %s || ']'
-                                WHERE user_id = %s AND device_mac = %s AND status = 'ACTIVE'
+                                WHERE user_id = %s AND (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', ''))) AND status = 'ACTIVE'
                                 """,
-                                (now, request_id or "delete_all", int(owner_id), r["board_mac"]),
+                                (now, request_id or "delete_all", int(owner_id), b_mac, b_mac),
+                            )
+                            cur.execute(
+                                """
+                                UPDATE registered_devices
+                                SET owner_id = NULL, status = 'DETACHED', last_active_at = %s
+                                WHERE (LOWER(device_id) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
+                                  AND owner_id = %s
+                                """,
+                                (now, b_mac, b_mac, int(owner_id)),
                             )
                     cur.execute("DELETE FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
                 affected = cur.rowcount > 0
@@ -2835,6 +2909,76 @@ class PostgresStore:
                 )
                 row = cur.fetchone()
                 return dict(row) if row else None
+
+    def find_user_by_active_token_mac(self, device_mac: str) -> Optional[int]:
+        """Cari user_id yang secara aktif mengunci MAC ini di salah satu dari 3 slot MCP-nya."""
+        norm_mac = normalize_mac_address(device_mac)
+        if not norm_mac:
+            return None
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT user_id FROM xiaozhi_tokens
+                    WHERE (LOWER(board_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(board_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
+                      AND COALESCE(is_active, TRUE) = TRUE
+                    ORDER BY updated_at DESC LIMIT 1
+                    """,
+                    (norm_mac, norm_mac),
+                )
+                row = cur.fetchone()
+                if row and row.get("user_id"):
+                    return int(row["user_id"])
+        return None
+
+    def find_active_user_for_unassigned_device(self, device_mac: str, query: str = "", video_id: str = "") -> Optional[int]:
+        """
+        Jika board belum terikat ke slot manapun (atau baru dipindah):
+        Cari user yang baru saja memanggil pemutaran lagu ini di audio_queue.
+        """
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                # 1. Cek berdasarkan video_id yang sama dalam 3 menit terakhir
+                if video_id:
+                    cur.execute(
+                        """
+                        SELECT owner_id FROM audio_queue
+                        WHERE video_id = %s AND created_at >= NOW() - INTERVAL '3 minutes'
+                        ORDER BY id DESC LIMIT 1
+                        """,
+                        (video_id,),
+                    )
+                    row = cur.fetchone()
+                    if row and row.get("owner_id"):
+                        return int(row["owner_id"])
+
+                # 2. Cek berdasarkan title / search query dalam 3 menit terakhir
+                if query and len(query) >= 3:
+                    clean_q = query.strip()
+                    cur.execute(
+                        """
+                        SELECT owner_id FROM audio_queue
+                        WHERE title ILIKE %s AND created_at >= NOW() - INTERVAL '3 minutes'
+                        ORDER BY id DESC LIMIT 1
+                        """,
+                        (f"%{clean_q}%",),
+                    )
+                    row = cur.fetchone()
+                    if row and row.get("owner_id"):
+                        return int(row["owner_id"])
+
+                # 3. Cek audio_queue pending paling baru (dibuat dalam 90 detik terakhir)
+                cur.execute(
+                    """
+                    SELECT owner_id FROM audio_queue
+                    WHERE status = 'pending' AND created_at >= NOW() - INTERVAL '90 seconds'
+                    ORDER BY id DESC LIMIT 1
+                    """
+                )
+                row = cur.fetchone()
+                if row and row.get("owner_id"):
+                    return int(row["owner_id"])
+        return None
 
     def expire_audio_commands(self, minutes: int = 30) -> int:
         with self._get_conn() as conn:

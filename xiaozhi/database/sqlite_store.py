@@ -991,20 +991,75 @@ class SQLiteStore:
                 "is_locked": True,
             }
 
+        u_row = conn.execute("SELECT username FROM users WHERE id = ?", (int(owner_id),)).fetchone()
+        username = u_row["username"] if u_row else f"user_{owner_id}"
+
+        # Jika MAC ini sebelumnya ada di slot user lain, lepaskan dari user lain
+        conn.execute(
+            """
+            UPDATE xiaozhi_tokens
+            SET board_mac = '', updated_at = ?
+            WHERE user_id != ? AND (LOWER(board_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(board_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', '')))
+            """,
+            (now, int(owner_id), norm_mac, norm_mac)
+        )
+        conn.execute(
+            """
+            UPDATE board_binding_history
+            SET status = 'DETACHED', unlinked_at = ?,
+                notes = notes || ' | Dialihkan ke user ' || ? || ' (ID: ' || ? || ')'
+            WHERE user_id != ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
+            """,
+            (now, username, str(owner_id), int(owner_id), norm_mac, norm_mac)
+        )
+
         conn.execute(
             "UPDATE xiaozhi_tokens SET board_mac = ?, updated_at = ? WHERE user_id = ? AND slot_number = ?",
             (norm_mac, now, owner_id, slot_num)
         )
-        u_row = conn.execute("SELECT username FROM users WHERE id = ?", (int(owner_id),)).fetchone()
-        username = u_row["username"] if u_row else f"user_{owner_id}"
-        conn.execute(
+
+        # Cek apakah sudah ada riwayat aktif untuk user ini
+        hist_active = conn.execute(
             """
-            INSERT INTO board_binding_history 
-            (device_mac, user_id, username, device_name, device_type, slot_number, request_id, action, linked_at, last_active_at, status, notes, created_at)
-            VALUES (?, ?, ?, ?, 'ESP32_SLOT', ?, ?, 'bind', ?, ?, 'ACTIVE', ?, ?)
+            SELECT id FROM board_binding_history
+            WHERE (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', '')))
+              AND user_id = ? AND status = 'ACTIVE'
+            LIMIT 1
             """,
-            (norm_mac, int(owner_id), username, label, slot_num, request_id or "", now, now, f"Terkunci ke Slot {slot_num} ({label})", now)
-        )
+            (norm_mac, norm_mac, int(owner_id))
+        ).fetchone()
+        if not hist_active:
+            conn.execute(
+                """
+                INSERT INTO board_binding_history 
+                (device_mac, user_id, username, device_name, device_type, slot_number, request_id, action, linked_at, last_active_at, status, notes, created_at)
+                VALUES (?, ?, ?, ?, 'ESP32_SLOT', ?, ?, 'bind', ?, ?, 'ACTIVE', ?, ?)
+                """,
+                (norm_mac, int(owner_id), username, label, slot_num, request_id or "", now, now, f"Terkunci ke Slot {slot_num} ({label})", now)
+            )
+
+        # Pastikan registered_devices terhubung ke owner_id ini
+        dev_exist = conn.execute(
+            "SELECT id FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ?",
+            (norm_mac.lower(), norm_mac.lower())
+        ).fetchone()
+        if dev_exist:
+            conn.execute(
+                """
+                UPDATE registered_devices
+                SET owner_id = ?, status = 'ACTIVE', last_active_at = ?
+                WHERE LOWER(device_id) = ? OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ?
+                """,
+                (int(owner_id), now, norm_mac.lower(), norm_mac.lower())
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, is_protected, status, created_at, last_active_at)
+                VALUES (?, ?, ?, 'esp32', 0, 'ACTIVE', ?, ?)
+                """,
+                (int(owner_id), norm_mac, label, now, now)
+            )
         conn.commit()
         return {"success": True, "slot": slot_num, "board_mac": norm_mac, "label": label, "is_locked": True, "request_id": request_id}
 
@@ -1028,9 +1083,18 @@ class SQLiteStore:
             UPDATE board_binding_history
             SET unlinked_at = ?, status = 'DETACHED', action = 'detach',
                 notes = notes || ' | Dilepas dari Slot ' || ? || ' [Req: ' || ? || ']'
-            WHERE user_id = ? AND LOWER(device_mac) = LOWER(?) AND status = 'ACTIVE'
+            WHERE user_id = ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
             """,
-            (now, str(slot_num), request_id or "manual", int(owner_id), old_mac)
+            (now, str(slot_num), request_id or "manual", int(owner_id), old_mac, old_mac)
+        )
+        conn.execute(
+            """
+            UPDATE registered_devices
+            SET owner_id = NULL, status = 'DETACHED', last_active_at = ?
+            WHERE (LOWER(device_id) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', '')))
+              AND owner_id = ?
+            """,
+            (now, old_mac, old_mac, int(owner_id))
         )
         conn.commit()
         return {"success": True, "slot": slot_num, "detached": True, "device_mac": old_mac, "request_id": request_id}
@@ -1120,10 +1184,54 @@ class SQLiteStore:
         return result
 
     def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None, request_id: str = "") -> bool:
+        now = utc_now()
         conn = self._get_conn()
         if slot is not None:
+            row = conn.execute("SELECT board_mac FROM xiaozhi_tokens WHERE user_id = ? AND slot_number = ?", (owner_id, int(slot))).fetchone()
+            if row and row["board_mac"]:
+                b_mac = row["board_mac"]
+                conn.execute(
+                    """
+                    UPDATE board_binding_history
+                    SET unlinked_at = ?, status = 'UNLINKED',
+                        notes = notes || ' | Slot ' || ? || ' dihapus [Req: ' || ? || ']'
+                    WHERE user_id = ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
+                    """,
+                    (now, str(slot), request_id or "delete_slot", int(owner_id), b_mac, b_mac)
+                )
+                conn.execute(
+                    """
+                    UPDATE registered_devices
+                    SET owner_id = NULL, status = 'DETACHED', last_active_at = ?
+                    WHERE (LOWER(device_id) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', '')))
+                      AND owner_id = ?
+                    """,
+                    (now, b_mac, b_mac, int(owner_id))
+                )
             cursor = conn.execute("DELETE FROM xiaozhi_tokens WHERE user_id = ? AND slot_number = ?", (owner_id, int(slot)))
         else:
+            rows = conn.execute("SELECT board_mac FROM xiaozhi_tokens WHERE user_id = ?", (owner_id,)).fetchall()
+            for r in rows:
+                if r["board_mac"]:
+                    b_mac = r["board_mac"]
+                    conn.execute(
+                        """
+                        UPDATE board_binding_history
+                        SET unlinked_at = ?, status = 'UNLINKED',
+                            notes = notes || ' | Semua slot dihapus [Req: ' || ? || ']'
+                        WHERE user_id = ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
+                        """,
+                        (now, request_id or "delete_all", int(owner_id), b_mac, b_mac)
+                    )
+                    conn.execute(
+                        """
+                        UPDATE registered_devices
+                        SET owner_id = NULL, status = 'DETACHED', last_active_at = ?
+                        WHERE (LOWER(device_id) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', '')))
+                          AND owner_id = ?
+                        """,
+                        (now, b_mac, b_mac, int(owner_id))
+                    )
             cursor = conn.execute("DELETE FROM xiaozhi_tokens WHERE user_id = ?", (owner_id,))
         conn.commit()
         # Periksa sisa slot
@@ -1137,9 +1245,29 @@ class SQLiteStore:
 
     def delete_xiaozhi_token_by_hash(self, token: str) -> bool:
         token_hash = xiaozhi_token_hash(token)
+        now = utc_now()
         conn = self._get_conn()
-        row = conn.execute("SELECT user_id FROM xiaozhi_tokens WHERE token_hash = ?", (token_hash,)).fetchone()
+        row = conn.execute("SELECT user_id, board_mac FROM xiaozhi_tokens WHERE token_hash = ?", (token_hash,)).fetchone()
         target_user = row["user_id"] if row else None
+        if row and row["board_mac"] and target_user:
+            b_mac = row["board_mac"]
+            conn.execute(
+                """
+                UPDATE board_binding_history
+                SET unlinked_at = ?, status = 'UNLINKED', notes = notes || ' | Token hash dihapus'
+                WHERE user_id = ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
+                """,
+                (now, int(target_user), b_mac, b_mac)
+            )
+            conn.execute(
+                """
+                UPDATE registered_devices
+                SET owner_id = NULL, status = 'DETACHED', last_active_at = ?
+                WHERE (LOWER(device_id) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', '')))
+                  AND owner_id = ?
+                """,
+                (now, b_mac, b_mac, int(target_user))
+            )
         cursor = conn.execute("DELETE FROM xiaozhi_tokens WHERE token_hash = ?", (token_hash,))
         conn.commit()
         if target_user:
@@ -2299,6 +2427,71 @@ class SQLiteStore:
             (f"-{abs(minutes)}",),
         ).fetchone()
         return dict(row) if row else None
+
+    def find_user_by_active_token_mac(self, device_mac: str) -> Optional[int]:
+        """Cari user_id yang secara aktif mengunci MAC ini di salah satu dari 3 slot MCP-nya."""
+        norm_mac = normalize_mac_address(device_mac)
+        if not norm_mac:
+            return None
+        conn = self._get_conn()
+        row = conn.execute(
+            """
+            SELECT user_id FROM xiaozhi_tokens
+            WHERE (LOWER(board_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(board_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', '')))
+              AND COALESCE(is_active, 1) = 1
+            ORDER BY updated_at DESC LIMIT 1
+            """,
+            (norm_mac, norm_mac),
+        ).fetchone()
+        if row and row["user_id"]:
+            return int(row["user_id"])
+        return None
+
+    def find_active_user_for_unassigned_device(self, device_mac: str, query: str = "", video_id: str = "") -> Optional[int]:
+        """
+        Jika board belum terikat ke slot manapun (atau baru dipindah):
+        Cari user yang baru saja memanggil pemutaran lagu ini di audio_queue.
+        """
+        conn = self._get_conn()
+        # 1. Cek berdasarkan video_id yang sama dalam 3 menit terakhir
+        if video_id:
+            row = conn.execute(
+                """
+                SELECT owner_id FROM audio_queue
+                WHERE video_id = ? AND datetime(created_at) >= datetime('now', '-3 minutes')
+                ORDER BY id DESC LIMIT 1
+                """,
+                (video_id,),
+            ).fetchone()
+            if row and row["owner_id"]:
+                return int(row["owner_id"])
+
+        # 2. Cek berdasarkan title / search query dalam 3 menit terakhir
+        if query and len(query) >= 3:
+            clean_q = query.strip()
+            row = conn.execute(
+                """
+                SELECT owner_id FROM audio_queue
+                WHERE title LIKE ? AND datetime(created_at) >= datetime('now', '-3 minutes')
+                ORDER BY id DESC LIMIT 1
+                """,
+                (f"%{clean_q}%",),
+            ).fetchone()
+            if row and row["owner_id"]:
+                return int(row["owner_id"])
+
+        # 3. Cek audio_queue pending paling baru (dibuat dalam 90 detik terakhir)
+        row = conn.execute(
+            """
+            SELECT owner_id FROM audio_queue
+            WHERE status = 'pending' AND datetime(created_at) >= datetime('now', '-90 seconds')
+            ORDER BY id DESC LIMIT 1
+            """
+        ).fetchone()
+        if row and row["owner_id"]:
+            return int(row["owner_id"])
+
+        return None
 
     def expire_audio_commands(self, minutes: int = 30) -> int:
         conn = self._get_conn()

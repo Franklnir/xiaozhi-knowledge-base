@@ -1206,8 +1206,24 @@ class HFJsonStore:
                     "is_locked": True,
                 }
 
+            # Jika MAC ini sebelumnya ada di slot user lain, bersihkan
+            for other in data["xiaozhi_tokens"]:
+                if int(other.get("user_id", 0)) != int(owner_id):
+                    other_mac = normalize_mac_address(other.get("board_mac", ""))
+                    if other_mac and other_mac.lower() == norm_mac.lower():
+                        other["board_mac"] = ""
+                        other["updated_at"] = utc_now()
+
             existing["board_mac"] = norm_mac
             existing["updated_at"] = utc_now()
+
+            for dev in data.get("registered_devices", []):
+                d_mac = normalize_mac_address(dev.get("device_id", "") or dev.get("mac_address", ""))
+                if d_mac and d_mac.lower() == norm_mac.lower():
+                    dev["owner_id"] = int(owner_id)
+                    dev["status"] = "ACTIVE"
+                    dev["last_active_at"] = utc_now()
+
             self._commit(data, f"Bind board {norm_mac} to slot {slot_num}")
         return {"success": True, "slot": slot_num, "board_mac": norm_mac, "label": label, "is_locked": True}
 
@@ -1221,8 +1237,16 @@ class HFJsonStore:
             )
             if not existing or not existing.get("board_mac"):
                 return False
+            old_mac = normalize_mac_address(existing.get("board_mac", ""))
             existing["board_mac"] = ""
             existing["updated_at"] = utc_now()
+            if old_mac:
+                for dev in data.get("registered_devices", []):
+                    d_mac = normalize_mac_address(dev.get("device_id", "") or dev.get("mac_address", ""))
+                    if d_mac and d_mac.lower() == old_mac.lower() and int(dev.get("owner_id", 0)) == int(owner_id):
+                        dev["owner_id"] = None
+                        dev["status"] = "DETACHED"
+                        dev["last_active_at"] = utc_now()
             self._commit(data, f"Detach board from slot {slot_num}")
         return True
 
@@ -1319,26 +1343,35 @@ class HFJsonStore:
         with self._lock:
             data = self._load()
             before = len(data["xiaozhi_tokens"])
+            detached_macs = []
             if slot is not None:
+                for item in data["xiaozhi_tokens"]:
+                    if int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == int(slot):
+                        if item.get("board_mac"):
+                            detached_macs.append(normalize_mac_address(item["board_mac"]))
                 data["xiaozhi_tokens"] = [
                     item for item in data["xiaozhi_tokens"]
                     if not (int(item.get("user_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == int(slot))
                 ]
             else:
+                for item in data["xiaozhi_tokens"]:
+                    if int(item.get("user_id", 0)) == int(owner_id) and item.get("board_mac"):
+                        detached_macs.append(normalize_mac_address(item["board_mac"]))
                 data["xiaozhi_tokens"] = [
                     item for item in data["xiaozhi_tokens"]
                     if int(item.get("user_id", 0)) != int(owner_id)
                 ]
+            for b_mac in detached_macs:
+                if b_mac:
+                    for dev in data.get("registered_devices", []):
+                        d_mac = normalize_mac_address(dev.get("device_id", "") or dev.get("mac_address", ""))
+                        if d_mac and d_mac.lower() == b_mac.lower() and int(dev.get("owner_id", 0)) == int(owner_id):
+                            dev["owner_id"] = None
+                            dev["status"] = "DETACHED"
+                            dev["last_active_at"] = utc_now()
             changed = len(data["xiaozhi_tokens"]) != before
             if changed:
                 self._commit(data, "Delete Xiaozhi token")
-        remaining = any(int(item.get("user_id", 0)) == int(owner_id) for item in data.get("xiaozhi_tokens", []))
-        if not remaining:
-            try:
-                self.detach_user_devices(int(owner_id), reason="Semua slot MCP Xiaozhi diputus / dihapus")
-            except Exception as exc:
-                logger.warning("Gagal detach devices memory user %s: %s", owner_id, exc)
-        return changed
         remaining = any(int(item.get("user_id", 0)) == int(owner_id) for item in data.get("xiaozhi_tokens", []))
         if not remaining:
             try:
@@ -2839,6 +2872,41 @@ class HFJsonStore:
             for cmd in reversed(data.get("audio_queue", [])):
                 if cmd.get("status") == "pending" and cmd.get("owner_id"):
                     return cmd
+        return None
+
+    def find_user_by_active_token_mac(self, device_mac: str) -> Optional[int]:
+        """Cari user_id yang secara aktif mengunci MAC ini di salah satu dari 3 slot MCP-nya."""
+        norm_mac = normalize_mac_address(device_mac)
+        if not norm_mac:
+            return None
+        with self._lock:
+            data = self._load()
+            for item in reversed(data.get("xiaozhi_tokens", [])):
+                stored_mac = normalize_mac_address(item.get("board_mac", ""))
+                if stored_mac and stored_mac.lower() == norm_mac.lower() and item.get("is_active", True):
+                    return int(item["user_id"])
+        return None
+
+    def find_active_user_for_unassigned_device(self, device_mac: str, query: str = "", video_id: str = "") -> Optional[int]:
+        """
+        Jika board belum terikat ke slot manapun (atau baru dipindah):
+        Cari user yang baru saja memanggil pemutaran lagu ini di audio_queue.
+        """
+        with self._lock:
+            data = self._load()
+            queue = data.get("audio_queue", [])
+            if video_id:
+                for cmd in reversed(queue):
+                    if cmd.get("video_id") == video_id and cmd.get("owner_id"):
+                        return int(cmd["owner_id"])
+            if query and len(query) >= 3:
+                clean_q = query.strip().lower()
+                for cmd in reversed(queue):
+                    if clean_q in str(cmd.get("title", "")).lower() and cmd.get("owner_id"):
+                        return int(cmd["owner_id"])
+            for cmd in reversed(queue):
+                if cmd.get("status") == "pending" and cmd.get("owner_id"):
+                    return int(cmd["owner_id"])
         return None
 
     def expire_audio_commands(self, minutes: int = 30) -> int:

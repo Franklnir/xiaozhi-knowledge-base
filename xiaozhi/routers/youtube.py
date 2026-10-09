@@ -59,7 +59,7 @@ def _can_bind_device_to_user(user_id: Optional[int]) -> bool:
         return False
 
 
-def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
+def _resolve_owner_for_device(store, device_id: str, query: str = "", video_id: str = "") -> Optional[int]:
     """Resolve user owner ID based on ESP32 device_id or MAC address."""
     device_id = str(device_id or "").strip()
     if not device_id:
@@ -69,8 +69,27 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
     mac_with_colons = _normalize_mac(raw_mac)
     raw_mac_clean = raw_mac.replace(":", "").replace("-", "").lower()
 
-    # 1. PRIMARY AUTHORITY: Check registered_devices by exact device_id / MAC via store
+    # 1. HIGHEST AUTHORITY: Active slot in xiaozhi_tokens (kunci slot aktif oleh user)
+    if hasattr(store, "find_user_by_active_token_mac"):
+        try:
+            owner_by_token = store.find_user_by_active_token_mac(mac_with_colons) or store.find_user_by_active_token_mac(raw_mac)
+            if owner_by_token:
+                return int(owner_by_token)
+        except Exception as e:
+            logger.debug("Active token MAC lookup failed: %s", e)
+
+    # 2. RECENT AUDIO QUEUE CORRELATION (user yang baru saja meminta lagu ini diputar di XiaoZhi)
+    if hasattr(store, "find_active_user_for_unassigned_device"):
+        try:
+            matched_owner = store.find_active_user_for_unassigned_device(mac_with_colons, query=query, video_id=video_id)
+            if matched_owner:
+                return int(matched_owner)
+        except Exception as e:
+            logger.debug("Audio queue correlation lookup failed: %s", e)
+
+    # 3. REGISTERED_DEVICES (dengan verifikasi anti-stale)
     try:
+        dev = None
         if hasattr(store, "find_device_by_mac"):
             dev = (
                 store.find_device_by_mac(device_id) or
@@ -78,20 +97,44 @@ def _resolve_owner_for_device(store, device_id: str) -> Optional[int]:
                 store.find_device_by_mac(raw_mac) or
                 store.find_device_by_mac(raw_mac_clean)
             )
-            if dev and dev.get("owner_id"):
-                return int(dev["owner_id"])
-        if hasattr(store, "find_device_by_id"):
+        if not dev and hasattr(store, "find_device_by_id"):
             dev = (
                 store.find_device_by_id(device_id) or
                 store.find_device_by_id(mac_with_colons) or
                 store.find_device_by_id(raw_mac)
             )
-            if dev and dev.get("owner_id"):
-                return int(dev["owner_id"])
+        if dev and dev.get("owner_id"):
+            reg_owner = int(dev["owner_id"])
+            # VALIDASI ANTI-STALE:
+            # Jika user ini memiliki token slot MCP, pastikan board MAC ini masih ada di salah satu slotnya,
+            # atau setidaknya user masih memiliki slot kosong yang belum dikunci MAC lain.
+            # JIKA SEMUA SLOT USER SUDAH TERISI MAC LAIN, atau board ini sudah berstatus DETACHED:
+            # Maka data di registered_devices sudah STALE!
+            if hasattr(store, "list_user_xiaozhi_tokens"):
+                tokens = store.list_user_xiaozhi_tokens(reg_owner)
+                if tokens:
+                    has_matching_mac = any(
+                        (t.get("board_mac") or "").replace(":", "").lower() == raw_mac_clean
+                        for t in tokens
+                    )
+                    has_empty_slot = any(not (t.get("board_mac") or "") for t in tokens)
+                    if has_matching_mac:
+                        return reg_owner
+                    elif not has_empty_slot:
+                        # User memiliki token slot tapi semuanya terisi MAC board lain!
+                        # Board ini BUKAN lagi milik user lama!
+                        logger.info(f"[RESOLVE MAC] Board {mac_with_colons} di registered_devices milik user {reg_owner} dinyatakan STALE (semua slot terisi MAC lain).")
+                        dev = None
+                    elif dev.get("status") == "DETACHED":
+                        dev = None
+                    else:
+                        return reg_owner
+            else:
+                return reg_owner
     except Exception as e:
         logger.debug("Device lookup by MAC failed: %s", e)
 
-    # 2. MATCH AUDIO QUEUE ONLY IF THE URL/COMMAND EXPLICITLY CONTAINS THIS MAC
+    # 4. MATCH AUDIO QUEUE ONLY IF THE URL/COMMAND EXPLICITLY CONTAINS THIS MAC
     try:
         if hasattr(store, "find_recent_audio_command_by_mac"):
             cmd = store.find_recent_audio_command_by_mac(mac_with_colons) or store.find_recent_audio_command_by_mac(raw_mac)
@@ -312,7 +355,7 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
     # 4. If still not resolved, lookup user by device_mac in registered_devices
     if not user and device_mac:
         try:
-            resolved_id = _resolve_owner_for_device(store, device_mac)
+            resolved_id = _resolve_owner_for_device(store, device_mac, video_id=video_id)
             if resolved_id:
                 user = _fetch_user(store, resolved_id)
         except Exception:
@@ -907,7 +950,7 @@ async def audio_play_direct(
         if owner and owner.get("user_id"):
             resolved_owner_id = owner["user_id"]
     if not resolved_owner_id and device_mac:
-        resolved_owner_id = _resolve_owner_for_device(store, device_mac)
+        resolved_owner_id = _resolve_owner_for_device(store, device_mac, query=q)
     if not resolved_owner_id:
         try:
             su = get_current_user(request)
@@ -943,6 +986,25 @@ async def audio_play_direct(
                     notes="Tertaut saat play direct audio (MCP Terhubung)"
                 )
                 logger.info(f"[PLAY DIRECT MAC] Device {clean_mac} ({dev_type}) diikat ke user {resolved_owner_id} [MCP AKTIF]")
+
+                # Auto-lock board MAC ke slot MCP pengguna (Slot 1..3)
+                if hasattr(store, "list_user_xiaozhi_tokens") and hasattr(store, "bind_board_to_slot"):
+                    try:
+                        user_tokens = store.list_user_xiaozhi_tokens(resolved_owner_id)
+                        target_slot = None
+                        for t in user_tokens:
+                            if t.get("board_mac") == clean_mac:
+                                target_slot = t["slot_number"]
+                                break
+                        if not target_slot:
+                            for t in user_tokens:
+                                if not t.get("board_mac"):
+                                    target_slot = t["slot_number"]
+                                    break
+                        if target_slot:
+                            store.bind_board_to_slot(resolved_owner_id, slot=target_slot, device_mac=clean_mac, request_id="play_direct")
+                    except Exception as b_exc:
+                        logger.warning(f"Gagal auto-lock slot MAC play_direct: {b_exc}")
             elif hasattr(store, "record_device_activity"):
                 store.record_device_activity(clean_mac, resolved_owner_id)
                 logger.warning(f"[PLAY DIRECT MAC] Board {clean_mac} TIDAK diikat ke user {resolved_owner_id} karena MCP tidak terhubung")
