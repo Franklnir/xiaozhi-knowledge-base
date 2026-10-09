@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import sqlite3
 import threading
@@ -2566,10 +2567,52 @@ class SQLiteStore:
             return int(row["user_id"])
         return None
 
+    def find_recent_tool_caller_for_unassigned_board(self, device_mac: str = "", minutes: int = 3) -> Optional[int]:
+        """
+        Deteksi otomatis user yang baru saja memanggil tool MCP dalam kurun waktu N menit terakhir,
+        dengan verifikasi bahwa user tersebut memiliki slot yang belum terisi board lain.
+        """
+        clean_mac = normalize_mac_address(device_mac) if device_mac else ""
+        conn = self._get_conn()
+        try:
+            cur = conn.execute(
+                """
+                SELECT owner_id, MAX(id) as last_call_id
+                FROM chat_history
+                WHERE datetime(created_at) >= datetime('now', '-' || ? || ' minutes')
+                GROUP BY owner_id
+                ORDER BY last_call_id DESC
+                LIMIT 5
+                """,
+                (int(minutes),),
+            )
+            candidates = [dict(r) for r in cur.fetchall()]
+            for cand in candidates:
+                cand_id = cand.get("owner_id")
+                if not cand_id:
+                    continue
+                cur_tok = conn.execute(
+                    "SELECT slot_number, board_mac FROM xiaozhi_tokens WHERE user_id = ? AND is_active = 1 ORDER BY slot_number ASC",
+                    (int(cand_id),),
+                )
+                tokens = [dict(r) for r in cur_tok.fetchall()]
+                if not tokens:
+                    continue
+                has_matching = any(
+                    (t.get("board_mac") or "").replace(":", "").lower() == clean_mac.replace(":", "").lower()
+                    for t in tokens
+                ) if clean_mac else False
+                has_empty = any(not (t.get("board_mac") or "").strip() for t in tokens)
+                if has_matching or has_empty:
+                    return int(cand_id)
+        except Exception as e:
+            logger.debug("Error finding recent tool caller: %s", e)
+        return None
+
     def find_active_user_for_unassigned_device(self, device_mac: str, query: str = "", video_id: str = "") -> Optional[int]:
         """
         Jika board belum terikat ke slot manapun (atau baru dipindah):
-        Cari user yang baru saja memanggil pemutaran lagu ini di audio_queue.
+        Cari user yang baru saja memanggil pemutaran lagu ini di audio_queue atau memanggil tool MCP terkini.
         """
         conn = self._get_conn()
         # 1. Cek berdasarkan video_id yang sama dalam 3 menit terakhir
@@ -2588,13 +2631,23 @@ class SQLiteStore:
         # 2. Cek berdasarkan title / search query dalam 3 menit terakhir
         if query and len(query) >= 3:
             clean_q = query.strip()
+            patterns = [
+                r'^(kan|tolong|coba|mohon|harap|bisa|bisakah)\s+(lagu|putarkan|putar|mainkan)?\s*',
+                r'^(putarkan|putar|mainkan|nyalakan|play)\s+(lagu|musik)?\s*',
+                r'\s+(di\s+youtube|di\s+yt|sekarang|dong|ya|oke|ok|please)[\?\!\.\,]*$',
+            ]
+            stripped_q = clean_q
+            for p in patterns:
+                stripped_q = re.sub(p, '', stripped_q, flags=re.IGNORECASE).strip()
+            stripped_q = re.sub(r'[\?\!\.\,]+$', '', stripped_q).strip()
+
             row = conn.execute(
                 """
                 SELECT owner_id FROM audio_queue
-                WHERE title LIKE ? AND datetime(created_at) >= datetime('now', '-3 minutes')
+                WHERE (title LIKE ? OR (length(?) >= 3 AND title LIKE ?)) AND datetime(created_at) >= datetime('now', '-3 minutes')
                 ORDER BY id DESC LIMIT 1
                 """,
-                (f"%{clean_q}%",),
+                (f"%{clean_q}%", stripped_q, f"%{stripped_q}%"),
             ).fetchone()
             if row and row["owner_id"]:
                 return int(row["owner_id"])
@@ -2609,6 +2662,11 @@ class SQLiteStore:
         ).fetchone()
         if row and row["owner_id"]:
             return int(row["owner_id"])
+
+        # 4. Cek user yang baru saja memanggil tool MCP dalam 3 menit terakhir
+        recent_caller = self.find_recent_tool_caller_for_unassigned_board(device_mac, minutes=3)
+        if recent_caller:
+            return int(recent_caller)
 
         return None
 

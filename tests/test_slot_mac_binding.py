@@ -290,5 +290,77 @@ def test_board_history_with_current_owner_and_transfer_detection():
     assert target_u2["current_owner_username"] == "irsyad"
 
 
+def test_auto_bind_from_tool_call_history():
+    from xiaozhi.database.sqlite_store import SQLiteStore
+    from xiaozhi.routers.youtube import _resolve_owner_for_device
+
+    store = SQLiteStore(db_path=":memory:")
+    u1 = store.create_user("irsyad26", "password123")["id"]
+    u2 = store.create_user("irsyad", "password123")["id"]
+
+    mac_a = "90:DA:72:87:D2:68"
+    mac_new_board = "7C:E8:B1:A4:D6:E4"
+
+    # User 1 has slot 1 locked with MAC A
+    store.set_xiaozhi_token(u1, "wss://api.xiaozhi.me/mcp/?token=u1tok", slot=1, device_label="U1 Slot 1")
+    store.bind_board_to_slot(u1, slot=1, device_mac=mac_a)
+
+    # User 2 has slot 1 configured but NO MAC bound yet (board_mac is empty)
+    store.set_xiaozhi_token(u2, "wss://api.xiaozhi.me/mcp/?token=u2tok", slot=1, device_label="U2 Slot 1")
+    t2 = store.list_user_xiaozhi_tokens(u2)
+    assert t2[0]["board_mac"] == ""
+
+    # User 2 calls tool 'get_playback_status' via MCP
+    store.add_chat_history(
+        u2,
+        tool_name="get_playback_status",
+        user_message="status pemutaran",
+        source="mcp_tool",
+        slot_number=1,
+    )
+
+    # Now the unassigned board with MAC 7C:E8:B1:A4:D6:E4 makes a play_direct request
+    # with conversational query containing Indonesian filler words
+    resolved = _resolve_owner_for_device(
+        store,
+        mac_new_board,
+        query="kan lagu On My Why Alan Walker di Youtube sekarang.",
+    )
+
+    # It MUST resolve to User 2 (irsyad) automatically via recent tool caller correlation!
+    assert resolved == u2
+
+    # And if User 1 calls tool later, but board is already locked to User 2:
+    store.bind_board_to_slot(u2, slot=1, device_mac=mac_new_board)
+    assert _resolve_owner_for_device(store, mac_new_board) == u2
 
 
+def test_anti_spoofing_other_user_locked_board():
+    from xiaozhi.database.sqlite_store import SQLiteStore
+    from xiaozhi.routers.youtube import _resolve_owner_for_device
+
+    store = SQLiteStore(db_path=":memory:")
+    u1 = store.create_user("owner_user", "password123")["id"]
+    u2 = store.create_user("attacker_user", "password123")["id"]
+
+    mac_legit = "7C:E8:B1:A4:D6:E4"
+
+    # Legit user binds the board
+    store.set_xiaozhi_token(u1, "wss://api.xiaozhi.me/mcp/?token=tok1", slot=1)
+    store.bind_board_to_slot(u1, slot=1, device_mac=mac_legit)
+
+    # Attacker calls a tool right now
+    store.set_xiaozhi_token(u2, "wss://api.xiaozhi.me/mcp/?token=tok2", slot=1)
+    store.add_chat_history(
+        u2,
+        tool_name="play_youtube_song",
+        user_message="hack track",
+        source="mcp_tool",
+        slot_number=1,
+    )
+
+    # Even though attacker called a tool 1 millisecond ago,
+    # the board MAC is already owned and locked by legit user!
+    # It MUST resolve to u1 (legit owner), NEVER to u2 (attacker)!
+    resolved = _resolve_owner_for_device(store, mac_legit, query="hack track")
+    assert resolved == u1

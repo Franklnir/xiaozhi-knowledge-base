@@ -143,6 +143,36 @@ def _resolve_owner_for_device(store, device_id: str, query: str = "", video_id: 
     except Exception as e:
         logger.debug("Audio queue lookup by MAC failed: %s", e)
 
+    # 5. RECENT MCP TOOL INVOCATION / ACTIVE BRIDGE CORRELATION
+    try:
+        from xiaozhi.services.mcp_service import mcp_connection_states, mcp_state_lock
+        # A. Cek store untuk user yang baru saja memanggil tool MCP dalam 3 menit terakhir
+        if hasattr(store, "find_recent_tool_caller_for_unassigned_board"):
+            caller_id = store.find_recent_tool_caller_for_unassigned_board(mac_with_colons, minutes=3)
+            if caller_id and _can_bind_device_to_user(caller_id):
+                logger.info(f"[RESOLVE MAC] Board {mac_with_colons} dikorelasikan ke user {caller_id} via riwayat pemanggilan tool MCP.")
+                return int(caller_id)
+
+        # B. Cek in-memory active MCP bridge connections (user yang sedang terhubung)
+        with mcp_state_lock:
+            active_uids = []
+            for (uid, s_num), state in mcp_connection_states.items():
+                if isinstance(state, dict) and state.get("connected"):
+                    s_mac = (state.get("board_mac") or "").replace(":", "").lower()
+                    if not s_mac or s_mac == raw_mac_clean:
+                        active_uids.append(int(uid))
+        if len(active_uids) == 1:
+            cand_id = active_uids[0]
+            if _can_bind_device_to_user(cand_id):
+                if hasattr(store, "list_user_xiaozhi_tokens"):
+                    t_list = store.list_user_xiaozhi_tokens(cand_id)
+                    has_slot = any(not (t.get("board_mac") or "") or (t.get("board_mac") or "").replace(":", "").lower() == raw_mac_clean for t in t_list)
+                    if has_slot:
+                        logger.info(f"[RESOLVE MAC] Board {mac_with_colons} dikorelasikan ke user {cand_id} via active MCP bridge connection.")
+                        return int(cand_id)
+    except Exception as e:
+        logger.debug("Active MCP correlation failed: %s", e)
+
     return None
 
 
@@ -435,6 +465,12 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
                                         break
                             if target_slot:
                                 store.bind_board_to_slot(user_id, slot=target_slot, device_mac=clean_mac, request_id="stream_audio")
+                                try:
+                                    from xiaozhi.services.mcp_service import set_mcp_connection_state, current_mcp_token_hash
+                                    th = current_mcp_token_hash(user_id, slot=target_slot)
+                                    set_mcp_connection_state(user_id, th, connected=True, slot=target_slot, board_mac=clean_mac, message=f"Board {clean_mac} auto-bound")
+                                except Exception:
+                                    pass
                         except Exception as b_exc:
                             logger.warning(f"Gagal auto-lock slot MAC stream: {b_exc}")
                 else:
@@ -1003,6 +1039,12 @@ async def audio_play_direct(
                                     break
                         if target_slot:
                             store.bind_board_to_slot(resolved_owner_id, slot=target_slot, device_mac=clean_mac, request_id="play_direct")
+                            try:
+                                from xiaozhi.services.mcp_service import set_mcp_connection_state, current_mcp_token_hash
+                                th = current_mcp_token_hash(resolved_owner_id, slot=target_slot)
+                                set_mcp_connection_state(resolved_owner_id, th, connected=True, slot=target_slot, board_mac=clean_mac, message=f"Board {clean_mac} auto-bound")
+                            except Exception:
+                                pass
                     except Exception as b_exc:
                         logger.warning(f"Gagal auto-lock slot MAC play_direct: {b_exc}")
             elif hasattr(store, "record_device_activity"):

@@ -3006,10 +3006,36 @@ class HFJsonStore:
                     return int(item["user_id"])
         return None
 
+    def find_recent_tool_caller_for_unassigned_board(self, device_mac: str = "", minutes: int = 3) -> Optional[int]:
+        clean_mac = normalize_mac_address(device_mac) if device_mac else ""
+        with self._lock:
+            data = self._load()
+            chats = data.get("chat_history", [])
+            tokens = data.get("xiaozhi_tokens", [])
+            recent_uids = []
+            for c in reversed(chats):
+                uid = c.get("owner_id")
+                if uid and uid not in recent_uids:
+                    recent_uids.append(uid)
+                if len(recent_uids) >= 5:
+                    break
+            for cand_id in recent_uids:
+                u_toks = [t for t in tokens if int(t.get("user_id", 0)) == int(cand_id) and t.get("is_active", True)]
+                if not u_toks:
+                    continue
+                has_matching = any(
+                    (t.get("board_mac") or "").replace(":", "").lower() == clean_mac.replace(":", "").lower()
+                    for t in u_toks
+                ) if clean_mac else False
+                has_empty = any(not (t.get("board_mac") or "").strip() for t in u_toks)
+                if has_matching or has_empty:
+                    return int(cand_id)
+        return None
+
     def find_active_user_for_unassigned_device(self, device_mac: str, query: str = "", video_id: str = "") -> Optional[int]:
         """
         Jika board belum terikat ke slot manapun (atau baru dipindah):
-        Cari user yang baru saja memanggil pemutaran lagu ini di audio_queue.
+        Cari user yang baru saja memanggil pemutaran lagu ini di audio_queue atau memanggil tool MCP terkini.
         """
         with self._lock:
             data = self._load()
@@ -3020,12 +3046,28 @@ class HFJsonStore:
                         return int(cmd["owner_id"])
             if query and len(query) >= 3:
                 clean_q = query.strip().lower()
+                patterns = [
+                    r'^(kan|tolong|coba|mohon|harap|bisa|bisakah)\s+(lagu|putarkan|putar|mainkan)?\s*',
+                    r'^(putarkan|putar|mainkan|nyalakan|play)\s+(lagu|musik)?\s*',
+                    r'\s+(di\s+youtube|di\s+yt|sekarang|dong|ya|oke|ok|please)[\?\!\.\,]*$',
+                ]
+                stripped_q = clean_q
+                for p in patterns:
+                    stripped_q = re.sub(p, '', stripped_q, flags=re.IGNORECASE).strip()
+                stripped_q = re.sub(r'[\?\!\.\,]+$', '', stripped_q).strip()
+
                 for cmd in reversed(queue):
-                    if clean_q in str(cmd.get("title", "")).lower() and cmd.get("owner_id"):
+                    cmd_title = str(cmd.get("title", "")).lower()
+                    if (clean_q in cmd_title or (len(stripped_q) >= 3 and stripped_q in cmd_title)) and cmd.get("owner_id"):
                         return int(cmd["owner_id"])
             for cmd in reversed(queue):
                 if cmd.get("status") == "pending" and cmd.get("owner_id"):
                     return int(cmd["owner_id"])
+
+        recent_caller = self.find_recent_tool_caller_for_unassigned_board(device_mac, minutes=3)
+        if recent_caller:
+            return int(recent_caller)
+
         return None
 
     def expire_audio_commands(self, minutes: int = 30) -> int:
