@@ -1149,7 +1149,7 @@ class PostgresStore:
                                 """
                                 UPDATE board_binding_history
                                 SET unlinked_at = %s, status = 'UNLINKED',
-                                    notes = notes || ' | Token diperbarui [Req: ' || %s || ']'
+                                    notes = COALESCE(notes, '') || ' | Token diperbarui [Req: ' || %s || ']'
                                 WHERE user_id = %s AND device_mac = %s AND status = 'ACTIVE'
                                 """,
                                 (now, request_id or "renew", int(owner_id), old_mac),
@@ -1219,7 +1219,7 @@ class PostgresStore:
                     """
                     UPDATE board_binding_history
                     SET status = 'DETACHED', unlinked_at = %s,
-                        notes = notes || ' | Dialihkan ke user ' || %s || ' (ID: ' || %s || ')'
+                        notes = COALESCE(notes, '') || ' | Dialihkan ke user ' || %s || ' (ID: ' || %s || ')'
                     WHERE user_id != %s AND (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', ''))) AND status = 'ACTIVE'
                     """,
                     (now, username, str(owner_id), int(owner_id), norm_mac, norm_mac),
@@ -1297,8 +1297,8 @@ class PostgresStore:
                 cur.execute(
                     """
                     UPDATE board_binding_history
-                    SET unlinked_at = %s, status = 'DETACHED', action = 'detach',
-                        notes = notes || ' | Dilepas dari Slot ' || %s || ' [Req: ' || %s || ']'
+                    SET unlinked_at = %s, status = 'DETACHED',
+                        notes = COALESCE(notes, '') || ' | Dilepas dari Slot ' || %s || ' [Req: ' || %s || ']'
                     WHERE user_id = %s AND (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', ''))) AND status = 'ACTIVE'
                     """,
                     (now, str(slot_num), request_id or "manual", int(owner_id), old_mac, old_mac),
@@ -1435,7 +1435,7 @@ class PostgresStore:
                             """
                             UPDATE board_binding_history
                             SET unlinked_at = %s, status = 'UNLINKED',
-                                notes = notes || ' | Slot ' || %s || ' dihapus [Req: ' || %s || ']'
+                                notes = COALESCE(notes, '') || ' | Slot ' || %s || ' dihapus [Req: ' || %s || ']'
                             WHERE user_id = %s AND (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', ''))) AND status = 'ACTIVE'
                             """,
                             (now, str(slot), request_id or "delete_slot", int(owner_id), b_mac, b_mac),
@@ -1461,7 +1461,7 @@ class PostgresStore:
                                 """
                                 UPDATE board_binding_history
                                 SET unlinked_at = %s, status = 'UNLINKED',
-                                    notes = notes || ' | Semua slot dihapus [Req: ' || %s || ']'
+                                    notes = COALESCE(notes, '') || ' | Semua slot dihapus [Req: ' || %s || ']'
                                 WHERE user_id = %s AND (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', ''))) AND status = 'ACTIVE'
                                 """,
                                 (now, request_id or "delete_all", int(owner_id), b_mac, b_mac),

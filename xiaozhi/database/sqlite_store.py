@@ -1008,7 +1008,7 @@ class SQLiteStore:
             """
             UPDATE board_binding_history
             SET status = 'DETACHED', unlinked_at = ?,
-                notes = notes || ' | Dialihkan ke user ' || ? || ' (ID: ' || ? || ')'
+                notes = COALESCE(notes, '') || ' | Dialihkan ke user ' || ? || ' (ID: ' || ? || ')'
             WHERE user_id != ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
             """,
             (now, username, str(owner_id), int(owner_id), norm_mac, norm_mac)
@@ -1082,8 +1082,8 @@ class SQLiteStore:
         conn.execute(
             """
             UPDATE board_binding_history
-            SET unlinked_at = ?, status = 'DETACHED', action = 'detach',
-                notes = notes || ' | Dilepas dari Slot ' || ? || ' [Req: ' || ? || ']'
+            SET unlinked_at = ?, status = 'DETACHED',
+                notes = COALESCE(notes, '') || ' | Dilepas dari Slot ' || ? || ' [Req: ' || ? || ']'
             WHERE user_id = ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
             """,
             (now, str(slot_num), request_id or "manual", int(owner_id), old_mac, old_mac)
@@ -1195,7 +1195,7 @@ class SQLiteStore:
                     """
                     UPDATE board_binding_history
                     SET unlinked_at = ?, status = 'UNLINKED',
-                        notes = notes || ' | Slot ' || ? || ' dihapus [Req: ' || ? || ']'
+                        notes = COALESCE(notes, '') || ' | Slot ' || ? || ' dihapus [Req: ' || ? || ']'
                     WHERE user_id = ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
                     """,
                     (now, str(slot), request_id or "delete_slot", int(owner_id), b_mac, b_mac)
@@ -1219,7 +1219,7 @@ class SQLiteStore:
                         """
                         UPDATE board_binding_history
                         SET unlinked_at = ?, status = 'UNLINKED',
-                            notes = notes || ' | Semua slot dihapus [Req: ' || ? || ']'
+                            notes = COALESCE(notes, '') || ' | Semua slot dihapus [Req: ' || ? || ']'
                         WHERE user_id = ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
                         """,
                         (now, request_id or "delete_all", int(owner_id), b_mac, b_mac)
@@ -1255,7 +1255,7 @@ class SQLiteStore:
             conn.execute(
                 """
                 UPDATE board_binding_history
-                SET unlinked_at = ?, status = 'UNLINKED', notes = notes || ' | Token hash dihapus'
+                SET unlinked_at = ?, status = 'UNLINKED', notes = COALESCE(notes, '') || ' | Token hash dihapus'
                 WHERE user_id = ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
                 """,
                 (now, int(target_user), b_mac, b_mac)

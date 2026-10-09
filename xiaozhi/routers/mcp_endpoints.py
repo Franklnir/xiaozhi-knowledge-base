@@ -264,13 +264,26 @@ async def detach_mcp_slot_board(
     if slot_num < 1 or slot_num > 3:
         raise HTTPException(status_code=400, detail="Slot harus antara 1 sampai 3.")
 
-    detached = store.detach_board_from_slot(user["id"], slot=slot_num, request_id=req_id)
-    if not detached:
+    try:
+        detached = store.detach_board_from_slot(user["id"], slot=slot_num, request_id=req_id)
+    except Exception as e:
+        logger.error(f"Error detaching board from slot {slot_num} user {user['id']}: {e}", exc_info=True)
         return {
             "success": False,
             "request_id": req_id,
             "slot": slot_num,
-            "message": f"Slot {slot_num} tidak memiliki board hardware MAC yang terkunci.",
+            "message": f"Terjadi kesalahan saat melepas kunci board: {str(e)}",
+        }
+
+    is_success = detached.get("success", False) if isinstance(detached, dict) else bool(detached)
+    detail_msg = detached.get("detail") if isinstance(detached, dict) else None
+
+    if not is_success:
+        return {
+            "success": False,
+            "request_id": req_id,
+            "slot": slot_num,
+            "message": detail_msg or f"Slot {slot_num} tidak memiliki board hardware MAC yang terkunci.",
         }
 
     return {
