@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 import requests
 from bs4 import BeautifulSoup
 
-from xiaozhi.core.utils import clean_text
+from xiaozhi.core.utils import clean_text, is_generic_playlist_query
 from xiaozhi.mcp.context import mcp_active_owner_ctx
 from xiaozhi.services.scraper_service import extract_structured_text_bs4, validate_scrape_url
 from xiaozhi.services.smarthome_service import (
@@ -1664,7 +1664,38 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         """
         owner_id = mcp_active_owner_ctx.get()
         try:
-            # 1. Cek apakah permintaan cocok dengan lagu di Playlist pribadi user
+            # 1. Cek jika user meminta playlist secara umum tanpa nomor/judul spesifik
+            if owner_id and is_generic_playlist_query(query) and hasattr(store, "get_user_playlist"):
+                all_tracks = store.get_user_playlist(owner_id)
+                if all_tracks:
+                    sample_tracks = [f"Nomor {t.get('track_number')}: {t.get('title')}" for t in all_tracks[:5]]
+                    daftar_text = ", ".join(sample_tracks)
+                    if len(all_tracks) > 5:
+                        daftar_text += f", dan {len(all_tracks) - 5} lagu lainnya"
+                    ask_msg = (
+                        f"Mau putar lagu di playlist nomor berapa atau yang mana? "
+                        f"Di playlist Anda ada {len(all_tracks)} lagu: {daftar_text}. "
+                        f"Sebutkan nomor atau judul lagunya ya."
+                    )
+                    response = {
+                        "success": False,
+                        "needs_clarification": True,
+                        "source": "playlist",
+                        "message": ask_msg,
+                        "total_tracks": len(all_tracks),
+                        "playlist_preview": [
+                            {"track_number": t.get("track_number"), "title": t.get("title"), "artist": t.get("artist")}
+                            for t in all_tracks
+                        ],
+                        "instructions": (
+                            f"Tanyakan langsung kepada pengguna dengan suara ramah dan sebutkan pilihan lagu: '{ask_msg}' "
+                            f"Jangan memanggil tool pemutar audio sampai pengguna menyebutkan lagu yang ingin diputar."
+                        ),
+                    }
+                    record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query, "source": "playlist"}, response)
+                    return response
+
+            # 1b. Cek apakah permintaan cocok dengan lagu di Playlist pribadi user
             if owner_id and hasattr(store, "find_playlist_track_by_query"):
                 matched_track = store.find_playlist_track_by_query(owner_id, query)
                 if matched_track:
@@ -1724,7 +1755,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                             "stream_url": stream_url,
                             "play_count": cnt,
                         },
-                        "instructions": f"Panggil tool perangkat `self.audio.play` dengan url='{full_stream}' atau `self.audio.play_youtube` dengan video_id='{vid}' dan title='{title}' agar speaker XiaoZhi langsung memutar lagunya.",
+                        "instructions": f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' agar speaker XiaoZhi langsung memutar lagunya.",
                     }
                     record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query, "source": "playlist"}, response)
                     return response
@@ -1766,7 +1797,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
                     stream_path = np.get("stream_url", "")
                     full_stream = f"{base}{stream_path}" if stream_path.startswith("/") else stream_path
-                    response["instructions"] = f"Panggil tool perangkat `self.audio.play` dengan url='{full_stream}' atau `self.audio.play_youtube` dengan video_id='{np.get('video_id', '')}' dan title='{np.get('title', '')}' agar speaker XiaoZhi langsung memutar lagunya."
+                    response["instructions"] = f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{np.get('title', '')}' dan video_id='{np.get('video_id', '')}' agar speaker XiaoZhi langsung memutar lagunya."
                     store.queue_audio_command(owner_id, title=np.get("title", ""), stream_url=full_stream, video_url=np.get("video_url", ""), duration=np.get("duration", ""), video_id=np.get("video_id", ""))
                 except Exception:
                     logger.warning("Failed to queue audio for ESP32")
@@ -1803,15 +1834,48 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             if not features.get("youtube_music", True):
                 return {"success": False, "message": "Fitur YouTube Music telah dinonaktifkan untuk akun Anda."}
 
-            matched = store.find_playlist_track_by_query(owner_id, query)
-            if not matched:
-                all_tracks = store.get_user_playlist(owner_id)
-                total = len(all_tracks)
-                return {
+            all_tracks = store.get_user_playlist(owner_id) if hasattr(store, "get_user_playlist") else []
+            if not all_tracks:
+                response = {
                     "success": False,
-                    "message": f"Lagu '{query}' tidak ditemukan di playlist Anda. Saat ini Anda memiliki {total} lagu di playlist.",
-                    "total_tracks": total,
+                    "message": "Playlist Anda saat ini masih kosong. Silakan tambahkan lagu ke playlist melalui dashboard web terlebih dahulu.",
+                    "total_tracks": 0,
+                    "instructions": "Katakan kepada pengguna bahwa playlist mereka masih kosong dan dapat ditambahkan lagu melalui menu Playlist di web.",
                 }
+                record_mcp_tool_history(owner_id, "play_playlist_song", query, {"query": query}, response)
+                return response
+
+            is_generic = is_generic_playlist_query(query)
+            matched = None if is_generic else store.find_playlist_track_by_query(owner_id, query)
+
+            if not matched:
+                # User tidak menyebutkan pilihan spesifik atau lagu tidak ditemukan: tanyakan ke user dengan menyebutkan opsi lagu
+                sample_tracks = [f"Nomor {t.get('track_number')}: {t.get('title')}" for t in all_tracks[:5]]
+                daftar_text = ", ".join(sample_tracks)
+                if len(all_tracks) > 5:
+                    daftar_text += f", dan {len(all_tracks) - 5} lagu lainnya"
+
+                ask_msg = (
+                    f"Mau putar lagu di playlist nomor berapa atau yang mana? "
+                    f"Di playlist Anda ada {len(all_tracks)} lagu: {daftar_text}. "
+                    f"Sebutkan nomor atau judul lagunya ya."
+                )
+                response = {
+                    "success": False,
+                    "needs_clarification": True,
+                    "message": ask_msg,
+                    "total_tracks": len(all_tracks),
+                    "playlist_preview": [
+                        {"track_number": t.get("track_number"), "title": t.get("title"), "artist": t.get("artist")}
+                        for t in all_tracks
+                    ],
+                    "instructions": (
+                        f"Tanyakan langsung kepada pengguna dengan suara ramah dan jelas: '{ask_msg}' "
+                        f"Jangan memanggil tool pemutar musik sampai pengguna menyebutkan nomor atau judul lagu yang ingin diputar."
+                    ),
+                }
+                record_mcp_tool_history(owner_id, "play_playlist_song", query, {"query": query}, response)
+                return response
 
             # Cek apakah lagu dinonaktifkan oleh Admin (Akses Plus)
             if not matched.get("is_active", True):
@@ -1864,7 +1928,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     "artist": matched.get("artist", ""),
                     "play_count": cnt,
                 },
-                "instructions": f"Panggil tool perangkat `self.audio.play` dengan url='{full_stream}' atau `self.audio.play_youtube` dengan video_id='{vid}' dan title='{title}' agar speaker XiaoZhi langsung memutar lagunya.",
+                "instructions": f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' agar speaker XiaoZhi langsung memutar lagunya.",
             }
             record_mcp_tool_history(owner_id, "play_playlist_song", query, {"query": query}, response)
             return response

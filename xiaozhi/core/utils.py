@@ -73,6 +73,7 @@ def extract_youtube_video_id(url_or_id: str) -> Optional[str]:
     patterns = [
         r"(?:v=|\/v\/|youtu\.be\/|\/embed\/|\/live\/|\/shorts\/)([a-zA-Z0-9_-]{11})",
         r"[?&]v=([a-zA-Z0-9_-]{11})",
+        r"/(?:api/)?audio/stream/([a-zA-Z0-9_-]{11})",
     ]
     for pattern in patterns:
         m = re.search(pattern, cleaned)
@@ -201,12 +202,35 @@ def extract_tiktok_media_info(url_or_id: str) -> Optional[Dict[str, str]]:
 
 def detect_media_url_source(url_or_id: str) -> Optional[Dict[str, str]]:
     """
-    Auto-detect whether input is a YouTube video URL/ID or a TikTok video URL.
+    Auto-detect whether input is a YouTube video URL/ID, TikTok video URL, or internal audio stream URL.
     Returns dict with keys: 'platform', 'video_id', 'canonical_url'.
     """
     if not url_or_id:
         return None
     cleaned = str(url_or_id).strip()
+
+    # 0. Check internal audio stream URL: e.g. /api/audio/stream/{vid}
+    m_stream = re.search(r"/(?:api/)?audio/stream/([a-zA-Z0-9_-]+)", cleaned)
+    if m_stream:
+        stream_vid = m_stream.group(1)
+        if stream_vid.startswith("tt_"):
+            return {
+                "platform": "tiktok",
+                "video_id": stream_vid,
+                "canonical_url": normalize_tiktok_url_for_ytdlp(stream_vid),
+            }
+        elif len(stream_vid) == 11:
+            return {
+                "platform": "youtube",
+                "video_id": stream_vid,
+                "canonical_url": f"https://www.youtube.com/watch?v={stream_vid}",
+            }
+        else:
+            return {
+                "platform": "audio",
+                "video_id": stream_vid,
+                "canonical_url": cleaned,
+            }
 
     # 1. Check YouTube
     yt_id = extract_youtube_video_id(cleaned)
@@ -223,6 +247,22 @@ def detect_media_url_source(url_or_id: str) -> Optional[Dict[str, str]]:
         return tt_info
 
     return None
+
+
+def is_generic_playlist_query(query: str) -> bool:
+    """
+    Periksa apakah permintaan user hanya berupa perintah umum memutar playlist tanpa menyebutkan
+    nomor lagu atau judul lagu yang spesifik (misal: 'putar playlist', 'putar lagu di playlist saya', 'playlist').
+    """
+    if not query:
+        return True
+    cleaned = re.sub(
+        r"(?i)\b(putar|mainkan|setel|dengarkan|lagu|musik|di|dari|ke|playlist|daftar|saya|favorit|pribadi|dong|tolong|coba|nih|ya)\b",
+        "",
+        str(query),
+    ).strip()
+    cleaned = re.sub(r"[\?\!\.\,\s]+", "", cleaned)
+    return len(cleaned) == 0
 
 
 def content_size_metadata(content: str) -> Dict[str, Any]:

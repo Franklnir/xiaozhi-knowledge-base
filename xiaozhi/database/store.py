@@ -3426,18 +3426,18 @@ class HFJsonStore:
         if not raw_q:
             return None
         import re
-        from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id
+        from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id, is_generic_playlist_query
 
         user_tracks = self.get_user_playlist(owner_id)
         if not user_tracks:
             return None
 
-        # Check track number: ONLY if query is literally a number or has explicit keyword ("nomor 2", "track 3", "playlist 1")
+        # Check track number: ONLY if query is literally a number or has explicit keyword ("nomor 2", "lagu 1", "track 3", "playlist 1")
         track_num = None
         if raw_q.isdigit():
             track_num = int(raw_q)
         else:
-            explicit_track_match = re.search(r"\b(?:nomor|no\.?|ke-?|track|urutan|playlist)\s*(\d+)\b", raw_q.lower())
+            explicit_track_match = re.search(r"\b(?:nomor|no\.?|ke-?|track|urutan|playlist|lagu|musik)\s*(\d+)\b", raw_q.lower())
             if explicit_track_match:
                 track_num = int(explicit_track_match.group(1))
 
@@ -3446,7 +3446,7 @@ class HFJsonStore:
                 if int(t.get("track_number", 0)) == track_num:
                     return t
 
-        # Check Video ID / URL (YouTube or TikTok)
+        # Check Video ID / URL (YouTube, TikTok, atau internal stream URL)
         media_info = detect_media_url_source(raw_q)
         target_vid = media_info["video_id"] if media_info else extract_youtube_video_id(raw_q)
         if target_vid:
@@ -3454,9 +3454,15 @@ class HFJsonStore:
                 if str(t.get("video_id", "")).strip() == target_vid:
                     return t
 
+        # Jika query hanya permintaan umum memutar playlist tanpa nama lagu spesifik, kembalikan None agar asisten bertanya
+        if is_generic_playlist_query(raw_q):
+            return None
+
         # Check by title / artist
-        clean_kw = re.sub(r"(?i)\b(putar|lagu|musik|dari playlist|di playlist|playlist)\b", "", raw_q).strip().lower()
+        clean_kw = re.sub(r"(?i)\b(putar|mainkan|setel|dengarkan|lagu|musik|dari playlist|di playlist|playlist|saya|favorit|pribadi)\b", "", raw_q).strip().lower()
         target_q = clean_kw if clean_kw else raw_q.lower()
+        if not target_q:
+            return None
         for t in user_tracks:
             if target_q in str(t.get("title", "")).lower() or target_q in str(t.get("artist", "")).lower():
                 return t
