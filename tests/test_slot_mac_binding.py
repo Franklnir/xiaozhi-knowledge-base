@@ -124,3 +124,118 @@ def test_playlist_matching_accuracy():
     assert t3 is not None and t3["video_id"] == "33333333333"
 
 
+def test_mac_transfer_and_detach_on_slot_deletion():
+    from xiaozhi.database.sqlite_store import SQLiteStore
+    store = SQLiteStore(db_path=":memory:")
+
+    user1 = store.create_user("irsyad26", "password123")
+    user2 = store.create_user("irsyad", "password456")
+    u1_id = user1["id"]
+    u2_id = user2["id"]
+
+    mac_board = "7C:E8:B1:A4:D6:E4"
+
+    # 1. User 1 configures slot 1, 2, and 3
+    store.set_xiaozhi_token(u1_id, "wss://api.xiaozhi.me/mcp/?token=token1", slot=1, device_label="Slot 1")
+    store.set_xiaozhi_token(u1_id, "wss://api.xiaozhi.me/mcp/?token=token2", slot=2, device_label="Slot 2")
+    store.set_xiaozhi_token(u1_id, "wss://api.xiaozhi.me/mcp/?token=token3", slot=3, device_label="Slot 3")
+
+    # User 1 binds MAC to slot 3
+    b1 = store.bind_board_to_slot(u1_id, slot=3, device_mac=mac_board, request_id="req-u1-bind")
+    assert b1["success"] is True
+
+    # Check registered_devices & find_user_by_active_token_mac
+    dev = store.find_device_by_mac(mac_board)
+    assert dev is not None
+    assert dev["owner_id"] == u1_id
+    assert store.find_user_by_active_token_mac(mac_board) == u1_id
+
+    # 2. User 1 deletes slot 3 (leaving slots 1 and 2 intact)
+    del_res = store.delete_xiaozhi_token(u1_id, slot=3, request_id="req-u1-del-s3")
+    assert del_res is True
+
+    # Board MAC must be unlinked from registered_devices (owner_id = NULL, status = 'DETACHED')
+    dev_after_del = store.find_device_by_mac(mac_board)
+    assert dev_after_del is not None
+    assert dev_after_del["owner_id"] is None
+    assert dev_after_del["status"] == "DETACHED"
+
+    # User 1 active token lookup must return None for this MAC
+    assert store.find_user_by_active_token_mac(mac_board) is None
+
+    # History for User 1 must still exist and be marked UNLINKED
+    hist_u1 = store.get_board_binding_history(user_id=u1_id, slot_number=3)
+    assert len(hist_u1) >= 1
+    assert any(h["status"] == "UNLINKED" for h in hist_u1)
+
+    # 3. User 2 registers slot 1
+    store.set_xiaozhi_token(u2_id, "wss://api.xiaozhi.me/mcp/?token=u2_token1", slot=1, device_label="irsyad Slot 1")
+
+    # User 2 binds the same board MAC
+    b2 = store.bind_board_to_slot(u2_id, slot=1, device_mac=mac_board, request_id="req-u2-bind")
+    assert b2["success"] is True
+
+    # Verify registered_devices now belongs to User 2
+    dev_u2 = store.find_device_by_mac(mac_board)
+    assert dev_u2 is not None
+    assert dev_u2["owner_id"] == u2_id
+    assert dev_u2["status"] == "ACTIVE"
+
+    # Active token MAC belongs to User 2
+    assert store.find_user_by_active_token_mac(mac_board) == u2_id
+
+    # History for User 2 exists as ACTIVE
+    hist_u2 = store.get_board_binding_history(user_id=u2_id, slot_number=1)
+    assert len(hist_u2) >= 1
+    assert any(h["status"] == "ACTIVE" and h["user_id"] == u2_id for h in hist_u2)
+
+    # Old history for User 1 is STILL preserved!
+    hist_u1_check = store.get_board_binding_history(user_id=u1_id, slot_number=3)
+    assert len(hist_u1_check) >= 1
+
+
+def test_resolve_owner_for_device_anti_stale_and_transfer():
+    from xiaozhi.database.sqlite_store import SQLiteStore
+    from xiaozhi.routers.youtube import _resolve_owner_for_device
+
+    store = SQLiteStore(db_path=":memory:")
+    u1 = store.create_user("irsyad26", "password123")["id"]
+    u2 = store.create_user("irsyad", "password456")["id"]
+
+    mac_a = "90:DA:72:87:D2:68"
+    mac_b = "68:EE:8F:4D:50:1C"
+    mac_c = "7C:E8:B1:A4:D6:E4"
+
+    # User 1 sets 3 slots
+    store.set_xiaozhi_token(u1, "wss://api.xiaozhi.me/mcp/?token=tok1", slot=1, device_label="U1 Slot 1")
+    store.set_xiaozhi_token(u1, "wss://api.xiaozhi.me/mcp/?token=tok2", slot=2, device_label="U1 Slot 2")
+    store.set_xiaozhi_token(u1, "wss://api.xiaozhi.me/mcp/?token=tok3", slot=3, device_label="U1 Slot 3")
+
+    store.bind_board_to_slot(u1, slot=1, device_mac=mac_a)
+    store.bind_board_to_slot(u1, slot=2, device_mac=mac_b)
+    store.bind_board_to_slot(u1, slot=3, device_mac=mac_c)
+
+    # Initially, MAC C resolves to User 1
+    assert _resolve_owner_for_device(store, mac_c) == u1
+
+    # User 1 deletes slot 3
+    store.delete_xiaozhi_token(u1, slot=3, request_id="del-s3")
+
+    # Now MAC C must NOT resolve to User 1!
+    assert _resolve_owner_for_device(store, mac_c) is None
+
+    # User 2 configures slot 1 and queues an audio command for "despacito"
+    store.set_xiaozhi_token(u2, "wss://api.xiaozhi.me/mcp/?token=u2_tok1", slot=1, device_label="U2 Slot 1")
+    store.queue_audio_command(u2, title="Despacito", stream_url="/api/audio/stream/xyz", video_id="vid123")
+
+    # With query="despacito", it resolves to User 2 via recent audio queue correlation!
+    assert _resolve_owner_for_device(store, mac_c, query="despacito") == u2
+
+    # User 2 binds MAC C to slot 1
+    store.bind_board_to_slot(u2, slot=1, device_mac=mac_c)
+
+    # Now MAC C resolves directly to User 2 as active token owner!
+    assert _resolve_owner_for_device(store, mac_c) == u2
+
+
+
