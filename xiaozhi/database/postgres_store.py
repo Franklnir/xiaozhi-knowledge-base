@@ -1495,8 +1495,8 @@ class PostgresStore:
         request_id: str = "",
     ) -> Dict[str, Any]:
         """Log chat/tool execution with scoped asynchronous commit for maximum throughput."""
-        req_json = json.dumps(request_payload) if request_payload is not None else None
-        res_json = json.dumps(response_payload) if response_payload is not None else None
+        req_json = json.dumps(request_payload, default=str) if request_payload is not None else None
+        res_json = json.dumps(response_payload, default=str) if response_payload is not None else None
         slot_num = int(slot_number or 1)
         clean_mac = (device_mac or "").strip().upper()
         clean_req_id = (request_id or "").strip()
@@ -3705,14 +3705,14 @@ class PostgresStore:
             return None
 
         import re
-        from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id
+        from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id, is_generic_playlist_query
 
-        # Check track number in query: ONLY if query is literally a number (e.g. "1") or has explicit keyword ("nomor 2", "track 3", "playlist 1")
+        # Check track number in query: ONLY if query is literally a number (e.g. "1") or has explicit keyword ("nomor 2", "lagu 1", "track 3", "playlist 1")
         track_num = None
         if raw_q.isdigit():
             track_num = int(raw_q)
         else:
-            explicit_track_match = re.search(r"\b(?:nomor|no\.?|ke-?|track|urutan|playlist)\s*(\d+)\b", raw_q.lower())
+            explicit_track_match = re.search(r"\b(?:nomor|no\.?|ke-?|track|urutan|playlist|lagu|musik)\s*(\d+)\b", raw_q.lower())
             if explicit_track_match:
                 track_num = int(explicit_track_match.group(1))
 
@@ -3727,7 +3727,7 @@ class PostgresStore:
                     if row:
                         return dict(row)
 
-                # Check if query is Media URL or Video ID (YouTube or TikTok)
+                # Check if query is Media URL or Video ID (YouTube, TikTok, atau internal stream URL)
                 media_info = detect_media_url_source(raw_q)
                 vid = media_info["video_id"] if media_info else extract_youtube_video_id(raw_q)
                 if vid:
@@ -3739,9 +3739,16 @@ class PostgresStore:
                     if row:
                         return dict(row)
 
+                # Jika query hanya permintaan umum memutar playlist tanpa nama lagu spesifik, kembalikan None agar asisten bertanya
+                if is_generic_playlist_query(raw_q):
+                    return None
+
                 # Check by title / artist similarity
-                clean_kw = re.sub(r"(?i)\b(putar|lagu|musik|dari playlist|di playlist|playlist)\b", "", raw_q).strip()
+                clean_kw = re.sub(r"(?i)\b(putar|mainkan|setel|dengarkan|lagu|musik|dari playlist|di playlist|playlist|saya|favorit|pribadi)\b", "", raw_q).strip()
                 target_q = clean_kw if clean_kw else raw_q
+                if not target_q:
+                    return None
+
                 cur.execute(
                     """
                     SELECT * FROM user_playlists 

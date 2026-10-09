@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from xiaozhi.dependencies import get_current_user, get_store, require_user
 from xiaozhi.services.mcp_service import is_mcp_connected
+from xiaozhi.core.utils import is_generic_playlist_query, normalize_tiktok_url_for_ytdlp
 
 logger = logging.getLogger("xiaozhi.youtube")
 router = APIRouter()
@@ -953,8 +954,35 @@ async def audio_play_direct(
         title = ""
         target_video_url = ""
 
+        # 0. Cek apakah query langsung berupa URL stream audio internal (misal: /api/audio/stream/xyz)
+        m_stream = re.search(r"/(?:api/)?audio/stream/([a-zA-Z0-9_-]+)", q)
+        if m_stream:
+            stream_vid = m_stream.group(1)
+            if resolved_owner_id and hasattr(store, "find_playlist_track_by_video_id"):
+                try:
+                    matched_track = store.find_playlist_track_by_video_id(stream_vid, owner_id=resolved_owner_id)
+                    if matched_track:
+                        vid = matched_track.get("video_id", stream_vid)
+                        title = matched_track.get("title", "")
+                        target_video_url = matched_track.get("youtube_url", "")
+                        if hasattr(store, "increment_playlist_play_count") and matched_track.get("id"):
+                            try:
+                                store.increment_playlist_play_count(resolved_owner_id, track_id=matched_track["id"])
+                            except Exception:
+                                pass
+                except Exception as exc:
+                    logger.debug(f"[PLAY DIRECT] Stream URL playlist lookup error: {exc}")
+            if not vid:
+                vid = stream_vid
+                title = stream_vid
+                target_video_url = (
+                    normalize_tiktok_url_for_ytdlp(stream_vid)
+                    if stream_vid.startswith("tt_")
+                    else f"https://www.youtube.com/watch?v={stream_vid}"
+                )
+
         # 1. Cek apakah query cocok dengan lagu di Playlist milik user (nomor lagu, judul, atau link video)
-        if resolved_owner_id and hasattr(store, "find_playlist_track_by_query"):
+        if not vid and resolved_owner_id and hasattr(store, "find_playlist_track_by_query"):
             try:
                 matched_track = store.find_playlist_track_by_query(resolved_owner_id, q)
                 if matched_track:
@@ -969,6 +997,26 @@ async def audio_play_direct(
                     logger.info(f"[PLAY DIRECT] Ditemukan di playlist user {resolved_owner_id}: #{matched_track.get('track_number')} {title} ({vid})")
             except Exception as exc:
                 logger.debug(f"[PLAY DIRECT] Playlist lookup error: {exc}")
+
+        # 1b. Fallback untuk query umum playlist ('putar playlist') jika hardware memanggil langsung
+        if not vid and resolved_owner_id and is_generic_playlist_query(q):
+            try:
+                top_tracks = store.get_top_played_playlist(resolved_owner_id, limit=1) if hasattr(store, "get_top_played_playlist") else []
+                if not top_tracks and hasattr(store, "get_user_playlist"):
+                    top_tracks = store.get_user_playlist(resolved_owner_id)
+                if top_tracks:
+                    matched_track = top_tracks[0]
+                    vid = matched_track.get("video_id", "")
+                    title = matched_track.get("title", "")
+                    target_video_url = matched_track.get("youtube_url", "")
+                    if hasattr(store, "increment_playlist_play_count") and matched_track.get("id"):
+                        try:
+                            store.increment_playlist_play_count(resolved_owner_id, track_id=matched_track["id"])
+                        except Exception:
+                            pass
+                    logger.info(f"[PLAY DIRECT] Fallback generic playlist user {resolved_owner_id}: #{matched_track.get('track_number')} {title} ({vid})")
+            except Exception as exc:
+                logger.debug(f"[PLAY DIRECT] Generic playlist fallback error: {exc}")
 
         # 2. Jika tidak ditemukan di playlist, lakukan ekstraksi / pencarian audio (YouTube atau TikTok)
         if not vid:
