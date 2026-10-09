@@ -884,7 +884,22 @@
             <div class="profile-joined">Bergabung: {{ (user.created_at|string)[:10] }}</div>
             {% endif %}
             <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                {% if device_mac %}
+                {% if mcp_slots %}
+                    {% for sl in mcp_slots %}
+                    <div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; background: {% if sl.connected %}rgba(16, 185, 129, 0.12){% elif sl.saved %}rgba(245, 158, 11, 0.12){% else %}var(--app-soft){% endif %}; border: 1px solid {% if sl.connected %}rgba(16, 185, 129, 0.3){% elif sl.saved %}rgba(245, 158, 11, 0.3){% else %}var(--app-border){% endif %}; border-radius: 999px; font-size: 12px; font-weight: 700;">
+                        <span style="font-size: 12px;">{% if sl.connected %}🟢{% elif sl.saved %}🟡{% else %}⚪{% endif %}</span>
+                        <span style="color: var(--app-text); font-weight: 800;">Slot {{ sl.slot }}:</span>
+                        {% if sl.board_mac %}
+                            <code style="font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 800; color: #10b981;">{{ sl.board_mac }}</code>
+                            <span class="app-chip app-chip-small app-chip-success" style="font-size: 9.5px; padding: 1px 5px; font-weight: 700;">🔒 Terkunci</span>
+                        {% elif sl.saved %}
+                            <span style="color: #d97706; font-size: 11px; font-weight: 600;">Menunggu Board</span>
+                        {% else %}
+                            <span style="color: var(--app-muted); font-size: 11px;">Kosong</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% elif device_mac %}
                 <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 999px; font-size: 12.5px; font-weight: 700; color: #10b981;">
                     <span style="font-size: 14px;">📟</span>
                     <span style="color: var(--app-muted); font-weight: 600;">ESP32 Board ID:</span>
@@ -895,29 +910,14 @@
                     <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; padding: 2px 7px; font-weight: 700; background: #10b981; color: #ffffff; border-radius: 999px;">Tertaut Aktif</span>
                     <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
                 </div>
-                <button type="button" onclick="viewBoardHistory('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #3b82f6; font-weight: 700; cursor: pointer;">📜 Riwayat Tautan Board</button>
-                {% if user.role == 'admin' %}
+                {% endif %}
+                <a href="#mcpSlotsSection" class="app-button app-button-small" style="padding: 5px 14px; font-size: 11.5px; border-radius: 999px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); color: #6366f1; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                    <span>🔌 Kelola 3 Slot MCP & Riwayat</span>
+                </a>
+                <button type="button" onclick="viewMyPastBoards()" class="app-button app-button-small" style="padding: 5px 14px; font-size: 11.5px; border-radius: 999px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #3b82f6; font-weight: 700; cursor: pointer;">📜 Riwayat Board Akun</button>
+                {% if user.role == 'admin' and device_mac %}
                 <button type="button" onclick="unlinkMyBoard('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-weight: 700; cursor: pointer;" title="Pisahkan board ini (Hanya Admin)">✂️ Putus Tautan (Admin)</button>
                 <button type="button" onclick="promptSaveMac('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">✏️ Ganti MAC</button>
-                {% endif %}
-                {% elif mcp_status.connected %}
-                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 999px; font-size: 12px; font-weight: 650; color: #3b82f6;">
-                    <span style="font-size: 14px;">📟</span>
-                    <span>MCP Aktif (Board belum tertaut - siap pakai board lain)</span>
-                </div>
-                <button type="button" onclick="viewMyPastBoards()" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: var(--app-soft); border: 1px solid var(--app-border); color: var(--app-muted); font-weight: 600; cursor: pointer;">📜 Riwayat Board Akun</button>
-                {% if user.role == 'admin' %}
-                <button type="button" onclick="promptSaveMac('')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: #10b981; color: #ffffff; cursor: pointer;">➕ Tautkan MAC Board</button>
-                {% endif %}
-                {% else %}
-                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: var(--app-soft); border: 1px solid var(--app-border); border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--app-muted);">
-                    <span style="font-size: 14px;">📟</span>
-                    <span>ESP32: Belum tertaut (Bisa pakai Board ID manapun)</span>
-                </div>
-                <button type="button" onclick="viewMyPastBoards()" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: var(--app-soft); border: 1px solid var(--app-border); color: var(--app-muted); font-weight: 600; cursor: pointer;">📜 Riwayat Board Akun</button>
-                {% if user.role == 'admin' %}
-                <button type="button" onclick="promptSaveMac('')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">➕ Tautkan MAC Board</button>
-                {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -1269,33 +1269,229 @@
         </div>
     </div>
 
-    <!-- MCP Status -->
-    <div class="profile-section">
-        <div class="profile-section-title">
-            <span>🔌</span> Status Koneksi MCP
-        </div>
-        <div class="app-card">
-            <div style="display: flex; align-items: center; gap: 12px;">
-                {% if mcp_status.connected %}
-                <div style="width: 12px; height: 12px; border-radius: 999px; background: #047857;"></div>
-                <div>
-                    <div style="font-size: 14px; font-weight: 700; color: #047857;">Terhubung</div>
-                    <div style="font-size: 12px; color: var(--app-muted);">MCP terhubung ke XiaoZhi</div>
-                </div>
-                {% elif mcp_status.tokenSaved %}
-                <div style="width: 12px; height: 12px; border-radius: 999px; background: #d97706;"></div>
-                <div>
-                    <div style="font-size: 14px; font-weight: 700; color: #d97706;">Menunggu Koneksi</div>
-                    <div style="font-size: 12px; color: var(--app-muted);">Token tersimpan, menunggu bridge</div>
-                </div>
-                {% else %}
-                <div style="width: 12px; height: 12px; border-radius: 999px; background: #6b7280;"></div>
-                <div>
-                    <div style="font-size: 14px; font-weight: 700; color: #6b7280;">Tidak Terhubung</div>
-                    <div style="font-size: 12px; color: var(--app-muted);">Endpoint MCP belum disimpan</div>
-                </div>
-                {% endif %}
+    <!-- 🔌 Hardware & 3 Slot MCP XiaoZhi Section -->
+    <div class="profile-section" id="mcpSlotsSection">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <div class="profile-section-title" style="margin-bottom: 0;">
+                <span>🔌</span> Perangkat Hardware & 3 Slot MCP XiaoZhi
             </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="app-chip" style="font-size: 11.5px; font-weight: 700; background: rgba(99, 102, 241, 0.12); color: #6366f1; border: 1px solid rgba(99, 102, 241, 0.25);">
+                    Multi-Slot: 3 Slot Tersedia
+                </span>
+                <button type="button" onclick="viewMyPastBoards()" class="app-button app-button-small" style="font-size: 11.5px; padding: 4px 12px; border-radius: 8px;">
+                    📜 Riwayat Semua Board
+                </button>
+            </div>
+        </div>
+
+        <!-- 🎛️ 3-Slot MCP Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; margin-bottom: 24px;">
+            {% for sl in mcp_slots %}
+            <div class="app-card" style="border: 2px solid {% if sl.connected %}rgba(16, 185, 129, 0.4){% elif sl.saved %}rgba(245, 158, 11, 0.4){% else %}var(--app-border){% endif %}; position: relative; display: flex; flex-direction: column; justify-content: space-between; padding: 18px; border-radius: var(--app-radius);">
+                <div>
+                    <!-- Slot Header -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 18px;">{% if sl.slot == 1 %}🥇{% elif sl.slot == 2 %}🥈{% else %}🥉{% endif %}</span>
+                            <div>
+                                <div style="font-size: 15px; font-weight: 800; color: var(--app-text);">Slot {{ sl.slot }}</div>
+                                <div style="font-size: 11.5px; color: var(--app-muted); font-weight: 600;">{{ sl.label }}</div>
+                            </div>
+                        </div>
+                        <div>
+                            {% if sl.is_restricted %}
+                            <span class="app-chip app-chip-small" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700; font-size: 10px;">🔒 Akses Plus</span>
+                            {% elif sl.connected %}
+                            <span class="app-chip app-chip-small app-chip-success" style="font-size: 10px; font-weight: 700;">🟢 Terhubung</span>
+                            {% elif sl.saved %}
+                            <span class="app-chip app-chip-small" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px; font-weight: 700;">🟡 Standby</span>
+                            {% else %}
+                            <span class="app-chip app-chip-small app-chip-neutral" style="font-size: 10px;">⚪ Kosong</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Token Endpoint Preview -->
+                    <div style="background: var(--app-soft, rgba(0,0,0,0.04)); border: 1px solid var(--app-border); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;">
+                        <div style="font-size: 10.5px; font-weight: 700; color: var(--app-muted); margin-bottom: 2px;">ENDPOINT WEBSOCKET:</div>
+                        {% if sl.preview %}
+                        <div style="font-family: ui-monospace, monospace; font-size: 11px; color: var(--app-text); word-break: break-all; font-weight: 600;">
+                            {{ sl.preview }}
+                        </div>
+                        {% else %}
+                        <div style="font-size: 11.5px; color: var(--app-muted); font-style: italic;">
+                            Endpoint belum dikonfigurasi
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Hardware Board Binding Status -->
+                    <div style="margin-bottom: 16px;">
+                        <div style="font-size: 10.5px; font-weight: 700; color: var(--app-muted); margin-bottom: 4px;">KUNCI HARDWARE ESP32:</div>
+                        {% if sl.board_mac %}
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 7px 10px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 14px;">🔒</span>
+                                <code style="font-family: ui-monospace, monospace; font-size: 12px; font-weight: 800; color: #10b981;">{{ sl.board_mac }}</code>
+                            </div>
+                            <div style="display: flex; gap: 4px;">
+                                <button type="button" onclick="viewBoardHistory('{{ sl.board_mac }}')" class="app-button app-button-small" style="font-size: 10px; padding: 2px 7px; border-radius: 5px;" title="Lihat riwayat audit MAC ini">📜 Riwayat</button>
+                                <button type="button" onclick="detachSlotBoardConfirm({{ sl.slot }}, '{{ sl.board_mac }}')" class="app-button app-button-small app-button-danger" style="font-size: 10px; padding: 2px 7px; border-radius: 5px;" title="Lepaskan kunci MAC dari slot ini">✂️ Lepas</button>
+                            </div>
+                        </div>
+                        {% elif sl.saved %}
+                        <div style="background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 7px 10px; font-size: 11.5px; color: #d97706; display: flex; align-items: center; gap: 6px;">
+                            <span>⏳</span>
+                            <span>Menunggu Hardware (Siap mengunci board pertama yang aktif)</span>
+                        </div>
+                        {% else %}
+                        <div style="color: var(--app-muted); font-size: 11.5px; padding: 4px 0;">
+                            - Belum ada hardware tertaut -
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Slot Action Buttons -->
+                <div style="border-top: 1px solid var(--app-border); padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    {% if sl.is_restricted %}
+                    <span style="font-size: 11px; color: #ef4444; font-weight: 600;">Hubungi Admin untuk mengaktifkan slot</span>
+                    {% else %}
+                    <button type="button" onclick="openSlotConfigModal({{ sl.slot }}, '{{ sl.label|e }}', '{{ sl.preview|e }}')" class="app-button app-button-small {% if not sl.saved %}app-button-primary{% endif %}" style="font-size: 11.5px; padding: 6px 12px; border-radius: 6px; font-weight: 700;">
+                        {% if sl.saved %}⚙️ Ubah Endpoint{% else %}➕ Konfigurasi Slot {{ sl.slot }}{% endif %}
+                    </button>
+                    {% if sl.saved %}
+                    <button type="button" onclick="deleteSlotConfirm({{ sl.slot }})" class="app-button app-button-small app-button-danger" style="font-size: 11px; padding: 6px 10px; border-radius: 6px;" title="Hapus slot ini & putus tautan board">
+                        🗑️ Hapus
+                    </button>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 📜 Riwayat Pengikatan Board & Status Pemilik Saat Ini -->
+        <div class="app-card" style="padding: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--app-text); display: flex; align-items: center; gap: 8px;">
+                        <span>📜</span>
+                        <span>Riwayat Pengikatan Hardware ESP32 & Transfer Akun</span>
+                    </h3>
+                    <p style="margin: 3px 0 0; font-size: 12.5px; color: var(--app-muted);">
+                        Audit linimasa board yang pernah dipakai akun ini. Jika board dipindah ke pengguna lain, pemilik akun barunya ditampilkan di bawah.
+                    </p>
+                </div>
+                <span class="app-chip app-chip-neutral" style="font-size: 11.5px; font-weight: 700;">
+                    Total: {{ board_history|length }} Catatan
+                </span>
+            </div>
+
+            {% if not board_history or board_history|length == 0 %}
+            <div style="text-align: center; padding: 36px 20px; color: var(--app-muted); background: var(--app-soft, rgba(0,0,0,0.02)); border: 1px dashed var(--app-border); border-radius: var(--app-radius);">
+                <div style="font-size: 28px; margin-bottom: 8px;">📟</div>
+                <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">Belum Ada Riwayat Board</div>
+                <div style="font-size: 12.5px;">Board ESP32 Anda akan otomatis tercatat di sini saat pertama kali terhubung ke MCP atau memutar lagu.</div>
+            </div>
+            {% else %}
+            <div style="overflow-x: auto; margin-top: 14px;">
+                <table class="app-table" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--app-border); text-align: left; color: var(--app-muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            <th style="padding: 10px 12px;">ID MAC Hardware</th>
+                            <th style="padding: 10px 12px;">Slot di Akun Anda</th>
+                            <th style="padding: 10px 12px;">Periode Tautan</th>
+                            <th style="padding: 10px 12px;">Status di Akun Anda</th>
+                            <th style="padding: 10px 12px;">Status Terhubung Saat Ini & Akun Baru</th>
+                            <th style="padding: 10px 12px; text-align: right;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in board_history %}
+                        <tr style="border-bottom: 1px solid var(--app-border); transition: background 0.15s ease;">
+                            <!-- MAC Hardware -->
+                            <td style="padding: 12px; vertical-align: middle;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <code style="font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 800; color: var(--app-text); background: var(--app-soft, rgba(0,0,0,0.05)); padding: 2px 7px; border-radius: 5px; border: 1px solid var(--app-border);">
+                                        {{ h.device_mac }}
+                                    </code>
+                                    {% if h.is_protected %}
+                                    <span class="app-chip app-chip-small" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; background: #6366f1; color: white;" title="Master Protected Board">🛡️ Protected</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+
+                            <!-- Slot info -->
+                            <td style="padding: 12px; vertical-align: middle;">
+                                <span style="font-weight: 700; color: var(--app-text);">Slot {{ h.slot_number or 1 }}</span>
+                                {% if h.device_name %}
+                                <div style="font-size: 11px; color: var(--app-muted);">{{ h.device_name }}</div>
+                                {% endif %}
+                            </td>
+
+                            <!-- Linked at -->
+                            <td style="padding: 12px; vertical-align: middle; font-size: 12px;">
+                                <div>📅 <strong>Tertaut:</strong> {{ h.linked_at_str or '-' }}</div>
+                                {% if h.unlinked_at_str %}
+                                <div style="color: var(--app-muted); margin-top: 2px;">🔌 <strong>Dilepas:</strong> {{ h.unlinked_at_str }}</div>
+                                {% endif %}
+                            </td>
+
+                            <!-- Status di akun ini -->
+                            <td style="padding: 12px; vertical-align: middle;">
+                                {% if h.status == 'ACTIVE' and h.is_current_owner %}
+                                <span class="app-chip app-chip-small app-chip-success" style="font-weight: 700; padding: 2px 8px;">
+                                    🟢 Sedang Tertaut
+                                </span>
+                                {% else %}
+                                <span class="app-chip app-chip-small app-chip-neutral" style="font-weight: 600; padding: 2px 8px;">
+                                    ⚪ Terputus / Riwayat
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Status Terhubung Saat Ini & Akun Baru (USER MAIN REQUEST) -->
+                            <td style="padding: 12px; vertical-align: middle;">
+                                {% if h.is_transferred %}
+                                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(245, 158, 11, 0.12); border: 1.5px solid #f59e0b; border-radius: 8px;">
+                                    <span style="font-size: 15px;">🔄</span>
+                                    <div>
+                                        <div style="font-size: 10.5px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.3px;">
+                                            Tersambung ke Akun Baru:
+                                        </div>
+                                        <div style="font-size: 13px; font-weight: 800; color: #d97706;">
+                                            @{{ h.current_owner_username }} 
+                                            <span style="font-size: 11px; font-weight: 600; color: #92400e;">(Slot {{ h.current_slot_number or 1 }})</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% elif h.is_current_owner and h.current_status == 'ACTIVE' %}
+                                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; font-size: 12px; font-weight: 700; color: #059669;">
+                                    <span>🟢</span>
+                                    <span>Masih Aktif di Akun Anda (Slot {{ h.current_slot_number or h.slot_number or 1 }})</span>
+                                </div>
+                                {% else %}
+                                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--app-soft, rgba(0,0,0,0.03)); border: 1px solid var(--app-border); border-radius: 8px; font-size: 11.5px; color: var(--app-muted);">
+                                    <span>⚪</span>
+                                    <span>{{ h.current_connection_text or 'Belum terhubung ke siapapun' }}</span>
+                                </div>
+                                {% endif %}
+                            </td>
+
+                            <!-- Action -->
+                            <td style="padding: 12px; vertical-align: middle; text-align: right;">
+                                <button type="button" onclick="viewBoardHistory('{{ h.device_mac }}')" class="app-button app-button-small" style="font-size: 11.5px; padding: 4px 10px; border-radius: 6px; cursor: pointer;">
+                                    📜 Detail Audit
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -3951,7 +4147,141 @@
     </div>
 </div>
 
+<!-- ⚙️ Modal Konfigurasi Slot MCP -->
+<div id="slotConfigModal" style="display: none; position: fixed; inset: 0; z-index: 99999; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: var(--app-surface, #1e293b); border: 1px solid var(--app-border, #334155); border-radius: 16px; width: 100%; max-width: 520px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+        <div style="padding: 18px 24px; border-bottom: 1px solid var(--app-border, #334155); display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--app-text, #f8fafc); display: flex; align-items: center; gap: 8px;">
+                    <span>⚙️</span>
+                    <span>Konfigurasi Slot MCP <span id="slotConfigModalSlotNumDisplay" style="color: #6366f1;"></span></span>
+                </h3>
+                <p style="margin: 3px 0 0; font-size: 12px; color: var(--app-muted, #94a3b8);">Simpan endpoint WebSocket XiaoZhi untuk slot yang dipilih</p>
+            </div>
+            <button type="button" onclick="closeSlotConfigModal()" style="background: transparent; border: none; font-size: 22px; cursor: pointer; color: var(--app-muted, #94a3b8); line-height: 1;">&times;</button>
+        </div>
+        <form id="slotConfigForm" onsubmit="handleSlotConfigSubmit(event)" style="padding: 20px 24px;">
+            <input type="hidden" id="slotConfigSlotNum" value="1">
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12.5px; font-weight: 700; color: var(--app-text); margin-bottom: 6px;">
+                    Label / Nama Perangkat:
+                </label>
+                <input type="text" id="slotConfigLabel" class="app-input" placeholder="Contoh: Ruang Tamu / Meja Kerja" style="width: 100%; font-size: 13px;">
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12.5px; font-weight: 700; color: var(--app-text); margin-bottom: 6px;">
+                    Endpoint WebSocket MCP:
+                </label>
+                <input type="text" id="slotConfigToken" class="app-input" placeholder="wss://api.xiaozhi.me/mcp/?token=..." required style="width: 100%; font-family: ui-monospace, monospace; font-size: 12px;">
+                <div style="font-size: 11.5px; color: var(--app-muted); margin-top: 4px;">
+                    Salin endpoint MCP dari <a href="https://xiaozhi.me" target="_blank" style="color: var(--app-brand, #3b82f6); text-decoration: underline;">xiaozhi.me</a>
+                </div>
+            </div>
+            <div id="slotConfigError" style="display: none; color: #dc2626; font-size: 12px; font-weight: 700; margin-bottom: 12px;"></div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" onclick="closeSlotConfigModal()" class="app-button" style="padding: 7px 16px; border-radius: 8px;">Batal</button>
+                <button type="submit" id="slotConfigSubmitBtn" class="app-button app-button-primary" style="padding: 7px 20px; border-radius: 8px; font-weight: 800;">💾 Simpan Slot</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+function openSlotConfigModal(slot, label, preview) {
+    document.getElementById("slotConfigSlotNum").value = slot;
+    document.getElementById("slotConfigModalSlotNumDisplay").textContent = `(Slot ${slot})`;
+    document.getElementById("slotConfigLabel").value = label || (slot === 1 ? "{{ user.username }} - Slot 1" : `XiaoZhi ${slot}`);
+    document.getElementById("slotConfigToken").value = preview || "";
+    const err = document.getElementById("slotConfigError");
+    if (err) { err.style.display = "none"; err.textContent = ""; }
+    document.getElementById("slotConfigModal").style.display = "flex";
+}
+
+function closeSlotConfigModal() {
+    document.getElementById("slotConfigModal").style.display = "none";
+}
+
+async function handleSlotConfigSubmit(event) {
+    event.preventDefault();
+    const slot = document.getElementById("slotConfigSlotNum").value;
+    const label = document.getElementById("slotConfigLabel").value;
+    const token = document.getElementById("slotConfigToken").value;
+    const err = document.getElementById("slotConfigError");
+    const btn = document.getElementById("slotConfigSubmitBtn");
+    if (err) { err.style.display = "none"; err.textContent = ""; }
+    if (btn) { btn.disabled = true; btn.textContent = "Menyimpan..."; }
+    try {
+        const fd = new FormData();
+        fd.append("slot", slot);
+        fd.append("device_label", label);
+        fd.append("mcp_token", token);
+        fd.append("csrf_token", "{{ csrf_token }}");
+        const res = await fetch("/save_mcp", {
+            method: "POST",
+            body: fd
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert(data.message || "Slot berhasil disimpan!");
+            window.location.reload();
+        } else {
+            if (err) { err.style.display = "block"; err.textContent = data.detail || data.message || "Gagal menyimpan slot."; }
+        }
+    } catch(e) {
+        if (err) { err.style.display = "block"; err.textContent = "Error: " + e.message; }
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "💾 Simpan Slot"; }
+    }
+}
+
+async function deleteSlotConfirm(slot) {
+    if (!confirm(`Hapus endpoint MCP untuk Slot ${slot}?\n\nTautan board hardware pada slot ini juga akan dilepaskan secara otomatis.`)) {
+        return;
+    }
+    try {
+        const fd = new FormData();
+        fd.append("slot", slot);
+        fd.append("csrf_token", "{{ csrf_token }}");
+        const res = await fetch("/delete_mcp", {
+            method: "POST",
+            body: fd
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert(data.message || `Slot ${slot} berhasil dihapus.`);
+            window.location.reload();
+        } else {
+            alert(data.detail || data.message || "Gagal menghapus slot.");
+        }
+    } catch(e) {
+        alert("Error: " + e.message);
+    }
+}
+
+async function detachSlotBoardConfirm(slot, mac) {
+    if (!confirm(`Lepas kunci Hardware Board MAC (${mac}) dari Slot ${slot}?\n\nEndpoint MCP tetap tersimpan, dan slot ini akan siap menerima board hardware ESP32 baru.`)) {
+        return;
+    }
+    try {
+        const fd = new FormData();
+        fd.append("slot", slot);
+        fd.append("csrf_token", "{{ csrf_token }}");
+        const res = await fetch("/api/mcp/slots/detach-board", {
+            method: "POST",
+            body: fd
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert(data.message || `Kunci MAC pada Slot ${slot} berhasil dilepas.`);
+            window.location.reload();
+        } else {
+            alert(data.detail || data.message || "Gagal melepas kunci MAC.");
+        }
+    } catch(e) {
+        alert("Error: " + e.message);
+    }
+}
+
 async function unlinkMyBoard(currentMac) {
     if (!confirm("Putus tautan Board ID (" + currentMac + ") dari akun Anda?\n\nID Board dan seluruh riwayatnya akan tetap aman di database, dan Anda bebas menautkan board ESP32 lain kapan saja.")) {
         return;
@@ -3994,10 +4324,32 @@ async function viewBoardHistory(deviceMac) {
         
         let html = '';
         if (data.is_protected) {
-            html += `<div style="margin-bottom: 16px; padding: 10px 14px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 10px; font-size: 12.5px; color: #818cf8; display: flex; align-items: center; gap: 8px;">
+            html += `<div style="margin-bottom: 14px; padding: 10px 14px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 10px; font-size: 12.5px; color: #818cf8; display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 16px;">🛡️</span>
                 <span><strong>Protected Master Board:</strong> ID perangkat ini terlindungi permanen di sistem dan tidak akan pernah dihapus walau MCP diputus.</span>
             </div>`;
+        }
+
+        // Show prominent current connection & new owner info at top
+        if (data.current_owner && data.current_owner.username) {
+            const co = data.current_owner;
+            const isSelf = (Number(co.user_id) === Number({{ user.id }}));
+            if (isSelf && co.status === 'ACTIVE') {
+                html += `<div style="margin-bottom: 16px; padding: 10px 14px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px; font-size: 13px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">🟢</span>
+                    <span>Status Saat Ini: <strong>Masih Aktif di Akun Anda (Slot ${co.slot_number || 1})</strong></span>
+                </div>`;
+            } else if (!isSelf) {
+                html += `<div style="margin-bottom: 16px; padding: 12px 16px; background: rgba(245, 158, 11, 0.14); border: 1.5px solid #f59e0b; border-radius: 10px; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">🔄</span>
+                    <div>
+                        <div style="font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.3px;">Status Terhubung Saat Ini:</div>
+                        <div style="font-size: 14px; font-weight: 800; color: #d97706;">
+                            Tersambung ke Akun Baru: <strong>@${co.username}</strong> <span style="font-size: 11.5px; font-weight: 600; color: #92400e;">(Slot ${co.slot_number || 1})</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
         }
         
         if (!data.history || data.history.length === 0) {
@@ -4010,13 +4362,26 @@ async function viewBoardHistory(deviceMac) {
                     ? `<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">🟢 Sedang Tertaut (Aktif)</span>`
                     : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600;">⚪ Terputus / Riwayat Lampau</span>`;
                 
+                let transferBadge = '';
+                if (h.is_transferred && h.current_owner_username) {
+                    transferBadge = `<div style="margin-top: 8px; padding: 6px 12px; background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; font-size: 12px; color: #d97706; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>🔄</span>
+                        <span>Tersambung ke Akun Baru: <strong>@${h.current_owner_username}</strong> (Slot ${h.current_slot_number || 1})</span>
+                    </div>`;
+                } else if (h.is_current_owner && h.current_status === 'ACTIVE') {
+                    transferBadge = `<div style="margin-top: 8px; padding: 4px 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; font-size: 11.5px; color: #059669; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>🟢</span>
+                        <span>Masih Aktif di Akun Anda (Slot ${h.current_slot_number || h.slot_number || 1})</span>
+                    </div>`;
+                }
+                
                 html += `
                 <div style="background: var(--app-card, rgba(255,255,255,0.03)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 12px; padding: 14px 16px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
                         <div style="font-weight: 700; font-size: 14px; color: var(--app-text, #fff); display: flex; align-items: center; gap: 6px;">
                             <span>👤</span>
                             <span>${h.username || 'User ID: ' + h.user_id}</span>
-                            <span style="font-size: 11px; color: var(--app-muted, #94a3b8); font-weight: 500;">(ID: ${h.user_id})</span>
+                            <span style="font-size: 11px; color: var(--app-muted, #94a3b8); font-weight: 500;">(Slot: ${h.slot_number || 1})</span>
                         </div>
                         ${statusBadge}
                     </div>
@@ -4026,6 +4391,7 @@ async function viewBoardHistory(deviceMac) {
                         <div>🔌 <strong>Terakhir Tertaut / Diputus:</strong> ${h.unlinked_at_str ? h.unlinked_at_str : '<span style="color: #10b981; font-weight: 600;">Masih aktif sampai sekarang</span>'}</div>
                         <div>📝 <strong>Catatan:</strong> ${h.notes || 'Normal binding'}</div>
                     </div>
+                    ${transferBadge}
                 </div>`;
             });
             html += `</div>`;
@@ -4059,10 +4425,23 @@ async function viewMyPastBoards() {
         } else {
             html += `<div style="display: flex; flex-direction: column; gap: 12px;">`;
             data.history.forEach((h) => {
-                const isActive = h.status === 'ACTIVE';
+                const isActive = h.status === 'ACTIVE' && h.is_current_owner;
                 const statusBadge = isActive 
                     ? `<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">🟢 Sedang Tertaut</span>`
-                    : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600;">⚪ Terputus</span>`;
+                    : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600;">⚪ Terputus / Riwayat</span>`;
+                
+                let transferBadge = '';
+                if (h.is_transferred && h.current_owner_username) {
+                    transferBadge = `<div style="margin-top: 8px; padding: 6px 12px; background: rgba(245, 158, 11, 0.14); border: 1px solid #f59e0b; border-radius: 8px; font-size: 12px; color: #d97706; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>🔄</span>
+                        <span>Tersambung ke Akun Baru: <strong>@${h.current_owner_username}</strong> (Slot ${h.current_slot_number || 1})</span>
+                    </div>`;
+                } else if (h.is_current_owner && h.current_status === 'ACTIVE') {
+                    transferBadge = `<div style="margin-top: 8px; padding: 4px 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; font-size: 11.5px; color: #059669; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>🟢</span>
+                        <span>Masih Aktif di Akun Anda (Slot ${h.current_slot_number || h.slot_number || 1})</span>
+                    </div>`;
+                }
                 
                 html += `
                 <div style="background: var(--app-card, rgba(255,255,255,0.03)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 12px; padding: 14px 16px;">
@@ -4074,10 +4453,12 @@ async function viewMyPastBoards() {
                         ${statusBadge}
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 12px; color: var(--app-muted, #94a3b8);">
+                        <div>🏷️ <strong>Slot Anda:</strong> Slot ${h.slot_number || 1}</div>
                         <div>📅 <strong>Tertaut Pada:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
                         <div>🔌 <strong>Diputus Pada:</strong> ${h.unlinked_at_str || '<span style="color: #10b981;">Masih aktif</span>'}</div>
                         <div>📝 <strong>Catatan:</strong> ${h.notes || 'Normal binding'}</div>
                     </div>
+                    ${transferBadge}
                 </div>`;
             });
             html += `</div>`;

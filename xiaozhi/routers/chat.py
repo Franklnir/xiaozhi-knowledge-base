@@ -28,7 +28,7 @@ from xiaozhi.dependencies import (
     validate_csrf,
     redirect_with_message,
 )
-from xiaozhi.services.mcp_service import is_mcp_connected, mcp_status_payload
+from xiaozhi.services.mcp_service import is_mcp_connected, mcp_status_payload, mcp_slots_payload
 from xiaozhi.services.sse_service import stream_ai_chat
 from xiaozhi.services.community_chat_service import chat_hub
 from xiaozhi.core.utils import utc_now
@@ -634,6 +634,10 @@ async def profile_page(request: Request, mode: Optional[str] = "profile", sub: O
         token_preview=token_info.get("preview", "") if token_info else "",
         token_hash=token_hash,
     )
+    mcp_slots_data = mcp_slots_payload(user["id"], store)
+    user_tokens = store.list_user_xiaozhi_tokens(user["id"]) if hasattr(store, "list_user_xiaozhi_tokens") else []
+    board_history = store.get_board_binding_history(user_id=user["id"], limit=50) if hasattr(store, "get_board_binding_history") else []
+
     persona_analysis = store.get_user_persona_analysis(user["id"])
     device_mac = store.get_user_mac_address(user["id"]) if hasattr(store, "get_user_mac_address") else None
 
@@ -690,6 +694,10 @@ async def profile_page(request: Request, mode: Optional[str] = "profile", sub: O
             "user": user,
             "features": features,
             "mcp_status": mcp_status,
+            "mcp_slots": mcp_slots_data.get("slots", []),
+            "mcp_multislot_allowed": mcp_slots_data.get("multislotAllowed", True),
+            "user_tokens": user_tokens,
+            "board_history": board_history,
             "persona_analysis": persona_analysis,
             "tools_catalog": tools_catalog,
             "total_tools": len(tools_catalog),
