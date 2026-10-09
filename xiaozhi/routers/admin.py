@@ -179,8 +179,10 @@ async def admin_toggle_feature(
     target_user_id: int,
     feature: str = Form(...),
     enabled: str = Form("true"),
+    csrf_token: str = Form(...),
 ):
     admin = require_admin(request)
+    validate_csrf(request, csrf_token, admin)
     store = get_store()
     is_enabled = enabled.lower() in {"true", "1", "on"}
     try:
@@ -499,8 +501,10 @@ async def admin_api_youtube_active_streams(request: Request):
 
 
 @router.post("/admin/api/youtube/stop/{session_id}")
-async def admin_api_youtube_stop(request: Request, session_id: str):
+async def admin_api_youtube_stop(request: Request, session_id: str, csrf_token: Optional[str] = Form(None)):
     admin = require_admin(request)
+    if csrf_token:
+        validate_csrf(request, csrf_token, admin)
     stopped = playback_tracker.stop_session(session_id)
     return {
         "success": stopped,

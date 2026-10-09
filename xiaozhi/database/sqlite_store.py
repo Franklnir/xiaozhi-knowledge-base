@@ -155,7 +155,6 @@ class SQLiteStore:
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS idx_tokens_hash ON xiaozhi_tokens(token_hash);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);
 
             -- Chat history
             CREATE TABLE IF NOT EXISTS chat_history (
@@ -258,7 +257,6 @@ class SQLiteStore:
             );
             CREATE INDEX IF NOT EXISTS idx_board_hist_mac ON board_binding_history(device_mac);
             CREATE INDEX IF NOT EXISTS idx_board_hist_user ON board_binding_history(user_id);
-            CREATE INDEX IF NOT EXISTS idx_board_hist_slot ON board_binding_history(slot_number);
 
             -- User Playlists
             CREATE TABLE IF NOT EXISTS user_playlists (
@@ -448,6 +446,9 @@ class SQLiteStore:
                     conn.execute("ALTER TABLE board_binding_history ADD COLUMN request_id TEXT;")
                 if "action" not in bbh_cols:
                     conn.execute("ALTER TABLE board_binding_history ADD COLUMN action TEXT NOT NULL DEFAULT 'bind';")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_board_hist_slot ON board_binding_history(slot_number);")
+
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);")
 
             # Migration check Access Plus
             tok_cols = [r["name"] for r in conn.execute("PRAGMA table_info(xiaozhi_tokens)").fetchall()]

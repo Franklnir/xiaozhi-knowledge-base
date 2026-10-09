@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request, Form, UploadFile, File, HTTPException, s
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
-from xiaozhi.dependencies import render, get_current_user, require_user, redirect_with_message
+from xiaozhi.dependencies import render, get_current_user, require_user, redirect_with_message, validate_csrf
 from xiaozhi.marketplace.deps import (
     get_product_service,
     get_order_service,
@@ -367,8 +367,11 @@ async def request_withdrawal_action(
     destination_bank: str = Form(...),
     destination_account_name: str = Form(...),
     destination_account_number: str = Form(...),
+    csrf_token: Optional[str] = Form(None),
 ):
     user = require_user(request)
+    if csrf_token:
+        validate_csrf(request, csrf_token, user)
     service = get_wallet_service()
     try:
         inquiry = verify_account(destination_bank, destination_account_number, user)
@@ -389,10 +392,17 @@ async def request_withdrawal_action(
 @router.get("/checkout/simulate", response_class=HTMLResponse)
 async def simulated_checkout_page(request: Request, order_number: str):
     user = require_user(request)
+    allow_sim = os.getenv("ALLOW_SIMULATOR_PAYMENTS", "false").strip().lower() in ("1", "true", "yes")
+    if not allow_sim and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Simulasi pembayaran dinonaktifkan.")
+
     repo = get_marketplace_repo()
     order = repo.get_order_by_number(order_number)
     if not order:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan.")
+
+    if int(order.get("buyer_id", 0)) != int(user["id"]) and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Akses ditolak: Anda bukan pemilik pesanan ini.")
 
     return render(request, "marketplace/checkout_simulate.html", {
         "user": user,
@@ -404,10 +414,17 @@ async def simulated_checkout_page(request: Request, order_number: str):
 @router.post("/checkout/simulate/confirm")
 async def confirm_simulated_checkout_action(request: Request, order_number: str = Form(...)):
     user = require_user(request)
+    allow_sim = os.getenv("ALLOW_SIMULATOR_PAYMENTS", "false").strip().lower() in ("1", "true", "yes")
+    if not allow_sim and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Simulasi pembayaran dinonaktifkan.")
+
     repo = get_marketplace_repo()
     order = repo.get_order_by_number(order_number)
     if not order:
         return redirect_with_message("/firmware/marketplace", "Pesanan tidak ditemukan.")
+
+    if int(order.get("buyer_id", 0)) != int(user["id"]) and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Akses ditolak: Anda bukan pemilik pesanan ini.")
 
     # Finalize payment via repo
     import uuid

@@ -13,7 +13,7 @@ import logging
 from fastapi import APIRouter, Request, Form, Query, HTTPException, status, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from xiaozhi.dependencies import render, require_admin, redirect_with_message, get_store
+from xiaozhi.dependencies import render, require_admin, redirect_with_message, get_store, validate_csrf
 from typing import Optional
 from xiaozhi.marketplace.deps import get_approval_service, get_wallet_service, get_marketplace_repo, get_product_service
 
@@ -35,8 +35,10 @@ async def admin_products_page(request: Request, status: Optional[str] = None):
 
 
 @router.post("/products/{product_id}/delete")
-async def admin_delete_product_action(request: Request, product_id: str):
+async def admin_delete_product_action(request: Request, product_id: str, csrf_token: Optional[str] = Form(None)):
     user = require_admin(request)
+    if csrf_token:
+        validate_csrf(request, csrf_token, user)
     service = get_product_service()
     try:
         res = service.delete_product(product_id, user)
@@ -196,8 +198,10 @@ async def admin_catalog_approvals_page(request: Request):
 
 
 @router.post("/approvals/{approval_id}/approve")
-async def admin_approve_action(request: Request, approval_id: str):
+async def admin_approve_action(request: Request, approval_id: str, csrf_token: Optional[str] = Form(None)):
     user = require_admin(request)
+    if csrf_token:
+        validate_csrf(request, csrf_token, user)
     service = get_approval_service()
     try:
         success = service.approve_product(approval_id, int(user["id"]))
@@ -214,8 +218,11 @@ async def admin_reject_action(
     approval_id: str,
     reason: Optional[str] = Form(None),
     rejection_reason: Optional[str] = Form(None),
+    csrf_token: Optional[str] = Form(None),
 ):
     user = require_admin(request)
+    if csrf_token:
+        validate_csrf(request, csrf_token, user)
     service = get_approval_service()
     final_reason = (reason or rejection_reason or "").strip() or "Tidak memenuhi standar katalog."
     try:
@@ -302,8 +309,11 @@ async def admin_approve_withdrawal_action(
     request: Request,
     withdrawal_id: str,
     admin_notes: Optional[str] = Form(None),
+    csrf_token: Optional[str] = Form(None),
 ):
     user = require_admin(request)
+    if csrf_token:
+        validate_csrf(request, csrf_token, user)
     repo = get_marketplace_repo()
     try:
         repo.admin_process_withdrawal(
@@ -322,8 +332,11 @@ async def admin_reject_withdrawal_action(
     request: Request,
     withdrawal_id: str,
     reason: str = Form(...),
+    csrf_token: Optional[str] = Form(None),
 ):
     user = require_admin(request)
+    if csrf_token:
+        validate_csrf(request, csrf_token, user)
     repo = get_marketplace_repo()
     try:
         repo.admin_process_withdrawal(

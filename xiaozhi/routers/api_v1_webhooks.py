@@ -73,6 +73,15 @@ async def midtrans_webhook(request: Request):
 
 @router.post("/simulator")
 async def simulator_webhook(request: Request):
+    import os
+    allow_sim = os.getenv("ALLOW_SIMULATOR_PAYMENTS", "false").strip().lower() in ("1", "true", "yes")
+    if not allow_sim:
+        logger.warning("Rejected simulator webhook: ALLOW_SIMULATOR_PAYMENTS is disabled.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Simulator webhook dinonaktifkan di server ini."
+        )
+
     headers = dict(request.headers)
     raw_body = await request.body()
     provider = SimulatorPaymentProvider()

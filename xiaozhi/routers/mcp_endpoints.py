@@ -9,6 +9,8 @@ from xiaozhi.dependencies import (
     get_store,
     redirect_with_message,
     validate_csrf,
+    require_admin,
+    require_user,
 )
 from xiaozhi.services.mcp_service import (
     clear_mcp_state,
@@ -322,6 +324,8 @@ async def get_mcp_slot_history(
 
 @router.post("/api/mcp/check")
 async def check_mcp_endpoint(request: Request):
+    """Diagnosa endpoint MCP (khusus administrator)."""
+    user = require_admin(request)
     req_id = _get_req_id(request)
     body = await request.json()
     token = str(body.get("token", "")).strip()
@@ -349,40 +353,18 @@ async def check_mcp_endpoint(request: Request):
             "message": f"Endpoint ini milik user: {owner['username']} (ID: {owner['user_id']}){slot_label}",
         }
 
-    all_tokens = store.list_xiaozhi_tokens()
-    token_base = token.split("?")[0] if "?" in token else token
-
-    similar_tokens = []
-    for t in all_tokens:
-        stored_token = t.get("token", "")
-        if stored_token and stored_token.startswith(token_base[:30]):
-            similar_tokens.append({
-                "user_id": t["user_id"],
-                "slot_number": t.get("slot_number", 1),
-                "device_label": t.get("device_label", "XiaoZhi"),
-                "token_preview": stored_token[:50] + "..." if len(stored_token) > 50 else stored_token,
-            })
-
-    if similar_tokens:
-        return {
-            "success": True,
-            "request_id": req_id,
-            "found": False,
-            "similar": similar_tokens,
-            "message": "Endpoint tidak cocok persis, tapi ditemukan token mirip. Pastikan URL lengkap benar.",
-        }
-
     return {
         "success": True,
         "request_id": req_id,
         "found": False,
-        "total_endpoints": len(all_tokens),
         "message": "Endpoint ini belum terdaftar di user manapun.",
     }
 
 
 @router.post("/api/mcp/delete-by-token")
 async def delete_mcp_by_token(request: Request):
+    """Hapus endpoint MCP (wajib login, hanya pemilik atau admin)."""
+    user = require_user(request)
     req_id = _get_req_id(request)
     body = await request.json()
     token = str(body.get("token", "")).strip()
@@ -392,6 +374,14 @@ async def delete_mcp_by_token(request: Request):
     owner = store.find_user_by_mcp_token(token)
     if not owner:
         return {"success": False, "request_id": req_id, "message": "Endpoint tidak ditemukan di database."}
+    
+    # Validasi kepemilikan
+    if user.get("role") != "admin" and int(owner["user_id"]) != int(user["id"]):
+        raise HTTPException(
+            status_code=403,
+            detail="Akses ditolak: Anda tidak memiliki izin untuk menghapus endpoint MCP akun lain."
+        )
+
     slot_num = owner.get("slot_number", 1)
     deleted = store.delete_xiaozhi_token_by_hash(token)
     clear_mcp_state(owner["user_id"], slot=slot_num)
