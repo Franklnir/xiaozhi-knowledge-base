@@ -143,10 +143,12 @@ async def get_device_history_endpoint(device_id: str, request: Request):
             raise HTTPException(status_code=403, detail="Tidak memiliki izin untuk melihat riwayat board ini.")
 
     is_protected = (device_id.upper() == "E8:3D:C1:9B:B5:14") or (hasattr(store, "is_device_protected") and store.is_device_protected(device_id))
+    current_owner = store.find_current_board_owner(device_id) if hasattr(store, "find_current_board_owner") else None
     return {
         "success": True,
         "device_id": device_id,
         "is_protected": is_protected,
+        "current_owner": current_owner,
         "total_records": len(history),
         "history": history,
     }

@@ -238,4 +238,57 @@ def test_resolve_owner_for_device_anti_stale_and_transfer():
     assert _resolve_owner_for_device(store, mac_c) == u2
 
 
+def test_board_history_with_current_owner_and_transfer_detection():
+    from xiaozhi.database.sqlite_store import SQLiteStore
+
+    store = SQLiteStore(db_path=":memory:")
+    u1 = store.create_user("irsyad26", "password123")["id"]
+    u2 = store.create_user("irsyad", "password456")["id"]
+
+    mac_test = "7C:E8:B1:A4:D6:E4"
+
+    # 1. User 1 binds MAC to slot 3
+    store.set_xiaozhi_token(u1, "wss://api.xiaozhi.me/mcp/?token=u1_tok3", slot=3, device_label="U1 Slot 3")
+    store.bind_board_to_slot(u1, slot=3, device_mac=mac_test)
+
+    # Check history for User 1: currently self-owned
+    hist_u1 = store.get_board_binding_history(user_id=u1)
+    assert len(hist_u1) >= 1
+    target = next((h for h in hist_u1 if h["device_mac"] == mac_test), None)
+    assert target is not None
+    assert target["is_current_owner"] is True
+    assert target["is_transferred"] is False
+    assert target["current_owner_username"] == "irsyad26"
+
+    # 2. User 1 deletes slot 3 (detaches board)
+    store.delete_xiaozhi_token(u1, slot=3, request_id="del-u1-s3")
+
+    # 3. User 2 configures slot 1 and binds this MAC
+    store.set_xiaozhi_token(u2, "wss://api.xiaozhi.me/mcp/?token=u2_tok1", slot=1, device_label="U2 Slot 1")
+    store.bind_board_to_slot(u2, slot=1, device_mac=mac_test)
+
+    # 4. Old user (User 1 - irsyad26) views history
+    hist_u1_after = store.get_board_binding_history(user_id=u1)
+    target_u1 = next((h for h in hist_u1_after if h["device_mac"] == mac_test), None)
+    assert target_u1 is not None
+
+    # CRITICAL: Old user knows board MAC is now connected to new user @irsyad!
+    assert target_u1["is_transferred"] is True
+    assert target_u1["is_current_owner"] is False
+    assert target_u1["current_owner_username"] == "irsyad"
+    assert target_u1["current_owner_id"] == u2
+    assert target_u1["current_slot_number"] == 1
+    assert "irsyad" in target_u1["current_connection_text"]
+    assert "Slot 1" in target_u1["current_connection_text"]
+
+    # 5. New user (User 2 - irsyad) views history
+    hist_u2 = store.get_board_binding_history(user_id=u2)
+    target_u2 = next((h for h in hist_u2 if h["device_mac"] == mac_test), None)
+    assert target_u2 is not None
+    assert target_u2["is_current_owner"] is True
+    assert target_u2["is_transferred"] is False
+    assert target_u2["current_owner_username"] == "irsyad"
+
+
+
 

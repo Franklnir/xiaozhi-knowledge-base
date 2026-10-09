@@ -2800,8 +2800,132 @@ class PostgresStore:
                     item["linked_at_str"] = _format_ts(item.get("linked_at"))
                     item["last_active_str"] = _format_ts(item.get("last_active_at"))
                     item["unlinked_at_str"] = _format_ts(item.get("unlinked_at"))
+
+                    # Enrich current connection info & new account transfer detection
+                    mac = item.get("device_mac", "")
+                    current_owner = self.find_current_board_owner(mac)
+                    row_user_id = int(item.get("user_id") or 0)
+
+                    if current_owner:
+                        cur_uid = int(current_owner.get("user_id") or 0)
+                        cur_uname = current_owner.get("username") or ""
+                        cur_slot = int(current_owner.get("slot_number", 1) or 1)
+                        cur_status = current_owner.get("status", "ACTIVE")
+                        is_historic = current_owner.get("is_latest_historic", False)
+
+                        item["current_owner_id"] = cur_uid
+                        item["current_owner_username"] = cur_uname
+                        item["current_slot_number"] = cur_slot
+                        item["current_status"] = cur_status
+
+                        if cur_uid == row_user_id:
+                            if cur_status == "ACTIVE" and not is_historic:
+                                item["is_transferred"] = False
+                                item["is_current_owner"] = True
+                                item["current_connection_text"] = f"Aktif di Akun Anda (Slot {cur_slot})"
+                            else:
+                                item["is_transferred"] = False
+                                item["is_current_owner"] = False
+                                item["current_connection_text"] = "Terputus (Belum terhubung ke siapapun)"
+                        else:
+                            item["is_transferred"] = True
+                            item["is_current_owner"] = False
+                            if cur_status == "ACTIVE" and not is_historic:
+                                item["current_connection_text"] = f"Tersambung ke akun baru: @{cur_uname} (Slot {cur_slot})"
+                            else:
+                                item["current_connection_text"] = f"Pernah dialihkan ke @{cur_uname} (Saat ini terputus)"
+                    else:
+                        item["current_owner_id"] = None
+                        item["current_owner_username"] = None
+                        item["current_slot_number"] = None
+                        item["current_status"] = "UNASSIGNED"
+                        item["is_transferred"] = False
+                        item["is_current_owner"] = False
+                        item["current_connection_text"] = "Belum terhubung ke akun manapun (Bebas)"
+
                     res.append(item)
                 return res
+
+    def find_current_board_owner(self, device_mac: str) -> Optional[Dict[str, Any]]:
+        """
+        Mencari akun yang saat ini terhubung ke device MAC ini.
+        Urutan prioritas:
+        1. xiaozhi_tokens aktif yang mengunci MAC ini.
+        2. registered_devices dengan status 'ACTIVE' dan owner_id IS NOT NULL.
+        3. board_binding_history dengan status 'ACTIVE' paling baru.
+        4. Jika tidak aktif, cari riwayat terakhir di board_binding_history (untuk mendeteksi pemilik terakhir).
+        """
+        if not device_mac:
+            return None
+        norm = normalize_mac_address(device_mac) or str(device_mac).strip()
+        clean = norm.replace(":", "").replace("-", "").lower()
+
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                # 1. Cek xiaozhi_tokens aktif
+                cur.execute(
+                    """
+                    SELECT xt.user_id, xt.slot_number, xt.device_label, u.username, 'ACTIVE' as status
+                    FROM xiaozhi_tokens xt
+                    JOIN users u ON u.id = xt.user_id
+                    WHERE (LOWER(xt.board_mac) = %s OR LOWER(REPLACE(REPLACE(xt.board_mac, ':', ''), '-', '')) = %s)
+                      AND COALESCE(xt.is_active, TRUE) = TRUE
+                    ORDER BY xt.updated_at DESC LIMIT 1
+                    """,
+                    (norm.lower(), clean),
+                )
+                row = cur.fetchone()
+                if row:
+                    return dict(row)
+
+                # 2. Cek registered_devices aktif
+                cur.execute(
+                    """
+                    SELECT rd.owner_id as user_id, 1 as slot_number, rd.device_name as device_label, u.username, rd.status
+                    FROM registered_devices rd
+                    JOIN users u ON u.id = rd.owner_id
+                    WHERE (LOWER(rd.device_id) = %s OR LOWER(REPLACE(REPLACE(rd.device_id, ':', ''), '-', '')) = %s)
+                      AND rd.status = 'ACTIVE' AND rd.owner_id IS NOT NULL
+                    ORDER BY rd.id DESC LIMIT 1
+                    """,
+                    (norm.lower(), clean),
+                )
+                row = cur.fetchone()
+                if row:
+                    return dict(row)
+
+                # 3. Cek board_binding_history aktif
+                cur.execute(
+                    """
+                    SELECT bbh.user_id, bbh.slot_number, bbh.device_name as device_label, bbh.username, bbh.status
+                    FROM board_binding_history bbh
+                    WHERE (LOWER(bbh.device_mac) = %s OR LOWER(REPLACE(REPLACE(bbh.device_mac, ':', ''), '-', '')) = %s)
+                      AND bbh.status = 'ACTIVE'
+                    ORDER BY bbh.id DESC LIMIT 1
+                    """,
+                    (norm.lower(), clean),
+                )
+                row = cur.fetchone()
+                if row:
+                    return dict(row)
+
+                # 4. Deteksi riwayat paling baru jika sedang terputus
+                cur.execute(
+                    """
+                    SELECT bbh.user_id, bbh.slot_number, bbh.device_name as device_label, bbh.username, bbh.status
+                    FROM board_binding_history bbh
+                    WHERE (LOWER(bbh.device_mac) = %s OR LOWER(REPLACE(REPLACE(bbh.device_mac, ':', ''), '-', '')) = %s)
+                    ORDER BY bbh.id DESC LIMIT 1
+                    """,
+                    (norm.lower(), clean),
+                )
+                row = cur.fetchone()
+                if row:
+                    d = dict(row)
+                    d["is_latest_historic"] = True
+                    return d
+
+        return None
 
     def get_user_board_history(self, user_id: int) -> List[Dict[str, Any]]:
         return self.get_board_binding_history(user_id=int(user_id))
