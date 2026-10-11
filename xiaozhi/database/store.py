@@ -3034,15 +3034,26 @@ class HFJsonStore:
 
     def find_active_user_for_unassigned_device(self, device_mac: str, query: str = "", video_id: str = "") -> Optional[int]:
         """
-        Jika board belum terikat ke slot manapun (atau baru dipindah):
-        Cari user yang baru saja memanggil pemutaran lagu ini di audio_queue atau memanggil tool MCP terkini.
+        Jika board belum terikat ke slot manapun:
+        Cari user yang baru saja memanggil pemutaran lagu INI di audio_queue dalam kurun waktu 30 detik terakhir.
+        Wajib match persis (video_id atau judul lagu yang relevan).
+        Jika tidak cocok persis dalam 30 detik, kembalikan None (jangan pernah mengaitkan board ke sembarang user).
         """
         with self._lock:
             data = self._load()
             queue = data.get("audio_queue", [])
+            now_dt = datetime.now(timezone.utc)
             if video_id:
                 for cmd in reversed(queue):
                     if cmd.get("video_id") == video_id and cmd.get("owner_id"):
+                        cat = cmd.get("created_at")
+                        if cat:
+                            try:
+                                dt = datetime.fromisoformat(str(cat).replace("Z", "+00:00"))
+                                if (now_dt - dt).total_seconds() > 30:
+                                    continue
+                            except Exception:
+                                pass
                         return int(cmd["owner_id"])
             if query and len(query) >= 3:
                 clean_q = query.strip().lower()
@@ -3052,21 +3063,26 @@ class HFJsonStore:
                     r'\s+(di\s+youtube|di\s+yt|sekarang|dong|ya|oke|ok|please)[\?\!\.\,]*$',
                 ]
                 stripped_q = clean_q
-                for p in patterns:
-                    stripped_q = re.sub(p, '', stripped_q, flags=re.IGNORECASE).strip()
-                stripped_q = re.sub(r'[\?\!\.\,]+$', '', stripped_q).strip()
+                changed = True
+                while changed:
+                    before = stripped_q
+                    for p in patterns:
+                        stripped_q = re.sub(p, '', stripped_q, flags=re.IGNORECASE).strip()
+                    stripped_q = re.sub(r'[\?\!\.\,]+$', '', stripped_q).strip()
+                    changed = (stripped_q != before)
 
                 for cmd in reversed(queue):
                     cmd_title = str(cmd.get("title", "")).lower()
                     if (clean_q in cmd_title or (len(stripped_q) >= 3 and stripped_q in cmd_title)) and cmd.get("owner_id"):
+                        cat = cmd.get("created_at")
+                        if cat:
+                            try:
+                                dt = datetime.fromisoformat(str(cat).replace("Z", "+00:00"))
+                                if (now_dt - dt).total_seconds() > 30:
+                                    continue
+                            except Exception:
+                                pass
                         return int(cmd["owner_id"])
-            for cmd in reversed(queue):
-                if cmd.get("status") == "pending" and cmd.get("owner_id"):
-                    return int(cmd["owner_id"])
-
-        recent_caller = self.find_recent_tool_caller_for_unassigned_board(device_mac, minutes=3)
-        if recent_caller:
-            return int(recent_caller)
 
         return None
 

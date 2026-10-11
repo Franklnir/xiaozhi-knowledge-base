@@ -578,22 +578,77 @@
                 </div>
             </div>
 
-            <!-- Console Log -->
+            <!-- Console & Serial Monitor Log -->
             <div class="app-card">
-                <div class="app-card-header">
+                <div class="app-card-header" style="flex-wrap:wrap; gap:10px;">
                     <div>
                         <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                            <span>💻</span> Serial Terminal Log
+                            <span>💻</span> Serial Terminal Log &amp; Monitor
                         </h2>
-                        <p class="app-section-subtitle">Log output komunikasi bootloader ESP32 secara realtime.</p>
+                        <p class="app-section-subtitle">Pantau output bootloader dan log aplikasi ESP32 secara realtime saat kabel tercolok.</p>
                     </div>
-                    <button type="button" class="app-button app-button-ghost app-button-small" onclick="clearConsole()" style="font-size:11px;">
-                        🧹 Bersihkan
-                    </button>
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span id="terminalModeBadge" class="app-chip app-chip-neutral" style="font-size:11px; font-weight:800;">
+                            ⚪ Siap
+                        </span>
+                        <button type="button" class="app-button app-button-ghost app-button-small" onclick="clearConsole()" style="font-size:11px; padding:5px 9px;" title="Bersihkan riwayat log">
+                            🧹 Bersihkan
+                        </button>
+                    </div>
                 </div>
-                <div class="flasher-console" id="consoleLog">Xiaozhi ESP32 Web Flasher siap.
-Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
+
+                <!-- Terminal Control Toolbar -->
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:8px 12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); margin-bottom:10px;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <button type="button" id="btnToggleMonitor" class="app-button app-button-primary app-button-small" style="font-size:12px; font-weight:800; padding:6px 12px; cursor:pointer;">
+                            <span>▶️</span> Buka Serial Monitor
+                        </button>
+                        <div style="display:flex; align-items:center; gap:5px; font-size:11.5px;">
+                            <label for="monitorBaudSelect" style="color:var(--app-muted); font-weight:700;">Baud:</label>
+                            <select id="monitorBaudSelect" class="app-input" style="padding:4px 8px; font-size:11.5px; font-weight:700; width:auto; border-radius:4px;">
+                                <option value="115200" selected>115,200 (Default Xiaozhi / ESP-IDF)</option>
+                                <option value="74880">74,880 (Boot ROM ESP)</option>
+                                <option value="9600">9,600 (Baud Standar)</option>
+                                <option value="230400">230,400 (Cepat)</option>
+                                <option value="460800">460,800</option>
+                                <option value="921600">921,600</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <button type="button" id="btnResetBoard" class="app-button app-button-secondary app-button-small" style="font-size:11.5px; font-weight:700; padding:6px 10px; cursor:pointer;" title="Restart ESP32 via pin DTR/RTS untuk memunculkan log booting dari awal">
+                            <span>🔄</span> Restart Board (RST)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Terminal Console Screen -->
+                <div class="flasher-console" id="consoleLog">Xiaozhi ESP32 Web Flasher &amp; Serial Monitor siap.
+• Klik 'Pilih &amp; Hubungkan Port COM' di sebelah kiri untuk Flashing Firmware.
+• Atau klik '▶️ Buka Serial Monitor' di atas untuk memantau log ESP32 yang tercolok secara langsung (115200 bps).
 </div>
+
+                <!-- Terminal Bottom Options & Command Input -->
+                <div style="margin-top:10px; display:grid; gap:8px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:11.5px; color:var(--app-muted);">
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <input type="checkbox" id="chkAutoScroll" checked style="accent-color:var(--app-accent, #059669);">
+                            <span>Auto-scroll terminal ke baris terbaru</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <input type="checkbox" id="chkAutoMonitorAfterFlash" checked style="accent-color:var(--app-accent, #059669);">
+                            <span>⚡ Otomatis buka Serial Monitor setelah flashing selesai</span>
+                        </label>
+                    </div>
+
+                    <!-- Input Bar for Sending Serial Commands -->
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <input type="text" id="serialInputText" placeholder="Ketik perintah serial / CLI ke ESP32 lalu tekan Enter..." class="app-input" style="flex:1; font-size:12px; font-family:ui-monospace, monospace; padding:6px 10px;">
+                        <button type="button" id="btnSendSerial" class="app-button app-button-primary app-button-small" style="font-size:11.5px; font-weight:800; padding:6px 14px; white-space:nowrap; cursor:pointer;">
+                            <span>📤</span> Kirim
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- Quick Tips Card -->
@@ -887,10 +942,25 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
     const selectedFileName = document.getElementById('selectedFileName');
     const selectedFileSize = document.getElementById('selectedFileSize');
 
-    function logToConsole(text) {
+    // Serial Monitor State Variables
+    let isMonitoring = false;
+    let monitorReader = null;
+    let autoScrollConsole = true;
+
+    function appendConsoleRaw(text) {
         if (!consoleLog) return;
-        consoleLog.textContent += text + '\n';
-        consoleLog.scrollTop = consoleLog.scrollHeight;
+        consoleLog.textContent += text;
+        // Limit console text buffer to maintain smooth rendering
+        if (consoleLog.textContent.length > 100000) {
+            consoleLog.textContent = consoleLog.textContent.slice(-60000);
+        }
+        if (autoScrollConsole) {
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+        }
+    }
+
+    function logToConsole(text) {
+        appendConsoleRaw(text + '\n');
     }
 
     window.clearConsole = function() {
@@ -1507,6 +1577,12 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 
     // Connect Web Serial Port (PC / Laptop Chromium)
     btnConnect.addEventListener('click', async () => {
+        // Jika Serial Monitor sedang aktif, hentikan terlebih dahulu agar port bisa dipakai esptool
+        if (isMonitoring) {
+            await stopSerialMonitor(true);
+            await new Promise(r => setTimeout(r, 100));
+        }
+
         const serialObj = getSerialApi();
         if (!serialObj || !serialObj.api) {
             alert('Browser ini tidak mendukung Web Serial API.\n\nHarap buka Web Flasher di Komputer PC atau Laptop menggunakan peramban:\n- Google Chrome\n- Microsoft Edge\n- Opera\n- Brave Browser');
@@ -1580,6 +1656,9 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 
     // Disconnect Port
     btnDisconnect.addEventListener('click', async () => {
+        if (isMonitoring) {
+            await stopSerialMonitor(true);
+        }
         try {
             if (transport) await transport.disconnect();
         } catch (e) {}
@@ -1601,6 +1680,9 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
 
     // Flash Action
     btnFlash.addEventListener('click', async () => {
+        if (isMonitoring) {
+            await stopSerialMonitor(true);
+        }
         if (!esploader || !selectedFileBuffer || isFlashing) return;
 
         let offsetStr = offsetPreset.disabled ? '0x0' : (offsetPreset.value === 'custom' ? offsetInput.value.trim() : offsetPreset.value);
@@ -1692,6 +1774,8 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             logToConsole('[SUKSES] Seluruh data firmware berhasil ditulis ke ESP32!');
             logToConsole('============================================================');
 
+            const postFlashPort = port;
+
             if (autoReset) {
                 logToConsole('[INFO] Mereset chip otomatis ke mode aplikasi...');
                 try {
@@ -1716,6 +1800,15 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 if (btnDisconnect) btnDisconnect.style.display = 'none';
                 if (chipInfoBox) chipInfoBox.style.display = 'none';
                 updateFlashButtonState();
+
+                // Cek opsi Auto-Monitor setelah Flash
+                const chkAutoMon = document.getElementById('chkAutoMonitorAfterFlash');
+                if (chkAutoMon && chkAutoMon.checked && postFlashPort) {
+                    logToConsole('[AUTO-MONITOR] Menghubungkan Serial Monitor secara otomatis (115200 bps)...');
+                    setTimeout(async () => {
+                        await startSerialMonitor(postFlashPort);
+                    }, 500);
+                }
             }
 
             alert('Flashing Berhasil 100%! Seluruh binary firmware (9.2 MB) berhasil ditulis ke ESP32 dan chip telah di-reboot.\n\nJika ini board baru, sambungkan perangkat ke Wi-Fi "Xiaozhi-XXXX" lalu buka 192.168.4.1 untuk konfigurasi Wi-Fi awal.');
@@ -1737,6 +1830,280 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             updateFlashButtonState();
         }
     });
+
+    // ── Serial Monitor Functions & Handlers ──
+    async function startSerialMonitor(targetPort = null) {
+        if (isFlashing) {
+            alert('Sedang dalam proses flashing! Tunggu hingga proses flashing selesai.');
+            return;
+        }
+
+        // Lepaskan koneksi esptool jika sedang memegang port
+        if (transport) {
+            try {
+                await transport.disconnect();
+            } catch (e) {
+                console.warn('Transport disconnect before monitor:', e);
+            }
+            transport = null;
+            esploader = null;
+        }
+
+        const serialObj = getSerialApi();
+        if (!serialObj || !serialObj.api) {
+            alert('Browser ini tidak mendukung Web Serial API.\n\nHarap buka Web Flasher di PC/Laptop dengan Google Chrome atau Microsoft Edge.');
+            return;
+        }
+
+        let p = targetPort || port;
+        if (!p) {
+            try {
+                logToConsole('[INFO] Membuka jendela pemilih port serial untuk Monitor...');
+                p = await serialObj.api.requestPort({});
+                port = p;
+            } catch (err) {
+                if (err.name === 'NotFoundError') {
+                    logToConsole('[TIPS] Pemilihan port monitor dibatalkan.');
+                } else {
+                    logToConsole(`[ERROR] Gagal memilih port serial: ${err.message}`);
+                }
+                return;
+            }
+        } else {
+            port = p;
+        }
+
+        const baudSelect = document.getElementById('monitorBaudSelect');
+        const baudRate = parseInt(baudSelect ? baudSelect.value : '115200', 10) || 115200;
+
+        try {
+            if (!p.readable) {
+                await p.open({ baudRate: baudRate });
+            }
+        } catch (openErr) {
+            console.warn('Error opening port for monitor:', openErr);
+            if (openErr.name !== 'InvalidStateError') {
+                logToConsole(`[ERROR] Gagal membuka port monitor (${baudRate} bps): ${openErr.message}`);
+                alert(`Gagal membuka port serial: ${openErr.message}\n\nPastikan port COM tidak sedang dibuka di aplikasi lain (seperti Arduino IDE, PuTTY, atau VS Code).`);
+                return;
+            }
+        }
+
+        const devName = identifyUsbDevice(p);
+        isMonitoring = true;
+        updateMonitorUIState(true, baudRate, devName);
+
+        logToConsole('\n============================================================');
+        logToConsole(`[MONITOR] 🟢 Serial Terminal Aktif (${baudRate} bps)`);
+        logToConsole(`[MONITOR] Port / Bridge : ${devName}`);
+        logToConsole(`[MONITOR] Mendengarkan log komunikasi ESP32 secara realtime.`);
+        logToConsole(`[MONITOR] (Tips: Klik 'Restart Board (RST)' untuk melihat log bootloader dari awal)`);
+        logToConsole('============================================================\n');
+
+        readSerialLoop(p);
+    }
+
+    async function readSerialLoop(p) {
+        const decoder = new TextDecoder();
+        try {
+            while (p.readable && isMonitoring) {
+                monitorReader = p.readable.getReader();
+                try {
+                    while (true) {
+                        const { value, done } = await monitorReader.read();
+                        if (done) break;
+                        if (value) {
+                            const chunk = decoder.decode(value, { stream: true });
+                            appendConsoleRaw(chunk);
+                        }
+                    }
+                } catch (readErr) {
+                    if (isMonitoring) {
+                        console.warn('Serial reader error:', readErr);
+                        logToConsole(`\n[MONITOR] Aliran serial terputus: ${readErr.message}`);
+                    }
+                    break;
+                } finally {
+                    if (monitorReader) {
+                        try {
+                            monitorReader.releaseLock();
+                        } catch (e) {}
+                        monitorReader = null;
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('readSerialLoop outer error:', err);
+        } finally {
+            if (isMonitoring) {
+                await stopSerialMonitor(false);
+            }
+        }
+    }
+
+    async function stopSerialMonitor(closePort = true) {
+        if (!isMonitoring && !monitorReader) {
+            updateMonitorUIState(false);
+            return;
+        }
+        isMonitoring = false;
+
+        if (monitorReader) {
+            try {
+                await monitorReader.cancel();
+            } catch (e) {}
+            try {
+                monitorReader.releaseLock();
+            } catch (e) {}
+                monitorReader = null;
+        }
+
+        await new Promise(r => setTimeout(r, 60));
+
+        if (closePort && port) {
+            try {
+                if (port.readable || port.writable) {
+                    await port.close();
+                }
+            } catch (e) {
+                console.warn('Port close error:', e);
+            }
+        }
+
+        updateMonitorUIState(false);
+        logToConsole('\n[MONITOR] ⚪ Serial Monitor dihentikan.');
+    }
+
+    function updateMonitorUIState(active, baud = 115200, dev = '') {
+        const btnToggle = document.getElementById('btnToggleMonitor');
+        const badge = document.getElementById('terminalModeBadge');
+        const btnReset = document.getElementById('btnResetBoard');
+        const btnSend = document.getElementById('btnSendSerial');
+
+        if (active) {
+            if (btnToggle) {
+                btnToggle.innerHTML = '<span>⏹️</span> Hentikan Monitor';
+                btnToggle.className = 'app-button app-button-danger app-button-small';
+            }
+            if (badge) {
+                badge.textContent = `🟢 Monitor Aktif (${baud} bps)`;
+                badge.className = 'app-chip app-chip-success';
+            }
+            if (btnReset) btnReset.disabled = false;
+            if (btnSend) btnSend.disabled = false;
+            if (connStatusBadge) {
+                connStatusBadge.className = 'app-status-pill is-online';
+                connStatusText.textContent = `Monitor Aktif: ${dev || 'ESP32'} (${baud} bps)`;
+            }
+        } else {
+            if (btnToggle) {
+                btnToggle.innerHTML = '<span>▶️</span> Buka Serial Monitor';
+                btnToggle.className = 'app-button app-button-primary app-button-small';
+            }
+            if (badge) {
+                badge.textContent = '⚪ Monitor Nonaktif';
+                badge.className = 'app-chip app-chip-neutral';
+            }
+            if (btnReset) btnReset.disabled = false;
+            if (btnSend) btnSend.disabled = false;
+            if (!esploader && connStatusBadge) {
+                connStatusBadge.className = 'app-status-pill is-offline';
+                connStatusText.textContent = 'Port Belum Terhubung';
+            }
+        }
+    }
+
+    async function resetEsp32Board() {
+        if (!port) {
+            alert('Port serial belum terhubung. Buka Serial Monitor atau hubungkan port terlebih dahulu.');
+            return;
+        }
+        try {
+            logToConsole('\n[RST] Mengirim sinyal hardware reboot (RTS toggle)...');
+            // Auto-reset standar ESP32: RTS low triggers EN chip reset
+            await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+            await new Promise(r => setTimeout(r, 120));
+            // RTS high melepaskan pin EN ke status high agar CPU booting
+            await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+            logToConsole('[RST] Sinyal reset terkirim. ESP32 sedang reboot...\n');
+        } catch (err) {
+            logToConsole(`[ERROR] Gagal mengirim sinyal reset: ${err.message}`);
+        }
+    }
+
+    async function sendSerialCommand() {
+        const inputEl = document.getElementById('serialInputText');
+        if (!inputEl) return;
+        const text = inputEl.value.trim();
+        if (!text) return;
+
+        if (!port || !port.writable || !isMonitoring) {
+            alert('Serial Monitor belum aktif. Klik "Buka Serial Monitor" terlebih dahulu untuk mengirim perintah.');
+            return;
+        }
+
+        try {
+            const encoder = new TextEncoder();
+            const writer = port.writable.getWriter();
+            await writer.write(encoder.encode(text + '\r\n'));
+            writer.releaseLock();
+            logToConsole(`[KIRIM >>] ${text}`);
+            inputEl.value = '';
+        } catch (err) {
+            logToConsole(`[ERROR] Gagal mengirim data serial: ${err.message}`);
+        }
+    }
+
+    // Wiring Event Listeners untuk Serial Terminal & Monitor
+    const btnToggleMonitor = document.getElementById('btnToggleMonitor');
+    if (btnToggleMonitor) {
+        btnToggleMonitor.addEventListener('click', async () => {
+            if (isMonitoring) {
+                await stopSerialMonitor(true);
+            } else {
+                await startSerialMonitor();
+            }
+        });
+    }
+
+    const btnResetBoard = document.getElementById('btnResetBoard');
+    if (btnResetBoard) {
+        btnResetBoard.addEventListener('click', resetEsp32Board);
+    }
+
+    const btnSendSerial = document.getElementById('btnSendSerial');
+    if (btnSendSerial) {
+        btnSendSerial.addEventListener('click', sendSerialCommand);
+    }
+
+    const serialInputText = document.getElementById('serialInputText');
+    if (serialInputText) {
+        serialInputText.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendSerialCommand();
+            }
+        });
+    }
+
+    const chkAutoScroll = document.getElementById('chkAutoScroll');
+    if (chkAutoScroll) {
+        chkAutoScroll.addEventListener('change', (e) => {
+            autoScrollConsole = !!e.target.checked;
+        });
+    }
+
+    const monitorBaudSelect = document.getElementById('monitorBaudSelect');
+    if (monitorBaudSelect) {
+        monitorBaudSelect.addEventListener('change', async () => {
+            if (isMonitoring && port) {
+                const currentPort = port;
+                await stopSerialMonitor(true);
+                await new Promise(r => setTimeout(r, 120));
+                await startSerialMonitor(currentPort);
+            }
+        });
+    }
 
     // ── Auto-Detection Port & USB Device Identification ──
     function identifyUsbDevice(p) {
@@ -1761,7 +2128,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
             const dev = identifyUsbDevice(event.port);
             logToConsole(`⚡ [DETEKSI USB] Perangkat USB baru dicolokkan: ${dev}`);
             if (usbPlugNotice && usbPlugNoticeText) {
-                usbPlugNoticeText.textContent = `Perangkat USB dicolokkan (${dev})! Klik "Pilih & Hubungkan Port COM" untuk menyambungkan.`;
+                usbPlugNoticeText.textContent = `Perangkat USB dicolokkan (${dev})! Klik "Pilih & Hubungkan Port COM" untuk flash, atau "Buka Serial Monitor" untuk melihat log.`;
                 usbPlugNotice.style.display = 'flex';
             }
         });
@@ -1770,6 +2137,10 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
         navigator.serial.addEventListener('disconnect', (event) => {
             logToConsole('⚠️ [DETEKSI USB] Perangkat USB dicabut dari port.');
             if (usbPlugNotice) usbPlugNotice.style.display = 'none';
+            if (isMonitoring && (port === event.port || !port)) {
+                logToConsole('[PERINGATAN] Monitor serial terputus karena kabel USB dicabut.');
+                stopSerialMonitor(false);
+            }
             if (port === event.port && esploader) {
                 logToConsole('[PERINGATAN] Port serial aktif terputus karena kabel USB dicabut!');
                 if (btnDisconnect) btnDisconnect.click();
@@ -1782,7 +2153,7 @@ Silakan klik 'Pilih & Hubungkan Port COM' untuk memulai.
                 const dev = identifyUsbDevice(ports[0]);
                 logToConsole(`[INFO] Terdeteksi ${ports.length} port yang sebelumnya pernah diizinkan (${dev}).`);
                 if (usbPlugNotice && usbPlugNoticeText) {
-                    usbPlugNoticeText.textContent = `Port tersimpan terdeteksi (${dev})! Klik "Pilih & Hubungkan Port COM" untuk langsung menyambungkan.`;
+                    usbPlugNoticeText.textContent = `Port tersimpan terdeteksi (${dev})! Klik "Pilih & Hubungkan Port COM" atau "Buka Serial Monitor".`;
                     usbPlugNotice.style.display = 'flex';
                 }
             }

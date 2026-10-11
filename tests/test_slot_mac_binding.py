@@ -310,27 +310,29 @@ def test_auto_bind_from_tool_call_history():
     t2 = store.list_user_xiaozhi_tokens(u2)
     assert t2[0]["board_mac"] == ""
 
-    # User 2 calls tool 'get_playback_status' via MCP
-    store.add_chat_history(
+    # User 2 queues an audio command for 'Alan Walker - On My Way' via MCP
+    store.queue_audio_command(
         u2,
-        tool_name="get_playback_status",
-        user_message="status pemutaran",
-        source="mcp_tool",
-        slot_number=1,
+        title="Alan Walker - On My Way",
+        stream_url="/api/audio/stream/vid-omw-123",
+        video_id="vid-omw-123",
     )
 
     # Now the unassigned board with MAC 7C:E8:B1:A4:D6:E4 makes a play_direct request
-    # with conversational query containing Indonesian filler words
+    # with conversational query containing Indonesian filler words matching the queued song
     resolved = _resolve_owner_for_device(
         store,
         mac_new_board,
-        query="kan lagu On My Why Alan Walker di Youtube sekarang.",
+        query="kan lagu On My Way di Youtube sekarang.",
     )
 
-    # It MUST resolve to User 2 (irsyad) automatically via recent tool caller correlation!
+    # It MUST resolve to User 2 because User 2 actually queued this song within 30 seconds!
     assert resolved == u2
 
-    # And if User 1 calls tool later, but board is already locked to User 2:
+    # But an unassigned board asking for an unqueued random song MUST resolve to None (Guest)
+    assert _resolve_owner_for_device(store, "FF:EE:DD:CC:BB:AA", query="Random Song Unqueued") is None
+
+    # And if User 2 locks the board, it becomes permanently bound to User 2:
     store.bind_board_to_slot(u2, slot=1, device_mac=mac_new_board)
     assert _resolve_owner_for_device(store, mac_new_board) == u2
 

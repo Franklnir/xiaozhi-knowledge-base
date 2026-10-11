@@ -143,36 +143,8 @@ def _resolve_owner_for_device(store, device_id: str, query: str = "", video_id: 
     except Exception as e:
         logger.debug("Audio queue lookup by MAC failed: %s", e)
 
-    # 5. RECENT MCP TOOL INVOCATION / ACTIVE BRIDGE CORRELATION
-    try:
-        from xiaozhi.services.mcp_service import mcp_connection_states, mcp_state_lock
-        # A. Cek store untuk user yang baru saja memanggil tool MCP dalam 3 menit terakhir
-        if hasattr(store, "find_recent_tool_caller_for_unassigned_board"):
-            caller_id = store.find_recent_tool_caller_for_unassigned_board(mac_with_colons, minutes=3)
-            if caller_id and _can_bind_device_to_user(caller_id):
-                logger.info(f"[RESOLVE MAC] Board {mac_with_colons} dikorelasikan ke user {caller_id} via riwayat pemanggilan tool MCP.")
-                return int(caller_id)
-
-        # B. Cek in-memory active MCP bridge connections (user yang sedang terhubung)
-        with mcp_state_lock:
-            active_uids = []
-            for (uid, s_num), state in mcp_connection_states.items():
-                if isinstance(state, dict) and state.get("connected"):
-                    s_mac = (state.get("board_mac") or "").replace(":", "").lower()
-                    if not s_mac or s_mac == raw_mac_clean:
-                        active_uids.append(int(uid))
-        if len(active_uids) == 1:
-            cand_id = active_uids[0]
-            if _can_bind_device_to_user(cand_id):
-                if hasattr(store, "list_user_xiaozhi_tokens"):
-                    t_list = store.list_user_xiaozhi_tokens(cand_id)
-                    has_slot = any(not (t.get("board_mac") or "") or (t.get("board_mac") or "").replace(":", "").lower() == raw_mac_clean for t in t_list)
-                    if has_slot:
-                        logger.info(f"[RESOLVE MAC] Board {mac_with_colons} dikorelasikan ke user {cand_id} via active MCP bridge connection.")
-                        return int(cand_id)
-    except Exception as e:
-        logger.debug("Active MCP correlation failed: %s", e)
-
+    # Jika tidak terikat di token slot, registered_devices, atau antrean audio_queue 30 detik yang cocok persis:
+    # Kembalikan None (jangan pernah mengaitkan board ke sembarang user).
     return None
 
 

@@ -2338,8 +2338,8 @@ class SQLiteStore:
             item = dict(r)
             item["linked_at_str"] = str(item.get("linked_at", ""))
             item["last_active_str"] = str(item.get("last_active_at", ""))
-            item["unlinked_at_str"] = str(item.get("unlinked_at", "")) if item.get("unlinked_at") else None
             item["status_label"] = "Sedang Tertaut" if item.get("status") == "ACTIVE" else "Terputus / Riwayat Lampau"
+            item["action"] = "detach" if item.get("status") in ("UNLINKED", "DETACHED") else "bind"
 
             # Enrich current connection info & new account transfer detection
             mac = item.get("device_mac", "")
@@ -2612,16 +2612,18 @@ class SQLiteStore:
 
     def find_active_user_for_unassigned_device(self, device_mac: str, query: str = "", video_id: str = "") -> Optional[int]:
         """
-        Jika board belum terikat ke slot manapun (atau baru dipindah):
-        Cari user yang baru saja memanggil pemutaran lagu ini di audio_queue atau memanggil tool MCP terkini.
+        Jika board belum terikat ke slot manapun:
+        Cari user yang baru saja memanggil pemutaran lagu INI di audio_queue dalam kurun waktu 30 detik terakhir.
+        Wajib match persis (video_id atau judul lagu yang relevan).
+        Jika tidak cocok persis dalam 30 detik, kembalikan None (jangan pernah mengaitkan board ke sembarang user).
         """
         conn = self._get_conn()
-        # 1. Cek berdasarkan video_id yang sama dalam 3 menit terakhir
+        # 1. Cek berdasarkan video_id yang sama persis dalam 30 detik terakhir
         if video_id:
             row = conn.execute(
                 """
                 SELECT owner_id FROM audio_queue
-                WHERE video_id = ? AND datetime(created_at) >= datetime('now', '-3 minutes')
+                WHERE video_id = ? AND datetime(created_at) >= datetime('now', '-30 seconds')
                 ORDER BY id DESC LIMIT 1
                 """,
                 (video_id,),
@@ -2629,7 +2631,7 @@ class SQLiteStore:
             if row and row["owner_id"]:
                 return int(row["owner_id"])
 
-        # 2. Cek berdasarkan title / search query dalam 3 menit terakhir
+        # 2. Cek berdasarkan title / search query yang cocok persis dalam 30 detik terakhir
         if query and len(query) >= 3:
             clean_q = query.strip()
             patterns = [
@@ -2638,36 +2640,24 @@ class SQLiteStore:
                 r'\s+(di\s+youtube|di\s+yt|sekarang|dong|ya|oke|ok|please)[\?\!\.\,]*$',
             ]
             stripped_q = clean_q
-            for p in patterns:
-                stripped_q = re.sub(p, '', stripped_q, flags=re.IGNORECASE).strip()
-            stripped_q = re.sub(r'[\?\!\.\,]+$', '', stripped_q).strip()
+            changed = True
+            while changed:
+                before = stripped_q
+                for p in patterns:
+                    stripped_q = re.sub(p, '', stripped_q, flags=re.IGNORECASE).strip()
+                stripped_q = re.sub(r'[\?\!\.\,]+$', '', stripped_q).strip()
+                changed = (stripped_q != before)
 
             row = conn.execute(
                 """
                 SELECT owner_id FROM audio_queue
-                WHERE (title LIKE ? OR (length(?) >= 3 AND title LIKE ?)) AND datetime(created_at) >= datetime('now', '-3 minutes')
+                WHERE (title LIKE ? OR (length(?) >= 3 AND title LIKE ?)) AND datetime(created_at) >= datetime('now', '-30 seconds')
                 ORDER BY id DESC LIMIT 1
                 """,
                 (f"%{clean_q}%", stripped_q, f"%{stripped_q}%"),
             ).fetchone()
             if row and row["owner_id"]:
                 return int(row["owner_id"])
-
-        # 3. Cek audio_queue pending paling baru (dibuat dalam 90 detik terakhir)
-        row = conn.execute(
-            """
-            SELECT owner_id FROM audio_queue
-            WHERE status = 'pending' AND datetime(created_at) >= datetime('now', '-90 seconds')
-            ORDER BY id DESC LIMIT 1
-            """
-        ).fetchone()
-        if row and row["owner_id"]:
-            return int(row["owner_id"])
-
-        # 4. Cek user yang baru saja memanggil tool MCP dalam 3 menit terakhir
-        recent_caller = self.find_recent_tool_caller_for_unassigned_board(device_mac, minutes=3)
-        if recent_caller:
-            return int(recent_caller)
 
         return None
 
