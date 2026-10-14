@@ -55,6 +55,28 @@ def seconds_since_iso(value: str) -> Optional[float]:
         return None
 
 
+def calculate_seconds_ago(value: Any) -> Optional[float]:
+    """Calculate elapsed seconds since timestamp with robust format handling."""
+    if not value:
+        return None
+    if isinstance(value, (int, float)):
+        import time
+        return max(0.0, time.time() - float(value))
+    v_str = str(value).strip()
+    sec = seconds_since_iso(v_str)
+    if sec is not None and -120 <= sec <= 86400 * 365:
+        return max(0.0, sec)
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+        try:
+            dt = datetime.strptime(v_str[:19], fmt)
+            diff = (datetime.now(timezone.utc) - dt.replace(tzinfo=timezone.utc)).total_seconds()
+            if -120 <= diff <= 86400 * 365:
+                return max(0.0, diff)
+        except Exception:
+            pass
+    return None
+
+
 def utf8_size(value: str) -> int:
     return len((value or "").encode("utf-8"))
 

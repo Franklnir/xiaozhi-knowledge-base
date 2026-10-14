@@ -168,10 +168,12 @@ def rank_chat_history_semantically(
 ) -> List[Dict[str, Any]]:
     """
     Rank chat history entries using semantic similarity score.
-    Combines recency bonus with semantic relevance.
+    Combines recency bonus and active session time-window filter (< 5 minutes) with semantic relevance.
     """
-    if not query or not records:
-        return records[:top_k]
+    if not records:
+        return []
+
+    from xiaozhi.core.utils import calculate_seconds_ago
 
     scored_records: List[Tuple[float, Dict[str, Any]]] = []
 
@@ -181,17 +183,38 @@ def rank_chat_history_semantically(
         tool_name = str(r.get("tool_name") or "")
         req_p = str(r.get("request_payload") or "")
         res_p = str(r.get("response_payload") or "")
+        created_at_val = r.get("created_at") or ""
         combined_text = f"{user_msg} {ai_ans} {tool_name} {req_p} {res_p}"
 
-        sim_score = calculate_semantic_similarity(query, combined_text)
+        sim_score = calculate_semantic_similarity(query, combined_text) if query else 0.0
 
-        # Small recency weight (newer records get up to 0.05 bonus)
+        # Base recency weight (newer records get up to 0.05 bonus)
         recency_bonus = max(0.0, 0.05 * (1.0 - (idx / max(1, len(records)))))
-        final_score = sim_score + recency_bonus
 
-        if sim_score >= min_similarity or any(token in combined_text.lower() for token in clean_and_tokenize(query)):
+        # Time-Window Filter: Jika obrolan terjadi dalam rentang < 5 menit (300 detik) yang lalu
+        sec_ago = calculate_seconds_ago(created_at_val)
+        is_active_session = sec_ago is not None and 0 <= sec_ago <= 300
+        active_session_bonus = 0.0
+        if is_active_session:
+            # Berikan lonjakan prioritas skor untuk sesi obrolan aktif (< 5 menit)
+            active_session_bonus = max(0.25, 0.50 * (1.0 - (sec_ago / 300.0)))
+
+        final_score = sim_score + recency_bonus + active_session_bonus
+
+        # Obrolan aktif (< 5 menit) selalu lolos threshold meskipun kemiripan teks rendah
+        # agar percakapan yang baru berlangsung tidak terputus konteks
+        if (
+            not query
+            or is_active_session
+            or sim_score >= min_similarity
+            or any(token in combined_text.lower() for token in clean_and_tokenize(query))
+        ):
             entry = dict(r)
             entry["similarity_score"] = round(sim_score, 3)
+            entry["is_active_session"] = is_active_session
+            if is_active_session and sec_ago is not None:
+                entry["seconds_ago"] = int(sec_ago)
+                entry["session_tag"] = "Active Session Context (< 5 menit)"
             scored_records.append((final_score, entry))
 
     # Sort descending by final score
@@ -591,12 +614,28 @@ def analyze_user_persona_from_chats(
 
 def format_user_persona_for_prompt(
     persona_items: List[Dict[str, Any]],
-    persona_analysis: Optional[Dict[str, Any]] = None
+    persona_analysis: Optional[Dict[str, Any]] = None,
+    recent_chats: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """
-    Formats the user's stored persona attributes and RAG vector insights into an AI prompt context block.
+    Formats the user's stored persona attributes, RAG vector insights, and recent chats into an AI prompt context block.
     """
     lines = ["Berikut adalah profil & preferensi personal pengguna yang tersimpan:"]
+
+    # Injected 3 Recent Chats (Short-Term Memory / Active Session)
+    if recent_chats:
+        lines.append("\n[3 Percakapan Terakhir di Perangkat Ini (Short-Term Memory)]")
+        lines.append("Gunakan konteks percakapan terakhir ini untuk memahami pembicaraan yang baru saja berlangsung:")
+        for idx, chat in enumerate(recent_chats, 1):
+            u = chat.get("pesan_user") or chat.get("user_message") or "-"
+            a = chat.get("jawaban_xiaozhi") or chat.get("xiaozhi_answer") or "-"
+            w = chat.get("waktu") or chat.get("created_at") or ""
+            w_str = f" ({w})" if w else ""
+            t = chat.get("tool_dipakai") or chat.get("tool_name") or ""
+            t_str = f" [Tool: {t}]" if t and t != "save_chat_history" else ""
+            lines.append(f"{idx}. User: \"{u}\"{t_str}{w_str}")
+            lines.append(f"   Xiaozhi: \"{a}\"")
+        lines.append("💡 Rekomendasi Proaktif: Jika pengguna menyapa atau bertanya singkat (misal 'halo', 'lanjutin tadi'), Anda dapat menyapa kembali dan secara proaktif mengaitkan dengan topik terakhir di atas!")
 
     # Injected RAG Vector Persona insights
     if persona_analysis:
@@ -635,7 +674,7 @@ def format_user_persona_for_prompt(
 
     lines.append(
         "\nInstruksi untuk Xiaozhi: Sesuaikan nada bicara, empati, dan gaya ekspresi vokal Anda agar selaras dengan profil, "
-        "suasana hati (mood), dan emosi percakapan di atas. Berekspresilah secara hidup dengan nada tawa, senyuman suara, "
+        "suasana hati (mood), emosi percakapan, dan riwayat obrolan di atas. Berekspresilah secara hidup dengan nada tawa, senyuman suara, "
         "atau seruan emosional yang wajar!"
     )
     return "\n".join(lines)

@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from xiaozhi.core.utils import clean_text, is_generic_playlist_query
-from xiaozhi.mcp.context import mcp_active_owner_ctx
+from xiaozhi.mcp.context import mcp_active_owner_ctx, mcp_active_slot_ctx
 from xiaozhi.services.scraper_service import extract_structured_text_bs4, validate_scrape_url
 from xiaozhi.services.smarthome_service import (
     parse_smart_home_action,
@@ -1096,6 +1096,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             limit: Jumlah riwayat percakapan terakhir yang ingin diambil (default: 5, maksimal: 10).
         """
         owner_id = mcp_active_owner_ctx.get()
+        active_slot = mcp_active_slot_ctx.get()
         if owner_id is None:
             return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif.", "riwayat_percakapan": []}
 
@@ -1103,24 +1104,45 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         query_clean = str(query or "").strip()
 
         try:
-            # Gunakan mode semantik cerdas jika user mencari berdasarkan topik/makna
+            # Gunakan mode semantik cerdas jika user mencari berdasarkan topik/makna (terisolasi per slot aktif)
             use_semantic = bool(query_clean)
-            records = store.list_chat_history(owner_id, query=query_clean, limit=limit_val, semantic=use_semantic)
+            records = store.list_chat_history(
+                owner_id,
+                query=query_clean,
+                limit=limit_val,
+                semantic=use_semantic,
+                slot_number=active_slot,
+            )
             parsed_history = []
+            has_active_session = False
+            from xiaozhi.core.utils import calculate_seconds_ago
+
             for r in records:
                 user_msg = str(r.get("user_message") or "").strip()
                 ai_ans = str(r.get("xiaozhi_answer") or "").strip()
                 tool_name = str(r.get("tool_name") or "").strip()
                 req_p = r.get("request_payload")
                 res_p = r.get("response_payload")
+                created_at_val = str(r.get("created_at") or "")
                 if not user_msg and not ai_ans and not res_p:
                     continue
+
+                sec_ago = calculate_seconds_ago(created_at_val)
+                is_active = (sec_ago is not None and 0 <= sec_ago <= 300) or bool(r.get("is_active_session"))
+                if is_active:
+                    has_active_session = True
+
                 item_dict = {
-                    "waktu": str(r.get("created_at") or ""),
+                    "waktu": created_at_val,
                     "pesan_user": user_msg or f"(Pemanggilan {tool_name})" if tool_name else "-",
                     "jawaban_xiaozhi": ai_ans[:800] + ("..." if len(ai_ans) > 800 else ""),
-                    "tool_dipakai": tool_name
+                    "tool_dipakai": tool_name,
+                    "is_active_session": is_active,
                 }
+                if is_active and sec_ago is not None:
+                    item_dict["rentang_waktu"] = f"{int(sec_ago)} detik yang lalu" if sec_ago < 60 else f"{int(sec_ago // 60)} menit yang lalu"
+                    item_dict["prioritas"] = "Active Session Context (< 5 menit)"
+
                 # Attach Raw JSON Response & parameters so RAG tool fully understands past context
                 if res_p:
                     try:
@@ -1138,16 +1160,25 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     item_dict["relevansi_semantik"] = r["similarity_score"]
                 parsed_history.append(item_dict)
 
+            instruksi = (
+                f"Gunakan memori percakapan, parameter tool, dan data raw response khusus Slot {active_slot} di atas untuk merespons pertanyaan pengguna secara akurat, ramah, dan kontekstual. "
+                "Jika pengguna menanyakan hal yang pernah dibahas, diputar, atau dieksekusi sebelumnya di perangkat ini, manfaatkan data detail di atas agar jawaban kamu sangat nyambung dan paham konteksnya."
+            )
+            if has_active_session:
+                instruksi += (
+                    "\n\n[PERHATIAN ACTIVE SESSION]: Ditemukan obrolan yang berlangsung dalam rentang < 5 menit yang lalu. "
+                    "Pengguna kemungkinan besar sedang melanjutkan percakapan ini secara langsung! Utamakan dan rujuk konteks obrolan aktif ini terlebih dahulu."
+                )
+
             response = {
                 "success": True,
+                "slot_aktif": active_slot,
+                "active_session_terdeteksi": has_active_session,
                 "pencarian": query_clean or "Percakapan Terkini",
                 "mode": "Semantic Long-Term Recall" if use_semantic else "Chronological",
                 "total_ditemukan": len(parsed_history),
                 "riwayat_percakapan": parsed_history,
-                "instruksi_xiaozhi": (
-                    "Gunakan memori percakapan, parameter tool, dan data raw response di atas untuk merespons pertanyaan pengguna secara akurat, ramah, dan kontekstual. "
-                    "Jika pengguna menanyakan hal yang pernah dibahas, diputar, atau dieksekusi sebelumnya, manfaatkan data detail di atas agar jawaban kamu sangat nyambung dan paham konteksnya."
-                )
+                "instruksi_xiaozhi": instruksi,
             }
             return response
         except Exception:
@@ -1207,21 +1238,51 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             category: Filter kategori tertentu ('informasi_pribadi', 'minat_hobi', 'gaya_bicara', 'tujuan_belajar', 'kebiasaan') atau kosongkan untuk mengambil semua.
         """
         owner_id = mcp_active_owner_ctx.get()
+        active_slot = mcp_active_slot_ctx.get()
         if owner_id is None:
             return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif.", "profil": []}
 
         try:
             from xiaozhi.services.semantic_memory_service import format_user_persona_for_prompt
             persona_items = store.get_user_persona(owner_id, category=category)
-            persona_analysis = store.get_user_persona_analysis(owner_id) if hasattr(store, "get_user_persona_analysis") else None
-            prompt_context = format_user_persona_for_prompt(persona_items, persona_analysis=persona_analysis)
+            persona_analysis = store.get_user_persona_analysis(owner_id, slot_number=active_slot) if hasattr(store, "get_user_persona_analysis") else None
+
+            # Ambil 3 obrolan terbaru khusus slot ini untuk diinjeksikan langsung ke prompt awal
+            recent_chats = []
+            try:
+                raw_recents = store.list_chat_history(owner_id, limit=3, slot_number=active_slot)
+                for r in raw_recents:
+                    u = str(r.get("user_message") or "").strip()
+                    a = str(r.get("xiaozhi_answer") or "").strip()
+                    t = str(r.get("tool_name") or "").strip()
+                    w = str(r.get("created_at") or "").strip()
+                    if u or a:
+                        recent_chats.append({
+                            "pesan_user": u,
+                            "jawaban_xiaozhi": a[:200] + ("..." if len(a) > 200 else ""),
+                            "tool_dipakai": t,
+                            "waktu": w
+                        })
+            except Exception as e:
+                logger.debug("Failed fetching recent chats for profile: %s", e)
+
+            prompt_context = format_user_persona_for_prompt(
+                persona_items,
+                persona_analysis=persona_analysis,
+                recent_chats=recent_chats,
+            )
             return {
                 "success": True,
+                "slot_aktif": active_slot,
                 "total_preferensi": len(persona_items),
                 "preferensi_tersimpan": persona_items,
                 "analisis_vektor_karakter": persona_analysis,
+                "3_percakapan_terakhir": recent_chats,
                 "prompt_context": prompt_context,
-                "instruksi_xiaozhi": "Gunakan preferensi, kepribadian, hobi, dan tantangan di atas untuk menyesuaikan gaya bicara dan relevansi jawabanmu agar user merasa sangat dipahami dan akrab."
+                "instruksi_xiaozhi": (
+                    f"Gunakan preferensi, kepribadian, hobi, dan 3 percakapan terakhir khusus Slot {active_slot} di atas untuk menyesuaikan gaya bicara. "
+                    "Jika ada obrolan terakhir yang relevan, Anda dapat menyapa kembali dan melanjutkan obrolan tersebut secara proaktif!"
+                )
             }
         except Exception:
             logger.exception("Error getting user profile")

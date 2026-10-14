@@ -3179,11 +3179,11 @@ class PostgresStore:
             return False
         return bool(dev.get("owner_id") is not None and int(dev.get("owner_id")) == int(owner_id))
 
-    def get_user_persona_analysis(self, owner_id: int) -> Dict[str, Any]:
+    def get_user_persona_analysis(self, owner_id: int, slot_number: Optional[int] = None) -> Dict[str, Any]:
         """Runs RAG & Vector Semantic profiling on user chat history & stored personas."""
         from xiaozhi.services.semantic_memory_service import analyze_user_persona_from_chats
         try:
-            chats = self.list_chat_history(owner_id, limit=300)
+            chats = self.list_chat_history(owner_id, limit=300, slot_number=slot_number)
             stored_personas = self.get_user_persona(owner_id)
             return analyze_user_persona_from_chats(chats, stored_personas)
         except Exception as e:

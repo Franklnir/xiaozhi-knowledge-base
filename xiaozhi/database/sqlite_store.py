@@ -1956,13 +1956,13 @@ class SQLiteStore:
         conn.commit()
         return cursor.rowcount > 0
 
-    def get_user_persona_analysis(self, owner_id: int) -> Dict[str, Any]:
+    def get_user_persona_analysis(self, owner_id: int, slot_number: Optional[int] = None) -> Dict[str, Any]:
         """
         Runs RAG & Vector Semantic profiling on the user's chat history & stored personas.
         """
         from xiaozhi.services.semantic_memory_service import analyze_user_persona_from_chats
         try:
-            chats = self.list_chat_history(owner_id, limit=300)
+            chats = self.list_chat_history(owner_id, limit=300, slot_number=slot_number)
             stored_personas = self.get_user_persona(owner_id)
             return analyze_user_persona_from_chats(chats, stored_personas)
         except Exception as e:
