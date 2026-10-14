@@ -575,6 +575,7 @@ async def _stream_opus_audio(
     cmd = [
         ffmpeg_bin,
         "-reconnect", "1",
+        "-reconnect_at_eof", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
         "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
@@ -582,7 +583,6 @@ async def _stream_opus_audio(
     if start_sec > 0:
         cmd.extend(["-ss", f"{start_sec:.2f}"])
     cmd.extend([
-        "-re",
         "-i", source_url,
         "-vn",
         "-ac", "1",
@@ -591,7 +591,7 @@ async def _stream_opus_audio(
         "-b:a", br,
         "-vbr", "on",
         "-compression_level", "5",
-        "-application", "voip",
+        "-application", "audio",
         "-flush_packets", "1",
         "-frame_duration", "60",
         "-page_duration", "60000",
@@ -1115,7 +1115,8 @@ async def audio_play_direct(
         if resolved_owner_id:
             mac_param = f"&mac={clean_mac}" if clean_mac else ""
             stream_url = f"/api/audio/stream/{vid}?owner_id={resolved_owner_id}{mac_param}"
-            full_stream = f"{base_url}{stream_url}"
+            device_base_url = base_url.replace("https://", "http://") if clean_mac else base_url
+            full_stream = f"{device_base_url}{stream_url}"
             try:
                 store.queue_audio_command(
                     resolved_owner_id,
