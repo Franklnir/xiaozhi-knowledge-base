@@ -1787,7 +1787,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     title = matched_track.get("title", "")
                     stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
                     base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
-                    full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
+                    device_base = base.replace("https://", "http://") if user_mac else base
+                    full_stream = f"{device_base}{stream_url}" if stream_url.startswith("/") else stream_url
 
                     try:
                         store.queue_audio_command(
@@ -1856,8 +1857,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 np = results[0]
                 try:
                     base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
+                    device_base = base.replace("https://", "http://") if user_mac else base
                     stream_path = np.get("stream_url", "")
-                    full_stream = f"{base}{stream_path}" if stream_path.startswith("/") else stream_path
+                    full_stream = f"{device_base}{stream_path}" if stream_path.startswith("/") else stream_path
                     response["instructions"] = f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{np.get('title', '')}' dan video_id='{np.get('video_id', '')}' agar speaker XiaoZhi langsung memutar lagunya."
                     store.queue_audio_command(owner_id, title=np.get("title", ""), stream_url=full_stream, video_url=np.get("video_url", ""), duration=np.get("duration", ""), video_id=np.get("video_id", ""))
                 except Exception:
@@ -1961,7 +1963,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             title = matched.get("title", "")
             stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
             base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
-            full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
+            device_base = base.replace("https://", "http://") if user_mac else base
+            full_stream = f"{device_base}{stream_url}" if stream_url.startswith("/") else stream_url
 
             try:
                 store.queue_audio_command(

@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from typing import Any, Dict, List, Optional, AsyncGenerator
 
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -575,6 +576,7 @@ async def _stream_opus_audio(
     cmd = [
         ffmpeg_bin,
         "-reconnect", "1",
+        "-reconnect_at_eof", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
         "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
@@ -582,7 +584,6 @@ async def _stream_opus_audio(
     if start_sec > 0:
         cmd.extend(["-ss", f"{start_sec:.2f}"])
     cmd.extend([
-        "-re",
         "-i", source_url,
         "-vn",
         "-ac", "1",
@@ -591,7 +592,7 @@ async def _stream_opus_audio(
         "-b:a", br,
         "-vbr", "on",
         "-compression_level", "5",
-        "-application", "voip",
+        "-application", "audio",
         "-flush_packets", "1",
         "-frame_duration", "60",
         "-page_duration", "60000",
@@ -606,6 +607,13 @@ async def _stream_opus_audio(
     )
 
     total_bytes = 0
+    loop_count = 0
+    br_num_match = re.match(r"^(\d+)", str(br).strip().lower())
+    bitrate_kbps = int(br_num_match.group(1)) if br_num_match else 24
+    nominal_bps = (bitrate_kbps * 1000) // 8
+    # Berikan 45% delivery headroom di atas nominal bitrate agar buffer ESP32 selalu terisi mantap
+    bytes_per_sec = max(1800, int(nominal_bps * 1.45))
+    target_send_time = time.monotonic()
     logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
     try:
         while True:
@@ -617,10 +625,24 @@ async def _stream_opus_audio(
                 logger.info(f"YouTube stream for {video_id} reached EOF, total={total_bytes} bytes")
                 break
             total_bytes += len(chunk)
+            loop_count += 1
             if session:
                 session.record_chunk(len(chunk))
             if total_bytes % (1536 * 50) == 0:
                 logger.info(f"YouTube stream for {video_id}: sent {total_bytes // 1024} KB")
+
+            # Adaptive Pacing:
+            # 15 chunk pertama (~23KB = ~6-8 detik audio) dikirim instan tanpa delay agar buffer ESP32 penuh.
+            # Setelahnya dialirkan dengan 45% headroom agar tidak pernah kering dan tidak membanjiri RAM ESP32.
+            if loop_count > 15:
+                chunk_duration = len(chunk) / bytes_per_sec
+                target_send_time += chunk_duration
+                sleep_sec = target_send_time - time.monotonic()
+                if sleep_sec > 0:
+                    await asyncio.sleep(min(sleep_sec, 0.4))
+                elif sleep_sec < -1.5:
+                    target_send_time = time.monotonic()
+
             yield chunk
     except (asyncio.CancelledError, GeneratorExit) as exc:
         logger.warning(f"YouTube stream for {video_id} client disconnected or cancelled after {total_bytes} bytes")
@@ -1115,7 +1137,8 @@ async def audio_play_direct(
         if resolved_owner_id:
             mac_param = f"&mac={clean_mac}" if clean_mac else ""
             stream_url = f"/api/audio/stream/{vid}?owner_id={resolved_owner_id}{mac_param}"
-            full_stream = f"{base_url}{stream_url}"
+            device_base_url = base_url.replace("https://", "http://") if clean_mac else base_url
+            full_stream = f"{device_base_url}{stream_url}"
             try:
                 store.queue_audio_command(
                     resolved_owner_id,

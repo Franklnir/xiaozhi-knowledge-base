@@ -88,17 +88,32 @@ async def playlist_page(request: Request):
 
 
 @router.get("/api/v1/playlist")
-async def api_get_playlist(request: Request):
-    user = require_user(request)
+async def api_get_playlist(
+    request: Request,
+    mac: str = Query("", description="ESP32 device MAC address"),
+):
+    user = get_current_user(request)
     store = get_store()
-    tracks = store.get_user_playlist(user["id"])
-    top_tracks = store.get_top_played_playlist(user["id"], limit=5)
-    plus_cfg = store.get_user_access_plus(user["id"]) if hasattr(store, "get_user_access_plus") else {}
+    owner_id = user["id"] if user else None
+
+    if not owner_id:
+        device_mac = mac or request.headers.get("X-Device-Mac", "") or request.headers.get("Device-Id", "")
+        if device_mac:
+            from xiaozhi.routers.youtube import _resolve_owner_for_device
+            owner_id = _resolve_owner_for_device(store, device_mac)
+
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Login diperlukan atau perangkat tidak terdaftar.")
+
+    tracks = store.get_user_playlist(owner_id)
+    top_tracks = store.get_top_played_playlist(owner_id, limit=5) if hasattr(store, "get_top_played_playlist") else []
+    plus_cfg = store.get_user_access_plus(owner_id) if hasattr(store, "get_user_access_plus") else {}
     quota_enabled = plus_cfg.get("playlist_quota_enabled", False)
     max_tracks = plus_cfg.get("max_playlist_tracks", 15)
     active_tracks_count = sum(1 for t in tracks if t.get("is_active", True))
     return {
         "success": True,
+        "owner_id": owner_id,
         "total": len(tracks),
         "total_plays": sum(int(t.get("play_count", 0)) for t in tracks),
         "active_tracks_count": active_tracks_count,
@@ -263,7 +278,8 @@ async def api_play_playlist_track(track_id: int, request: Request):
     mac_param = f"&mac={user_mac}" if user_mac else ""
     stream_url = f"/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
     base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
-    full_stream = f"{base}{stream_url}" if stream_url.startswith("/") else stream_url
+    device_base = base.replace("https://", "http://") if user_mac else base
+    full_stream = f"{device_base}{stream_url}" if stream_url.startswith("/") else stream_url
 
     try:
         store.queue_audio_command(
