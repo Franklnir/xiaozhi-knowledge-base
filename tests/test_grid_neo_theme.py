@@ -80,10 +80,12 @@ def test_base_template_theme_render():
     # Painterly background & stat cards assertions
     assert 'radial-gradient(circle at 8% 14%' in rendered
     assert ':root[data-theme="grid_neo"] .app-stat-card:nth-child(1)' in rendered
-    # Single navbar: sidebar off-canvas and main-wrapper full width in Grid Neo
+    # Single navbar: sidebar completely hidden/suppressed and main-wrapper full width in Grid Neo
     assert ':root[data-theme="grid_neo"] .app-nav-aside' in rendered
-    assert 'transform: translateX(-100%)' in rendered
+    assert 'display: none !important' in rendered
     assert ':root[data-theme="grid_neo"] .app-main-wrapper' in rendered
+    # Sidebar element should NOT be rendered in DOM for Grid Neo users
+    assert '<aside class="app-nav-aside" id="appSidebar">' not in rendered
 
     # Guest render
     guest_rendered = template.render(
