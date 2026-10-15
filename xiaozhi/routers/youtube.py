@@ -603,11 +603,11 @@ async def _stream_opus_audio(
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
         "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
+        "-i", source_url,
     ]
     if start_sec > 0:
         cmd.extend(["-ss", f"{start_sec:.2f}"])
     cmd.extend([
-        "-i", source_url,
         "-vn",
         "-ac", "1",
         "-ar", str(sample_rate),
@@ -631,6 +631,7 @@ async def _stream_opus_audio(
 
     total_bytes = 0
     loop_count = 0
+    end_reason = "finished"
     br_num_match = re.match(r"^(\d+)", str(br).strip().lower())
     bitrate_kbps = int(br_num_match.group(1)) if br_num_match else 24
     nominal_bps = (bitrate_kbps * 1000) // 8
@@ -642,9 +643,14 @@ async def _stream_opus_audio(
         while True:
             if session and session.abort_event.is_set():
                 logger.info(f"Stream aborted by admin for video {video_id}")
+                end_reason = "aborted"
                 break
             chunk = await proc.stdout.read(1536)
             if not chunk:
+                if total_bytes == 0:
+                    end_reason = "error"
+                    logger.error(f"YouTube stream for {video_id} failed on start (0 bytes), FFmpeg returncode={proc.returncode}")
+                    raise RuntimeError(f"FFmpeg failed to stream audio for {video_id}")
                 logger.info(f"YouTube stream for {video_id} reached EOF, total={total_bytes} bytes")
                 break
             total_bytes += len(chunk)
@@ -668,12 +674,14 @@ async def _stream_opus_audio(
 
             yield chunk
     except (asyncio.CancelledError, GeneratorExit) as exc:
+        end_reason = "cancelled"
         logger.warning(f"YouTube stream for {video_id} client disconnected or cancelled after {total_bytes} bytes")
     except Exception as exc:
+        end_reason = "error"
         logger.error(f"YouTube stream for {video_id} error after {total_bytes} bytes: {exc}")
     finally:
         if session:
-            playback_tracker.end_session(session.session_id)
+            playback_tracker.end_session(session.session_id, reason=end_reason)
         if proc.returncode is None:
             try:
                 proc.kill()
