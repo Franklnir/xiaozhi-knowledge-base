@@ -149,6 +149,29 @@ def _resolve_owner_for_device(store, device_id: str, query: str = "", video_id: 
     return None
 
 
+def format_duration(sec_or_str) -> str:
+    if not sec_or_str:
+        return ""
+    if isinstance(sec_or_str, str):
+        sec_or_str = sec_or_str.strip()
+        if ":" in sec_or_str:
+            return sec_or_str
+        try:
+            sec_or_str = int(float(sec_or_str))
+        except Exception:
+            return ""
+    if isinstance(sec_or_str, (int, float)):
+        s = int(sec_or_str)
+        m = s // 60
+        sec = s % 60
+        if m >= 60:
+            h = m // 60
+            m = m % 60
+            return f"{h}:{m:02d}:{sec:02d}"
+        return f"{m:02d}:{sec:02d}"
+    return ""
+
+
 def youtube_search(query: str, max_results: int = 5) -> list:
     if not yt_dlp:
         raise ValueError("yt_dlp tidak tersedia.")
@@ -175,7 +198,7 @@ def youtube_search(query: str, max_results: int = 5) -> list:
                 info = ydl.extract_info(f"https://www.youtube.com/watch?v={direct_vid}", download=False)
                 if info:
                     v_title = info.get("title", "") or f"YouTube Video ({direct_vid})"
-                    v_dur = info.get("duration_string", "")
+                    v_dur = format_duration(info.get("duration") or info.get("duration_string"))
                     thumbs = info.get("thumbnails", [])
                     v_thumb = thumbs[-1].get("url", "") if thumbs else ""
                     return [{
@@ -210,7 +233,7 @@ def youtube_search(query: str, max_results: int = 5) -> list:
                 info = ydl.extract_info(norm_url, download=False)
                 if info:
                     v_title = info.get("title", "") or f"TikTok Video ({tt_vid})"
-                    v_dur = info.get("duration_string", "")
+                    v_dur = format_duration(info.get("duration") or info.get("duration_string"))
                     thumbs = info.get("thumbnails", [])
                     v_thumb = thumbs[-1].get("url", "") if thumbs else ""
                     return [{
@@ -255,7 +278,7 @@ def youtube_search(query: str, max_results: int = 5) -> list:
                             "title": entry.get("title", ""),
                             "video_id": entry_id,
                             "video_url": f"https://www.youtube.com/watch?v={entry_id}",
-                            "duration": entry.get("duration_string", ""),
+                            "duration": format_duration(entry.get("duration") or entry.get("duration_string")),
                             "thumbnail": thumbs[-1].get("url", "") if thumbs else "",
                             "stream_url": f"/api/audio/stream/{entry_id}",
                         })
@@ -290,7 +313,7 @@ def youtube_search(query: str, max_results: int = 5) -> list:
                 "title": entry.get("title", ""),
                 "video_id": video_id,
                 "video_url": f"https://www.youtube.com/watch?v={video_id}",
-                "duration": entry.get("duration_string", ""),
+                "duration": format_duration(entry.get("duration") or entry.get("duration_string")),
                 "thumbnail": entry.get("thumbnails", [{}])[-1].get("url", "") if entry.get("thumbnails") else "",
                 "stream_url": f"/api/audio/stream/{video_id}",
             })
@@ -1153,10 +1176,27 @@ async def audio_play_direct(
             mac_param = f"&mac={clean_mac}" if clean_mac else ""
             stream_url = f"/api/audio/stream/{vid}?{mac_param.lstrip('&')}" if mac_param else f"/api/audio/stream/{vid}"
 
+        dur = ""
+        if matched_track and matched_track.get("duration"):
+            dur = format_duration(matched_track.get("duration"))
+        elif results and results[0].get("duration"):
+            dur = format_duration(results[0].get("duration"))
+
+        if not dur and vid:
+            try:
+                ydl_opts = {"quiet": True, "no_warnings": True, "extract_flat": True}
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    v_info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=False)
+                    if v_info:
+                        dur = format_duration(v_info.get("duration") or v_info.get("duration_string"))
+            except Exception:
+                pass
+
         return {
             "success": True,
             "video_id": vid,
             "title": title,
+            "duration": dur,
             "stream_url": stream_url,
             "owner_id": resolved_owner_id,
         }
