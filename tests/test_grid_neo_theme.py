@@ -66,9 +66,29 @@ def test_base_template_theme_render():
     rendered = template.render(
         user={"id": 1, "username": "ajeng", "role": "user", "ui_theme": "grid_neo"},
         csrf_token="dummy_token",
+        page="dashboard",
         request=None
     )
     assert 'data-theme="grid_neo"' in rendered
     assert '<option value="grid_neo">Grid Neo</option>' in rendered
     assert ':root[data-theme="grid_neo"]' in rendered
+    # Quixel Header assertions
+    assert 'app-top-header' in rendered
+    assert 'app-top-nav-pills' in rendered
+    assert 'app-top-user-pill' in rendered
+    assert 'Hi, ajeng!' in rendered
+    # Painterly background & stat cards assertions
+    assert 'radial-gradient(circle at 8% 14%' in rendered
+    assert ':root[data-theme="grid_neo"] .app-stat-card:nth-child(1)' in rendered
+
+    # Guest render
+    guest_rendered = template.render(
+        user=None,
+        csrf_token="dummy_token",
+        active_page="home",
+        request=None
+    )
+    assert 'app-top-header' in guest_rendered
+    assert 'Masuk' in guest_rendered
+
 
