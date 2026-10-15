@@ -1,9 +1,24 @@
-{% set current_theme = user.ui_theme if user and user.ui_theme in ['default', 'dark', 'neo'] else 'neo' %}
+{% set raw_theme = user.ui_theme if user and user.ui_theme else 'neo' %}
+{% set current_theme = 'grid_neo' if raw_theme in ['grid_neo', 'grid-neo', 'grid neo'] else (raw_theme if raw_theme in ['default', 'dark', 'neo'] else 'neo') %}
 <!DOCTYPE html>
 <html lang="id" {% if current_theme != 'default' %}data-theme="{{ current_theme }}" {% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function() {
+            try {
+                const saved = localStorage.getItem('xiaozhi_theme');
+                const validThemes = ["default", "dark", "neo", "grid_neo", "grid-neo"];
+                {% if not user %}
+                if (saved && validThemes.includes(saved)) {
+                    if (saved === 'default') delete document.documentElement.dataset.theme;
+                    else document.documentElement.dataset.theme = (saved === 'grid-neo' ? 'grid_neo' : saved);
+                }
+                {% endif %}
+            } catch (_) {}
+        })();
+    </script>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
@@ -133,6 +148,25 @@
             --app-radius: 4px;
             --app-shadow: 5px 5px 0 #111111;
             --app-nav-bg: #ffffff;
+            --app-input-bg: #ffffff;
+            --app-button-bg: #ffffff;
+        }
+        :root[data-theme="grid_neo"], :root[data-theme="grid-neo"] {
+            --app-bg: #f4f5f8;
+            --app-surface: #ffffff;
+            --app-surface-muted: #f8fafc;
+            --app-border: #111216;
+            --app-border-strong: #111216;
+            --app-text: #111216;
+            --app-muted: #595f6e;
+            --app-soft: #f0f2f6;
+            --app-brand: #111216;
+            --app-accent: #ddf844;
+            --app-sky: #6366f1;
+            --app-danger: #ef4444;
+            --app-radius: 16px;
+            --app-shadow: 3px 3px 0 #111216;
+            --app-nav-bg: #111216;
             --app-input-bg: #ffffff;
             --app-button-bg: #ffffff;
         }
@@ -1197,6 +1231,548 @@
             background: #f0fdf4 !important;
         }
 
+        /* ══════════════════════════════════════════════════════════════════
+           GRID NEO THEME MASTER SYSTEM (:root[data-theme="grid_neo"])
+           Aesthetic: Soft Neobrutalism / Tactile Grid Neo
+           Palette: Soft off-white canvas with micro-dots, crisp 1.5px dark border,
+                    signature electric chartreuse (#ddf844), vibrant indigo (#6366f1),
+                    soft pastel cards, and sleek dark top/sidebar header.
+           ══════════════════════════════════════════════════════════════════ */
+        :root[data-theme="grid_neo"] body,
+        :root[data-theme="grid-neo"] body {
+            background-color: #f4f5f8 !important;
+            background-image: radial-gradient(#111216 0.75px, transparent 0.75px) !important;
+            background-size: 20px 20px !important;
+            color: #111216 !important;
+        }
+
+        /* 1. Cards, Stat Cards, & Containers */
+        :root[data-theme="grid_neo"] .app-card,
+        :root[data-theme="grid-neo"] .app-card,
+        :root[data-theme="grid_neo"] .app-stat-card,
+        :root[data-theme="grid-neo"] .app-stat-card,
+        :root[data-theme="grid_neo"] .auth-card,
+        :root[data-theme="grid-neo"] .auth-card {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 3.5px 3.5px 0 #111216 !important;
+            border-radius: 18px !important;
+            background: #ffffff !important;
+            color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-stat-card,
+        :root[data-theme="grid-neo"] .app-stat-card {
+            box-shadow: 3px 3px 0 #111216 !important;
+            border-radius: 18px !important;
+            transition: transform .15s ease, box-shadow .15s ease !important;
+        }
+        :root[data-theme="grid_neo"] .app-stat-card:hover,
+        :root[data-theme="grid-neo"] .app-stat-card:hover {
+            transform: translate(-1.5px, -1.5px) !important;
+            box-shadow: 5px 5px 0 #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-stat-label,
+        :root[data-theme="grid-neo"] .app-stat-label {
+            color: #595f6e !important;
+            font-weight: 750 !important;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.6px;
+        }
+        :root[data-theme="grid_neo"] .app-stat-value,
+        :root[data-theme="grid-neo"] .app-stat-value {
+            font-weight: 850 !important;
+            color: #111216 !important;
+            font-size: 26px;
+        }
+        :root[data-theme="grid_neo"] .app-card-header,
+        :root[data-theme="grid-neo"] .app-card-header {
+            border-bottom: 1.5px solid #111216;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        :root[data-theme="grid_neo"] .app-section-title,
+        :root[data-theme="grid-neo"] .app-section-title {
+            font-weight: 850 !important;
+            color: #111216 !important;
+            letter-spacing: -0.2px;
+        }
+
+        /* 2. Buttons: Tactile Smooth-Pill & Tactile Offset */
+        :root[data-theme="grid_neo"] .app-button,
+        :root[data-theme="grid-neo"] .app-button {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2.5px 2.5px 0 #111216 !important;
+            border-radius: 9999px !important;
+            font-weight: 750 !important;
+            background: #ffffff;
+            color: #111216 !important;
+            text-transform: none;
+            transition: transform .12s ease, box-shadow .12s ease, background-color .15s ease !important;
+        }
+        :root[data-theme="grid_neo"] .app-button:hover,
+        :root[data-theme="grid-neo"] .app-button:hover {
+            transform: translate(-1px, -1px) !important;
+            box-shadow: 3.5px 3.5px 0 #111216 !important;
+            background: #f4f5f8 !important;
+            color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-button:active,
+        :root[data-theme="grid-neo"] .app-button:active {
+            transform: translate(1.5px, 1.5px) !important;
+            box-shadow: 1px 1px 0 #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-button-primary,
+        :root[data-theme="grid-neo"] .app-button-primary {
+            background: #111216 !important;
+            color: #ffffff !important;
+            border-color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-button-primary:hover,
+        :root[data-theme="grid-neo"] .app-button-primary:hover {
+            background: #27272a !important;
+            color: #ffffff !important;
+            box-shadow: 4px 4px 0 #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-button-success,
+        :root[data-theme="grid-neo"] .app-button-success {
+            background: #ddf844 !important;
+            color: #111216 !important;
+            border-color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-button-success:hover,
+        :root[data-theme="grid-neo"] .app-button-success:hover {
+            background: #ccee24 !important;
+            color: #111216 !important;
+            box-shadow: 4px 4px 0 #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-button-danger,
+        :root[data-theme="grid-neo"] .app-button-danger {
+            background: #ef4444 !important;
+            color: #ffffff !important;
+            border-color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-button-danger:hover,
+        :root[data-theme="grid-neo"] .app-button-danger:hover {
+            background: #dc2626 !important;
+            color: #ffffff !important;
+        }
+        :root[data-theme="grid_neo"] .app-button-sky,
+        :root[data-theme="grid-neo"] .app-button-sky {
+            background: #6366f1 !important;
+            color: #ffffff !important;
+            border-color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-button-sky:hover,
+        :root[data-theme="grid-neo"] .app-button-sky:hover {
+            background: #4f46e5 !important;
+            color: #ffffff !important;
+        }
+
+        /* 3. Inputs & Form Controls */
+        :root[data-theme="grid_neo"] .app-input,
+        :root[data-theme="grid-neo"] .app-input,
+        :root[data-theme="grid_neo"] .app-select,
+        :root[data-theme="grid-neo"] .app-select,
+        :root[data-theme="grid_neo"] .app-textarea,
+        :root[data-theme="grid-neo"] .app-textarea {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2.5px 2.5px 0 #111216 !important;
+            border-radius: 12px !important;
+            background: #ffffff !important;
+            color: #111216 !important;
+            font-weight: 600 !important;
+            transition: box-shadow .12s ease, background-color .12s ease;
+        }
+        :root[data-theme="grid_neo"] .app-input:focus,
+        :root[data-theme="grid-neo"] .app-input:focus,
+        :root[data-theme="grid_neo"] .app-select:focus,
+        :root[data-theme="grid-neo"] .app-select:focus,
+        :root[data-theme="grid_neo"] .app-textarea:focus,
+        :root[data-theme="grid-neo"] .app-textarea:focus {
+            border-color: #111216 !important;
+            box-shadow: 3.5px 3.5px 0 #111216, 0 0 0 3.5px rgba(221, 248, 68, 0.45) !important;
+            background: #ffffff !important;
+            outline: none !important;
+        }
+        :root[data-theme="grid_neo"] .app-label,
+        :root[data-theme="grid-neo"] .app-label {
+            color: #111216 !important;
+            font-weight: 800 !important;
+            font-size: 11.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        :root[data-theme="grid_neo"] .app-field-hint,
+        :root[data-theme="grid-neo"] .app-field-hint {
+            color: #595f6e !important;
+            font-weight: 600;
+        }
+
+        /* 4. Alerts & Notifications */
+        :root[data-theme="grid_neo"] .app-alert,
+        :root[data-theme="grid-neo"] .app-alert {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 3px 3px 0 #111216 !important;
+            border-radius: 14px !important;
+            font-weight: 700 !important;
+            color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-alert-info,
+        :root[data-theme="grid-neo"] .app-alert-info {
+            background: #ede9fe !important;
+            color: #3730a3 !important;
+        }
+        :root[data-theme="grid_neo"] .app-alert-warning,
+        :root[data-theme="grid-neo"] .app-alert-warning {
+            background: #fef3c7 !important;
+            color: #92400e !important;
+        }
+        :root[data-theme="grid_neo"] .app-alert-danger,
+        :root[data-theme="grid-neo"] .app-alert-danger {
+            background: #fee2e2 !important;
+            color: #991b1b !important;
+        }
+        :root[data-theme="grid_neo"] .app-alert-success,
+        :root[data-theme="grid-neo"] .app-alert-success {
+            background: #ddf844 !important;
+            color: #111216 !important;
+        }
+
+        /* 5. Chips, Status Pills, Badges */
+        :root[data-theme="grid_neo"] .app-chip,
+        :root[data-theme="grid-neo"] .app-chip,
+        :root[data-theme="grid_neo"] .app-status-pill,
+        :root[data-theme="grid-neo"] .app-status-pill {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 1.5px 1.5px 0 #111216 !important;
+            border-radius: 9999px !important;
+            font-weight: 750 !important;
+            font-size: 11px !important;
+            padding: 3px 10px !important;
+            color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-chip-success,
+        :root[data-theme="grid-neo"] .app-chip-success,
+        :root[data-theme="grid_neo"] .app-status-pill.is-online,
+        :root[data-theme="grid-neo"] .app-status-pill.is-online {
+            background: #ddf844 !important;
+            color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-chip-info,
+        :root[data-theme="grid-neo"] .app-chip-info {
+            background: #ede9fe !important;
+            color: #4338ca !important;
+        }
+        :root[data-theme="grid_neo"] .app-chip-neutral,
+        :root[data-theme="grid-neo"] .app-chip-neutral {
+            background: #f1f5f9 !important;
+            color: #334155 !important;
+        }
+        :root[data-theme="grid_neo"] .app-status-pill.is-offline,
+        :root[data-theme="grid-neo"] .app-status-pill.is-offline {
+            background: #fee2e2 !important;
+            color: #991b1b !important;
+        }
+
+        /* 6. Tables */
+        :root[data-theme="grid_neo"] .app-table-wrap,
+        :root[data-theme="grid-neo"] .app-table-wrap {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 4px 4px 0 #111216 !important;
+            border-radius: 18px !important;
+            background: #ffffff !important;
+            overflow: hidden !important;
+        }
+        :root[data-theme="grid_neo"] .app-table thead tr,
+        :root[data-theme="grid-neo"] .app-table thead tr {
+            background: #111216 !important;
+            border-bottom: 2px solid #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-table th,
+        :root[data-theme="grid-neo"] .app-table th {
+            border-bottom: 2px solid #111216 !important;
+            color: #ffffff !important;
+            font-weight: 800 !important;
+            text-transform: uppercase;
+            font-size: 11.5px;
+            letter-spacing: 0.6px;
+            padding: 14px 16px;
+        }
+        :root[data-theme="grid_neo"] .app-table td,
+        :root[data-theme="grid-neo"] .app-table td {
+            border-top: 1.5px solid #f1f5f9 !important;
+            color: #111216 !important;
+            padding: 13px 16px;
+        }
+        :root[data-theme="grid_neo"] .app-table tr:hover td,
+        :root[data-theme="grid-neo"] .app-table tr:hover td {
+            background: rgba(221, 248, 68, 0.15) !important;
+        }
+
+        /* 7. Sidebar Navigation & Brand */
+        :root[data-theme="grid_neo"] .app-nav-aside,
+        :root[data-theme="grid-neo"] .app-nav-aside {
+            border-right: 1.5px solid #111216 !important;
+            box-shadow: 3px 0 0 #111216 !important;
+            background: #ffffff !important;
+        }
+        :root[data-theme="grid_neo"] .app-sidebar-header,
+        :root[data-theme="grid-neo"] .app-sidebar-header {
+            border-bottom: 1.5px solid #111216 !important;
+            background: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .app-sidebar-header .app-brand-name,
+        :root[data-theme="grid-neo"] .app-sidebar-header .app-brand-name {
+            color: #ffffff !important;
+            font-weight: 850;
+        }
+        :root[data-theme="grid_neo"] .app-sidebar-header .app-brand-sub,
+        :root[data-theme="grid-neo"] .app-sidebar-header .app-brand-sub {
+            color: #94a3b8 !important;
+        }
+        :root[data-theme="grid_neo"] .app-brand-mark,
+        :root[data-theme="grid-neo"] .app-brand-mark {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2px 2px 0 #111216 !important;
+            background: #ddf844 !important;
+            color: #111216 !important;
+            border-radius: 10px !important;
+            overflow: hidden;
+        }
+        :root[data-theme="grid_neo"] .app-sidebar-link,
+        :root[data-theme="grid-neo"] .app-sidebar-link {
+            border: 1.5px solid transparent !important;
+            font-weight: 750 !important;
+            color: #3f3f46 !important;
+            border-radius: 9999px !important;
+            margin-bottom: 3px;
+            transition: all .15s ease !important;
+        }
+        :root[data-theme="grid_neo"] .app-sidebar-link:hover,
+        :root[data-theme="grid-neo"] .app-sidebar-link:hover {
+            background: #ddf844 !important;
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2px 2px 0 #111216 !important;
+            color: #111216 !important;
+            transform: translate(-1px, -1px);
+        }
+        :root[data-theme="grid_neo"] .app-sidebar-link.is-active,
+        :root[data-theme="grid-neo"] .app-sidebar-link.is-active {
+            background: #111216 !important;
+            color: #ffffff !important;
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2.5px 2.5px 0 #111216 !important;
+            font-weight: 850 !important;
+        }
+        :root[data-theme="grid_neo"] .app-sidebar-link.is-active .app-sidebar-link-icon svg,
+        :root[data-theme="grid-neo"] .app-sidebar-link.is-active .app-sidebar-link-icon svg {
+            stroke: #ddf844 !important;
+        }
+        :root[data-theme="grid_neo"] .app-sidebar-footer,
+        :root[data-theme="grid-neo"] .app-sidebar-footer {
+            border-top: 1.5px solid #111216 !important;
+            background: #f8fafc !important;
+        }
+        :root[data-theme="grid_neo"] .app-sidebar-avatar,
+        :root[data-theme="grid-neo"] .app-sidebar-avatar {
+            border: 1.5px solid #111216 !important;
+            background: #ddf844 !important;
+            color: #111216 !important;
+            box-shadow: 1.5px 1.5px 0 #111216 !important;
+            font-weight: 900 !important;
+        }
+
+        /* 8. Modals & Overlays */
+        :root[data-theme="grid_neo"] .app-modal-box,
+        :root[data-theme="grid-neo"] .app-modal-box,
+        :root[data-theme="grid_neo"] .mcp-blocking-box,
+        :root[data-theme="grid-neo"] .mcp-blocking-box {
+            border: 2px solid #111216 !important;
+            box-shadow: 6px 6px 0 #111216 !important;
+            border-radius: 22px !important;
+            background: #ffffff !important;
+        }
+
+        /* 9. Header, Eyebrow & Public Nav */
+        :root[data-theme="grid_neo"] .app-page-header,
+        :root[data-theme="grid-neo"] .app-page-header {
+            border-bottom: 1.5px solid #111216 !important;
+            padding-bottom: 18px;
+        }
+        :root[data-theme="grid_neo"] .app-eyebrow,
+        :root[data-theme="grid-neo"] .app-eyebrow {
+            color: #111216 !important;
+            display: inline-flex !important;
+            align-items: center;
+            gap: 6px;
+            background: #ddf844 !important;
+            padding: 4px 12px !important;
+            border: 1.5px solid #111216 !important;
+            border-radius: 9999px !important;
+            box-shadow: 2px 2px 0 #111216 !important;
+            font-weight: 850 !important;
+            text-transform: uppercase !important;
+            font-size: 11px !important;
+            letter-spacing: 0.6px !important;
+        }
+        :root[data-theme="grid_neo"] header,
+        :root[data-theme="grid-neo"] header {
+            background: #111216 !important;
+            border-bottom: 1.5px solid #111216 !important;
+        }
+        :root[data-theme="grid_neo"] header .app-brand-name,
+        :root[data-theme="grid-neo"] header .app-brand-name {
+            color: #ffffff !important;
+        }
+        :root[data-theme="grid_neo"] header .app-brand-sub,
+        :root[data-theme="grid-neo"] header .app-brand-sub {
+            color: #94a3b8 !important;
+        }
+        :root[data-theme="grid_neo"] header .app-button,
+        :root[data-theme="grid-neo"] header .app-button {
+            background: rgba(255, 255, 255, 0.08) !important;
+            color: #ffffff !important;
+            border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
+            box-shadow: none !important;
+        }
+        :root[data-theme="grid_neo"] header .app-button:hover,
+        :root[data-theme="grid-neo"] header .app-button:hover {
+            background: #ddf844 !important;
+            color: #111216 !important;
+            border-color: #ddf844 !important;
+        }
+        :root[data-theme="grid_neo"] header .app-button-primary,
+        :root[data-theme="grid-neo"] header .app-button-primary {
+            background: #ddf844 !important;
+            color: #111216 !important;
+            border: 1.5px solid #ddf844 !important;
+        }
+
+        /* 10. Components: Relays, Documentation & Muted Panels */
+        :root[data-theme="grid_neo"] .relay-item,
+        :root[data-theme="grid-neo"] .relay-item {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 3px 3px 0 #111216 !important;
+            border-radius: 16px !important;
+        }
+        :root[data-theme="grid_neo"] .relay-item.is-on,
+        :root[data-theme="grid-neo"] .relay-item.is-on {
+            background: #ddf844 !important;
+            color: #111216 !important;
+            border-color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .relay-item.is-off,
+        :root[data-theme="grid-neo"] .relay-item.is-off {
+            background: #fee2e2 !important;
+            border-color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] .doc-step,
+        :root[data-theme="grid-neo"] .doc-step {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 3px 3px 0 #111216 !important;
+            border-radius: 16px !important;
+        }
+        :root[data-theme="grid_neo"] .doc-step-number,
+        :root[data-theme="grid-neo"] .doc-step-number {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2px 2px 0 #111216 !important;
+            background: #ddf844 !important;
+            color: #111216 !important;
+            font-weight: 850 !important;
+            border-radius: 10px !important;
+        }
+        :root[data-theme="grid_neo"] .app-muted-panel,
+        :root[data-theme="grid-neo"] .app-muted-panel {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2.5px 2.5px 0 #111216 !important;
+            border-radius: 14px !important;
+            background: #f8fafc !important;
+        }
+        :root[data-theme="grid_neo"] .app-google-btn,
+        :root[data-theme="grid-neo"] .app-google-btn {
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2.5px 2.5px 0 #111216 !important;
+            border-radius: 9999px !important;
+            font-weight: 750 !important;
+        }
+        :root[data-theme="grid_neo"] .app-mcp-lock-badge,
+        :root[data-theme="grid-neo"] .app-mcp-lock-badge {
+            border: 1.5px solid #111216 !important;
+            background: #ddf844 !important;
+            color: #111216 !important;
+            box-shadow: 1.5px 1.5px 0 #111216 !important;
+            border-radius: 9999px !important;
+        }
+
+        /* 11. Admin Theme System for Grid Neo */
+        :root[data-theme="grid_neo"] body.is-admin-page .app-eyebrow,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-eyebrow {
+            background: #ddf844 !important;
+            color: #111216 !important;
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2px 2px 0 #111216 !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-table thead tr,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-table thead tr {
+            background: #111216 !important;
+            border-bottom: 2px solid #111216 !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-table thead th,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-table thead th {
+            color: #ffffff !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-table tr:hover td,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-table tr:hover td {
+            background: rgba(221, 248, 68, 0.15) !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-button-primary,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-button-primary {
+            background: #ddf844 !important;
+            color: #111216 !important;
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2.5px 2.5px 0 #111216 !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-button-primary:hover,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-button-primary:hover {
+            background: #ccee24 !important;
+            color: #111216 !important;
+            box-shadow: 3.5px 3.5px 0 #111216 !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-sidebar-header,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-sidebar-header {
+            background: #111216 !important;
+            border-bottom: 1.5px solid #111216 !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-brand-mark,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-brand-mark {
+            background: #ddf844 !important;
+            color: #111216 !important;
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2px 2px 0 #111216 !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-sidebar-link:hover,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-sidebar-link:hover {
+            background: #ddf844 !important;
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2px 2px 0 #111216 !important;
+            color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-muted-panel,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-muted-panel {
+            background: #f8fafc !important;
+            border: 1.5px solid #111216 !important;
+            box-shadow: 2.5px 2.5px 0 #111216 !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .doc-step-number,
+        :root[data-theme="grid-neo"] body.is-admin-page .doc-step-number {
+            background: #ddf844 !important;
+            color: #111216 !important;
+        }
+        :root[data-theme="grid_neo"] body.is-admin-page .app-button:hover,
+        :root[data-theme="grid-neo"] body.is-admin-page .app-button:hover {
+            background: rgba(221, 248, 68, 0.15) !important;
+        }
+
         /* RESPONSIVE */
         @media (max-width: 900px) {
             .app-nav-aside {
@@ -1775,6 +2351,7 @@
                 </div>
             </a>
             <select id="themeSelect" class="app-input" style="font-size:12px; padding:6px 8px; min-height:32px" aria-label="Tema">
+                <option value="grid_neo">Grid Neo</option>
                 <option value="neo">Neo Brutalism</option>
                 <option value="dark">Dark</option>
                 <option value="default">Original</option>
@@ -2020,13 +2597,18 @@
         (function () {
             const select = document.getElementById('themeSelect');
             if (!select) return;
-            const validThemes = ["default", "dark", "neo"];
+            const validThemes = ["default", "dark", "neo", "grid_neo", "grid-neo"];
             const initialTheme = {{ current_theme|tojson }};
             const csrfToken = {{ csrf_token|tojson }};
 
             function applyTheme(theme) {
-                if (theme === "default") { delete document.documentElement.dataset.theme; return; }
+                if (theme === "default") { 
+                    delete document.documentElement.dataset.theme; 
+                    try { localStorage.setItem('xiaozhi_theme', 'default'); } catch (_) {}
+                    return; 
+                }
                 document.documentElement.dataset.theme = theme;
+                try { localStorage.setItem('xiaozhi_theme', theme); } catch (_) {}
             }
 
             select.value = validThemes.includes(initialTheme) ? initialTheme : "default";

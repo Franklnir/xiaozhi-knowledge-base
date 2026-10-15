@@ -92,6 +92,13 @@
         border: 2px solid #111;
         box-shadow: 4px 4px 0 #111;
     }
+    :root[data-theme="grid_neo"] .flasher-console,
+    :root[data-theme="grid-neo"] .flasher-console {
+        border: 1.5px solid #111216;
+        box-shadow: 4px 4px 0 #111216;
+        border-radius: 16px;
+        background: #0f1015;
+    }
     .flasher-progress-wrap {
         background: var(--app-surface-muted);
         border: 1.5px solid var(--app-border-strong);
@@ -104,12 +111,22 @@
     :root[data-theme="neo"] .flasher-progress-wrap {
         border: 2px solid #111;
     }
+    :root[data-theme="grid_neo"] .flasher-progress-wrap,
+    :root[data-theme="grid-neo"] .flasher-progress-wrap {
+        border: 1.5px solid #111216;
+        border-radius: 9999px;
+    }
     .flasher-progress-bar {
         height: 100%;
         width: 0%;
         background: linear-gradient(90deg, #059669, #10b981);
         border-radius: 999px;
         transition: width 0.2s ease;
+    }
+    :root[data-theme="grid_neo"] .flasher-progress-bar,
+    :root[data-theme="grid-neo"] .flasher-progress-bar {
+        background: linear-gradient(90deg, #10b981, #06b6d4);
+        border-radius: 9999px;
     }
     .flasher-chip-info-grid {
         display: grid;
@@ -124,6 +141,13 @@
     }
     :root[data-theme="neo"] .flasher-chip-info-grid {
         border: 1.5px solid #111;
+    }
+    :root[data-theme="grid_neo"] .flasher-chip-info-grid,
+    :root[data-theme="grid-neo"] .flasher-chip-info-grid {
+        border: 1.5px solid #111216;
+        border-radius: 14px;
+        box-shadow: 2px 2px 0 #111216;
+        background: #ffffff;
     }
     .chip-info-item span:first-child {
         color: var(--app-muted);
@@ -179,6 +203,26 @@
         border: 2.5px solid #111111 !important;
         box-shadow: 3.5px 3.5px 0 #111111 !important;
         font-weight: 900 !important;
+    }
+    :root[data-theme="grid_neo"] .source-tab-btn,
+    :root[data-theme="grid-neo"] .source-tab-btn {
+        background: #ffffff !important;
+        color: #111216 !important;
+        border: 1.5px solid #111216 !important;
+        border-radius: 9999px !important;
+        box-shadow: 2px 2px 0 #111216 !important;
+    }
+    :root[data-theme="grid_neo"] .source-tab-btn:hover,
+    :root[data-theme="grid-neo"] .source-tab-btn:hover {
+        background: #f4f5f8 !important;
+    }
+    :root[data-theme="grid_neo"] .source-tab-btn.active,
+    :root[data-theme="grid-neo"] .source-tab-btn.active {
+        background: #ddf844 !important;
+        color: #111216 !important;
+        border: 1.5px solid #111216 !important;
+        box-shadow: 2.5px 2.5px 0 #111216 !important;
+        font-weight: 850 !important;
     }
     :root[data-theme="dark"] .source-tab-btn {
         background: var(--app-surface) !important;

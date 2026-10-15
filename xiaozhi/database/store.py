@@ -668,7 +668,7 @@ class HFJsonStore:
             self._commit(data, "Rotate user session")
 
     def set_user_theme(self, user_id: int, theme: str) -> Dict[str, Any]:
-        theme = str(theme or "default").strip().lower()
+        theme = str(theme or "default").strip().lower().replace(" ", "_").replace("-", "_")
         if theme not in UI_THEMES:
             raise ValueError("Tema tidak valid.")
         with self._lock:

@@ -70,6 +70,15 @@ class SQLiteStore:
             self._local.conn.execute("PRAGMA foreign_keys=ON")
         return self._local.conn
 
+    def close(self) -> None:
+        """Close thread-local database connection."""
+        if hasattr(self._local, "conn") and self._local.conn is not None:
+            try:
+                self._local.conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
+
     def _init_db(self) -> None:
         """Initialize database schema with proper indexes."""
         conn = self._get_conn()
@@ -660,7 +669,7 @@ class SQLiteStore:
         conn.commit()
 
     def set_user_theme(self, user_id: int, theme: str) -> Dict[str, Any]:
-        theme = str(theme or "default").strip().lower()
+        theme = str(theme or "default").strip().lower().replace(" ", "_").replace("-", "_")
         if theme not in UI_THEMES:
             raise ValueError("Tema tidak valid.")
         conn = self._get_conn()

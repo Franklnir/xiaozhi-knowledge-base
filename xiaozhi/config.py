@@ -685,7 +685,7 @@ SESSION_MAX_AGE = 60 * 60 * 24 * 7
 CSRF_MAX_AGE = 60 * 60 * 4
 
 # ── UI ─────────────────────────────────────────────────────────────────────
-UI_THEMES = {"default", "dark", "neo"}
+UI_THEMES = {"default", "dark", "neo", "grid_neo", "grid-neo", "grid neo"}
 DEFAULT_UI_THEME = "neo"
 
 # ── Production Detection ───────────────────────────────────────────────────
