@@ -183,10 +183,13 @@
         width: 100%;
         overflow: hidden;
         animation: mcpPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
     :root[data-theme="neo"] .app-modal-card {
         border: 2.5px solid #111;
         box-shadow: 6px 6px 0 #111;
+    }
+    @keyframes appSpin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
 </style>
 
@@ -417,9 +420,12 @@
                     id="trackSearchInput" 
                     placeholder="🔍 Cari nomor, judul, artis, URL..." 
                     class="app-input" 
-                    style="width:260px; font-size:12.5px; padding:7px 12px;"
+                    style="width:240px; font-size:12.5px; padding:7px 12px;"
                     oninput="filterPlaylistTable()"
                 >
+                <button type="button" onclick="cacheAllTracks()" class="app-button" style="font-size:12px; padding:7px 12px; display:inline-flex; align-items:center; gap:5px; font-weight:700;" title="Unduh dan simpan semua audio playlist ke disk server VPS agar siap diputar instan tanpa buffering">
+                    <span>⚡</span> Unduh Semua Cache
+                </button>
                 <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; font-size:12.5px; padding:7px 14px;">
                     ➕ Tambah Lagu
                 </button>
@@ -434,6 +440,7 @@
                         <th style="width:84px;">Preview</th>
                         <th>Judul Lagu & Info</th>
                         <th>Link YouTube / Video ID</th>
+                        <th style="width:145px; text-align:center;">Status Audio</th>
                         <th style="width:130px; text-align:center;">Frekuensi Putar</th>
                         <th style="width:180px; text-align:right;">Aksi (CRUD)</th>
                     </tr>
@@ -487,6 +494,10 @@
                                 <div style="display:flex; align-items:center; gap:8px; margin-top:4px; font-size:12px; color:var(--app-muted);">
                                     <span id="track-artist-{{ track.id }}">{{ track.artist or ('TikTok Creator' if track.video_id.startswith('tt_') else 'YouTube Audio') }}</span>
                                     <span>•</span>
+                                    {% if track.duration %}
+                                    <span style="font-weight:700; color:var(--app-text-muted, #888); font-size:11.5px;">⏱️ {{ track.duration }}</span>
+                                    <span>•</span>
+                                    {% endif %}
                                     <span style="font-family:monospace; font-size:11px; background:var(--app-surface-muted); padding:1px 5px; border-radius:4px; border:1px solid var(--app-border);">
                                         ID: {{ track.video_id }}
                                     </span>
@@ -501,6 +512,23 @@
                                         📋
                                     </button>
                                 </div>
+                            </td>
+                            <td style="text-align:center;" id="track-cache-cell-{{ track.id }}">
+                                {% if track.cache_status == 'ready' or track.is_cached %}
+                                <span class="track-cache-badge" style="background:rgba(16, 185, 129, 0.15); color:#059669; border:1px solid rgba(16, 185, 129, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Audio ter-cache 100% di server VPS. Siap diputar seketika tanpa jeda!">
+                                    <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981;"></span>
+                                    Siap Diputar
+                                </span>
+                                {% elif track.cache_status == 'downloading' %}
+                                <span class="track-cache-badge" style="background:rgba(245, 158, 11, 0.15); color:#d97706; border:1px solid rgba(245, 158, 11, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Sedang mengunduh audio ke disk cache server di latar belakang...">
+                                    <span style="display:inline-block; width:8px; height:8px; border:2px solid #d97706; border-top-color:transparent; border-radius:50%; animation:appSpin 1s linear infinite;"></span>
+                                    Mengunduh...
+                                </span>
+                                {% else %}
+                                <button type="button" onclick="cacheSingleTrack({{ track.id }}, '{{ track.title|escape }}')" class="app-button" style="padding:3px 8px; font-size:11px; font-weight:700; color:var(--app-muted); border-radius:999px;" title="Klik untuk unduh audio ke server sekarang">
+                                    ⚡ Unduh Cache
+                                </button>
+                                {% endif %}
                             </td>
                             <td style="text-align:center;">
                                 <span class="play-count-badge {% if not track.play_count or track.play_count == 0 %}is-zero{% endif %}" id="track-playcount-{{ track.id }}">
@@ -530,7 +558,7 @@
                         {% endfor %}
                     {% else %}
                         <tr id="emptyTableRow">
-                            <td colspan="6" style="text-align:center; padding:48px 16px; color:var(--app-muted);">
+                            <td colspan="7" style="text-align:center; padding:48px 16px; color:var(--app-muted);">
                                 <div style="font-size:36px; margin-bottom:12px;">🎵</div>
                                 <h3 style="font-size:16px; font-weight:800; color:var(--app-text); margin:0 0 6px;">Playlist Anda Masih Kosong</h3>
                                 <p style="font-size:13px; max-width:420px; margin:0 auto 16px;">
@@ -589,6 +617,9 @@
                             </button>
                         </div>
                         <p class="app-field-hint">Auto-deteksi cerdas: Cukup tempel link YouTube (video, Shorts) atau TikTok (vt.tiktok.com, vm.tiktok.com, video link). Sistem otomatis mengenali platformnya.</p>
+                        <div style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.25); border-radius:6px; padding:4px 10px; font-size:11.5px; color:#059669;">
+                            <span>⚡</span> <strong>Otomatis Pre-Cache:</strong> Lagu otomatis di-cache ke disk server (maksimal durasi 10 menit).
+                        </div>
                     </div>
 
                     <!-- Live Media Preview Box -->
@@ -1070,6 +1101,116 @@
             }
         });
     }
+
+    // ── Real-time Audio Disk Cache Monitoring & Triggers ──
+    let cachePollInterval = null;
+
+    function renderCacheBadge(status, trackId, title) {
+        if (status.is_cached || status.status === 'ready') {
+            return `<span class="track-cache-badge" style="background:rgba(16, 185, 129, 0.15); color:#059669; border:1px solid rgba(16, 185, 129, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Audio ter-cache 100% di server VPS. Siap diputar seketika tanpa jeda!">
+                <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981;"></span>
+                Siap Diputar
+            </span>`;
+        } else if (status.status === 'downloading') {
+            return `<span class="track-cache-badge" style="background:rgba(245, 158, 11, 0.15); color:#d97706; border:1px solid rgba(245, 158, 11, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Sedang mengunduh audio ke disk cache server di latar belakang...">
+                <span style="display:inline-block; width:8px; height:8px; border:2px solid #d97706; border-top-color:transparent; border-radius:50%; animation:appSpin 1s linear infinite;"></span>
+                Mengunduh...
+            </span>`;
+        } else {
+            const safeTitle = (title || '').replace(/'/g, "\\'");
+            return `<button type="button" onclick="cacheSingleTrack(${trackId}, '${safeTitle}')" class="app-button" style="padding:3px 8px; font-size:11px; font-weight:700; color:var(--app-muted); border-radius:999px;" title="Klik untuk unduh audio ke server sekarang">
+                ⚡ Unduh Cache
+            </button>`;
+        }
+    }
+
+    async function checkCacheStatus() {
+        try {
+            const resp = await fetch('/api/v1/playlist/cache-status');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data.success || !data.tracks) return;
+
+            let hasDownloading = false;
+            for (const [trackId, info] of Object.entries(data.tracks)) {
+                const cell = document.getElementById('track-cache-cell-' + trackId);
+                if (cell) {
+                    const titleEl = document.getElementById('track-title-' + trackId);
+                    const title = titleEl ? titleEl.textContent.trim() : '';
+                    cell.innerHTML = renderCacheBadge(info, trackId, title);
+                    if (info.status === 'downloading') {
+                        hasDownloading = true;
+                    }
+                }
+            }
+
+            if (!hasDownloading && cachePollInterval) {
+                clearInterval(cachePollInterval);
+                cachePollInterval = null;
+            }
+        } catch (_) {}
+    }
+
+    function startCachePolling() {
+        if (!cachePollInterval) {
+            cachePollInterval = setInterval(checkCacheStatus, 3000);
+        }
+        checkCacheStatus();
+    }
+
+    async function cacheSingleTrack(trackId, title) {
+        try {
+            if (window.App && App.toast) {
+                App.toast.info("Mengantrekan download cache untuk '" + title + "'...");
+            }
+            const cell = document.getElementById('track-cache-cell-' + trackId);
+            if (cell) {
+                cell.innerHTML = renderCacheBadge({ status: 'downloading', is_cached: false }, trackId, title);
+            }
+            const resp = await fetch('/api/v1/playlist/' + trackId + '/cache', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': csrfToken }
+            });
+            const data = await resp.json();
+            if (window.App && App.toast && data.message) {
+                App.toast.success(data.message);
+            }
+            startCachePolling();
+        } catch (err) {
+            if (window.App && App.toast) App.toast.error("Gagal memulai cache: " + err.message);
+        }
+    }
+
+    async function cacheAllTracks() {
+        try {
+            if (window.App && App.toast) {
+                App.toast.info("Memasukkan semua lagu yang belum di-cache ke antrean server...");
+            }
+            const resp = await fetch('/api/v1/playlist/cache-all', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': csrfToken }
+            });
+            const data = await resp.json();
+            if (window.App && App.toast && data.message) {
+                App.toast.success(data.message);
+            }
+            startCachePolling();
+        } catch (err) {
+            if (window.App && App.toast) App.toast.error("Gagal memulai cache semua: " + err.message);
+        }
+    }
+
+    // Auto-start polling if any track currently downloading
+    document.addEventListener('DOMContentLoaded', function() {
+        const downloadingBadges = document.querySelectorAll('#playlistTableBody [id^="track-cache-cell-"]');
+        let needsPolling = false;
+        downloadingBadges.forEach(cell => {
+            if (cell.textContent.includes('Mengunduh')) needsPolling = true;
+        });
+        if (needsPolling) {
+            startCachePolling();
+        }
+    });
 
     // Close modals on Escape key
     document.addEventListener('keydown', function(e) {

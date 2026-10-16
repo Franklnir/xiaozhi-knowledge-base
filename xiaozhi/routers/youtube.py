@@ -910,13 +910,25 @@ async def audio_stream_ogg_opus(
         except Exception as exc:
             logger.debug("Playlist cache check error: %s", exc)
 
+    safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
     cache_file = _get_playlist_cache_path(video_id, sample_rate, selected_br)
+    if is_playlist_track and not (cache_file.is_file() and cache_file.stat().st_size > 10240):
+        matches = list(AUDIO_CACHE_DIR.glob(f"{safe_vid}_*.opus")) if AUDIO_CACHE_DIR.exists() else []
+        valid = [f for f in matches if f.is_file() and f.stat().st_size > 10240]
+        if valid:
+            cache_file = valid[0]
+            m_sr = re.search(r"_(\d+)_\w+\.opus$", cache_file.name)
+            if m_sr:
+                try:
+                    sample_rate = int(m_sr.group(1))
+                except Exception:
+                    pass
 
     # Fast Path: Jika lagu ada di cache playlist dan diputar dari awal (start == 0)
     # Langsung stream dari disk (0% CPU, no yt-dlp, no FFmpeg)!
     if is_playlist_track and start == 0.0 and cache_file.is_file() and cache_file.stat().st_size > 10240:
         logger.info(
-            f"Serving CACHED playlist audio for {video_id} (size={cache_file.stat().st_size}B, br={selected_br}, sr={sample_rate}Hz)"
+            f"Serving CACHED playlist audio for {video_id} (size={cache_file.stat().st_size}B, file={cache_file.name}, sr={sample_rate}Hz)"
         )
         return StreamingResponse(
             _stream_cached_opus_audio(

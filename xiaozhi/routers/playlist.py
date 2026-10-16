@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -10,6 +11,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id
 from xiaozhi.dependencies import get_current_user, get_store, render, require_user
+from xiaozhi.services.audio_cache_worker import (
+    check_media_duration_limit,
+    enqueue_precache,
+    get_all_queue_status,
+    get_track_cache_status,
+)
 
 logger = logging.getLogger("xiaozhi.playlist")
 router = APIRouter()
@@ -61,6 +68,13 @@ async def playlist_page(request: Request):
     top_tracks = store.get_top_played_playlist(user["id"], limit=5)
     total_plays = sum(int(t.get("play_count", 0)) for t in tracks)
 
+    # Annotate tracks with audio cache status
+    for t in tracks:
+        c_info = get_track_cache_status(t.get("video_id", ""))
+        t["cache_status"] = c_info.get("status", "uncached")
+        t["is_cached"] = c_info.get("is_cached", False)
+        t["cache_size"] = c_info.get("size_bytes", 0)
+
     plus_cfg = store.get_user_access_plus(user["id"]) if hasattr(store, "get_user_access_plus") else {}
     quota_enabled = plus_cfg.get("playlist_quota_enabled", False)
     max_tracks = plus_cfg.get("max_playlist_tracks", 15)
@@ -106,6 +120,12 @@ async def api_get_playlist(
         raise HTTPException(status_code=401, detail="Login diperlukan atau perangkat tidak terdaftar.")
 
     tracks = store.get_user_playlist(owner_id)
+    for t in tracks:
+        c_info = get_track_cache_status(t.get("video_id", ""))
+        t["cache_status"] = c_info.get("status", "uncached")
+        t["is_cached"] = c_info.get("is_cached", False)
+        t["cache_size"] = c_info.get("size_bytes", 0)
+
     top_tracks = store.get_top_played_playlist(owner_id, limit=5) if hasattr(store, "get_top_played_playlist") else []
     plus_cfg = store.get_user_access_plus(owner_id) if hasattr(store, "get_user_access_plus") else {}
     quota_enabled = plus_cfg.get("playlist_quota_enabled", False)
@@ -162,7 +182,20 @@ async def api_add_playlist_track(request: Request):
     video_id = media_info["video_id"]
     full_url = media_info["canonical_url"]
 
-    # Auto-fetch title/artist if left blank
+    # Auto-fetch title/artist and validate media duration limit (max 10 minutes = 600s)
+    dur_info = check_media_duration_limit(full_url, max_seconds=600, platform=platform)
+    if not dur_info.get("valid", True):
+        raise HTTPException(
+            status_code=400,
+            detail=dur_info.get("error") or "Durasi lagu melebihi batas maksimal 10 menit.",
+        )
+
+    if not title and dur_info.get("title"):
+        title = dur_info["title"]
+    if not artist and dur_info.get("artist"):
+        artist = dur_info["artist"]
+    track_duration = dur_info.get("formatted_duration") or ""
+
     if platform == "youtube":
         if not title:
             fetched_title = _fetch_youtube_title_oembed(full_url)
@@ -182,10 +215,22 @@ async def api_add_playlist_track(request: Request):
             youtube_url=full_url,
             video_id=video_id,
             artist=artist,
+            duration=track_duration,
         )
+
+        # Trigger asynchronous background pre-caching
+        try:
+            asyncio.create_task(enqueue_precache(video_id, full_url))
+        except Exception as q_exc:
+            logger.warning("Failed triggering background precache: %s", q_exc)
+
+        c_info = get_track_cache_status(video_id)
+        track["cache_status"] = c_info.get("status", "downloading")
+        track["is_cached"] = c_info.get("is_cached", False)
+
         return {
             "success": True,
-            "message": f"Lagu '{title}' ({platform.capitalize()}) berhasil ditambahkan ke Playlist (Nomor #{track.get('track_number')}).",
+            "message": f"Lagu '{title}' ({platform.capitalize()}) berhasil ditambahkan ke Playlist (Nomor #{track.get('track_number')}). Audio otomatis di-cache ke disk server.",
             "track": track,
             "platform": platform,
         }
@@ -211,6 +256,7 @@ async def api_update_playlist_track(track_id: int, request: Request):
     title = body.get("title")
     artist = body.get("artist")
     video_id = None
+    duration_str = None
 
     if raw_url is not None:
         raw_url = str(raw_url).strip()
@@ -223,6 +269,23 @@ async def api_update_playlist_track(track_id: int, request: Request):
         video_id = media_info["video_id"]
         raw_url = media_info["canonical_url"]
 
+        dur_info = check_media_duration_limit(raw_url, max_seconds=600, platform=media_info["platform"])
+        if not dur_info.get("valid", True):
+            raise HTTPException(
+                status_code=400,
+                detail=dur_info.get("error") or "Durasi lagu melebihi batas maksimal 10 menit.",
+            )
+        duration_str = dur_info.get("formatted_duration") or None
+        if not title and dur_info.get("title"):
+            title = dur_info["title"]
+        if not artist and dur_info.get("artist"):
+            artist = dur_info["artist"]
+
+        try:
+            asyncio.create_task(enqueue_precache(video_id, raw_url))
+        except Exception:
+            pass
+
     updated = store.update_playlist_track(
         owner_id=user["id"],
         track_id=track_id,
@@ -230,7 +293,13 @@ async def api_update_playlist_track(track_id: int, request: Request):
         youtube_url=raw_url,
         video_id=video_id,
         artist=str(artist).strip() if artist is not None else None,
+        duration=duration_str,
     )
+    if updated and updated.get("video_id"):
+        c_info = get_track_cache_status(updated["video_id"])
+        updated["cache_status"] = c_info.get("status", "uncached")
+        updated["is_cached"] = c_info.get("is_cached", False)
+
     return {
         "success": True,
         "message": "Data lagu playlist berhasil diperbarui.",
@@ -300,3 +369,83 @@ async def api_play_playlist_track(track_id: int, request: Request):
         "video_id": vid,
         "track": updated_track,
     }
+
+
+@router.get("/api/v1/playlist/cache-status")
+async def api_playlist_cache_status(request: Request):
+    """Returns real-time audio disk cache status for all user playlist tracks."""
+    user = require_user(request)
+    store = get_store()
+    tracks = store.get_user_playlist(user["id"])
+    statuses = {}
+    for t in tracks:
+        vid = t.get("video_id", "")
+        if vid:
+            statuses[str(t["id"])] = {
+                "video_id": vid,
+                **get_track_cache_status(vid),
+            }
+    return {
+        "success": True,
+        "tracks": statuses,
+        "queue": get_all_queue_status(),
+    }
+
+
+@router.post("/api/v1/playlist/{track_id}/cache")
+async def api_cache_single_track(track_id: int, request: Request):
+    """Enqueues an individual playlist track for server disk pre-caching."""
+    user = require_user(request)
+    store = get_store()
+    track = store.get_playlist_track(user["id"], track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Lagu tidak ditemukan di playlist Anda.")
+    vid = track.get("video_id", "")
+    url = track.get("youtube_url", "")
+    if not vid or not url:
+        raise HTTPException(status_code=400, detail="Data lagu tidak valid.")
+
+    status_before = get_track_cache_status(vid)
+    if status_before["is_cached"]:
+        return {
+            "success": True,
+            "queued": False,
+            "status": status_before,
+            "message": f"Lagu '{track.get('title')}' sudah 100% tersimpan di disk cache server.",
+        }
+
+    queued = await enqueue_precache(vid, url)
+    status_after = get_track_cache_status(vid)
+    return {
+        "success": True,
+        "queued": queued,
+        "status": status_after,
+        "message": f"Pengunduhan cache untuk '{track.get('title')}' telah ditambahkan ke antrean latar belakang server.",
+    }
+
+
+@router.post("/api/v1/playlist/cache-all")
+async def api_cache_all_tracks(request: Request):
+    """Enqueues all uncached playlist tracks for background server disk caching."""
+    user = require_user(request)
+    store = get_store()
+    tracks = store.get_user_playlist(user["id"])
+    queued_count = 0
+    for t in tracks:
+        vid = t.get("video_id", "")
+        url = t.get("youtube_url", "")
+        if vid and url:
+            st = get_track_cache_status(vid)
+            if not st["is_cached"]:
+                if await enqueue_precache(vid, url):
+                    queued_count += 1
+    return {
+        "success": True,
+        "queued_count": queued_count,
+        "message": (
+            f"{queued_count} lagu berhasil ditambahkan ke antrean download cache server."
+            if queued_count > 0
+            else "Semua lagu di playlist Anda sudah ter-cache 100% di server!"
+        ),
+    }
+

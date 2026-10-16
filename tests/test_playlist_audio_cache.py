@@ -222,3 +222,128 @@ def test_audio_play_direct_playlist_track_without_duration(tmp_path):
 
     asyncio.run(_run())
 
+
+def test_check_media_duration_limit():
+    import yt_dlp
+    from xiaozhi.services.audio_cache_worker import check_media_duration_limit
+
+    # 1. Video > 10 minutes (e.g. 3 hours / 10838 seconds)
+    fake_info_long = {
+        "title": "Sleep Music 3 Hours",
+        "duration": 10838,
+        "is_live": False,
+        "uploader": "Relax Piano",
+    }
+    with patch.object(yt_dlp.YoutubeDL, "extract_info", return_value=fake_info_long):
+        res = check_media_duration_limit("https://www.youtube.com/watch?v=loO-KqvSZ6U", max_seconds=600)
+        assert res["valid"] is False
+        assert "melebihi batas maksimal 10 menit" in res["error"]
+        assert res["duration_sec"] == 10838
+
+    # 2. Video <= 10 minutes (e.g. 4 minutes / 240 seconds)
+    fake_info_ok = {
+        "title": "Normal Song",
+        "duration": 240,
+        "is_live": False,
+        "uploader": "Artist Band",
+    }
+    with patch.object(yt_dlp.YoutubeDL, "extract_info", return_value=fake_info_ok):
+        res = check_media_duration_limit("https://www.youtube.com/watch?v=normal123", max_seconds=600)
+        assert res["valid"] is True
+        assert res["error"] is None
+        assert res["duration_sec"] == 240
+        assert res["formatted_duration"] == "04:00"
+
+    # 3. Live stream video
+    fake_info_live = {
+        "title": "24/7 Live Lofi Radio",
+        "duration": None,
+        "is_live": True,
+        "uploader": "Lofi Girl",
+    }
+    with patch.object(yt_dlp.YoutubeDL, "extract_info", return_value=fake_info_live):
+        res = check_media_duration_limit("https://www.youtube.com/watch?v=live123", max_seconds=600)
+        assert res["valid"] is False
+        assert "live stream" in res["error"]
+
+
+def test_get_track_cache_status_states(tmp_path):
+    from xiaozhi.services import audio_cache_worker
+    from xiaozhi.services.audio_cache_worker import get_track_cache_status
+
+    vid = "TEST_STATUS_VID"
+    # Uncached state
+    with patch.object(audio_cache_worker, "AUDIO_CACHE_DIR", tmp_path):
+        st = get_track_cache_status(vid)
+        assert st["status"] == "uncached"
+        assert st["is_cached"] is False
+
+        # Downloading state (in queue or active)
+        audio_cache_worker._queue_set.add(vid)
+        try:
+            st2 = get_track_cache_status(vid)
+            assert st2["status"] == "downloading"
+            assert st2["is_cached"] is False
+        finally:
+            audio_cache_worker._queue_set.discard(vid)
+
+        # Ready state (cached file exists)
+        cache_file = tmp_path / f"{vid}_16000_16k.opus"
+        cache_file.write_bytes(b"OggS" + (b"0" * 15000))
+
+        st3 = get_track_cache_status(vid)
+        assert st3["status"] == "ready"
+        assert st3["is_cached"] is True
+        assert st3["size_bytes"] > 10240
+
+
+def test_audio_stream_fallback_to_other_cached_bitrate(tmp_path):
+    """If exact sr/br is not cached, but another sample rate exists for the playlist track, it hits disk cache."""
+    async def _run():
+        db_file = tmp_path / "test_fallback.db"
+        store = SQLiteStore(str(db_file))
+        user = store.create_user("cache_fallback_user", "password123")
+        uid = user["id"]
+
+        vid = "FALLBACK_VID_999"
+        store.add_playlist_track(
+            uid,
+            title="Pre-cached Song",
+            artist="Artist",
+            youtube_url=f"https://www.youtube.com/watch?v={vid}",
+            video_id=vid,
+        )
+
+        # Suppose background worker pre-cached at 16000_16k
+        cached_file = AUDIO_CACHE_DIR / f"{vid}_16000_16k.opus"
+        cached_file.parent.mkdir(parents=True, exist_ok=True)
+        cached_file.write_bytes(b"OggS" + (b"\x99" * 18000))
+
+        try:
+            scope = {
+                "type": "http",
+                "method": "GET",
+                "path": f"/api/audio/stream/{vid}",
+                "headers": [(b"host", b"testserver")],
+                "query_string": b"",
+            }
+            req = Request(scope)
+
+            with patch("xiaozhi.routers.youtube.get_store", return_value=store):
+                # Request with 24000Hz (e.g. ESP32-S3 default), but file exists at 16000Hz
+                resp = await audio_stream_ogg_opus(
+                    video_id=vid,
+                    request=req,
+                    br="24k",
+                    chip="esp32s3",
+                    start=0.0,
+                    owner_id=uid,
+                )
+                assert resp.headers.get("X-Audio-Cache") == "HIT"
+        finally:
+            if cached_file.exists():
+                cached_file.unlink()
+
+    asyncio.run(_run())
+
+

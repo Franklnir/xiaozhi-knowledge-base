@@ -43,6 +43,31 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def format_duration(sec_or_str: Any) -> str:
+    """Format seconds into HH:MM:SS or MM:SS string."""
+    if not sec_or_str:
+        return ""
+    if isinstance(sec_or_str, str):
+        sec_or_str = sec_or_str.strip()
+        if ":" in sec_or_str:
+            return sec_or_str
+        try:
+            sec_or_str = int(float(sec_or_str))
+        except Exception:
+            return ""
+    if isinstance(sec_or_str, (int, float)):
+        s = int(sec_or_str)
+        m = s // 60
+        sec = s % 60
+        if m >= 60:
+            h = m // 60
+            m = m % 60
+            return f"{h}:{m:02d}:{sec:02d}"
+        return f"{m:02d}:{sec:02d}"
+    return ""
+
+
+
 def seconds_since_iso(value: str) -> Optional[float]:
     if not value:
         return None
