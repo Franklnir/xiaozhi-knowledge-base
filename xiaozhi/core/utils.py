@@ -67,6 +67,30 @@ def format_duration(sec_or_str: Any) -> str:
     return ""
 
 
+def parse_duration_to_seconds(dur_str_or_num: Any) -> Optional[int]:
+    """Parse duration string (e.g. '03:45', '120:01', '3:00:38') or number to integer seconds."""
+    if dur_str_or_num is None or dur_str_or_num == "":
+        return None
+    if isinstance(dur_str_or_num, (int, float)):
+        return int(dur_str_or_num)
+    s = str(dur_str_or_num).strip()
+    if not s:
+        return None
+    if ":" in s:
+        parts = s.split(":")
+        try:
+            if len(parts) == 2:
+                return int(parts[0]) * 60 + int(parts[1])
+            elif len(parts) == 3:
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        except Exception:
+            return None
+    try:
+        return int(float(s))
+    except Exception:
+        return None
+
+
 
 def seconds_since_iso(value: str) -> Optional[float]:
     if not value:

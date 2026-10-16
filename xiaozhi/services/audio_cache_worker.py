@@ -30,11 +30,11 @@ _cache_semaphore = asyncio.Semaphore(1)
 
 def check_media_duration_limit(
     media_url: str,
-    max_seconds: int = 600,
+    max_seconds: int = 4200,
     platform: str = "youtube",
 ) -> Dict[str, Any]:
     """
-    Validates that a YouTube or TikTok audio does not exceed max_seconds (default 10 minutes / 600s).
+    Validates that a YouTube or TikTok audio does not exceed max_seconds (default 1 hour 10 minutes / 4200s).
     Also checks if the media is a live stream.
     Returns:
         {
@@ -115,17 +115,28 @@ def check_media_duration_limit(
             artist = info.get("uploader") or info.get("creator") or info.get("channel") or ""
 
             if duration_sec is not None and duration_sec > max_seconds:
-                m = duration_sec // 60
+                h = duration_sec // 3600
+                m = (duration_sec % 3600) // 60
                 s = duration_sec % 60
-                dur_text = f"{m} menit {s} detik" if m > 0 else f"{s} detik"
-                max_m = max_seconds // 60
+                if h > 0:
+                    dur_text = f"{h} jam {m} menit" if m > 0 else f"{h} jam"
+                else:
+                    dur_text = f"{m} menit {s} detik" if m > 0 else f"{s} detik"
+
+                max_h = max_seconds // 3600
+                max_rem_m = (max_seconds % 3600) // 60
+                max_text = (
+                    f"{max_h} jam {max_rem_m} menit"
+                    if (max_h > 0 and max_rem_m > 0)
+                    else (f"{max_h} jam" if max_h > 0 else f"{max_seconds // 60} menit")
+                )
                 return {
                     "valid": False,
                     "duration_sec": duration_sec,
                     "formatted_duration": fmt_dur,
                     "title": title,
                     "artist": artist,
-                    "error": f"Durasi audio ({dur_text}) melebihi batas maksimal {max_m} menit. Video di atas {max_m} menit tidak dapat disimpan ke playlist.",
+                    "error": f"Durasi audio ({dur_text}) melebihi batas maksimal {max_text}. Video di atas {max_text} tidak dapat disimpan ke playlist.",
                 }
 
             return {

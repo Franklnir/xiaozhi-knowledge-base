@@ -227,7 +227,7 @@ def test_check_media_duration_limit():
     import yt_dlp
     from xiaozhi.services.audio_cache_worker import check_media_duration_limit
 
-    # 1. Video > 10 minutes (e.g. 3 hours / 10838 seconds)
+    # 1. Video > 1 hour 10 minutes (e.g. 3 hours / 10838 seconds)
     fake_info_long = {
         "title": "Sleep Music 3 Hours",
         "duration": 10838,
@@ -235,12 +235,26 @@ def test_check_media_duration_limit():
         "uploader": "Relax Piano",
     }
     with patch.object(yt_dlp.YoutubeDL, "extract_info", return_value=fake_info_long):
-        res = check_media_duration_limit("https://www.youtube.com/watch?v=loO-KqvSZ6U", max_seconds=600)
+        res = check_media_duration_limit("https://www.youtube.com/watch?v=loO-KqvSZ6U", max_seconds=4200)
         assert res["valid"] is False
-        assert "melebihi batas maksimal 10 menit" in res["error"]
+        assert "melebihi batas maksimal 1 jam 10 menit" in res["error"]
         assert res["duration_sec"] == 10838
 
-    # 2. Video <= 10 minutes (e.g. 4 minutes / 240 seconds)
+    # 2. 1-Hour Version Video (e.g. 55 minutes / 3300 seconds)
+    fake_info_hour = {
+        "title": "Relaxing Piano 1 Hour",
+        "duration": 3300,
+        "is_live": False,
+        "uploader": "Relax Piano",
+    }
+    with patch.object(yt_dlp.YoutubeDL, "extract_info", return_value=fake_info_hour):
+        res = check_media_duration_limit("https://www.youtube.com/watch?v=piano1hour", max_seconds=4200)
+        assert res["valid"] is True
+        assert res["error"] is None
+        assert res["duration_sec"] == 3300
+        assert res["formatted_duration"] == "55:00"
+
+    # 3. Video <= 10 minutes (e.g. 4 minutes / 240 seconds)
     fake_info_ok = {
         "title": "Normal Song",
         "duration": 240,
@@ -248,13 +262,13 @@ def test_check_media_duration_limit():
         "uploader": "Artist Band",
     }
     with patch.object(yt_dlp.YoutubeDL, "extract_info", return_value=fake_info_ok):
-        res = check_media_duration_limit("https://www.youtube.com/watch?v=normal123", max_seconds=600)
+        res = check_media_duration_limit("https://www.youtube.com/watch?v=normal123", max_seconds=4200)
         assert res["valid"] is True
         assert res["error"] is None
         assert res["duration_sec"] == 240
         assert res["formatted_duration"] == "04:00"
 
-    # 3. Live stream video
+    # 4. Live stream video
     fake_info_live = {
         "title": "24/7 Live Lofi Radio",
         "duration": None,
@@ -262,7 +276,7 @@ def test_check_media_duration_limit():
         "uploader": "Lofi Girl",
     }
     with patch.object(yt_dlp.YoutubeDL, "extract_info", return_value=fake_info_live):
-        res = check_media_duration_limit("https://www.youtube.com/watch?v=live123", max_seconds=600)
+        res = check_media_duration_limit("https://www.youtube.com/watch?v=live123", max_seconds=4200)
         assert res["valid"] is False
         assert "live stream" in res["error"]
 
@@ -345,5 +359,90 @@ def test_audio_stream_fallback_to_other_cached_bitrate(tmp_path):
                 cached_file.unlink()
 
     asyncio.run(_run())
+
+
+def test_add_playlist_track_1_hour_policy(tmp_path):
+    async def _run():
+        from fastapi import HTTPException
+        from xiaozhi.routers.playlist import api_add_playlist_track
+
+        db_file = tmp_path / "test_1hour.db"
+        store = SQLiteStore(str(db_file))
+        user = store.create_user("user_policy", "password123")
+        uid = user["id"]
+
+        # 1. Add first 55-minute track (Allowed as the 1 long track)
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/playlist",
+            "headers": [(b"host", b"testserver")],
+        }
+        req1 = Request(scope)
+        req1._json = {
+            "youtube_url": "https://www.youtube.com/watch?v=long1111111",
+            "title": "Long Track 1",
+            "artist": "Artist",
+        }
+
+        fake_dur_55m = {
+            "valid": True,
+            "duration_sec": 3300,
+            "formatted_duration": "55:00",
+            "title": "Long Track 1",
+            "artist": "Artist",
+        }
+        with patch("xiaozhi.routers.playlist.require_user", return_value=user), \
+             patch("xiaozhi.routers.playlist.get_store", return_value=store), \
+             patch("xiaozhi.routers.playlist.check_media_duration_limit", return_value=fake_dur_55m):
+            res1 = await api_add_playlist_track(req1)
+            assert res1["success"] is True
+            assert res1["track"]["duration"] == "55:00"
+
+        # 2. Add second 45-minute track (Must be REJECTED with 400 because 1 long track already exists)
+        req2 = Request(scope)
+        req2._json = {
+            "youtube_url": "https://www.youtube.com/watch?v=long2222222",
+            "title": "Long Track 2",
+            "artist": "Artist",
+        }
+        fake_dur_45m = {
+            "valid": True,
+            "duration_sec": 2700,
+            "formatted_duration": "45:00",
+            "title": "Long Track 2",
+            "artist": "Artist",
+        }
+        with patch("xiaozhi.routers.playlist.require_user", return_value=user), \
+             patch("xiaozhi.routers.playlist.get_store", return_value=store), \
+             patch("xiaozhi.routers.playlist.check_media_duration_limit", return_value=fake_dur_45m):
+            with pytest.raises(HTTPException) as exc_info:
+                await api_add_playlist_track(req2)
+            assert exc_info.value.status_code == 400
+            assert "sudah memiliki 1 lagu berdurasi panjang versi 1 jam" in exc_info.value.detail
+
+        # 3. Add 4-minute track (Must be ALLOWED)
+        req3 = Request(scope)
+        req3._json = {
+            "youtube_url": "https://www.youtube.com/watch?v=short333333",
+            "title": "Short Track",
+            "artist": "Artist",
+        }
+        fake_dur_4m = {
+            "valid": True,
+            "duration_sec": 240,
+            "formatted_duration": "04:00",
+            "title": "Short Track",
+            "artist": "Artist",
+        }
+        with patch("xiaozhi.routers.playlist.require_user", return_value=user), \
+             patch("xiaozhi.routers.playlist.get_store", return_value=store), \
+             patch("xiaozhi.routers.playlist.check_media_duration_limit", return_value=fake_dur_4m):
+            res3 = await api_add_playlist_track(req3)
+            assert res3["success"] is True
+            assert res3["track"]["duration"] == "04:00"
+
+    asyncio.run(_run())
+
 
 

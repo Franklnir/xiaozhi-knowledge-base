@@ -9,7 +9,11 @@ from urllib.request import Request as UrlRequest, urlopen
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from xiaozhi.core.utils import detect_media_url_source, extract_youtube_video_id
+from xiaozhi.core.utils import (
+    detect_media_url_source,
+    extract_youtube_video_id,
+    parse_duration_to_seconds,
+)
 from xiaozhi.dependencies import get_current_user, get_store, render, require_user
 from xiaozhi.services.audio_cache_worker import (
     check_media_duration_limit,
@@ -182,13 +186,35 @@ async def api_add_playlist_track(request: Request):
     video_id = media_info["video_id"]
     full_url = media_info["canonical_url"]
 
-    # Auto-fetch title/artist and validate media duration limit (max 10 minutes = 600s)
-    dur_info = check_media_duration_limit(full_url, max_seconds=600, platform=platform)
+    # ── Duration Limit Check (Max 1 hour 10 min = 4200s absolute, max 10 min if user already has 1-hour version) ──
+    dur_info = check_media_duration_limit(full_url, max_seconds=4200, platform=platform)
     if not dur_info.get("valid", True):
         raise HTTPException(
             status_code=400,
-            detail=dur_info.get("error") or "Durasi lagu melebihi batas maksimal 10 menit.",
+            detail=dur_info.get("error") or "Durasi lagu melebihi batas maksimal 1 jam 10 menit.",
         )
+
+    cand_sec = dur_info.get("duration_sec")
+    if cand_sec is not None and cand_sec > 600:
+        # Check if user already has a 1-hour version track (> 10 minutes) in playlist
+        user_tracks = store.get_user_playlist(user["id"])
+        existing_long_track = None
+        for t in user_tracks:
+            t_sec = parse_duration_to_seconds(t.get("duration"))
+            if t_sec and t_sec > 600:
+                existing_long_track = t
+                break
+
+        if existing_long_track:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Akun Anda sudah memiliki 1 lagu berdurasi panjang versi 1 jam "
+                    f"('#{existing_long_track.get('track_number')} {existing_long_track.get('title')}' - {existing_long_track.get('duration')}). "
+                    f"Tiap akun dibatasi maksimal 1 lagu versi 1 jam (maksimal 1 jam 10 menit). "
+                    f"Lagu berikutnya maksimal berdurasi 10 menit."
+                ),
+            )
 
     if not title and dur_info.get("title"):
         title = dur_info["title"]
@@ -269,12 +295,36 @@ async def api_update_playlist_track(track_id: int, request: Request):
         video_id = media_info["video_id"]
         raw_url = media_info["canonical_url"]
 
-        dur_info = check_media_duration_limit(raw_url, max_seconds=600, platform=media_info["platform"])
+        dur_info = check_media_duration_limit(raw_url, max_seconds=4200, platform=media_info["platform"])
         if not dur_info.get("valid", True):
             raise HTTPException(
                 status_code=400,
-                detail=dur_info.get("error") or "Durasi lagu melebihi batas maksimal 10 menit.",
+                detail=dur_info.get("error") or "Durasi lagu melebihi batas maksimal 1 jam 10 menit.",
             )
+
+        cand_sec = dur_info.get("duration_sec")
+        if cand_sec is not None and cand_sec > 600:
+            user_tracks = store.get_user_playlist(user["id"])
+            existing_long_track = None
+            for t in user_tracks:
+                if t.get("id") == track_id:
+                    continue
+                t_sec = parse_duration_to_seconds(t.get("duration"))
+                if t_sec and t_sec > 600:
+                    existing_long_track = t
+                    break
+
+            if existing_long_track:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Akun Anda sudah memiliki 1 lagu berdurasi panjang versi 1 jam "
+                        f"('#{existing_long_track.get('track_number')} {existing_long_track.get('title')}' - {existing_long_track.get('duration')}). "
+                        f"Tiap akun dibatasi maksimal 1 lagu versi 1 jam (maksimal 1 jam 10 menit). "
+                        f"Lagu berikutnya maksimal berdurasi 10 menit."
+                    ),
+                )
+
         duration_str = dur_info.get("formatted_duration") or None
         if not title and dur_info.get("title"):
             title = dur_info["title"]
