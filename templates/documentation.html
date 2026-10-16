@@ -303,7 +303,7 @@
     <!-- Tabs -->
     <div class="doc-tabs">
         <button class="doc-tab active" onclick="switchTab('mcp')">MCP Setup</button>
-        <button class="doc-tab" style="display:none;" onclick="switchTab('youtube')">YouTube Music</button>
+        <button class="doc-tab" onclick="switchTab('youtube')">🎵 Musik &amp; Playlist</button>
         <button class="doc-tab" onclick="switchTab('smarthome')">Smart Home</button>
         <button class="doc-tab" onclick="switchTab('tools')">Tools MCP</button>
         <button class="doc-tab" onclick="switchTab('knowledge')">Knowledge Base</button>
@@ -411,12 +411,227 @@
         </div>
     </div>
 
-    <!-- YouTube Music Tab -->
+    <!-- YouTube Music & Playlist Tab -->
     <div id="tab-youtube" class="doc-tab-content">
         <div class="app-card">
+            <!-- ================= USER GUIDE: PLAYLIST & AUDIO CACHE ================= -->
+            <div class="doc-section" style="border-bottom: 2px dashed var(--app-border); padding-bottom: 28px; margin-bottom: 28px;">
+                <div style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(245, 158, 11, 0.08)); border: 1px solid var(--app-border); border-radius: 14px; padding: 20px; margin-bottom: 24px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                        <span style="font-size:26px;">🎧</span>
+                        <h2 style="font-size:18px; font-weight:800; color:var(--app-text); margin:0;">Panduan Lengkap: Playlist Musik &amp; Audio Cache Cerdas</h2>
+                    </div>
+                    <p style="font-size:13.5px; color:var(--app-muted); line-height:1.6; margin:0 0 14px;">
+                        Pelajari cara mengelola lagu favorit Anda di Web Dashboard, memanfaatkan sistem <strong>Audio Disk Cache</strong> agar lagu diputar super cepat tanpa buffering/tersendat, serta daftar perintah suara terlengkap untuk speaker XiaoZhi ESP32.
+                    </p>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px;">
+                        <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:10px; padding:12px 14px;">
+                            <div style="font-weight:750; font-size:13px; color:#10b981; display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                                <span>⚡</span> Playlist Musik (Cache Disk VPS)
+                            </div>
+                            <p style="font-size:12px; color:var(--app-muted); line-height:1.5; margin:0;">
+                                Lagu tersimpan di disk server VPS. Diputar <strong>instan (&lt; 0,2 detik)</strong>, stabil anti putus-putus, hemat kuota bandwidth, dan bebas beban CPU server.
+                            </p>
+                        </div>
+                        <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:10px; padding:12px 14px;">
+                            <div style="font-weight:750; font-size:13px; color:#3b82f6; display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                                <span>🌐</span> Putar Bebas YouTube (Live Streaming)
+                            </div>
+                            <p style="font-size:12px; color:var(--app-muted); line-height:1.5; margin:0;">
+                                Anda tetap <strong>bisa memutar lagu apa saja di YouTube</strong> di luar playlist. Audio di-stream secara realtime dari internet langsung ke speaker ESP32.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Langkah 1: Menambah Lagu ke Playlist -->
+                <div class="doc-step">
+                    <div class="doc-step-number" style="background:#ef4444;">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Cara Menambahkan Lagu ke Playlist (Web Dashboard)</div>
+                        <div class="doc-step-desc">
+                            Tambahkan lagu favorit Anda langsung dari antarmuka web:
+                            <ol style="margin: 8px 0 8px 18px; line-height: 1.6;">
+                                <li>Buka menu <strong>Playlist</strong> pada sidebar dashboard.</li>
+                                <li>Klik tombol merah <strong>➕ Tambah Lagu</strong> di kanan atas tabel.</li>
+                                <li>Tempel link video musik dari <strong>YouTube</strong> (contoh: <code>https://www.youtube.com/watch?v=...</code> atau <code>https://youtu.be/...</code>) atau link <strong>TikTok</strong> (contoh: <code>https://vt.tiktok.com/...</code>).</li>
+                                <li>Sistem otomatis mendeteksi <strong>Judul Lagu, Artis/Uploader, dan Durasi</strong> dalam hitungan milidetik.</li>
+                                <li>Klik <strong>Simpan Lagu</strong>. Lagu langsung tersimpan ke playlist dan otomatis masuk ke antrean unduhan audio cache di server.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Langkah 2: Ketentuan Kuota & Batas Durasi -->
+                <div class="doc-step">
+                    <div class="doc-step-number" style="background:#f59e0b;">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Ketentuan Durasi &amp; Kuota Playlist</div>
+                        <div class="doc-step-desc">
+                            Untuk menjaga kapasitas penyimpanan VPS tetap optimal dan mencegah server penuh oleh video raksasa:
+                            <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
+                                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border); font-size:12.5px;">
+                                    <strong>⚡ 1 Lagu Versi Panjang (Maks. 1 Jam 10 Menit / 4.200 Detik):</strong><br>
+                                    Setiap pengguna diizinkan menyimpan <strong>1 lagu berdurasi panjang</strong> hingga maksimal 1 jam 10 menit (sangat cocok untuk kompilasi lagu santai, podcast, murottal Al-Qur'an, atau musik fokus belajar).
+                                </div>
+                                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border); font-size:12.5px;">
+                                    <strong>⏱️ Lagu Lainnya (Maksimal 10 Menit):</strong><br>
+                                    Setelah kuota 1 lagu panjang digunakan, lagu-lagu berikutnya dibatasi maksimal 10 menit per video.
+                                </div>
+                                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border); font-size:12.5px;">
+                                    <strong>🚫 Live Stream Otomatis Ditolak:</strong><br>
+                                    Video siaran langsung (live stream) yang tidak memiliki durasi pasti tidak dapat disimpan ke playlist.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Langkah 3: Sistem Audio Cache Server -->
+                <div class="doc-step">
+                    <div class="doc-step-number" style="background:#10b981;">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Sistem Audio Cache Server (Anti Putus-putus)</div>
+                        <div class="doc-step-desc">
+                            Mikrokontroler ESP32-S3 memiliki RAM terbatas. Jika melakukan streaming langsung dari internet, koneksi rentan mengalami jeda (*buffering*) atau suara tersendat.<br>
+                            Dengan <strong>Audio Cache Server</strong>, server VPS Anda secara otomatis menyalin dan men-transcode audio menjadi file <code>.opus 24kHz</code> lokal:
+                            <ul style="margin:8px 0 8px 18px; line-height: 1.6;">
+                                <li><strong style="color:#10b981;">⚡ 100% Siap Diputar:</strong> Audio sudah ada di harddisk VPS. Pemutaran ke speaker langsung bunyi instan tanpa proses handshake SSL YouTube yang berat.</li>
+                                <li><strong style="color:#f59e0b;">⏳ Mengunduh (X%):</strong> Server sedang mengunduh dan men-transcode file di background. Anda dapat melihat persentase unduhan secara realtime di tabel playlist.</li>
+                                <li><strong style="color:#6b7280;">⚠️ Belum Di-cache:</strong> File belum tersimpan di disk server. Saat lagu ini diputar, sistem akan melakukan streaming online langsung.</li>
+                            </ul>
+                            <div class="doc-tip" style="margin-top:8px;">
+                                <strong>💡 Tombol "Unduh Semua Cache":</strong> Pada halaman playlist web, Anda cukup mengklik tombol <em>"⚡ Unduh Semua Cache"</em> untuk menyuruh server mengunduh dan menyiapkan seluruh lagu playlist secara otomatis satu per satu di background.
+                            </div>
+                            <div class="doc-warning" style="margin-top:8px;">
+                                <strong>🗑️ Pembersihan Otomatis:</strong> Saat Anda menghapus lagu dari playlist, file audio cache di harddisk VPS akan otomatis ikut terhapus bersih secara sinkron sehingga harddisk server Anda tidak membengkak.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Langkah 4: Panduan Perintah Suara (Voice Commands) -->
+                <div class="doc-step">
+                    <div class="doc-step-number" style="background:#6366f1;">4</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Panduan Perintah Suara ke Xiaozhi (Voice Commands)</div>
+                        <div class="doc-step-desc">
+                            Kendalikan seluruh pemutaran musik langsung dengan berbicara ke board ESP32 Xiaozhi:
+                        </div>
+
+                        <div style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:10px;">
+                            <!-- Command 1 -->
+                            <div style="padding:12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px;">
+                                <div style="font-weight:750; font-size:12.5px; color:var(--app-text); margin-bottom:4px;">
+                                    🎵 1. Putar Lagu Berdasarkan Nomor Playlist
+                                </div>
+                                <div style="font-size:12px; color:var(--app-accent); font-family:monospace; margin-bottom:4px;">
+                                    "Xiaozhi, putar playlist nomor 1"<br>
+                                    "Xiaozhi, mainkan lagu nomor 3"
+                                </div>
+                                <div style="font-size:11.5px; color:var(--app-muted);">
+                                    Memutar lagu sesuai urutan nomor di playlist akun Anda.
+                                </div>
+                            </div>
+
+                            <!-- Command 2 -->
+                            <div style="padding:12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px;">
+                                <div style="font-weight:750; font-size:12.5px; color:var(--app-text); margin-bottom:4px;">
+                                    🎶 2. Putar Lagu Berdasarkan Judul Playlist
+                                </div>
+                                <div style="font-size:12px; color:var(--app-accent); font-family:monospace; margin-bottom:4px;">
+                                    "Xiaozhi, putar lagu Bohemian Rhapsody dari playlist"<br>
+                                    "Xiaozhi, putar DJ Haning di playlist"
+                                </div>
+                                <div style="font-size:11.5px; color:var(--app-muted);">
+                                    Mencocokkan judul lagu yang tersimpan di playlist Anda.
+                                </div>
+                            </div>
+
+                            <!-- Command 3 -->
+                            <div style="padding:12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px;">
+                                <div style="font-weight:750; font-size:12.5px; color:var(--app-text); margin-bottom:4px;">
+                                    ❓ 3. Perintah Playlist Umum (Tanya Pilihan)
+                                </div>
+                                <div style="font-size:12px; color:var(--app-accent); font-family:monospace; margin-bottom:4px;">
+                                    "Xiaozhi, putar playlist saya"<br>
+                                    "Xiaozhi, putar lagu di playlist"
+                                </div>
+                                <div style="font-size:11.5px; color:var(--app-muted);">
+                                    Xiaozhi akan merespons ramah: menanyakan nomor atau judul lagu mana yang mau diputar sambil menyebutkan pilihan lagunya.
+                                </div>
+                            </div>
+
+                            <!-- Command 4 -->
+                            <div style="padding:12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px;">
+                                <div style="font-weight:750; font-size:12.5px; color:var(--app-text); margin-bottom:4px;">
+                                    ⚡ 4. Cek Status Kesiapan Cache (Putar Lancar)
+                                </div>
+                                <div style="font-size:12px; color:var(--app-accent); font-family:monospace; margin-bottom:4px;">
+                                    "Xiaozhi, cek status cache playlist saya"<br>
+                                    "Xiaozhi, lagu mana yang sudah siap diputar lancar?"
+                                </div>
+                                <div style="font-size:11.5px; color:var(--app-muted);">
+                                    Xiaozhi mengecek disk server dan menginfokan lagu mana yang 100% siap lancar dan mana yang masih proses download.
+                                </div>
+                            </div>
+
+                            <!-- Command 5 -->
+                            <div style="padding:12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px;">
+                                <div style="font-weight:750; font-size:12.5px; color:var(--app-text); margin-bottom:4px;">
+                                    📋 5. Cek Seluruh Daftar Lagu Playlist
+                                </div>
+                                <div style="font-size:12px; color:var(--app-accent); font-family:monospace; margin-bottom:4px;">
+                                    "Xiaozhi, sebutkan lagu di playlist saya"<br>
+                                    "Xiaozhi, apa saja lagu di playlist saya?"
+                                </div>
+                                <div style="font-size:11.5px; color:var(--app-muted);">
+                                    Xiaozhi membacakan daftar lagu beserta label status kelancarannya.
+                                </div>
+                            </div>
+
+                            <!-- Command 6 -->
+                            <div style="padding:12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px;">
+                                <div style="font-weight:750; font-size:12.5px; color:var(--app-text); margin-bottom:4px;">
+                                    🌐 6. Putar Bebas Dari YouTube (Di Luar Playlist)
+                                </div>
+                                <div style="font-size:12px; color:var(--app-accent); font-family:monospace; margin-bottom:4px;">
+                                    "Xiaozhi, putar lagu Denny Caknan"<br>
+                                    "Xiaozhi, setel musik lofi hip hop santai"
+                                </div>
+                                <div style="font-size:11.5px; color:var(--app-muted);">
+                                    Jika tidak ada di playlist, Xiaozhi otomatis mencarinya langsung di YouTube dan memutarnya ke speaker.
+                                </div>
+                            </div>
+
+                            <!-- Command 7 -->
+                            <div style="padding:12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px; grid-column: 1 / -1;">
+                                <div style="font-weight:750; font-size:12.5px; color:var(--app-text); margin-bottom:4px;">
+                                    ⏹️ 7. Hentikan Pemutaran Musik
+                                </div>
+                                <div style="font-size:12px; color:var(--app-accent); font-family:monospace; margin-bottom:4px;">
+                                    "Xiaozhi, hentikan musik" / "Xiaozhi, matikan lagu" / "Xiaozhi, stop musik"
+                                </div>
+                                <div style="font-size:11.5px; color:var(--app-muted);">
+                                    Menghentikan pemutaran audio di speaker ESP32 secara instan.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Smart Warning Notification -->
+                        <div style="margin-top:14px; padding:12px 14px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; font-size:12.5px; color:#92400e;">
+                            <strong>🔔 Peringatan Otomatis Kestabilan Audio:</strong><br>
+                            Jika Anda meminta memutar lagu playlist yang cachenya belum selesai diunduh, Xiaozhi akan memutar lagu tersebut secara live streaming dan secara otomatis memberikan peringatan suara singkat:
+                            <em>"Perhatian: Cache lagu ini sedang diunduh (X%). Pemutaran via streaming langsung mungkin berpotensi tersendat atau putus-putus jika koneksi kurang stabil."</em>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ================= END USER GUIDE: PLAYLIST & AUDIO CACHE ================= -->
+
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🎵</span> Apa itu YouTube Music?
+                    <span>🎵</span> Arsitektur Streaming Audio YouTube &amp; ESP32
                 </div>
                 <p class="doc-step-desc">
                     Fitur YouTube Music memungkinkan XiaoZhi mencari dan memutar lagu dari YouTube langsung ke speaker ESP32 kamu.
