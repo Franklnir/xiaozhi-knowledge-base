@@ -17,6 +17,7 @@ from xiaozhi.core.utils import (
 from xiaozhi.dependencies import get_current_user, get_store, render, require_user
 from xiaozhi.services.audio_cache_worker import (
     check_media_duration_limit,
+    delete_track_cache,
     enqueue_precache,
     get_all_queue_status,
     get_track_cache_status,
@@ -78,6 +79,7 @@ async def playlist_page(request: Request):
         t["cache_status"] = c_info.get("status", "uncached")
         t["is_cached"] = c_info.get("is_cached", False)
         t["cache_size"] = c_info.get("size_bytes", 0)
+        t["cache_percent"] = c_info.get("percent", 100 if c_info.get("is_cached") else 0)
 
     plus_cfg = store.get_user_access_plus(user["id"]) if hasattr(store, "get_user_access_plus") else {}
     quota_enabled = plus_cfg.get("playlist_quota_enabled", False)
@@ -129,6 +131,7 @@ async def api_get_playlist(
         t["cache_status"] = c_info.get("status", "uncached")
         t["is_cached"] = c_info.get("is_cached", False)
         t["cache_size"] = c_info.get("size_bytes", 0)
+        t["cache_percent"] = c_info.get("percent", 100 if c_info.get("is_cached") else 0)
 
     top_tracks = store.get_top_played_playlist(owner_id, limit=5) if hasattr(store, "get_top_played_playlist") else []
     plus_cfg = store.get_user_access_plus(owner_id) if hasattr(store, "get_user_access_plus") else {}
@@ -246,13 +249,14 @@ async def api_add_playlist_track(request: Request):
 
         # Trigger asynchronous background pre-caching
         try:
-            asyncio.create_task(enqueue_precache(video_id, full_url))
+            asyncio.create_task(enqueue_precache(video_id, full_url, duration_sec=cand_sec))
         except Exception as q_exc:
             logger.warning("Failed triggering background precache: %s", q_exc)
 
         c_info = get_track_cache_status(video_id)
         track["cache_status"] = c_info.get("status", "downloading")
         track["is_cached"] = c_info.get("is_cached", False)
+        track["cache_percent"] = c_info.get("percent", 0)
 
         return {
             "success": True,
@@ -332,7 +336,7 @@ async def api_update_playlist_track(track_id: int, request: Request):
             artist = dur_info["artist"]
 
         try:
-            asyncio.create_task(enqueue_precache(video_id, raw_url))
+            asyncio.create_task(enqueue_precache(video_id, raw_url, duration_sec=cand_sec))
         except Exception:
             pass
 
@@ -349,6 +353,7 @@ async def api_update_playlist_track(track_id: int, request: Request):
         c_info = get_track_cache_status(updated["video_id"])
         updated["cache_status"] = c_info.get("status", "uncached")
         updated["is_cached"] = c_info.get("is_cached", False)
+        updated["cache_percent"] = c_info.get("percent", 100 if c_info.get("is_cached") else 0)
 
     return {
         "success": True,
@@ -366,9 +371,25 @@ async def api_delete_playlist_track(track_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Lagu tidak ditemukan di playlist Anda.")
 
     deleted = store.delete_playlist_track(user["id"], track_id)
+    cache_cleaned = 0
+    if deleted and existing.get("video_id"):
+        vid = existing["video_id"]
+        # If no other user still has this video in their playlist, delete the disk cache
+        other_exists = False
+        try:
+            if hasattr(store, "is_video_id_in_any_playlist"):
+                other_exists = store.is_video_id_in_any_playlist(vid)
+        except Exception as exc:
+            logger.warning("Error checking if video_id exists in other playlists: %s", exc)
+
+        if not other_exists:
+            cache_cleaned = delete_track_cache(vid)
+            logger.info("Playlist track #%s deleted by user %s: cleaned %d cache files for video_id %s", track_id, user["id"], cache_cleaned, vid)
+
     return {
         "success": deleted,
-        "message": f"Lagu '{existing.get('title')}' berhasil dihapus dari playlist.",
+        "cache_deleted": cache_cleaned > 0,
+        "message": f"Lagu '{existing.get('title')}' berhasil dihapus dari playlist dan file audio cache dibersihkan.",
     }
 
 
@@ -464,7 +485,8 @@ async def api_cache_single_track(track_id: int, request: Request):
             "message": f"Lagu '{track.get('title')}' sudah 100% tersimpan di disk cache server.",
         }
 
-    queued = await enqueue_precache(vid, url)
+    dur_sec = parse_duration_to_seconds(track.get("duration"))
+    queued = await enqueue_precache(vid, url, duration_sec=dur_sec)
     status_after = get_track_cache_status(vid)
     return {
         "success": True,
@@ -487,7 +509,8 @@ async def api_cache_all_tracks(request: Request):
         if vid and url:
             st = get_track_cache_status(vid)
             if not st["is_cached"]:
-                if await enqueue_precache(vid, url):
+                dur_sec = parse_duration_to_seconds(t.get("duration"))
+                if await enqueue_precache(vid, url, duration_sec=dur_sec):
                     queued_count += 1
     return {
         "success": True,

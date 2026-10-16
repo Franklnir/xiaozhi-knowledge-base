@@ -3955,6 +3955,18 @@ class PostgresStore:
             conn.commit()
             return deleted
 
+    def is_video_id_in_any_playlist(self, video_id: str) -> bool:
+        safe_vid = str(video_id or "").strip()
+        if not safe_vid:
+            return False
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id FROM user_playlists WHERE video_id = %s LIMIT 1",
+                    (safe_vid,),
+                )
+                return cur.fetchone() is not None
+
     def increment_playlist_play_count(
         self, owner_id: int, track_id: Optional[int] = None, video_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:

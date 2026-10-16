@@ -517,12 +517,12 @@
                                 {% if track.cache_status == 'ready' or track.is_cached %}
                                 <span class="track-cache-badge" style="background:rgba(16, 185, 129, 0.15); color:#059669; border:1px solid rgba(16, 185, 129, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Audio ter-cache 100% di server VPS. Siap diputar seketika tanpa jeda!">
                                     <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981;"></span>
-                                    Siap Diputar
+                                    Siap Diputar (100%)
                                 </span>
                                 {% elif track.cache_status == 'downloading' %}
                                 <span class="track-cache-badge" style="background:rgba(245, 158, 11, 0.15); color:#d97706; border:1px solid rgba(245, 158, 11, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Sedang mengunduh audio ke disk cache server di latar belakang...">
                                     <span style="display:inline-block; width:8px; height:8px; border:2px solid #d97706; border-top-color:transparent; border-radius:50%; animation:appSpin 1s linear infinite;"></span>
-                                    Mengunduh...
+                                    Mengunduh ({{ track.cache_percent or 0 }}%)...
                                 </span>
                                 {% else %}
                                 <button type="button" onclick="cacheSingleTrack({{ track.id }}, '{{ track.title|escape }}')" class="app-button" style="padding:3px 8px; font-size:11px; font-weight:700; color:var(--app-muted); border-radius:999px;" title="Klik untuk unduh audio ke server sekarang">
@@ -1109,12 +1109,13 @@
         if (status.is_cached || status.status === 'ready') {
             return `<span class="track-cache-badge" style="background:rgba(16, 185, 129, 0.15); color:#059669; border:1px solid rgba(16, 185, 129, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Audio ter-cache 100% di server VPS. Siap diputar seketika tanpa jeda!">
                 <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981;"></span>
-                Siap Diputar
+                Siap Diputar (100%)
             </span>`;
         } else if (status.status === 'downloading') {
-            return `<span class="track-cache-badge" style="background:rgba(245, 158, 11, 0.15); color:#d97706; border:1px solid rgba(245, 158, 11, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Sedang mengunduh audio ke disk cache server di latar belakang...">
+            const pct = (status.percent !== undefined && status.percent !== null) ? status.percent : 0;
+            return `<span class="track-cache-badge" style="background:rgba(245, 158, 11, 0.15); color:#d97706; border:1px solid rgba(245, 158, 11, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Sedang mengunduh audio ke disk cache server di latar belakang (${pct}%)...">
                 <span style="display:inline-block; width:8px; height:8px; border:2px solid #d97706; border-top-color:transparent; border-radius:50%; animation:appSpin 1s linear infinite;"></span>
-                Mengunduh...
+                Mengunduh (${pct}%)...
             </span>`;
         } else {
             const safeTitle = (title || '').replace(/'/g, "\\'");
@@ -1153,7 +1154,7 @@
 
     function startCachePolling() {
         if (!cachePollInterval) {
-            cachePollInterval = setInterval(checkCacheStatus, 3000);
+            cachePollInterval = setInterval(checkCacheStatus, 2000);
         }
         checkCacheStatus();
     }
@@ -1165,7 +1166,7 @@
             }
             const cell = document.getElementById('track-cache-cell-' + trackId);
             if (cell) {
-                cell.innerHTML = renderCacheBadge({ status: 'downloading', is_cached: false }, trackId, title);
+                cell.innerHTML = renderCacheBadge({ status: 'downloading', is_cached: false, percent: 0 }, trackId, title);
             }
             const resp = await fetch('/api/v1/playlist/' + trackId + '/cache', {
                 method: 'POST',

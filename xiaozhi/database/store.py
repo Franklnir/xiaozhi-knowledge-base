@@ -3623,6 +3623,17 @@ class HFJsonStore:
                 return True
             return False
 
+    def is_video_id_in_any_playlist(self, video_id: str) -> bool:
+        safe_vid = str(video_id or "").strip()
+        if not safe_vid:
+            return False
+        with self._lock:
+            data = self._load()
+            for p in data.get("user_playlists", []):
+                if str(p.get("video_id", "")).strip() == safe_vid:
+                    return True
+            return False
+
     def increment_playlist_play_count(
         self, owner_id: int, track_id: Optional[int] = None, video_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:

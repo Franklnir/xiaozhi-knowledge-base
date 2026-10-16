@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import shutil
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -24,6 +25,8 @@ except Exception:
 _queue: asyncio.Queue = asyncio.Queue()
 _queue_set: Set[str] = set()
 _active_downloads: Set[str] = set()
+_progress_state: Dict[str, Dict[str, Any]] = {}
+_active_processes: Dict[str, Any] = {}
 _worker_task: Optional[asyncio.Task] = None
 _cache_semaphore = asyncio.Semaphore(1)
 
@@ -164,27 +167,92 @@ def get_track_cache_status(video_id: str) -> Dict[str, Any]:
     """
     Returns the real-time cache state of an audio track:
     - 'ready': Audio file exists on VPS local disk (>10KB) -> 100% ready to play
-    - 'downloading': Currently in the download queue or actively transcoding
+    - 'downloading': Currently in the download queue or actively transcoding (with percent 0-99%)
     - 'uncached': Not yet in disk cache
     """
     safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
     if not safe_vid:
-        return {"status": "uncached", "is_cached": False, "size_bytes": 0, "filename": ""}
+        return {"status": "uncached", "is_cached": False, "size_bytes": 0, "filename": "", "percent": 0}
 
-    if safe_vid in _active_downloads or safe_vid in _queue_set:
-        return {"status": "downloading", "is_cached": False, "size_bytes": 0, "filename": ""}
-
+    # 1. First check if finalized file exists on disk (>10KB)
     matches = list(AUDIO_CACHE_DIR.glob(f"{safe_vid}_*.opus")) if AUDIO_CACHE_DIR.exists() else []
-    valid = [f for f in matches if f.is_file() and f.stat().st_size > 10240]
+    valid = [f for f in matches if f.is_file() and f.stat().st_size > 10240 and ".tmp." not in f.name]
     if valid:
         return {
             "status": "ready",
             "is_cached": True,
             "size_bytes": valid[0].stat().st_size,
             "filename": valid[0].name,
+            "percent": 100,
         }
 
-    return {"status": "uncached", "is_cached": False, "size_bytes": 0, "filename": ""}
+    # 2. Check active downloads or in-memory progress
+    prog = _progress_state.get(safe_vid)
+    if safe_vid in _active_downloads or (prog and prog.get("status") == "downloading"):
+        pct = prog.get("percent", 5) if prog else 5
+        return {
+            "status": "downloading",
+            "is_cached": False,
+            "size_bytes": 0,
+            "filename": "",
+            "percent": pct,
+            "current_sec": prog.get("current_sec", 0.0) if prog else 0.0,
+            "total_sec": prog.get("total_sec") if prog else None,
+        }
+
+    # 3. Check if queued
+    if safe_vid in _queue_set:
+        pct = prog.get("percent", 0) if prog else 0
+        return {
+            "status": "downloading",
+            "is_cached": False,
+            "size_bytes": 0,
+            "filename": "",
+            "percent": pct,
+            "total_sec": prog.get("total_sec") if prog else None,
+        }
+
+    return {"status": "uncached", "is_cached": False, "size_bytes": 0, "filename": "", "percent": 0}
+
+
+def delete_track_cache(video_id: str) -> int:
+    """
+    Deletes all cached audio files (*.opus and *.tmp.*) for the specified video_id from AUDIO_CACHE_DIR.
+    Terminates active transcoding processes for this track and clears queue and progress state.
+    Returns the number of deleted files.
+    """
+    safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
+    if not safe_vid:
+        return 0
+
+    # 1. Terminate running ffmpeg process if active
+    proc = _active_processes.pop(safe_vid, None)
+    if proc:
+        try:
+            proc.kill()
+            logger.info("Terminated active transcoding process for deleted track: %s", safe_vid)
+        except Exception:
+            pass
+
+    # 2. Clean in-memory tracking
+    _queue_set.discard(safe_vid)
+    _active_downloads.discard(safe_vid)
+    _progress_state.pop(safe_vid, None)
+
+    # 3. Delete matching files on disk
+    deleted_count = 0
+    if AUDIO_CACHE_DIR.exists():
+        for pattern in (f"{safe_vid}_*.opus*", f"{safe_vid}.*"):
+            for f in AUDIO_CACHE_DIR.glob(pattern):
+                try:
+                    if f.is_file():
+                        f.unlink(missing_ok=True)
+                        deleted_count += 1
+                        logger.info("Deleted audio cache file: %s", f.name)
+                except Exception as exc:
+                    logger.warning("Failed deleting cache file %s: %s", f.name, exc)
+
+    return deleted_count
 
 
 def get_all_queue_status() -> Dict[str, Any]:
@@ -218,13 +286,20 @@ async def _worker_loop():
         youtube_url = item["youtube_url"]
         sample_rate = item.get("sample_rate", 16000)
         bitrate = item.get("bitrate", "16k")
+        duration_sec = item.get("duration_sec")
 
         _queue_set.discard(vid)
         _active_downloads.add(vid)
 
         try:
             async with _cache_semaphore:
-                await _execute_download_and_cache(vid, youtube_url, sample_rate, bitrate)
+                await _execute_download_and_cache(
+                    vid,
+                    youtube_url,
+                    sample_rate=sample_rate,
+                    bitrate=bitrate,
+                    duration_sec=duration_sec,
+                )
         except Exception as exc:
             logger.exception("Precache task error for %s: %s", vid, exc)
         finally:
@@ -237,6 +312,7 @@ async def _execute_download_and_cache(
     youtube_url: str,
     sample_rate: int = 16000,
     bitrate: str = "16k",
+    duration_sec: Optional[int] = None,
 ):
     safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
     safe_br = re.sub(r"[^a-zA-Z0-9]", "", str(bitrate or "").strip().lower())
@@ -244,18 +320,45 @@ async def _execute_download_and_cache(
 
     if target_cache_path.is_file() and target_cache_path.stat().st_size > 10240:
         logger.info("Precache: %s already cached, skipping.", target_cache_path.name)
+        _progress_state[safe_vid] = {
+            "status": "ready",
+            "percent": 100,
+            "is_cached": True,
+            "size_bytes": target_cache_path.stat().st_size,
+            "filename": target_cache_path.name,
+        }
         return
+
+    _progress_state[safe_vid] = {
+        "status": "downloading",
+        "percent": 3,
+        "current_sec": 0.0,
+        "total_sec": duration_sec,
+        "updated_at": time.time(),
+    }
 
     from xiaozhi.services.youtube_streamer import extract_audio_url
 
     source_url, extracted_title = await extract_audio_url(video_id, target_url=youtube_url)
     if not source_url:
         logger.warning("Precache: failed to extract audio stream for %s (%s)", video_id, youtube_url)
+        _progress_state[safe_vid] = {
+            "status": "error",
+            "percent": 0,
+            "is_cached": False,
+            "error": "Failed to extract audio stream",
+        }
         return
 
     ffmpeg_bin = shutil.which("ffmpeg")
     if not ffmpeg_bin:
         logger.warning("Precache: ffmpeg not found on system, cannot transcode.")
+        _progress_state[safe_vid] = {
+            "status": "error",
+            "percent": 0,
+            "is_cached": False,
+            "error": "ffmpeg not found",
+        }
         return
 
     tmp_cache_path = AUDIO_CACHE_DIR / f"{safe_vid}_{sample_rate}_{safe_br}.tmp.{os.getpid()}.opus"
@@ -263,6 +366,8 @@ async def _execute_download_and_cache(
     cmd = [
         ffmpeg_bin,
         "-y",
+        "-nostats",
+        "-progress", "pipe:1",
         "-reconnect", "1",
         "-reconnect_at_eof", "1",
         "-reconnect_streamed", "1",
@@ -282,16 +387,73 @@ async def _execute_download_and_cache(
     ]
 
     logger.info("Precache transcoding started for %s -> %s", video_id, target_cache_path.name)
+    _progress_state[safe_vid] = {
+        "status": "downloading",
+        "percent": 5,
+        "current_sec": 0.0,
+        "total_sec": duration_sec,
+        "updated_at": time.time(),
+    }
+
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
-            stdout=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
+        _active_processes[safe_vid] = proc
+
+        # Read ffmpeg progress lines from stdout
+        while True:
+            line_bytes = await proc.stdout.readline()
+            if not line_bytes:
+                break
+            line = line_bytes.decode("utf-8", errors="replace").strip()
+            if not line or "=" not in line:
+                continue
+
+            k, v = line.split("=", 1)
+            k = k.strip()
+            v = v.strip()
+
+            if k == "out_time_us":
+                try:
+                    cur_us = int(v)
+                    cur_sec = cur_us / 1_000_000.0
+                    if duration_sec and duration_sec > 0:
+                        pct = int((cur_sec / duration_sec) * 100)
+                        pct = max(5, min(99, pct))
+                    else:
+                        pct = min(95, max(5, int(cur_sec / 3)))
+                    _progress_state[safe_vid] = {
+                        "status": "downloading",
+                        "percent": pct,
+                        "current_sec": round(cur_sec, 1),
+                        "total_sec": duration_sec,
+                        "updated_at": time.time(),
+                    }
+                except Exception:
+                    pass
+            elif k == "progress" and v == "end":
+                _progress_state[safe_vid] = {
+                    "status": "downloading",
+                    "percent": 99,
+                    "current_sec": duration_sec or 0,
+                    "total_sec": duration_sec,
+                    "updated_at": time.time(),
+                }
+
         await proc.wait()
 
         if proc.returncode == 0 and tmp_cache_path.exists() and tmp_cache_path.stat().st_size > 10240:
             tmp_cache_path.replace(target_cache_path)
+            _progress_state[safe_vid] = {
+                "status": "ready",
+                "percent": 100,
+                "is_cached": True,
+                "size_bytes": target_cache_path.stat().st_size,
+                "filename": target_cache_path.name,
+            }
             logger.info(
                 "Precache SUCCESS: %s cached to disk (%d bytes, %s, %dHz)",
                 video_id,
@@ -302,6 +464,12 @@ async def _execute_download_and_cache(
         else:
             if tmp_cache_path.exists():
                 tmp_cache_path.unlink(missing_ok=True)
+            _progress_state[safe_vid] = {
+                "status": "error",
+                "percent": 0,
+                "is_cached": False,
+                "error": f"Transcode failed (code {proc.returncode})",
+            }
             logger.warning(
                 "Precache FAILED for %s (exit code %s, size=%s)",
                 video_id,
@@ -311,7 +479,15 @@ async def _execute_download_and_cache(
     except Exception as exc:
         if tmp_cache_path.exists():
             tmp_cache_path.unlink(missing_ok=True)
+        _progress_state[safe_vid] = {
+            "status": "error",
+            "percent": 0,
+            "is_cached": False,
+            "error": str(exc),
+        }
         logger.error("Precache subprocess error for %s: %s", video_id, exc)
+    finally:
+        _active_processes.pop(safe_vid, None)
 
 
 async def enqueue_precache(
@@ -319,6 +495,7 @@ async def enqueue_precache(
     youtube_url: str,
     sample_rate: int = 16000,
     bitrate: str = "16k",
+    duration_sec: Optional[int] = None,
 ) -> bool:
     """
     Submits an audio track to the background download and transcoding queue.
@@ -336,11 +513,19 @@ async def enqueue_precache(
         return False
 
     _queue_set.add(safe_vid)
+    _progress_state[safe_vid] = {
+        "status": "downloading",
+        "percent": 0,
+        "current_sec": 0.0,
+        "total_sec": duration_sec,
+        "updated_at": time.time(),
+    }
     await _queue.put({
         "video_id": safe_vid,
         "youtube_url": youtube_url,
         "sample_rate": sample_rate,
         "bitrate": bitrate,
+        "duration_sec": duration_sec,
     })
     _ensure_worker_running()
     return True

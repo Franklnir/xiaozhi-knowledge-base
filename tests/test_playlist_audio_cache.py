@@ -291,6 +291,7 @@ def test_get_track_cache_status_states(tmp_path):
         st = get_track_cache_status(vid)
         assert st["status"] == "uncached"
         assert st["is_cached"] is False
+        assert st["percent"] == 0
 
         # Downloading state (in queue or active)
         audio_cache_worker._queue_set.add(vid)
@@ -298,6 +299,7 @@ def test_get_track_cache_status_states(tmp_path):
             st2 = get_track_cache_status(vid)
             assert st2["status"] == "downloading"
             assert st2["is_cached"] is False
+            assert st2["percent"] == 0
         finally:
             audio_cache_worker._queue_set.discard(vid)
 
@@ -309,6 +311,7 @@ def test_get_track_cache_status_states(tmp_path):
         assert st3["status"] == "ready"
         assert st3["is_cached"] is True
         assert st3["size_bytes"] > 10240
+        assert st3["percent"] == 100
 
 
 def test_audio_stream_fallback_to_other_cached_bitrate(tmp_path):
@@ -441,6 +444,109 @@ def test_add_playlist_track_1_hour_policy(tmp_path):
             res3 = await api_add_playlist_track(req3)
             assert res3["success"] is True
             assert res3["track"]["duration"] == "04:00"
+
+    asyncio.run(_run())
+
+
+def test_delete_track_cache(tmp_path):
+    from xiaozhi.services import audio_cache_worker
+    from xiaozhi.services.audio_cache_worker import delete_track_cache, get_track_cache_status
+
+    vid = "DEL_TEST_VID"
+    with patch.object(audio_cache_worker, "AUDIO_CACHE_DIR", tmp_path):
+        # Create cache files
+        file1 = tmp_path / f"{vid}_16000_16k.opus"
+        file2 = tmp_path / f"{vid}_24000_24k.opus"
+        file_tmp = tmp_path / f"{vid}_16000_16k.tmp.999.opus"
+        other_file = tmp_path / "OTHER_VID_16000_16k.opus"
+
+        file1.write_bytes(b"OggS" + (b"1" * 15000))
+        file2.write_bytes(b"OggS" + (b"2" * 15000))
+        file_tmp.write_bytes(b"OggS" + (b"3" * 5000))
+        other_file.write_bytes(b"OggS" + (b"9" * 15000))
+
+        # Add to tracking
+        audio_cache_worker._queue_set.add(vid)
+        audio_cache_worker._active_downloads.add(vid)
+        audio_cache_worker._progress_state[vid] = {"status": "downloading", "percent": 50}
+
+        deleted = delete_track_cache(vid)
+        assert deleted == 3
+        assert not file1.exists()
+        assert not file2.exists()
+        assert not file_tmp.exists()
+        assert other_file.exists()  # other track file is untouched
+        assert vid not in audio_cache_worker._queue_set
+        assert vid not in audio_cache_worker._active_downloads
+        assert vid not in audio_cache_worker._progress_state
+
+
+def test_track_cache_percentage_progress(tmp_path):
+    from xiaozhi.services import audio_cache_worker
+    from xiaozhi.services.audio_cache_worker import get_track_cache_status
+
+    vid = "PROGRESS_TEST_VID"
+    with patch.object(audio_cache_worker, "AUDIO_CACHE_DIR", tmp_path):
+        # Active downloading with progress state
+        audio_cache_worker._active_downloads.add(vid)
+        audio_cache_worker._progress_state[vid] = {
+            "status": "downloading",
+            "percent": 45,
+            "current_sec": 45.0,
+            "total_sec": 100,
+        }
+
+        try:
+            st = get_track_cache_status(vid)
+            assert st["status"] == "downloading"
+            assert st["percent"] == 45
+            assert st["current_sec"] == 45.0
+            assert st["total_sec"] == 100
+        finally:
+            audio_cache_worker._active_downloads.discard(vid)
+            audio_cache_worker._progress_state.pop(vid, None)
+
+
+def test_api_delete_playlist_track_cleans_cache(tmp_path):
+    async def _run():
+        from xiaozhi.routers.playlist import api_delete_playlist_track
+        from xiaozhi.services import audio_cache_worker
+
+        db_file = tmp_path / "test_del.db"
+        store = SQLiteStore(str(db_file))
+        user = store.create_user("user_del", "password123")
+        uid = user["id"]
+
+        vid = "DELETE_SYNC_VID"
+        t = store.add_playlist_track(
+            owner_id=uid,
+            title="Track to Delete",
+            youtube_url=f"https://www.youtube.com/watch?v={vid}",
+            video_id=vid,
+            artist="Artist",
+        )
+        track_id = t["id"]
+
+        with patch.object(audio_cache_worker, "AUDIO_CACHE_DIR", tmp_path):
+            cache_file = tmp_path / f"{vid}_16000_16k.opus"
+            cache_file.write_bytes(b"OggS" + (b"A" * 15000))
+            assert cache_file.exists()
+
+            scope = {
+                "type": "http",
+                "method": "DELETE",
+                "path": f"/api/v1/playlist/{track_id}",
+                "headers": [(b"host", b"testserver")],
+            }
+            req = Request(scope)
+
+            with patch("xiaozhi.routers.playlist.require_user", return_value=user), \
+                 patch("xiaozhi.routers.playlist.get_store", return_value=store):
+                res = await api_delete_playlist_track(track_id, req)
+                assert res["success"] is True
+                assert res["cache_deleted"] is True
+                # Cache file must be deleted from disk
+                assert not cache_file.exists()
 
     asyncio.run(_run())
 

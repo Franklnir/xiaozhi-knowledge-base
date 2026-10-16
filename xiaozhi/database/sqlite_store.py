@@ -3402,6 +3402,17 @@ class SQLiteStore:
         conn.commit()
         return deleted
 
+    def is_video_id_in_any_playlist(self, video_id: str) -> bool:
+        safe_vid = str(video_id or "").strip()
+        if not safe_vid:
+            return False
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT id FROM user_playlists WHERE video_id = ? LIMIT 1",
+            (safe_vid,),
+        ).fetchone()
+        return row is not None
+
     def increment_playlist_play_count(
         self, owner_id: int, track_id: Optional[int] = None, video_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
