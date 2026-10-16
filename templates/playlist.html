@@ -268,137 +268,76 @@
             <p class="app-stat-value" id="statTotalTracks">{{ total_tracks }}</p>
         </div>
         <div class="app-stat-card">
-            <p class="app-stat-label">Total Kali Diputar</p>
-            <p class="app-stat-value" id="statTotalPlays" style="color:#ef4444;">{{ total_plays }}x</p>
+            <p class="app-stat-label">Status Kuota Playlist</p>
+            <p class="app-stat-value" style="font-size:16px; color:#f59e0b;">
+                {{ active_tracks_count }}{% if quota_enabled %} / {{ max_tracks }}{% endif %} Lagu Aktif
+            </p>
         </div>
         <div class="app-stat-card">
-            <p class="app-stat-label">Lagu Paling Sering Diputar</p>
-            <p class="app-stat-value" style="font-size:16px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{% if top_tracks %}{{ top_tracks[0].title }}{% else %}Belum ada lagu diputar{% endif %}">
-                {% if top_tracks %}
-                    🔥 {{ top_tracks[0].title }} ({{ top_tracks[0].play_count }}x)
-                {% else %}
-                    <span style="color:var(--app-muted); font-size:14px; font-weight:normal;">Belum ada</span>
-                {% endif %}
+            <p class="app-stat-label">Audio Cache Server</p>
+            <p class="app-stat-value" style="font-size:16px; color:#10b981;">
+                ⚡ Siap Diputar Instan
             </p>
         </div>
         <div class="app-stat-card">
             <p class="app-stat-label">Perintah Panggilan Voice AI</p>
-            <p class="app-stat-value" style="font-size:15px; color:#10b981;">
-                ✓ Nomor, Judul & URL
+            <p class="app-stat-value" style="font-size:15px; color:var(--app-text);">
+                ✓ Nomor & Judul Lagu
             </p>
         </div>
     </section>
 
-    <!-- Two-column Section: Voice Command Guide & Top Played Leaderboard -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-bottom:24px;">
-        <!-- Left: Voice Commands Quick Guide -->
-        <div class="app-card">
-            <div class="app-card-header is-compact">
-                <div>
-                    <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                        <span>🗣️</span> Panduan Perintah Suara Xiaozhi
-                    </h2>
-                    <p class="app-section-subtitle">Ucapkan kalimat berikut ke mikrofon ESP32 Xiaozhi Anda:</p>
-                </div>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border);">
-                    <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:4px;">1. Panggil Berdasarkan Nomor Urut</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar lagu nomor 1')" title="Klik untuk salin">
-                            "Xiaozhi, putar lagu nomor 1" 📋
-                        </span>
-                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar playlist nomor 2')" title="Klik untuk salin">
-                            "Xiaozhi, putar playlist nomor 2" 📋
-                        </span>
-                    </div>
-                </div>
-
-                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border);">
-                    <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:4px;">2. Panggil Berdasarkan Judul Lagu</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar judul lagu dari playlist saya')" title="Klik untuk salin">
-                            "Xiaozhi, putar [judul lagu] dari playlist" 📋
-                        </span>
-                    </div>
-                </div>
-
-                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border);">
-                    <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:4px;">3. Putar Bebas Dari YouTube (Bukan Playlist)</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar lagu Denny Caknan')" title="Klik untuk salin">
-                            "Xiaozhi, putar lagu [apa saja di YouTube]" 📋
-                        </span>
-                    </div>
-                    <p style="font-size:11px; color:var(--app-muted); margin:4px 0 0;">
-                        💡 Jika lagu tidak ada di playlist, Xiaozhi otomatis mencarinya di YouTube secara langsung.
-                    </p>
-                </div>
-
-                <div style="padding:10px 12px; background:var(--app-surface-muted); border-radius:8px; border:1px solid var(--app-border);">
-                    <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:4px;">4. Cek Statistik Playlist</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, sebutkan lagu di playlist saya')" title="Klik untuk salin">
-                            "Xiaozhi, sebutkan playlist saya" 📋
-                        </span>
-                        <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, lagu apa yang paling sering diputar?')" title="Klik untuk salin">
-                            "Lagu apa yang paling sering diputar?" 📋
-                        </span>
-                    </div>
-                </div>
+    <!-- Voice Commands Quick Guide Card (Full Width) -->
+    <div class="app-card" style="margin-bottom:24px;">
+        <div class="app-card-header is-compact">
+            <div>
+                <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                    <span>🗣️</span> Panduan Perintah Suara Xiaozhi
+                </h2>
+                <p class="app-section-subtitle">Ucapkan kalimat berikut ke mikrofon ESP32 Xiaozhi Anda untuk memutar musik:</p>
             </div>
         </div>
-
-        <!-- Right: Top 5 Played Tracks Leaderboard -->
-        <div class="app-card">
-            <div class="app-card-header is-compact">
-                <div>
-                    <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                        <span>🔥</span> Top 5 Lagu Paling Sering Diputar
-                    </h2>
-                    <p class="app-section-subtitle">Daftar lagu favorit berdasarkan frekuensi pemutaran:</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;">
+            <div style="padding:12px 14px; background:var(--app-surface-muted); border-radius:10px; border:1px solid var(--app-border);">
+                <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:6px;">1. Panggil Berdasarkan Nomor Urut</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar lagu nomor 1')" title="Klik untuk salin">
+                        "Xiaozhi, putar lagu nomor 1" 📋
+                    </span>
+                    <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar playlist nomor 2')" title="Klik untuk salin">
+                        "Xiaozhi, putar playlist nomor 2" 📋
+                    </span>
                 </div>
             </div>
-            <div id="topPlayedList" style="display:flex; flex-direction:column; gap:8px;">
-                {% if top_tracks %}
-                    {% for t in top_tracks %}
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; border-radius:8px; background:var(--app-surface-muted); border:1px solid var(--app-border);">
-                        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-                            <span style="font-weight:900; font-size:14px; width:22px; text-align:center; color:var(--app-muted);">
-                                {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}#{{ loop.index }}{% endif %}
-                            </span>
-                            <div class="track-thumb-box" style="width:48px; height:34px;">
-                                {% if t.video_id.startswith('tt_') %}
-                                <div style="width:100%; height:100%; background:linear-gradient(135deg, #000 50%, #fe2c55 100%); display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px;">
-                                    🎵
-                                </div>
-                                {% else %}
-                                <img src="https://img.youtube.com/vi/{{ t.video_id }}/default.jpg" class="track-thumb-img" alt="Thumb">
-                                {% endif %}
-                            </div>
-                            <div style="min-width:0;">
-                                <div style="font-size:13px; font-weight:800; color:var(--app-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ t.title }}">
-                                    #{{ t.track_number }} {{ t.title }}
-                                </div>
-                                <div style="font-size:11px; color:var(--app-muted);">
-                                    {{ t.artist or ('TikTok Creator' if t.video_id.startswith('tt_') else 'YouTube Audio') }}
-                                </div>
-                            </div>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-                            <span class="play-count-badge">🔥 {{ t.play_count }}x</span>
-                            <button type="button" onclick="playTrackOnEsp32({{ t.id }}, '{{ t.title|escape }}')" class="app-button" style="padding:4px 8px; font-size:11.5px;" title="Putar lagu ini di speaker ESP32">
-                                ▶️
-                            </button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div style="text-align:center; padding:32px 16px; color:var(--app-muted); font-size:13px;">
-                        <span style="font-size:28px; display:block; margin-bottom:8px;">🎧</span>
-                        Belum ada lagu yang diputar.<br>Panggil lagu melalui Xiaozhi atau klik tombol play untuk memulai!
-                    </div>
-                {% endif %}
+
+            <div style="padding:12px 14px; background:var(--app-surface-muted); border-radius:10px; border:1px solid var(--app-border);">
+                <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:6px;">2. Panggil Berdasarkan Judul Lagu</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar judul lagu dari playlist saya')" title="Klik untuk salin">
+                        "Xiaozhi, putar [judul lagu] dari playlist" 📋
+                    </span>
+                </div>
+            </div>
+
+            <div style="padding:12px 14px; background:var(--app-surface-muted); border-radius:10px; border:1px solid var(--app-border);">
+                <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:6px;">3. Putar Bebas Dari YouTube</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar lagu Denny Caknan')" title="Klik untuk salin">
+                        "Xiaozhi, putar lagu [apa saja di YouTube]" 📋
+                    </span>
+                </div>
+                <p style="font-size:11px; color:var(--app-muted); margin:4px 0 0;">
+                    💡 Jika lagu tidak ada di playlist, Xiaozhi otomatis mencarinya di YouTube secara langsung.
+                </p>
+            </div>
+
+            <div style="padding:12px 14px; background:var(--app-surface-muted); border-radius:10px; border:1px solid var(--app-border);">
+                <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:6px;">4. Cek Daftar Playlist</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, sebutkan lagu di playlist saya')" title="Klik untuk salin">
+                        "Xiaozhi, sebutkan playlist saya" 📋
+                    </span>
+                </div>
             </div>
         </div>
     </div>
@@ -440,9 +379,8 @@
                         <th style="width:84px;">Preview</th>
                         <th>Judul Lagu & Info</th>
                         <th>Link YouTube / Video ID</th>
-                        <th style="width:145px; text-align:center;">Status Audio</th>
-                        <th style="width:130px; text-align:center;">Frekuensi Putar</th>
-                        <th style="width:180px; text-align:right;">Aksi (CRUD)</th>
+                        <th style="width:160px; text-align:center;">Status Audio</th>
+                        <th style="width:130px; text-align:right;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="playlistTableBody">
@@ -530,27 +468,13 @@
                                 </button>
                                 {% endif %}
                             </td>
-                            <td style="text-align:center;">
-                                <span class="play-count-badge {% if not track.play_count or track.play_count == 0 %}is-zero{% endif %}" id="track-playcount-{{ track.id }}">
-                                    {% if track.play_count and track.play_count > 0 %}🔥 {{ track.play_count }}x{% else %}0x{% endif %}
-                                </span>
-                            </td>
                             <td style="text-align:right;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
-                                    {% if not track.is_active %}
-                                    <button type="button" onclick="alert('Lagu ini dinonaktifkan karena kuota Akses Plus. Silakan hubungi admin untuk membuka paket langganan Plus.');" class="app-button" style="background:var(--app-surface-muted); color:var(--app-muted); border:1px solid var(--app-border); padding:5px 10px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:4px; opacity:0.8;" title="Lagu ini dinonaktifkan (Paket Plus)">
-                                        <span>🔒</span> Nonaktif
+                                    <button type="button" onclick="openEditTrackModal({{ track.id }}, '{{ track.title|escape }}', '{{ track.youtube_url|escape }}', '{{ track.artist|escape }}')" class="app-button" style="padding:5px 10px; font-size:12px; font-weight:700;" title="Edit Judul & Link">
+                                        ✏️ Edit
                                     </button>
-                                    {% else %}
-                                    <button type="button" onclick="playTrackOnEsp32({{ track.id }}, '{{ track.title|escape }}')" class="app-button app-button-primary" style="background:#10b981; border-color:#059669; padding:5px 10px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:4px;" title="Kirim instruksi putar lagu ini ke speaker ESP32 sekarang">
-                                        <span>▶️</span> Putar
-                                    </button>
-                                    {% endif %}
-                                    <button type="button" onclick="openEditTrackModal({{ track.id }}, '{{ track.title|escape }}', '{{ track.youtube_url|escape }}', '{{ track.artist|escape }}')" class="app-button" style="padding:5px 9px; font-size:12px; font-weight:700;" title="Edit Judul & Link">
-                                        ✏️
-                                    </button>
-                                    <button type="button" onclick="deleteTrack({{ track.id }}, '{{ track.title|escape }}')" class="app-button app-button-danger" style="padding:5px 9px; font-size:12px; font-weight:700;" title="Hapus dari Playlist">
-                                        🗑️
+                                    <button type="button" onclick="deleteTrack({{ track.id }}, '{{ track.title|escape }}')" class="app-button app-button-danger" style="padding:5px 10px; font-size:12px; font-weight:700;" title="Hapus dari Playlist">
+                                        🗑️ Hapus
                                     </button>
                                 </div>
                             </td>
@@ -558,7 +482,7 @@
                         {% endfor %}
                     {% else %}
                         <tr id="emptyTableRow">
-                            <td colspan="7" style="text-align:center; padding:48px 16px; color:var(--app-muted);">
+                            <td colspan="6" style="text-align:center; padding:48px 16px; color:var(--app-muted);">
                                 <div style="font-size:36px; margin-bottom:12px;">🎵</div>
                                 <h3 style="font-size:16px; font-weight:800; color:var(--app-text); margin:0 0 6px;">Playlist Anda Masih Kosong</h3>
                                 <p style="font-size:13px; max-width:420px; margin:0 auto 16px;">
@@ -1019,46 +943,6 @@
             const tableTotalEl = document.getElementById('tableTrackCount');
             if (totalEl) totalEl.textContent = Math.max(0, parseInt(totalEl.textContent || 0) - 1);
             if (tableTotalEl) tableTotalEl.textContent = Math.max(0, parseInt(tableTotalEl.textContent || 0) - 1);
-        } catch (err) {
-            if (window.App && App.toast) App.toast.error(err.message);
-            else alert(err.message);
-        }
-    }
-
-    // Play Track on ESP32
-    async function playTrackOnEsp32(trackId, title) {
-        if (window.App && App.toast) {
-            App.toast.info("Mengirim perintah putar '" + title + "' ke speaker ESP32...");
-        }
-
-        try {
-            const resp = await fetch('/api/v1/playlist/' + trackId + '/play', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-Token': csrfToken
-                }
-            });
-            const data = await resp.json();
-            if (!resp.ok || !data.success) {
-                throw new Error(data.detail || data.message || "Gagal mengirim perintah putar ke ESP32.");
-            }
-
-            if (window.App && App.toast) {
-                App.toast.success(data.message || "Berhasil dikirim ke ESP32!");
-            }
-
-            // Update play count live badge
-            const badge = document.getElementById('track-playcount-' + trackId);
-            if (badge && data.track && data.track.play_count !== undefined) {
-                badge.textContent = "🔥 " + data.track.play_count + "x";
-                badge.classList.remove('is-zero');
-            }
-
-            const statTotalPlays = document.getElementById('statTotalPlays');
-            if (statTotalPlays) {
-                const current = parseInt(statTotalPlays.textContent || 0);
-                statTotalPlays.textContent = (current + 1) + "x";
-            }
         } catch (err) {
             if (window.App && App.toast) App.toast.error(err.message);
             else alert(err.message);
