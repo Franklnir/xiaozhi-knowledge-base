@@ -551,4 +551,94 @@ def test_api_delete_playlist_track_cleans_cache(tmp_path):
     asyncio.run(_run())
 
 
+def test_get_playlist_cache_status_tool(tmp_path):
+    from xiaozhi.mcp.context import mcp_active_owner_ctx
+    from xiaozhi.mcp.tools import register_tools
+    from xiaozhi.services import audio_cache_worker
 
+    db_file = tmp_path / "test_mcp_cache.db"
+    store = SQLiteStore(str(db_file))
+    user = store.create_user("cache_mcp_user", "password123")
+    uid = user["id"]
+
+    # Add 3 tracks: 1 cached, 1 downloading, 1 uncached
+    t1 = store.add_playlist_track(uid, title="Lagu Siap", artist="Artist 1", youtube_url="https://youtube.com/watch?v=VID_READY", video_id="VID_READY")
+    t2 = store.add_playlist_track(uid, title="Lagu Proses", artist="Artist 2", youtube_url="https://youtube.com/watch?v=VID_DL", video_id="VID_DL")
+    t3 = store.add_playlist_track(uid, title="Lagu Belum", artist="Artist 3", youtube_url="https://youtube.com/watch?v=VID_UNCACHED", video_id="VID_UNCACHED")
+
+    class MockMCPServer:
+        def __init__(self):
+            self.tools = {}
+
+        def tool(self):
+            def decorator(fn):
+                self.tools[fn.__name__] = fn
+                return fn
+            return decorator
+
+    mock_mcp = MockMCPServer()
+
+    history_records = []
+    def record_history(*args):
+        history_records.append(args)
+
+    with patch.object(audio_cache_worker, "AUDIO_CACHE_DIR", tmp_path):
+        # Create cache file for VID_READY
+        ready_file = tmp_path / "VID_READY_16000_16k.opus"
+        ready_file.write_bytes(b"OggS" + (b"B" * 15000))
+
+        # Setup downloading state for VID_DL
+        audio_cache_worker._active_downloads.add("VID_DL")
+        audio_cache_worker._progress_state["VID_DL"] = {"status": "downloading", "percent": 50, "current_sec": 30.0, "total_sec": 60}
+
+        try:
+            register_tools(mock_mcp, store, record_history)
+            token = mcp_active_owner_ctx.set(uid)
+
+            # 1. Test get_playlist_cache_status overall
+            res = mock_mcp.tools["get_playlist_cache_status"]("")
+            assert res["success"] is True
+            assert res["total_tracks"] == 3
+            assert res["ready_count"] == 1
+            assert res["downloading_count"] == 1
+            assert res["uncached_count"] == 1
+            assert "siap diputar lancar" in res["message"].lower()
+            assert "proses unduh cache" in res["message"].lower()
+            assert "belum diunduh" in res["message"].lower()
+
+            # 2. Test specific track query (track 1 - ready)
+            res_t1 = mock_mcp.tools["get_playlist_cache_status"]("1")
+            assert res_t1["success"] is True
+            assert res_t1["track"]["cache_status"] == "ready"
+            assert "100% selesai diunduh" in res_t1["message"]
+
+            # 3. Test specific track query (track 3 - uncached)
+            res_t3 = mock_mcp.tools["get_playlist_cache_status"]("Lagu Belum")
+            assert res_t3["success"] is True
+            assert res_t3["track"]["cache_status"] == "uncached"
+            assert "belum tersimpan" in res_t3["message"]
+
+            # 4. Test play_playlist_song with ready track
+            play_ready = mock_mcp.tools["play_playlist_song"]("1")
+            assert play_ready["success"] is True
+            assert play_ready["cache_status"] == "ready"
+            assert "siap diputar dengan sangat lancar" in play_ready["message"]
+
+            # 5. Test play_playlist_song with uncached track -> warning given
+            play_uncached = mock_mcp.tools["play_playlist_song"]("3")
+            assert play_uncached["success"] is True
+            assert play_uncached["cache_status"] == "uncached"
+            assert "putus-putus" in play_uncached["message"]
+            assert "putus-putus" in play_uncached["instructions"]
+
+            # 6. Test list_user_playlist has cache tags
+            list_res = mock_mcp.tools["list_user_playlist"]()
+            assert list_res["success"] is True
+            assert "[Siap Lancar ⚡]" in list_res["message"]
+            assert "[Unduh 50% ⏳]" in list_res["message"]
+            assert "[Streaming ⚠️]" in list_res["message"]
+
+            mcp_active_owner_ctx.reset(token)
+        finally:
+            audio_cache_worker._active_downloads.discard("VID_DL")
+            audio_cache_worker._progress_state.pop("VID_DL", None)

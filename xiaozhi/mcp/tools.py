@@ -1804,10 +1804,39 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
                     cnt = int(matched_track.get("play_count", 0)) + 1
                     track_no = matched_track.get("track_number", 1)
+
+                    # Periksa status cache untuk memberitahu kestabilan pemutaran
+                    cache_status = "uncached"
+                    cache_note = ""
+                    try:
+                        from xiaozhi.services.audio_cache_worker import get_track_cache_status, enqueue_precache
+                        c_info = get_track_cache_status(vid)
+                        cache_status = c_info.get("status", "uncached")
+                        pct = c_info.get("percent", 0)
+                        if cache_status == "ready":
+                            cache_note = "Lagu ini sudah 100% siap di cache server dan siap diputar dengan sangat lancar."
+                        elif cache_status == "downloading":
+                            cache_note = f"Perhatian: Lagu ini masih dalam proses unduh cache ({pct}%). Pemutaran via streaming langsung mungkin berpotensi tersendat atau putus-putus jika koneksi kurang stabil."
+                        else:
+                            cache_note = "Perhatian: Lagu ini belum tersimpan di cache server. Pemutaran via live streaming berisiko mengalami jeda atau putus-putus jika jaringan lambat."
+                            try:
+                                import asyncio
+                                loop = asyncio.get_running_loop()
+                                loop.create_task(enqueue_precache(vid, matched_track.get("youtube_url", f"https://www.youtube.com/watch?v={vid}")))
+                            except Exception:
+                                pass
+                    except Exception as e_c:
+                        logger.debug("Cache check error in play_youtube_song: %s", e_c)
+
+                    instructions = f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' agar speaker XiaoZhi langsung memutar lagunya."
+                    if cache_status != "ready" and cache_note:
+                        instructions += f" PENTING: Sampaikan juga kepada pengguna dengan suara singkat dan ramah: '{cache_note}'"
+
                     response = {
                         "success": True,
                         "source": "playlist",
-                        "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}' (telah diputar {cnt} kali). Panggil tool perangkat self.audio.play_youtube.",
+                        "cache_status": cache_status,
+                        "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}' ({cache_note}). Panggil tool perangkat self.audio.play_youtube.",
                         "query": query,
                         "now_playing": {
                             "track_number": track_no,
@@ -1816,8 +1845,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                             "video_url": matched_track.get("youtube_url", ""),
                             "stream_url": stream_url,
                             "play_count": cnt,
+                            "cache_status": cache_status,
                         },
-                        "instructions": f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' agar speaker XiaoZhi langsung memutar lagunya.",
+                        "instructions": instructions,
                     }
                     record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query, "source": "playlist"}, response)
                     return response
@@ -1980,9 +2010,38 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
             cnt = int(matched.get("play_count", 0)) + 1
             track_no = matched.get("track_number", 1)
+
+            # Periksa status cache untuk memberitahu kestabilan pemutaran
+            cache_status = "uncached"
+            cache_note = ""
+            try:
+                from xiaozhi.services.audio_cache_worker import get_track_cache_status, enqueue_precache
+                c_info = get_track_cache_status(vid)
+                cache_status = c_info.get("status", "uncached")
+                pct = c_info.get("percent", 0)
+                if cache_status == "ready":
+                    cache_note = "Lagu ini sudah 100% siap di cache server dan siap diputar dengan sangat lancar."
+                elif cache_status == "downloading":
+                    cache_note = f"Perhatian: Lagu ini masih dalam proses unduh cache ({pct}%). Pemutaran via streaming langsung mungkin berpotensi tersendat atau putus-putus jika koneksi kurang stabil."
+                else:
+                    cache_note = "Perhatian: Lagu ini belum tersimpan di cache server. Pemutaran via live streaming berisiko mengalami jeda atau putus-putus jika jaringan lambat."
+                    try:
+                        import asyncio
+                        loop = asyncio.get_running_loop()
+                        loop.create_task(enqueue_precache(vid, matched.get("youtube_url", f"https://www.youtube.com/watch?v={vid}")))
+                    except Exception:
+                        pass
+            except Exception as e_c:
+                logger.debug("Cache check error in play_playlist_song: %s", e_c)
+
+            instructions = f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' agar speaker XiaoZhi langsung memutar lagunya."
+            if cache_status != "ready" and cache_note:
+                instructions += f" PENTING: Sampaikan juga kepada pengguna dengan suara singkat dan ramah: '{cache_note}'"
+
             response = {
                 "success": True,
-                "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}' (telah diputar {cnt} kali). Panggil tool perangkat self.audio.play_youtube.",
+                "cache_status": cache_status,
+                "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}' ({cache_note}). Panggil tool perangkat self.audio.play_youtube.",
                 "query": query,
                 "track": {
                     "track_number": track_no,
@@ -1991,8 +2050,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     "youtube_url": matched.get("youtube_url", ""),
                     "artist": matched.get("artist", ""),
                     "play_count": cnt,
+                    "cache_status": cache_status,
                 },
-                "instructions": f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' agar speaker XiaoZhi langsung memutar lagunya.",
+                "instructions": instructions,
             }
             record_mcp_tool_history(owner_id, "play_playlist_song", query, {"query": query}, response)
             return response
@@ -2014,6 +2074,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return {"success": False, "message": "Belum ada koneksi akun/perangkat aktif.", "playlist": []}
 
         try:
+            from xiaozhi.services.audio_cache_worker import get_track_cache_status
             tracks = store.get_user_playlist(owner_id)
             if not tracks:
                 return {
@@ -2022,10 +2083,20 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     "total": 0,
                     "playlist": [],
                 }
-            summary = [
-                f"{t.get('track_number', i+1)}. {t.get('title')}" + (" [Dinonaktifkan - Akses Plus]" if not t.get("is_active", True) else f" (diputar {t.get('play_count', 0)}x)")
-                for i, t in enumerate(tracks)
-            ]
+            summary = []
+            for i, t in enumerate(tracks):
+                c_info = get_track_cache_status(t.get("video_id", ""))
+                c_status = c_info.get("status", "uncached")
+                if c_status == "ready":
+                    c_tag = " [Siap Lancar ⚡]"
+                elif c_status == "downloading":
+                    c_tag = f" [Unduh {c_info.get('percent', 0)}% ⏳]"
+                else:
+                    c_tag = " [Streaming ⚠️]"
+
+                status_tag = " [Dinonaktifkan - Akses Plus]" if not t.get("is_active", True) else c_tag
+                summary.append(f"{t.get('track_number', i+1)}. {t.get('title')}{status_tag}")
+
             response = {
                 "success": True,
                 "message": f"Ditemukan {len(tracks)} lagu di playlist Anda:\n" + "\n".join(summary[:10]),
@@ -2072,6 +2143,174 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         except Exception as exc:
             logger.exception("Error in get_playlist_top_played: %s", exc)
             return {"success": False, "message": f"Gagal mengambil statistik lagu: {exc}", "top_tracks": []}
+
+    @mcp_server.tool()
+    def get_playlist_cache_status(query: str = "") -> dict:
+        """
+        Cek status unduhan cache lagu-lagu di Playlist Musik pribadi pengguna di server VPS.
+        Mengetahui lagu playlist mana yang sudah siap diputar dengan lancar (100% ter-cache di harddisk),
+        mana yang masih dalam proses pengunduhan (downloading dengan persentase progres %),
+        dan mana yang belum ter-cache (uncached).
+
+        Gunakan tool ini saat pengguna bertanya:
+        - "Cek status cache playlist saya"
+        - "Lagu playlist mana yang siap diputar lancar?"
+        - "Apakah lagu playlist saya sudah selesai diunduh?"
+        - "Status unduhan lagu di playlist bagaimana?"
+        - "Apakah ada lagu yang cachenya belum siap atau berpotensi putus-putus?"
+
+        Args:
+            query: Opsional. Judul lagu atau nomor urut lagu di playlist untuk mengecek status lagu tertentu, atau kosongkan untuk memeriksa seluruh playlist.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if not owner_id:
+            return {"success": False, "message": "Belum ada koneksi akun/perangkat aktif.", "tracks": []}
+
+        try:
+            from xiaozhi.services.audio_cache_worker import get_track_cache_status
+
+            all_tracks = store.get_user_playlist(owner_id) if hasattr(store, "get_user_playlist") else []
+            if not all_tracks:
+                response = {
+                    "success": True,
+                    "message": "Playlist Anda saat ini masih kosong. Anda dapat menambahkan lagu melalui menu Playlist di dashboard web.",
+                    "total_tracks": 0,
+                    "ready_count": 0,
+                    "downloading_count": 0,
+                    "uncached_count": 0,
+                    "tracks": [],
+                }
+                record_mcp_tool_history(owner_id, "get_playlist_cache_status", query, {"query": query}, response)
+                return response
+
+            clean_q = str(query or "").strip()
+            # 1. Jika pengguna menanyakan nomor atau judul lagu tertentu
+            if clean_q and not is_generic_playlist_query(clean_q) and hasattr(store, "find_playlist_track_by_query"):
+                matched = store.find_playlist_track_by_query(owner_id, clean_q)
+                if matched:
+                    vid = matched.get("video_id", "")
+                    title = matched.get("title", "")
+                    track_no = matched.get("track_number", 1)
+                    c_info = get_track_cache_status(vid)
+                    c_status = c_info.get("status", "uncached")
+                    pct = c_info.get("percent", 0)
+
+                    if c_status == "ready":
+                        msg = (
+                            f"Lagu #{track_no} '{title}' sudah 100% selesai diunduh ke cache server. "
+                            f"Lagu ini siap diputar dengan lancar tanpa jeda atau kendala putus-putus."
+                        )
+                    elif c_status == "downloading":
+                        msg = (
+                            f"Lagu #{track_no} '{title}' saat ini masih dalam proses pengunduhan cache ({pct}%). "
+                            f"Jika diputar sekarang via streaming langsung, ada kemungkinan pemutaran tersendat atau putus-putus."
+                        )
+                    else:
+                        msg = (
+                            f"Lagu #{track_no} '{title}' belum tersimpan di cache server. "
+                            f"Pemutaran via live streaming berisiko mengalami jeda atau putus-putus jika koneksi tidak stabil."
+                        )
+
+                    response = {
+                        "success": True,
+                        "query": clean_q,
+                        "track": {
+                            "track_number": track_no,
+                            "title": title,
+                            "video_id": vid,
+                            "cache_status": c_status,
+                            "percent": pct,
+                            "is_cached": c_info.get("is_cached", False),
+                        },
+                        "message": msg,
+                        "instructions": f"Sampaikan status lagu #{track_no} '{title}' kepada pengguna dengan suara ramah dan jelas: '{msg}'",
+                    }
+                    record_mcp_tool_history(owner_id, "get_playlist_cache_status", query, {"query": query}, response)
+                    return response
+
+            # 2. Periksa status cache seluruh lagu di playlist
+            ready_tracks = []
+            downloading_tracks = []
+            uncached_tracks = []
+            all_statuses = []
+
+            for t in all_tracks:
+                vid = t.get("video_id", "")
+                t_no = t.get("track_number", 1)
+                t_title = t.get("title", "")
+                c_info = get_track_cache_status(vid)
+                c_status = c_info.get("status", "uncached")
+                pct = c_info.get("percent", 0)
+
+                item = {
+                    "track_number": t_no,
+                    "title": t_title,
+                    "video_id": vid,
+                    "cache_status": c_status,
+                    "percent": pct,
+                    "is_cached": c_info.get("is_cached", False),
+                }
+                all_statuses.append(item)
+
+                if c_status == "ready":
+                    ready_tracks.append(item)
+                elif c_status == "downloading":
+                    downloading_tracks.append(item)
+                else:
+                    uncached_tracks.append(item)
+
+            total = len(all_tracks)
+            parts = []
+
+            if len(ready_tracks) == total:
+                summary_msg = (
+                    f"Semua {total} lagu di playlist Anda sudah 100% selesai diunduh ke cache server "
+                    f"dan siap diputar dengan sangat lancar tanpa kendala putus-putus."
+                )
+            else:
+                if ready_tracks:
+                    ready_names = ", ".join([f"#{t['track_number']} {t['title']}" for t in ready_tracks[:4]])
+                    if len(ready_tracks) > 4:
+                        ready_names += f" dan {len(ready_tracks) - 4} lagu lainnya"
+                    parts.append(f"{len(ready_tracks)} dari {total} lagu sudah siap diputar lancar ({ready_names}).")
+
+                if downloading_tracks:
+                    dl_details = ", ".join([f"#{t['track_number']} {t['title']} ({t['percent']}%)" for t in downloading_tracks[:3]])
+                    parts.append(
+                        f"{len(downloading_tracks)} lagu masih dalam proses unduh cache: {dl_details}. "
+                        f"Lagu yang sedang diunduh berpotensi putus-putus jika diputar sekarang."
+                    )
+
+                if uncached_tracks:
+                    uncached_details = ", ".join([f"#{t['track_number']} {t['title']}" for t in uncached_tracks[:3]])
+                    parts.append(
+                        f"{len(uncached_tracks)} lagu belum diunduh ke cache: {uncached_details}. "
+                        f"Pemutaran langsung berisiko tersendat jika jaringan kurang stabil."
+                    )
+
+                summary_msg = " ".join(parts)
+
+            response = {
+                "success": True,
+                "total_tracks": total,
+                "ready_count": len(ready_tracks),
+                "downloading_count": len(downloading_tracks),
+                "uncached_count": len(uncached_tracks),
+                "message": summary_msg,
+                "ready_tracks": ready_tracks,
+                "downloading_tracks": downloading_tracks,
+                "uncached_tracks": uncached_tracks,
+                "instructions": (
+                    f"Jelaskan kepada pengguna dengan suara ramah dan ringkas: {summary_msg} "
+                    f"Pastikan pengguna mengetahui lagu mana yang sudah siap diputar dengan lancar, "
+                    f"serta ingatkan jika lagu yang belum selesai diunduh cachenya berpotensi tersendat atau putus-putus saat diputar."
+                ),
+            }
+            record_mcp_tool_history(owner_id, "get_playlist_cache_status", query, {"query": query}, response)
+            return response
+        except Exception as exc:
+            logger.exception("Error in get_playlist_cache_status: %s", exc)
+            return {"success": False, "message": f"Gagal mengecek status cache playlist: {exc}"}
 
 
     @mcp_server.tool()

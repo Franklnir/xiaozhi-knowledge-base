@@ -80,7 +80,7 @@ def setup_mode_filtering(store):
         if owner_id is not None:
             # Check user features (e.g. youtube_music)
             features = store.get_user_features(owner_id)
-            if tool_name == "play_youtube_song" and not features.get("youtube_music", True):
+            if tool_name in {"play_youtube_song", "play_playlist_song", "list_user_playlist", "get_playlist_top_played", "get_playlist_cache_status"} and not features.get("youtube_music", True):
                 return False
             # Check tool toggles set by admin
             if hasattr(store, "get_mcp_tool_toggles"):
@@ -140,8 +140,8 @@ def setup_mode_filtering(store):
         owner_id = mcp_active_owner_ctx.get()
         if owner_id is not None:
             features = store.get_user_features(owner_id)
-            if name == "play_youtube_song" and not features.get("youtube_music", True):
-                return {"success": False, "message": "Anda tidak diizinkan putar lagu YouTube. Fitur YouTube Music telah dinonaktifkan oleh administrator."}
+            if name in {"play_youtube_song", "play_playlist_song", "list_user_playlist", "get_playlist_top_played", "get_playlist_cache_status"} and not features.get("youtube_music", True):
+                return {"success": False, "message": "Anda tidak diizinkan putar lagu atau cek playlist. Fitur YouTube Music telah dinonaktifkan oleh administrator."}
             if hasattr(store, "get_mcp_tool_toggles"):
                 toggles = store.get_mcp_tool_toggles(owner_id)
                 if not toggles.get(name, True):

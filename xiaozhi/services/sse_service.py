@@ -447,7 +447,9 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                 "restoran": "search_places", "wisata": "search_places", "hotel": "search_places",
                 "nongkrong": "search_places",
                 "osint": "osint_recon", "recon": "osint_recon", "intelijen": "osint_recon",
-                "jejak digital": "osint_recon", "ip lookup": "osint_recon", "cek domain": "osint_recon"
+                "jejak digital": "osint_recon", "ip lookup": "osint_recon", "cek domain": "osint_recon",
+                "cache playlist": "get_playlist_cache_status", "status unduhan": "get_playlist_cache_status",
+                "unduhan playlist": "get_playlist_cache_status", "siap putar": "get_playlist_cache_status",
             }
             for kw, t_name in tool_keywords.items():
                 if kw in q_lower:

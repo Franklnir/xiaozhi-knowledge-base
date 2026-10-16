@@ -289,6 +289,14 @@ ALL_MCP_TOOLS_CATALOG = [
         "description": "Mengecek lagu-lagu di Playlist yang paling sering diputar (Top Played Tracks / Lagu Terfavorit).",
     },
     {
+        "name": "get_playlist_cache_status",
+        "title": "Status Cache Playlist",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "⚡",
+        "description": "Mengecek status unduhan cache lagu-lagu playlist di server, mengetahui lagu mana yang siap diputar lancar tanpa kendala putus-putus.",
+    },
+    {
         "name": "get_playback_status",
         "title": "Status Pemutaran Musik",
         "category": "media",
