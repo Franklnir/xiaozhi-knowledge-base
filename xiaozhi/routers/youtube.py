@@ -5,6 +5,7 @@ import base64
 import io
 import logging
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -20,6 +21,20 @@ from xiaozhi.core.utils import is_generic_playlist_query, normalize_tiktok_url_f
 
 logger = logging.getLogger("xiaozhi.youtube")
 router = APIRouter()
+
+# ── PLAYLIST AUDIO DISK CACHE ────────────────────────────────────────────────
+AUDIO_CACHE_DIR = Path(os.getenv("AUDIO_CACHE_DIR", str(Path(__file__).resolve().parent.parent.parent / "data" / "audio_cache")))
+try:
+    AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
+
+def _get_playlist_cache_path(video_id: str, sample_rate: int, bitrate: str) -> Path:
+    """Generate safe path for cached playlist audio (.opus) based on video_id, sample_rate, and bitrate."""
+    safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
+    safe_br = re.sub(r"[^a-zA-Z0-9]", "", str(bitrate or "").strip().lower())
+    return AUDIO_CACHE_DIR / f"{safe_vid}_{sample_rate}_{safe_br}.opus"
 
 # YouTube imports (optional)
 try:
@@ -337,7 +352,10 @@ def _fetch_user(store, user_id: Optional[int]) -> Optional[Dict[str, Any]]:
 def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_id: Optional[int] = None, mac: Optional[str] = None, token: Optional[str] = None):
     user = None
     title = ""
-    device_mac = (mac or "").strip()
+    clean_mac = mac if isinstance(mac, str) else ""
+    clean_token = token if isinstance(token, str) else ""
+    resolved_owner = owner_id if isinstance(owner_id, int) else None
+    device_mac = clean_mac.strip()
     if not device_mac and hasattr(request, "headers"):
         device_mac = (
             request.headers.get("Device-Id", "") or
@@ -354,8 +372,8 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
         ).strip()
 
     # 1. Highest priority: explicit owner_id from query parameter
-    if owner_id:
-        user = _fetch_user(store, owner_id)
+    if resolved_owner:
+        user = _fetch_user(store, resolved_owner)
 
     # 2. Check recent audio_queue for this video_id (created in last 20 minutes)
     # This directly identifies the user who just asked XiaoZhi to play this song!
@@ -370,7 +388,7 @@ def _resolve_stream_user_and_info(store, video_id: str, request: Request, owner_
             logger.debug("Error resolving user from audio_queue: %s", e)
 
     # 3. If still not resolved, check MCP token
-    if not user and token:
+    if not user and clean_token:
         try:
             owner = store.find_user_by_mcp_token(token)
             if owner and owner.get("user_id"):
@@ -567,6 +585,88 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip
     return "12k" if is_c3 else "24k"
 
 
+async def _stream_cached_opus_audio(
+    video_id: str,
+    cache_path: Path,
+    bitrate: str = "11k",
+    sample_rate: int = 24000,
+    user_id: Optional[int] = None,
+    username: str = "",
+    title: str = "",
+    device_mac: str = "",
+    chip: str = "",
+) -> AsyncGenerator[bytes, None]:
+    """Stream audio directly from local .opus disk cache without running FFmpeg or yt-dlp (0% CPU)."""
+    session = playback_tracker.start_session(
+        user_id=user_id if user_id is not None else 0,
+        username=username or (f"user-{user_id}" if user_id else "ESP32 Board"),
+        video_id=video_id,
+        title=title or f"Video {video_id} (Cached)",
+        stream_type="HTTP Cache",
+        device_mac=device_mac or "ESP32 Board",
+        bitrate=f"{bitrate}@{sample_rate//1000}kHz",
+        chip=chip or ""
+    )
+
+    total_bytes = 0
+    loop_count = 0
+    end_reason = "finished"
+    br_num_match = re.match(r"^(\d+)", str(bitrate).strip().lower())
+    bitrate_kbps = int(br_num_match.group(1)) if br_num_match else 24
+    nominal_bps = (bitrate_kbps * 1000) // 8
+    # Berikan 45% delivery headroom di atas nominal bitrate agar buffer ESP32 selalu terisi mantap
+    bytes_per_sec = max(1800, int(nominal_bps * 1.45))
+    target_send_time = time.monotonic()
+    logger.info(f"Starting cached YouTube stream for {video_id} from {cache_path} (user={user_id})")
+
+    try:
+        with open(cache_path, "rb") as f:
+            while True:
+                if session and session.abort_event.is_set():
+                    logger.info(f"Cached stream aborted by admin for video {video_id}")
+                    end_reason = "aborted"
+                    break
+
+                chunk = f.read(1536)
+                if not chunk:
+                    logger.info(f"Cached stream for {video_id} reached EOF, total={total_bytes} bytes")
+                    break
+
+                total_bytes += len(chunk)
+                loop_count += 1
+                if session:
+                    session.record_chunk(len(chunk))
+
+                if total_bytes % (1536 * 50) == 0:
+                    logger.info(f"Cached stream for {video_id}: sent {total_bytes // 1024} KB")
+
+                # Adaptive Pacing:
+                # 15 chunk pertama (~23KB = ~6-8 detik audio) dikirim instan tanpa delay agar buffer ESP32 penuh.
+                # Setelahnya dialirkan dengan 45% headroom agar tidak pernah kering dan tidak membanjiri RAM ESP32.
+                if loop_count > 15:
+                    chunk_duration = len(chunk) / bytes_per_sec
+                    target_send_time += chunk_duration
+                    sleep_sec = target_send_time - time.monotonic()
+                    if sleep_sec > 0:
+                        await asyncio.sleep(min(sleep_sec, 0.4))
+                    elif sleep_sec < -1.5:
+                        target_send_time = time.monotonic()
+                else:
+                    await asyncio.sleep(0.001)
+
+                yield chunk
+    except (asyncio.CancelledError, GeneratorExit):
+        end_reason = "cancelled"
+        logger.warning(f"Cached stream for {video_id} client disconnected or cancelled after {total_bytes} bytes")
+    except Exception as exc:
+        end_reason = "error"
+        logger.error(f"Cached stream for {video_id} error after {total_bytes} bytes: {exc}")
+    finally:
+        if session:
+            playback_tracker.end_session(session.session_id, reason=end_reason)
+        logger.info(f"Cached stream for {video_id} closed, reason={end_reason}")
+
+
 async def _stream_opus_audio(
     video_id: str,
     source_url: str,
@@ -579,6 +679,7 @@ async def _stream_opus_audio(
     title: str = "",
     device_mac: str = "",
     chip: str = "",
+    cache_path: Optional[Path] = None,
 ) -> AsyncGenerator[bytes, None]:
     br = resolve_adaptive_bitrate(bitrate, rssi, chip=chip)
     ffmpeg_bin = _FFMPEG_PATH or shutil.which("ffmpeg")
@@ -639,6 +740,19 @@ async def _stream_opus_audio(
     bytes_per_sec = max(1800, int(nominal_bps * 1.45))
     target_send_time = time.monotonic()
     logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
+
+    tmp_cache_path: Optional[Path] = None
+    tmp_cache_file = None
+    if cache_path:
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp_cache_path = cache_path.with_name(f"{cache_path.name}.tmp.{os.getpid()}.{time.time()}")
+            tmp_cache_file = open(tmp_cache_path, "wb")
+        except Exception as exc:
+            logger.warning("Failed initializing cache temp file for %s: %s", video_id, exc)
+            tmp_cache_path = None
+            tmp_cache_file = None
+
     try:
         while True:
             if session and session.abort_event.is_set():
@@ -657,6 +771,18 @@ async def _stream_opus_audio(
             loop_count += 1
             if session:
                 session.record_chunk(len(chunk))
+
+            if tmp_cache_file:
+                try:
+                    tmp_cache_file.write(chunk)
+                except Exception as exc:
+                    logger.warning("Failed writing audio cache chunk for %s: %s", video_id, exc)
+                    try:
+                        tmp_cache_file.close()
+                    except Exception:
+                        pass
+                    tmp_cache_file = None
+
             if total_bytes % (1536 * 50) == 0:
                 logger.info(f"YouTube stream for {video_id}: sent {total_bytes // 1024} KB")
 
@@ -680,6 +806,32 @@ async def _stream_opus_audio(
         end_reason = "error"
         logger.error(f"YouTube stream for {video_id} error after {total_bytes} bytes: {exc}")
     finally:
+        if tmp_cache_file:
+            try:
+                tmp_cache_file.flush()
+                tmp_cache_file.close()
+            except Exception:
+                pass
+            tmp_cache_file = None
+
+        if tmp_cache_path:
+            if end_reason == "finished" and total_bytes > 10240 and tmp_cache_path.exists():
+                try:
+                    tmp_cache_path.replace(cache_path)
+                    logger.info("Successfully cached playlist audio for %s -> %s (%d bytes)", video_id, cache_path, total_bytes)
+                except Exception as exc:
+                    logger.warning("Failed finalizing cache file %s: %s", cache_path, exc)
+                    try:
+                        tmp_cache_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+            else:
+                try:
+                    tmp_cache_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                logger.info("Discarded incomplete audio cache for %s (reason=%s, bytes=%d)", video_id, end_reason, total_bytes)
+
         if session:
             playback_tracker.end_session(session.session_id, reason=end_reason)
         if proc.returncode is None:
@@ -703,7 +855,7 @@ async def audio_stream_ogg_opus(
     mac: Optional[str] = Query(None),
     token: Optional[str] = Query(None),
 ):
-    """Real-time Ogg/Opus transcoding stream for ESP32 hardware decoder with adaptive bitrate, chip profiling, and seek resume support."""
+    """Real-time Ogg/Opus transcoding stream for ESP32 hardware decoder with adaptive bitrate, chip profiling, seek resume, and playlist disk caching."""
     # Resolve chip from query or header
     detected_chip = (
         chip or
@@ -744,8 +896,62 @@ async def audio_stream_ogg_opus(
         f"requested_br={br}, rssi={rssi} dBm -> selected_br={selected_br}"
     )
 
+    # ── AUDIO CACHE FOR PLAYLIST ONLY ──────────────────────────────────────────
+    # Cek apakah lagu ini terdaftar di playlist (milik user saat ini atau user mana pun di database)
+    is_playlist_track = False
+    playlist_item = None
+    if hasattr(store, "find_playlist_track_by_video_id"):
+        try:
+            playlist_item = store.find_playlist_track_by_video_id(video_id, owner_id=user_id) or store.find_playlist_track_by_video_id(video_id)
+            if playlist_item:
+                is_playlist_track = True
+                if not title:
+                    title = playlist_item.get("title") or ""
+        except Exception as exc:
+            logger.debug("Playlist cache check error: %s", exc)
+
+    cache_file = _get_playlist_cache_path(video_id, sample_rate, selected_br)
+
+    # Fast Path: Jika lagu ada di cache playlist dan diputar dari awal (start == 0)
+    # Langsung stream dari disk (0% CPU, no yt-dlp, no FFmpeg)!
+    if is_playlist_track and start == 0.0 and cache_file.is_file() and cache_file.stat().st_size > 10240:
+        logger.info(
+            f"Serving CACHED playlist audio for {video_id} (size={cache_file.stat().st_size}B, br={selected_br}, sr={sample_rate}Hz)"
+        )
+        return StreamingResponse(
+            _stream_cached_opus_audio(
+                video_id=video_id,
+                cache_path=cache_file,
+                bitrate=selected_br,
+                sample_rate=sample_rate,
+                user_id=user_id,
+                username=username,
+                title=title or f"Playlist Track {video_id}",
+                device_mac=device_mac,
+                chip=detected_chip,
+            ),
+            media_type="audio/ogg",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+                "Accept-Ranges": "none",
+                "X-Adaptive-Bitrate": selected_br,
+                "X-Adaptive-RSSI": str(rssi if rssi is not None else "N/A"),
+                "X-Device-MAC": device_mac or "none",
+                "X-Device-Chip": detected_chip or "unknown",
+                "X-Audio-Sample-Rate": str(sample_rate),
+                "X-Audio-Cache": "HIT",
+                "X-MAC-Status": "Tersimpan OK" if device_mac else "none",
+            }
+        )
+
+    # Cache Miss atau bukan dari awal (seek) atau bukan lagu playlist:
     target_url = None
-    if video_id.startswith("tt_"):
+    if playlist_item and playlist_item.get("youtube_url"):
+        target_url = playlist_item.get("youtube_url")
+
+    if not target_url and video_id.startswith("tt_"):
         if hasattr(store, "find_recent_audio_command_by_video_id"):
             try:
                 cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=60)
@@ -772,6 +978,7 @@ async def audio_stream_ogg_opus(
         media_name = "TikTok" if video_id.startswith("tt_") else "YouTube"
         raise HTTPException(status_code=404, detail=f"Gagal mengekstrak audio {media_name}: {exc}")
 
+    cache_target = cache_file if (is_playlist_track and start == 0.0) else None
 
     return StreamingResponse(
         _stream_opus_audio(
@@ -785,7 +992,8 @@ async def audio_stream_ogg_opus(
             username=username,
             title=title,
             device_mac=device_mac,
-            chip=detected_chip
+            chip=detected_chip,
+            cache_path=cache_target,
         ),
         media_type="audio/ogg",
         headers={
@@ -798,9 +1006,55 @@ async def audio_stream_ogg_opus(
             "X-Device-MAC": device_mac or "none",
             "X-Device-Chip": detected_chip or "unknown",
             "X-Audio-Sample-Rate": str(sample_rate),
+            "X-Audio-Cache": "MISS" if is_playlist_track else "BYPASS",
             "X-MAC-Status": "Tersimpan OK" if device_mac else "none",
         }
     )
+
+
+@router.get("/api/audio/cache/status")
+async def audio_cache_status():
+    """Mengembalikan ringkasan status audio cache di VPS."""
+    try:
+        AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cached_files = [f for f in AUDIO_CACHE_DIR.glob("*.opus") if f.is_file()]
+        total_size = sum(f.stat().st_size for f in cached_files)
+        return {
+            "success": True,
+            "cache_dir": str(AUDIO_CACHE_DIR),
+            "total_cached_tracks": len(cached_files),
+            "total_size_bytes": total_size,
+            "total_size_mb": round(total_size / (1024 * 1024), 2),
+            "files": [
+                {
+                    "filename": f.name,
+                    "size_bytes": f.stat().st_size,
+                    "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
+                }
+                for f in sorted(cached_files, key=lambda x: x.stat().st_mtime, reverse=True)[:50]
+            ]
+        }
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+@router.get("/api/audio/cache/status/{video_id}")
+async def audio_track_cache_status(video_id: str):
+    """Cek apakah sebuah video_id sudah tersimpan di cache disk VPS."""
+    safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
+    matches = list(AUDIO_CACHE_DIR.glob(f"{safe_vid}_*.opus")) if AUDIO_CACHE_DIR.exists() else []
+    return {
+        "video_id": video_id,
+        "is_cached": len(matches) > 0,
+        "cached_files": [
+            {
+                "filename": m.name,
+                "size_bytes": m.stat().st_size,
+                "size_mb": round(m.stat().st_size / (1024 * 1024), 2),
+            }
+            for m in matches
+        ]
+    }
 
 
 @router.get("/api/audio/commands/{device_id}")

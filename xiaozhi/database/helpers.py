@@ -38,11 +38,8 @@ def normalize_database(data: Dict[str, Any]) -> Dict[str, Any]:
         except (TypeError, ValueError):
             user["session_version"] = 1
         raw_theme = user.get("ui_theme")
-        norm_theme = str(raw_theme).strip().lower().replace(" ", "_").replace("-", "_") if raw_theme else ""
-        if not norm_theme or norm_theme not in UI_THEMES:
+        if not raw_theme or str(raw_theme) not in UI_THEMES:
             user["ui_theme"] = DEFAULT_UI_THEME
-        else:
-            user["ui_theme"] = norm_theme
     for item in data["user_limits"]:
         for key, default in USER_LIMIT_DEFAULTS.items():
             try:

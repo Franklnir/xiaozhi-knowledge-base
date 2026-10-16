@@ -772,7 +772,7 @@ class PostgresStore:
             conn.commit()
 
     def set_user_theme(self, user_id: int, theme: str) -> Dict[str, Any]:
-        theme = str(theme or "default").strip().lower().replace(" ", "_").replace("-", "_")
+        theme = theme.strip().lower()
         if theme not in UI_THEMES:
             raise ValueError(f"Tema '{theme}' tidak valid.")
         with self._get_conn() as conn:
