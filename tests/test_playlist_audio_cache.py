@@ -12,6 +12,7 @@ from xiaozhi.routers.youtube import (
     _get_playlist_cache_path,
     _stream_cached_opus_audio,
     audio_cache_status,
+    audio_play_direct,
     audio_stream_ogg_opus,
     audio_track_cache_status,
 )
@@ -174,3 +175,50 @@ def test_audio_cache_status_endpoints(tmp_path):
                 cache_path.unlink()
 
     asyncio.run(_run())
+
+
+def test_audio_play_direct_playlist_track_without_duration(tmp_path):
+    async def _run():
+        db_file = tmp_path / "test_play_direct.db"
+        store = SQLiteStore(str(db_file))
+        user = store.create_user("testuser_direct", "password123")
+        uid = user["id"]
+
+        # Register device MAC
+        clean_mac = "84:C7:BB:78:BE:54"
+        store.register_device(uid, clean_mac, "Test Device")
+
+        # Add playlist track with empty duration
+        track = store.add_playlist_track(
+            owner_id=uid,
+            title="intrument tidur",
+            youtube_url="https://www.youtube.com/watch?v=loO-KqvSZ6U",
+            video_id="loO-KqvSZ6U",
+            artist="Relaxing Music",
+        )
+        assert track["duration"] == ""
+
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/audio/play_direct",
+            "headers": [(b"host", b"localhost")],
+            "query_string": b"q=intrument%20tidur&mac=84:c7:bb:78:be:54",
+        }
+        req = Request(scope)
+
+        with patch("xiaozhi.routers.youtube.get_store", return_value=store), \
+             patch("xiaozhi.routers.youtube._can_bind_device_to_user", return_value=True):
+            res = await audio_play_direct(
+                request=req,
+                q="intrument tidur",
+                mac=clean_mac,
+                owner_id=uid,
+            )
+            assert res["success"] is True
+            assert res["video_id"] == "loO-KqvSZ6U"
+            assert res["title"] == "intrument tidur"
+            assert "/api/audio/stream/loO-KqvSZ6U" in res["stream_url"]
+
+    asyncio.run(_run())
+

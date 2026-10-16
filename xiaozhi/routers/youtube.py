@@ -1241,13 +1241,15 @@ async def audio_play_direct(
     owner_id: Optional[int] = Query(None),
 ):
     """Direct search and stream for ESP32 instant on-demand playback with auto MAC binding."""
-    q = (q or "").strip()
+    q = (q if isinstance(q, str) else "").strip()
+    mac = (mac if isinstance(mac, str) else "").strip()
+    token = (token if isinstance(token, str) else "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Query required")
     store = get_store()
 
     # Extract device MAC
-    device_mac = (mac or "").strip()
+    device_mac = mac
     if not device_mac and hasattr(request, "headers"):
         device_mac = (
             request.headers.get("Device-Id", "") or
@@ -1259,7 +1261,7 @@ async def audio_play_direct(
         ).strip()
 
     # Resolve owner
-    resolved_owner_id = owner_id
+    resolved_owner_id = int(owner_id) if isinstance(owner_id, int) or (isinstance(owner_id, str) and owner_id.isdigit()) else None
     if not resolved_owner_id and token:
         owner = store.find_user_by_mcp_token(token)
         if owner and owner.get("user_id"):
@@ -1336,6 +1338,8 @@ async def audio_play_direct(
         vid = ""
         title = ""
         target_video_url = ""
+        matched_track = None
+        results = None
 
         # 0. Cek apakah query langsung berupa URL stream audio internal (misal: /api/audio/stream/xyz)
         m_stream = re.search(r"/(?:api/)?audio/stream/([a-zA-Z0-9_-]+)", q)
@@ -1451,6 +1455,12 @@ async def audio_play_direct(
                     v_info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=False)
                     if v_info:
                         dur = format_duration(v_info.get("duration") or v_info.get("duration_string"))
+            except Exception:
+                pass
+
+        if matched_track and not matched_track.get("duration") and dur and hasattr(store, "update_playlist_track"):
+            try:
+                store.update_playlist_track(resolved_owner_id, matched_track["id"], duration=dur)
             except Exception:
                 pass
 

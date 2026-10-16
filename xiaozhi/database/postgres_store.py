@@ -3890,6 +3890,7 @@ class PostgresStore:
         video_id: Optional[str] = None,
         artist: Optional[str] = None,
         track_number: Optional[int] = None,
+        duration: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         updates = []
         params = []
@@ -3908,6 +3909,9 @@ class PostgresStore:
         if track_number is not None:
             updates.append("track_number = %s")
             params.append(int(track_number))
+        if duration is not None:
+            updates.append("duration = %s")
+            params.append(clean_text(duration, max_len=50, field="Durasi"))
         if not updates:
             return self.get_playlist_track(owner_id, track_id)
 

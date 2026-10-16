@@ -3577,6 +3577,7 @@ class HFJsonStore:
         video_id: Optional[str] = None,
         artist: Optional[str] = None,
         track_number: Optional[int] = None,
+        duration: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         with self._lock:
             data = self._load()
@@ -3597,6 +3598,8 @@ class HFJsonStore:
                 target["artist"] = clean_text(artist, max_len=120, field="Artis")
             if track_number is not None:
                 target["track_number"] = int(track_number)
+            if duration is not None:
+                target["duration"] = clean_text(duration, max_len=50, field="Durasi")
             target["updated_at"] = utc_now()
             self._commit(data, "Update playlist track")
             return dict(target)
