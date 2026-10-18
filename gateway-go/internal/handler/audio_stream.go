@@ -272,6 +272,42 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 			fi, err := os.Stat(match)
 			if err == nil && fi.Size() > 10240 {
 				log.Printf("[AUDIO CACHE HIT] Serving cached audio for %s (size=%d bytes, file=%s, seek=%.2fs)", videoID, fi.Size(), match, startSec)
+
+				var streamReader io.Reader
+				var cmd *exec.Cmd
+
+				if startSec == 0 {
+					f, fErr := os.Open(match)
+					if fErr != nil {
+						continue
+					}
+					defer f.Close()
+					streamReader = f
+				} else {
+					// Fast local SSD seek using ffmpeg stream copy: takes only ~20ms
+					cmd = exec.CommandContext(r.Context(), "ffmpeg", "-ss", fmt.Sprintf("%.2f", startSec), "-i", match, "-c", "copy", "-f", "ogg", "pipe:1")
+					stdout, pErr := cmd.StdoutPipe()
+					if pErr != nil || cmd.Start() != nil {
+						log.Printf("[AUDIO CACHE ERROR] Failed to start ffmpeg seek for %s: %v", videoID, pErr)
+						http.Error(w, "Failed to seek audio", http.StatusInternalServerError)
+						return
+					}
+
+					// Verify seek offset: if startSec is at or beyond track EOF, ffmpeg writes only Ogg container header (~2376B) with 0 audio frames
+					buf := make([]byte, 4096)
+					n, readErr := io.ReadAtLeast(stdout, buf, 2600)
+					if n < 2600 && (readErr == io.EOF || readErr == io.ErrUnexpectedEOF) {
+						if cmd.Process != nil {
+							_ = cmd.Process.Kill()
+						}
+						_ = cmd.Wait()
+						log.Printf("[AUDIO CACHE EOF] Seek %.2fs is at/beyond track duration for %s (read only %d bytes)", startSec, videoID, n)
+						http.Error(w, "Track reached end of file", http.StatusRequestedRangeNotSatisfiable)
+						return
+					}
+					streamReader = io.MultiReader(bytes.NewReader(buf[:n]), stdout)
+				}
+
 				w.Header().Set("Content-Type", "audio/ogg")
 				w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 				w.Header().Set("Pragma", "no-cache")
@@ -294,24 +330,12 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 				}
 				sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
 
-				var totalBytes int64
-				if startSec == 0 {
-					f, fErr := os.Open(match)
-					if fErr == nil {
-						defer f.Close()
-						totalBytes, _ = h.streamWithAdaptivePacing(r.Context(), w, f, flusher, bitrate)
+				totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate)
+				if cmd != nil {
+					if cmd.Process != nil {
+						_ = cmd.Process.Kill()
 					}
-				} else {
-					// Fast local SSD seek using ffmpeg stream copy: takes only ~20ms and generates valid Ogg header
-					cmd := exec.CommandContext(r.Context(), "ffmpeg", "-ss", fmt.Sprintf("%.2f", startSec), "-i", match, "-c", "copy", "-f", "ogg", "pipe:1")
-					stdout, pErr := cmd.StdoutPipe()
-					if pErr == nil && cmd.Start() == nil {
-						totalBytes, _ = h.streamWithAdaptivePacing(r.Context(), w, stdout, flusher, bitrate)
-						if cmd.Process != nil {
-							_ = cmd.Process.Kill()
-						}
-						_ = cmd.Wait()
-					}
+					_ = cmd.Wait()
 				}
 
 				reason := "finished"
@@ -403,6 +427,22 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	var streamReader io.Reader = stdout
+	if startSec > 0 {
+		buf := make([]byte, 4096)
+		n, readErr := io.ReadAtLeast(stdout, buf, 2600)
+		if n < 2600 && (readErr == io.EOF || readErr == io.ErrUnexpectedEOF) {
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+			}
+			_ = cmd.Wait()
+			log.Printf("[AUDIO STREAM EOF] Seek %.2fs is at/beyond track duration for %s (read only %d bytes)", startSec, videoID, n)
+			http.Error(w, "Track reached end of file", http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		streamReader = io.MultiReader(bytes.NewReader(buf[:n]), stdout)
+	}
+
 	title := resolveData.Title
 	if title == "" {
 		title = h.audioStore.GetTitleForVideo(r.Context(), videoID)
@@ -438,7 +478,7 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 
 	log.Printf("[STREAM START] Video %s -> ESP32 %s (%s, %dHz, br=%s)", videoID, mac, chip, sampleRate, bitrate)
 
-	totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, stdout, flusher, bitrate)
+	totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate)
 
 	if cmd.Process != nil {
 		_ = cmd.Process.Kill()
