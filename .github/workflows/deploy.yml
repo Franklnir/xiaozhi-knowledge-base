@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [main, verifikasi1]
+    branches: [main, verifikasi1, verifikasi-gochi1]
 
 permissions:
   contents: read
