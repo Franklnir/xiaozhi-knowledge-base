@@ -287,17 +287,25 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 				w.Header().Set("X-Audio-Sample-Rate", strconv.Itoa(sampleRate))
 				w.Header().Set("X-Audio-Cache", "HIT")
 				w.Header().Set("X-Device-MAC", mac)
+				w.WriteHeader(http.StatusOK)
+
+				flusher, _ := w.(http.Flusher)
+				if flusher != nil {
+					flusher.Flush()
+				}
 
 				title := h.audioStore.GetTitleForVideo(r.Context(), videoID)
 				if title == "" {
 					title = fmt.Sprintf("Cached Track %s", videoID)
 				}
 				sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
-				_, _ = io.Copy(w, f)
+
+				totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, f, flusher, bitrate)
 				reason := "finished"
 				if r.Context().Err() != nil {
 					reason = "stopped"
 				}
+				log.Printf("[AUDIO CACHE END] Video %s finished, streamed %d bytes", videoID, totalBytes)
 				h.notifyPlaybackEnd(ownerID, sessionID, reason)
 				return
 			}
@@ -345,6 +353,13 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		"-reconnect_streamed", "1",
 		"-reconnect_delay_max", "5",
 		"-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
+	}
+
+	if startSec > 0 {
+		args = append(args, "-ss", fmt.Sprintf("%.2f", startSec))
+	}
+
+	args = append(args,
 		"-i", resolveData.SourceURL,
 		"-vn",
 		"-ac", "1",
@@ -359,11 +374,7 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		"-page_duration", "60000",
 		"-f", "ogg",
 		"pipe:1",
-	}
-
-	if startSec > 0 {
-		args = append([]string{"-ss", fmt.Sprintf("%.2f", startSec)}, args...)
-	}
+	)
 
 	cmd := exec.CommandContext(r.Context(), ffmpegBin, args...)
 	stdout, err := cmd.StdoutPipe()
@@ -395,7 +406,7 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		h.notifyPlaybackEnd(ownerID, sessionID, reason)
 	}()
 
-	// Set audio headers for ESP32
+	// Set audio headers for ESP32 and flush immediately so ESP32 client timer does not time out
 	w.Header().Set("Content-Type", "audio/ogg")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
@@ -407,34 +418,97 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 	w.Header().Set("X-Device-MAC", mac)
 	w.WriteHeader(http.StatusOK)
 
+	flusher, _ := w.(http.Flusher)
+	if flusher != nil {
+		flusher.Flush()
+	}
+
 	log.Printf("[STREAM START] Video %s -> ESP32 %s (%s, %dHz, br=%s)", videoID, mac, chip, sampleRate, bitrate)
 
-	// Stream chunks directly with minimal memory buffer
-	buf := make([]byte, 4096)
-	flusher, hasFlusher := w.(http.Flusher)
-	totalBytes := int64(0)
-
-	for {
-		n, rErr := stdout.Read(buf)
-		if n > 0 {
-			_, wErr := w.Write(buf[:n])
-			if wErr != nil {
-				// Client disconnected (e.g. ESP32 stopped or requested next track)
-				break
-			}
-			if hasFlusher {
-				flusher.Flush()
-			}
-			totalBytes += int64(n)
-		}
-		if rErr != nil {
-			break
-		}
-	}
+	totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, stdout, flusher, bitrate)
 
 	if cmd.Process != nil {
 		_ = cmd.Process.Kill()
 	}
 	_ = cmd.Wait()
 	log.Printf("[STREAM END] Video %s finished, streamed %d bytes", videoID, totalBytes)
+}
+
+// parseBitrateBps parses bitrate strings like "16k", "24k", "32k" into bytes per second with 45% delivery headroom.
+func parseBitrateBps(bitrate string) int {
+	re := regexp.MustCompile(`^(\d+)`)
+	matches := re.FindStringSubmatch(strings.TrimSpace(bitrate))
+	kbps := 24
+	if len(matches) > 1 {
+		if val, err := strconv.Atoi(matches[1]); err == nil && val > 0 {
+			kbps = val
+		}
+	}
+	nominalBps := (kbps * 1000) / 8
+	bytesPerSec := int(float64(nominalBps) * 1.45)
+	if bytesPerSec < 2200 {
+		bytesPerSec = 2200
+	}
+	return bytesPerSec
+}
+
+// streamWithAdaptivePacing delivers audio chunks to ESP32 with adaptive rate limiting.
+// 15 chunk pertama (~30KB = ~6-8s audio) dikirim instan untuk mengisi buffer hardware ESP32.
+// Selanjutnya dialirkan dengan pembatas laju (nominal + 45% headroom) agar buffer ESP32 tidak meluap (overflow).
+func (h *AudioStreamHandler) streamWithAdaptivePacing(ctx context.Context, w http.ResponseWriter, r io.Reader, flusher http.Flusher, bitrate string) (int64, error) {
+	bytesPerSec := parseBitrateBps(bitrate)
+	buf := make([]byte, 2048)
+	totalBytes := int64(0)
+	loopCount := 0
+	targetSendTime := time.Now()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return totalBytes, ctx.Err()
+		default:
+		}
+
+		n, rErr := r.Read(buf)
+		if n > 0 {
+			_, wErr := w.Write(buf[:n])
+			if wErr != nil {
+				// Client disconnected (e.g. ESP32 stopped or requested next track)
+				return totalBytes, wErr
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+			totalBytes += int64(n)
+			loopCount++
+
+			// Adaptive Pacing:
+			// 15 chunk pertama dikirim instan tanpa delay untuk mengisi buffer hardware ESP32
+			if loopCount > 15 {
+				chunkDur := time.Duration(float64(n) / float64(bytesPerSec) * float64(time.Second))
+				targetSendTime = targetSendTime.Add(chunkDur)
+				sleepDur := time.Until(targetSendTime)
+				if sleepDur > 0 {
+					if sleepDur > 400*time.Millisecond {
+						sleepDur = 400 * time.Millisecond
+					}
+					select {
+					case <-time.After(sleepDur):
+					case <-ctx.Done():
+						return totalBytes, ctx.Err()
+					}
+				} else if sleepDur < -1500*time.Millisecond {
+					targetSendTime = time.Now()
+				}
+			}
+		}
+
+		if rErr != nil {
+			if rErr == io.EOF {
+				break
+			}
+			return totalBytes, rErr
+		}
+	}
+	return totalBytes, nil
 }
