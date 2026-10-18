@@ -11,6 +11,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: franklnir/xiaozhi
+  GATEWAY_IMAGE_NAME: franklnir/xiaozhi-gateway
   APP_DIR: /opt/xiaozhi
 
 jobs:
@@ -33,15 +34,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push Python Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile.prod
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=xiaozhi
+          cache-to: type=gha,mode=max,scope=xiaozhi
+
+      - name: Build and push Go Gateway Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./gateway-go
+          file: ./gateway-go/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.GATEWAY_IMAGE_NAME }}:latest
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,mode=max,scope=gateway
 
   deploy:
     needs: build-and-push
@@ -98,11 +109,14 @@ jobs:
             # Authenticate Docker to pull private GHCR image
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            # Pull pre-built image (ZERO build on VPS!)
-            docker compose pull xiaozhi
+            # Pull pre-built images (ZERO build on VPS!)
+            docker compose pull xiaozhi gateway
 
-            # Restart app service with pre-built image
-            docker compose up -d xiaozhi
+            # Ensure clean transition from standalone container to docker-compose service
+            docker rm -f xiaozhi-gateway 2>/dev/null || true
+
+            # Restart app services with pre-built images
+            docker compose up -d xiaozhi gateway
 
             # Wait for health check
             echo "Waiting for services to be healthy..."
@@ -111,12 +125,12 @@ jobs:
             # Run Alembic migrations on PostgreSQL
             docker compose exec -T xiaozhi alembic upgrade head || true
 
-            # Verify service is running
-            if docker compose ps | grep -q "xiaozhi.*Up"; then
-              echo "✅ xiaozhi service is running"
+            # Verify services are running
+            if docker compose ps | grep -q "xiaozhi.*Up" && docker compose ps | grep -q "xiaozhi-gateway.*Up"; then
+              echo "✅ xiaozhi and gateway services are running"
             else
-              echo "❌ xiaozhi service failed to start"
-              docker compose logs --tail 50 xiaozhi
+              echo "❌ Service check failed"
+              docker compose logs --tail 50
               exit 1
             fi
 

@@ -64,6 +64,37 @@ services:
         max-size: "5m"
         max-file: "2"
 
+  gateway:
+    image: ghcr.io/franklnir/xiaozhi-gateway:latest
+    build:
+      context: ./gateway-go
+      dockerfile: Dockerfile
+    container_name: xiaozhi-gateway
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8085:8080"
+    environment:
+      - PYTHON_BACKEND_URL=http://xiaozhi:7860
+      - AUDIO_CACHE_DIR=/app/data/audio_cache
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-xiaozhi_app}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-xiaozhi}
+      - GATEWAY_PORT=8080
+    volumes:
+      - ./data/audio_cache:/app/data/audio_cache:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      xiaozhi:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
   postgres:
     image: postgres:16-alpine
     container_name: xiaozhi-postgres
