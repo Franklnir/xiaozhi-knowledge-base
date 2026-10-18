@@ -41,3 +41,9 @@ scratch/
 *.key
 vps_key.pem
 id_rsa*
+
+# Go Binaries
+gateway-go/gateway.exe
+gateway-go/gateway-linux
+gateway-go/gateway
+

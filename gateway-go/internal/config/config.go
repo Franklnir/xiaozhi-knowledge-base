@@ -1,0 +1,66 @@
+package config
+
+import (
+	"fmt"
+	"net/url"
+	"os"
+
+	"github.com/joho/godotenv"
+)
+
+type Config struct {
+	Port             string
+	DatabaseURL      string
+	ServerBaseURL    string
+	PythonBackendURL string
+}
+
+func LoadConfig() *Config {
+	// Try loading from .env if present (in local directory or parent)
+	_ = godotenv.Load(".env")
+	_ = godotenv.Load("../.env")
+
+	port := os.Getenv("GATEWAY_PORT")
+	if port == "" {
+		port = os.Getenv("PORT")
+	}
+	if port == "" {
+		port = "8080"
+	}
+
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		host := getEnvOrDefault("POSTGRES_HOST", "localhost")
+		pgPort := getEnvOrDefault("POSTGRES_PORT", "5432")
+		db := getEnvOrDefault("POSTGRES_DB", "xiaozhi")
+		user := getEnvOrDefault("POSTGRES_USER", "xiaozhi_app")
+		password := getEnvOrDefault("POSTGRES_PASSWORD", "xiaozhi_secret")
+		sslmode := getEnvOrDefault("POSTGRES_SSLMODE", "prefer")
+
+		dbURL = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+			url.QueryEscape(user),
+			url.QueryEscape(password),
+			host,
+			pgPort,
+			db,
+			sslmode,
+		)
+	}
+
+	baseURL := getEnvOrDefault("SERVER_BASE_URL", "https://xiaozhiscig.biz.id")
+	pythonURL := getEnvOrDefault("PYTHON_BACKEND_URL", "http://127.0.0.1:8000")
+
+	return &Config{
+		Port:             port,
+		DatabaseURL:      dbURL,
+		ServerBaseURL:    baseURL,
+		PythonBackendURL: pythonURL,
+	}
+}
+
+func getEnvOrDefault(key, fallback string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return fallback
+}
