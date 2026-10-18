@@ -43,6 +43,7 @@ func main() {
 
 	// Handlers
 	devHandler := handler.NewDeviceHandler(cfg, deviceStore, audioStore)
+	streamHandler := handler.NewAudioStreamHandler(cfg, deviceStore, audioStore)
 
 	// Router
 	r := chi.NewRouter()
@@ -52,7 +53,6 @@ func main() {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(30 * time.Second))
 
 	// CORS configuration
 	r.Use(cors.Handler(cors.Options{
@@ -74,12 +74,16 @@ func main() {
 	r.Post("/api/device/audio/ack", devHandler.HandleAck)
 	r.Post("/api/device/audio/status", devHandler.HandleStatus)
 
+	// High-Performance Audio Streaming Pipeline
+	r.Get("/api/audio/stream/{video_id}", streamHandler.HandleStream)
+
 	server := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      r,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:        ":" + cfg.Port,
+		Handler:     r,
+		ReadTimeout: 30 * time.Second,
+		// WriteTimeout is 0 (disabled) to allow long-lived audio streaming to ESP32 without interruption
+		WriteTimeout: 0,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	// Server runner

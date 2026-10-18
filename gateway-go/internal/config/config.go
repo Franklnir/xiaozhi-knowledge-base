@@ -13,6 +13,7 @@ type Config struct {
 	DatabaseURL      string
 	ServerBaseURL    string
 	PythonBackendURL string
+	AudioCacheDir    string
 }
 
 func LoadConfig() *Config {
@@ -48,13 +49,15 @@ func LoadConfig() *Config {
 	}
 
 	baseURL := getEnvOrDefault("SERVER_BASE_URL", "https://xiaozhiscig.biz.id")
-	pythonURL := getEnvOrDefault("PYTHON_BACKEND_URL", "http://127.0.0.1:8000")
+	pythonURL := getEnvOrDefault("PYTHON_BACKEND_URL", "http://127.0.0.1:8080")
+	audioCacheDir := getEnvOrDefault("AUDIO_CACHE_DIR", "/app/data/audio_cache")
 
 	return &Config{
 		Port:             port,
 		DatabaseURL:      dbURL,
 		ServerBaseURL:    baseURL,
 		PythonBackendURL: pythonURL,
+		AudioCacheDir:    audioCacheDir,
 	}
 }
 

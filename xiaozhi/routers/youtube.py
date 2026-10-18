@@ -1069,6 +1069,24 @@ async def audio_track_cache_status(video_id: str):
     }
 
 
+@router.get("/internal/audio/resolve/{video_id}")
+async def internal_audio_resolve(video_id: str, request: Request, target_url: Optional[str] = Query(None)):
+    """Internal endpoint called by Go Gateway to resolve direct YouTube stream URL using yt-dlp."""
+    try:
+        source_url, extracted_title = await extract_audio_url(video_id, target_url=target_url)
+        if not source_url:
+            raise HTTPException(status_code=404, detail="Direct audio stream tidak ditemukan.")
+        return {
+            "success": True,
+            "video_id": video_id,
+            "source_url": source_url,
+            "title": extracted_title or f"Track {video_id}",
+        }
+    except Exception as exc:
+        logger.warning(f"[INTERNAL AUDIO RESOLVE ERROR] {video_id}: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/api/audio/commands/{device_id}")
 async def audio_commands_for_device(device_id: str, request: Request):
     """ESP32 firmware command poll endpoint."""
