@@ -1206,24 +1206,26 @@ class PostgresStore:
                 u_row = cur.fetchone()
                 username = u_row["username"] if u_row else f"user_{owner_id}"
 
-                # Jika MAC ini sebelumnya ada di slot user lain, lepaskan dari user lain
+                # Validasi: Jika MAC ini sedang aktif terkunci pada slot user lain, tolak agar tidak terbajak!
                 cur.execute(
                     """
-                    UPDATE xiaozhi_tokens
-                    SET board_mac = '', updated_at = %s
+                    SELECT user_id, slot_number FROM xiaozhi_tokens
                     WHERE user_id != %s AND (LOWER(board_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(board_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
+                      AND COALESCE(is_active, TRUE) = TRUE
+                    LIMIT 1
                     """,
-                    (now, int(owner_id), norm_mac, norm_mac),
+                    (int(owner_id), norm_mac, norm_mac),
                 )
-                cur.execute(
-                    """
-                    UPDATE board_binding_history
-                    SET status = 'DETACHED', unlinked_at = %s,
-                        notes = COALESCE(notes, '') || ' | Dialihkan ke user ' || %s || ' (ID: ' || %s || ')'
-                    WHERE user_id != %s AND (LOWER(device_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', ''))) AND status = 'ACTIVE'
-                    """,
-                    (now, username, str(owner_id), int(owner_id), norm_mac, norm_mac),
-                )
+                active_other = cur.fetchone()
+                if active_other:
+                    logger.warning(
+                        f"[SLOT BIND BLOCKED] Board {norm_mac} sedang aktif terkunci di slot {active_other['slot_number']} user {active_other['user_id']}. "
+                        f"Permintaan penautan oleh user {owner_id} ditolak."
+                    )
+                    return {
+                        "success": False,
+                        "detail": f"Board {norm_mac} sedang aktif tertaut pada akun user lain (ID: {active_other['user_id']}). Lepaskan terlebih dahulu dari akun tersebut.",
+                    }
 
                 # Kunci MAC ke slot user saat ini
                 cur.execute(
@@ -2546,20 +2548,22 @@ class PostgresStore:
                 username = u_row["username"] if u_row else f"user_{owner_id}"
 
                 # 2. Cek apakah board sebelumnya tertaut ke user lain
-                cur.execute("SELECT id, owner_id, is_protected FROM registered_devices WHERE LOWER(device_id) = %s", (normalized_id.lower(),))
+                cur.execute("SELECT id, owner_id, status, is_protected FROM registered_devices WHERE LOWER(device_id) = %s", (normalized_id.lower(),))
                 existing = cur.fetchone()
                 if existing:
                     prev_owner = existing.get("owner_id")
-                    if prev_owner and int(prev_owner) != int(owner_id):
-                        # Tutup riwayat aktif pemilik sebelumnya
-                        cur.execute(
-                            """
-                            UPDATE board_binding_history 
-                            SET status = 'DETACHED', unlinked_at = %s, notes = %s
-                            WHERE LOWER(device_mac) = %s AND user_id = %s AND status = 'ACTIVE'
-                            """,
-                            (now, f"Dialihkan ke user {username} (ID: {owner_id})", normalized_id.lower(), int(prev_owner)),
+                    if prev_owner and int(prev_owner) != int(owner_id) and existing.get("status") != "DETACHED":
+                        logger.warning(
+                            f"[DEVICE HIJACK PREVENTED] Board {normalized_id} sudah dimiliki user {prev_owner}. "
+                            f"Menolak pendaftaran oleh user {owner_id}."
                         )
+                        return {
+                            "id": existing.get("id"),
+                            "owner_id": prev_owner,
+                            "device_id": normalized_id,
+                            "success": False,
+                            "detail": f"Perangkat {normalized_id} sudah terdaftar pada user {prev_owner}. Lepaskan terlebih dahulu dari akun lama.",
+                        }
 
                 # 3. Upsert registered_devices
                 cur.execute(

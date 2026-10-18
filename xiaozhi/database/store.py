@@ -1206,21 +1206,26 @@ class HFJsonStore:
                     "is_locked": True,
                 }
 
-            # Jika MAC ini sebelumnya ada di slot user lain, bersihkan
-            for other in data["xiaozhi_tokens"]:
+            # Anti-hijacking: Cek apakah MAC ini sedang aktif tertaut di slot user lain
+            for other in data.get("xiaozhi_tokens", []):
                 if int(other.get("user_id", 0)) != int(owner_id):
                     other_mac = normalize_mac_address(other.get("board_mac", ""))
-                    if other_mac and other_mac.lower() == norm_mac.lower():
-                        other["board_mac"] = ""
-                        other["updated_at"] = utc_now()
+                    if other_mac and other_mac.lower() == norm_mac.lower() and other.get("is_active", True):
+                        logger.warning(
+                            f"[SLOT BIND BLOCKED] Board {norm_mac} sedang aktif terkunci di slot {other.get('slot_number')} user {other.get('user_id')}. "
+                            f"Permintaan penautan oleh user {owner_id} ditolak."
+                        )
+                        return {
+                            "success": False,
+                            "detail": f"Board {norm_mac} sedang aktif tertaut pada akun user lain (ID: {other.get('user_id')}). Lepaskan terlebih dahulu dari akun tersebut.",
+                        }
 
             existing["board_mac"] = norm_mac
             existing["updated_at"] = utc_now()
 
             for dev in data.get("registered_devices", []):
                 d_mac = normalize_mac_address(dev.get("device_id", "") or dev.get("mac_address", ""))
-                if d_mac and d_mac.lower() == norm_mac.lower():
-                    dev["owner_id"] = int(owner_id)
+                if d_mac and d_mac.lower() == norm_mac.lower() and int(dev.get("owner_id", 0)) == int(owner_id):
                     dev["status"] = "ACTIVE"
                     dev["last_active_at"] = utc_now()
 
@@ -2575,14 +2580,18 @@ class HFJsonStore:
 
             if existing:
                 prev_owner = existing.get("owner_id")
-                if prev_owner and int(prev_owner) != int(owner_id):
-                    for h in data["board_binding_history"]:
-                        if (normalize_mac_address(h.get("device_mac", "")).lower() == normalized_id.lower() 
-                                and int(h.get("user_id", 0)) == int(prev_owner) 
-                                and h.get("status") == "ACTIVE"):
-                            h["status"] = "DETACHED"
-                            h["unlinked_at"] = now
-                            h["notes"] = f"Dialihkan ke user {username} (ID: {owner_id})"
+                if prev_owner and int(prev_owner) != int(owner_id) and existing.get("status") != "DETACHED":
+                    logger.warning(
+                        f"[DEVICE HIJACK PREVENTED] Board {normalized_id} sudah dimiliki user {prev_owner}. "
+                        f"Menolak pendaftaran oleh user {owner_id}."
+                    )
+                    return {
+                        "id": existing.get("id"),
+                        "owner_id": prev_owner,
+                        "device_id": normalized_id,
+                        "success": False,
+                        "detail": f"Perangkat {normalized_id} sudah terdaftar pada user {prev_owner}. Lepaskan terlebih dahulu dari akun lama.",
+                    }
 
                 existing["owner_id"] = int(owner_id)
                 existing["mac_address"] = normalized_id

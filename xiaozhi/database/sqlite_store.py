@@ -996,24 +996,21 @@ class SQLiteStore:
         u_row = conn.execute("SELECT username FROM users WHERE id = ?", (int(owner_id),)).fetchone()
         username = u_row["username"] if u_row else f"user_{owner_id}"
 
-        # Jika MAC ini sebelumnya ada di slot user lain, lepaskan dari user lain
-        conn.execute(
+        # Validasi: Jika MAC ini sedang aktif terkunci pada slot user lain, tolak agar tidak terbajak!
+        active_other = conn.execute(
             """
-            UPDATE xiaozhi_tokens
-            SET board_mac = '', updated_at = ?
+            SELECT user_id, slot_number FROM xiaozhi_tokens
             WHERE user_id != ? AND (LOWER(board_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(board_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', '')))
+              AND COALESCE(is_active, 1) = 1
+            LIMIT 1
             """,
-            (now, int(owner_id), norm_mac, norm_mac)
-        )
-        conn.execute(
-            """
-            UPDATE board_binding_history
-            SET status = 'DETACHED', unlinked_at = ?,
-                notes = COALESCE(notes, '') || ' | Dialihkan ke user ' || ? || ' (ID: ' || ? || ')'
-            WHERE user_id != ? AND (LOWER(device_mac) = LOWER(?) OR LOWER(REPLACE(REPLACE(device_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(?, ':', ''), '-', ''))) AND status = 'ACTIVE'
-            """,
-            (now, username, str(owner_id), int(owner_id), norm_mac, norm_mac)
-        )
+            (int(owner_id), norm_mac, norm_mac)
+        ).fetchone()
+        if active_other:
+            return {
+                "success": False,
+                "detail": f"Board {norm_mac} sedang aktif tertaut pada akun user lain (ID: {active_other['user_id']}). Lepaskan terlebih dahulu dari akun tersebut.",
+            }
 
         conn.execute(
             "UPDATE xiaozhi_tokens SET board_mac = ?, updated_at = ? WHERE user_id = ? AND slot_number = ?",
@@ -2185,17 +2182,20 @@ class SQLiteStore:
         username = u_row["username"] if u_row else f"user_{owner_id}"
 
         existing = conn.execute(
-            "SELECT id, owner_id, device_name, is_protected FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ?",
+            "SELECT id, owner_id, device_name, is_protected, status FROM registered_devices WHERE LOWER(device_id) = ? OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = ?",
             (normalized_id.lower(), normalized_id.replace(":", "").replace("-", "").lower())
         ).fetchone()
 
         if existing:
             prev_owner = existing["owner_id"]
-            if prev_owner and int(prev_owner) != int(owner_id):
-                conn.execute(
-                    "UPDATE board_binding_history SET status = 'DETACHED', unlinked_at = ?, notes = ? WHERE LOWER(device_mac) = ? AND user_id = ? AND status = 'ACTIVE'",
-                    (now_str, f"Dialihkan ke user {username} (ID: {owner_id})", normalized_id.lower(), int(prev_owner))
-                )
+            if prev_owner and int(prev_owner) != int(owner_id) and existing["status"] != "DETACHED":
+                return {
+                    "id": existing["id"],
+                    "owner_id": prev_owner,
+                    "device_id": normalized_id,
+                    "success": False,
+                    "detail": f"Perangkat {normalized_id} sudah terdaftar pada user {prev_owner}. Lepaskan terlebih dahulu dari akun lama.",
+                }
             final_protected = 1 if (existing["is_protected"] or is_protected) else 0
             conn.execute(
                 "UPDATE registered_devices SET owner_id = ?, device_id = ?, device_name = ?, device_type = ?, is_protected = ?, status = 'ACTIVE', last_active_at = ? WHERE id = ?",
