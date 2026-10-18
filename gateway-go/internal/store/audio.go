@@ -115,3 +115,21 @@ func (s *AudioStore) UpdatePlaybackStatus(ctx context.Context, ownerID int64, vi
 	}
 	return nil
 }
+
+// GetTitleForVideo retrieves the title of a video from recent audio_queue if known
+func (s *AudioStore) GetTitleForVideo(ctx context.Context, videoID string) string {
+	conn, err := s.db.Pool.Acquire(ctx)
+	if err != nil {
+		return ""
+	}
+	defer conn.Release()
+	_, _ = conn.Exec(ctx, "SELECT set_config('app.user_role', 'system', true), set_config('app.is_admin', 'true', true);")
+
+	var title string
+	_ = conn.QueryRow(ctx, `
+		SELECT COALESCE(title, '') FROM audio_queue
+		WHERE video_id = $1 AND title != ''
+		ORDER BY id DESC LIMIT 1
+	`, videoID).Scan(&title)
+	return title
+}

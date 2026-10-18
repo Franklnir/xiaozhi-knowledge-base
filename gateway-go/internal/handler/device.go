@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"gateway-go/internal/config"
 	"gateway-go/internal/store"
@@ -238,9 +241,38 @@ func (h *DeviceHandler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	ownerID, _ := h.deviceStore.ResolveOwner(ctx, payload.Token, mac)
 	_ = h.audioStore.UpdatePlaybackStatus(ctx, ownerID, payload.VideoID, status)
 
+	if ownerID > 0 && (status == "finished" || status == "stopped" || status == "aborted" || status == "idle") {
+		h.notifyDeviceStatus(ownerID, status)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success": true,
 	})
+}
+
+func (h *DeviceHandler) notifyDeviceStatus(ownerID int64, status string) {
+	if h.cfg.PythonBackendURL == "" {
+		return
+	}
+	go func() {
+		payload := map[string]any{
+			"user_id": ownerID,
+			"reason":  status,
+		}
+		body, _ := json.Marshal(payload)
+		url := fmt.Sprintf("%s/internal/playback/end", strings.TrimRight(h.cfg.PythonBackendURL, "/"))
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+		if err != nil {
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+	}()
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
@@ -248,3 +280,4 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)
 }
+

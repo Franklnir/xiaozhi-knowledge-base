@@ -1087,6 +1087,69 @@ async def internal_audio_resolve(video_id: str, request: Request, target_url: Op
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.post("/internal/playback/start")
+async def internal_playback_start(request: Request):
+    """Internal endpoint called by Go Gateway to report when an audio stream starts."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    user_id = int(body.get("user_id") or 0)
+    video_id = str(body.get("video_id") or "").strip()
+    title = str(body.get("title") or "").strip()
+    device_mac = str(body.get("device_mac") or "").strip()
+    bitrate = str(body.get("bitrate") or "24k").strip()
+    chip = str(body.get("chip") or "").strip()
+
+    store = get_store()
+    user = store.get_user(user_id) if user_id else None
+    username = user["username"] if user else (f"user-{user_id}" if user_id else "ESP32 Board")
+
+    session = playback_tracker.start_session(
+        user_id=user_id,
+        username=username,
+        video_id=video_id,
+        title=title or f"YouTube {video_id}",
+        stream_type="HTTP Stream",
+        device_mac=device_mac,
+        bitrate=bitrate,
+        chip=chip,
+    )
+
+    from xiaozhi.routers.admin import broadcast_admin_users_update
+    try:
+        await broadcast_admin_users_update()
+    except Exception:
+        pass
+
+    return {"success": True, "session_id": session.session_id}
+
+
+@router.post("/internal/playback/end")
+async def internal_playback_end(request: Request):
+    """Internal endpoint called by Go Gateway to report when an audio stream ends."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    session_id = str(body.get("session_id") or "").strip()
+    reason = str(body.get("reason") or "finished").strip()
+    user_id = int(body.get("user_id") or 0)
+
+    if session_id:
+        playback_tracker.end_session(session_id, reason=reason)
+    elif user_id:
+        playback_tracker.handle_device_status(user_id, reason)
+
+    from xiaozhi.routers.admin import broadcast_admin_users_update
+    try:
+        await broadcast_admin_users_update()
+    except Exception:
+        pass
+
+    return {"success": True}
+
+
 @router.get("/api/audio/commands/{device_id}")
 async def audio_commands_for_device(device_id: str, request: Request):
     """ESP32 firmware command poll endpoint."""

@@ -110,15 +110,19 @@ func (s *DeviceStore) ResolveOwner(ctx context.Context, token, rawMAC string) (i
 		}
 	}
 
-	// 4. Fallback: Check recent pending command in last 2 minutes
-	var fallbackOwnerID int64
-	err = conn.QueryRow(ctx, `
-		SELECT owner_id FROM audio_queue
-		WHERE status = 'pending' AND created_at >= NOW() - INTERVAL '2 minutes'
-		ORDER BY id DESC LIMIT 1
-	`).Scan(&fallbackOwnerID)
-	if err == nil && fallbackOwnerID > 0 {
-		return fallbackOwnerID, nil
+	// 4. Strict Fallback: Only match recent audio command if stream_url explicitly contains this device's MAC!
+	if normMAC != "" || hexMAC != "" {
+		var macMatchedOwnerID int64
+		err = conn.QueryRow(ctx, `
+			SELECT owner_id FROM audio_queue
+			WHERE (stream_url ILIKE $1 OR stream_url ILIKE $2)
+			  AND status IN ('pending', 'playing')
+			  AND created_at >= NOW() - INTERVAL '20 minutes'
+			ORDER BY id DESC LIMIT 1
+		`, "%"+normMAC+"%", "%"+hexMAC+"%").Scan(&macMatchedOwnerID)
+		if err == nil && macMatchedOwnerID > 0 {
+			return macMatchedOwnerID, nil
+		}
 	}
 
 	return 0, nil

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -38,6 +39,82 @@ func NewAudioStreamHandler(cfg *config.Config, deviceStore *store.DeviceStore, a
 		},
 	}
 }
+
+type PlaybackStartPayload struct {
+	UserID    int64  `json:"user_id"`
+	VideoID   string `json:"video_id"`
+	Title     string `json:"title"`
+	DeviceMAC string `json:"device_mac"`
+	Bitrate   string `json:"bitrate"`
+	Chip      string `json:"chip"`
+}
+
+type PlaybackEndPayload struct {
+	SessionID string `json:"session_id"`
+	UserID    int64  `json:"user_id"`
+	Reason    string `json:"reason"`
+}
+
+func (h *AudioStreamHandler) notifyPlaybackStart(ctx context.Context, ownerID int64, videoID, title, mac, bitrate, chip string) string {
+	if h.cfg.PythonBackendURL == "" {
+		return ""
+	}
+	payload := PlaybackStartPayload{
+		UserID:    ownerID,
+		VideoID:   videoID,
+		Title:     title,
+		DeviceMAC: mac,
+		Bitrate:   bitrate,
+		Chip:      chip,
+	}
+	body, _ := json.Marshal(payload)
+	url := fmt.Sprintf("%s/internal/playback/start", strings.TrimRight(h.cfg.PythonBackendURL, "/"))
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	var res struct {
+		SessionID string `json:"session_id"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+	return res.SessionID
+}
+
+func (h *AudioStreamHandler) notifyPlaybackEnd(ownerID int64, sessionID, reason string) {
+	if h.cfg.PythonBackendURL == "" {
+		return
+	}
+	go func() {
+		payload := PlaybackEndPayload{
+			SessionID: sessionID,
+			UserID:    ownerID,
+			Reason:    reason,
+		}
+		body, _ := json.Marshal(payload)
+		url := fmt.Sprintf("%s/internal/playback/end", strings.TrimRight(h.cfg.PythonBackendURL, "/"))
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+		if err != nil {
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := h.httpClient.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+	}()
+}
+
 
 var safeFilenameRegex = regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
 
@@ -156,6 +233,16 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		mac = r.Header.Get("Device-Id")
 	}
 
+	ownerIDStr := q.Get("owner_id")
+	var ownerID int64
+	if ownerIDStr != "" {
+		ownerID, _ = strconv.ParseInt(ownerIDStr, 10, 64)
+	}
+	if ownerID == 0 {
+		resolved, _ := h.deviceStore.ResolveOwner(r.Context(), q.Get("token"), mac)
+		ownerID = resolved
+	}
+
 	bitrate := ResolveBitrate(requestedBr, rssi, chip)
 	sampleRate := ResolveSampleRate(chip)
 	safeVid := safeFilenameRegex.ReplaceAllString(videoID, "_")
@@ -177,6 +264,13 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 				w.Header().Set("X-Audio-Sample-Rate", strconv.Itoa(sampleRate))
 				w.Header().Set("X-Audio-Cache", "HIT")
 				w.Header().Set("X-Device-MAC", mac)
+
+				title := h.audioStore.GetTitleForVideo(r.Context(), videoID)
+				if title == "" {
+					title = fmt.Sprintf("Cached Track %s", videoID)
+				}
+				sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
+				defer h.notifyPlaybackEnd(ownerID, sessionID, "finished")
 
 				f, err := os.Open(match)
 				if err == nil {
@@ -201,12 +295,18 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 	}
 
 	resp, err := h.httpClient.Do(req)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		log.Printf("[AUDIO ERROR] Python resolver failed for %s: err=%v, status=%d", videoID, err, resp.StatusCode)
+	if err != nil {
+		log.Printf("[AUDIO ERROR] Python resolver request failed for %s: %v", videoID, err)
 		http.Error(w, "Unable to extract audio stream from YouTube", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[AUDIO ERROR] Python resolver returned status %d for %s", resp.StatusCode, videoID)
+		http.Error(w, "Unable to extract audio stream from YouTube", http.StatusBadGateway)
+		return
+	}
 
 	var resolveData InternalResolveResponse
 	if err := json.NewDecoder(resp.Body).Decode(&resolveData); err != nil || resolveData.SourceURL == "" {
@@ -256,6 +356,22 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Failed to start audio encoder", http.StatusInternalServerError)
 		return
 	}
+
+	title := resolveData.Title
+	if title == "" {
+		title = h.audioStore.GetTitleForVideo(r.Context(), videoID)
+	}
+	if title == "" {
+		title = fmt.Sprintf("YouTube %s", videoID)
+	}
+	sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
+	defer func() {
+		reason := "finished"
+		if r.Context().Err() != nil {
+			reason = "stopped"
+		}
+		h.notifyPlaybackEnd(ownerID, sessionID, reason)
+	}()
 
 	// Set audio headers for ESP32
 	w.Header().Set("Content-Type", "audio/ogg")
