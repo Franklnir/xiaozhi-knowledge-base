@@ -267,17 +267,11 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 	// 1. FAST PATH: Check local disk cache (Playlist track already transcoded)
 	cachePattern := filepath.Join(h.cfg.AudioCacheDir, fmt.Sprintf("%s_*.opus", safeVid))
 	matches, _ := filepath.Glob(cachePattern)
-	if len(matches) > 0 && startSec == 0 {
+	if len(matches) > 0 {
 		for _, match := range matches {
 			fi, err := os.Stat(match)
 			if err == nil && fi.Size() > 10240 {
-				f, err := os.Open(match)
-				if err != nil {
-					continue
-				}
-				defer f.Close()
-
-				log.Printf("[AUDIO CACHE HIT] Serving cached audio for %s (size=%d bytes, file=%s)", videoID, fi.Size(), match)
+				log.Printf("[AUDIO CACHE HIT] Serving cached audio for %s (size=%d bytes, file=%s, seek=%.2fs)", videoID, fi.Size(), match, startSec)
 				w.Header().Set("Content-Type", "audio/ogg")
 				w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 				w.Header().Set("Pragma", "no-cache")
@@ -300,7 +294,26 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 				}
 				sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
 
-				totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, f, flusher, bitrate)
+				var totalBytes int64
+				if startSec == 0 {
+					f, fErr := os.Open(match)
+					if fErr == nil {
+						defer f.Close()
+						totalBytes, _ = h.streamWithAdaptivePacing(r.Context(), w, f, flusher, bitrate)
+					}
+				} else {
+					// Fast local SSD seek using ffmpeg stream copy: takes only ~20ms and generates valid Ogg header
+					cmd := exec.CommandContext(r.Context(), "ffmpeg", "-ss", fmt.Sprintf("%.2f", startSec), "-i", match, "-c", "copy", "-f", "ogg", "pipe:1")
+					stdout, pErr := cmd.StdoutPipe()
+					if pErr == nil && cmd.Start() == nil {
+						totalBytes, _ = h.streamWithAdaptivePacing(r.Context(), w, stdout, flusher, bitrate)
+						if cmd.Process != nil {
+							_ = cmd.Process.Kill()
+						}
+						_ = cmd.Wait()
+					}
+				}
+
 				reason := "finished"
 				if r.Context().Err() != nil {
 					reason = "stopped"
