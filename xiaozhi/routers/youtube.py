@@ -1135,11 +1135,13 @@ async def internal_playback_end(request: Request):
     session_id = str(body.get("session_id") or "").strip()
     reason = str(body.get("reason") or "finished").strip()
     user_id = int(body.get("user_id") or 0)
+    device_mac = str(body.get("device_mac") or "").strip()
+    video_id = str(body.get("video_id") or "").strip()
 
     if session_id:
         playback_tracker.end_session(session_id, reason=reason)
     elif user_id:
-        playback_tracker.handle_device_status(user_id, reason)
+        playback_tracker.handle_device_status(user_id, reason, video_id=video_id, device_mac=device_mac)
 
     from xiaozhi.routers.admin import broadcast_admin_users_update
     try:
@@ -1194,6 +1196,8 @@ async def audio_commands_for_device(device_id: str, request: Request):
         stream_url = cmd.get("stream_url", "")
         if stream_url.startswith("/"):
             stream_url = f"{base_url}{stream_url}"
+        if device_id and stream_url.startswith("https://"):
+            stream_url = stream_url.replace("https://", "http://", 1)
 
         formatted_commands.append({
             "id": str(cmd.get("id", "")),
@@ -1557,16 +1561,23 @@ async def audio_play_direct(
             except Exception:
                 pass
 
+        final_stream_url = full_stream if (resolved_owner_id and full_stream) else (
+            f"{base_url}{stream_url}" if stream_url.startswith("/") else stream_url
+        )
+        if clean_mac and final_stream_url.startswith("https://"):
+            final_stream_url = final_stream_url.replace("https://", "http://", 1)
+
         return {
             "success": True,
             "video_id": vid,
             "title": title,
             "duration": dur,
-            "stream_url": stream_url,
+            "stream_url": final_stream_url,
             "owner_id": resolved_owner_id,
         }
     except HTTPException:
         raise
+
     except Exception as exc:
         logger.error(f"[PLAY DIRECT ERROR] {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
@@ -1607,11 +1618,12 @@ async def device_audio_commands(
         if device_hdr:
             owner_id = _resolve_owner_for_device(store, device_hdr)
 
-    # If owner_id is still None, check if there's a recent pending command in audio_queue created in last 2 mins
+    # If owner_id is still None, check if there's an audio command specifically targeted to this device MAC
     if not owner_id and (mac or request.headers.get("Device-Id", "")):
-        if hasattr(store, "find_recent_pending_audio_command"):
+        dev_mac = mac or request.headers.get("Device-Id", "") or request.headers.get("X-Device-Mac", "")
+        if hasattr(store, "find_recent_audio_command_by_mac"):
             try:
-                recent = store.find_recent_pending_audio_command(minutes=2)
+                recent = store.find_recent_audio_command_by_mac(dev_mac, minutes=10)
                 if recent and recent.get("owner_id"):
                     owner_id = int(recent["owner_id"])
             except Exception:
@@ -1663,6 +1675,8 @@ async def device_audio_commands(
         surl = c.get("stream_url", "")
         if surl.startswith("/"):
             surl = f"{base_url}{surl}"
+        if (device_mac or detected_chip) and surl.startswith("https://"):
+            surl = surl.replace("https://", "http://", 1)
         sep = "&" if "?" in surl else "?"
         if "owner_id=" not in surl and owner_id:
             surl = f"{surl}{sep}owner_id={owner_id}"

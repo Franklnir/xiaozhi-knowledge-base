@@ -51,9 +51,17 @@ type CommandsResponse struct {
 func (h *DeviceHandler) HandleGetCommands(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	token := strings.TrimSpace(q.Get("token"))
-	mac := strings.TrimSpace(q.Get("mac"))
-	chip := strings.TrimSpace(q.Get("chip"))
+	if token == "" {
+		token = r.Header.Get("X-Token")
+	}
+	if token == "" && strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	}
 
+	mac := strings.TrimSpace(q.Get("mac"))
+	if mac == "" {
+		mac = strings.TrimSpace(q.Get("device_id"))
+	}
 	if mac == "" {
 		mac = r.Header.Get("Device-Id")
 	}
@@ -64,6 +72,7 @@ func (h *DeviceHandler) HandleGetCommands(w http.ResponseWriter, r *http.Request
 		mac = r.Header.Get("X-MAC-Address")
 	}
 
+	chip := strings.TrimSpace(q.Get("chip"))
 	detectedChip := chip
 	if detectedChip == "" {
 		detectedChip = r.Header.Get("X-Device-Chip")
@@ -100,10 +109,15 @@ func (h *DeviceHandler) HandleGetCommands(w http.ResponseWriter, r *http.Request
 	baseURL := h.cfg.ServerBaseURL
 	if baseURL == "" {
 		scheme := "http"
-		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		// If requesting client is a browser or desktop (not an ESP32 board), use HTTPS if forwarded
+		if (r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https") && mac == "" && detectedChip == "" {
 			scheme = "https"
 		}
 		baseURL = fmt.Sprintf("%s://%s", scheme, r.Host)
+	}
+	// For ESP32 IoT devices, always force HTTP to prevent TLS memory exhaustion and crashes
+	if (mac != "" || detectedChip != "") && strings.HasPrefix(baseURL, "https://") {
+		baseURL = "http://" + strings.TrimPrefix(baseURL, "https://")
 	}
 	baseURL = strings.TrimRight(baseURL, "/")
 
@@ -113,6 +127,11 @@ func (h *DeviceHandler) HandleGetCommands(w http.ResponseWriter, r *http.Request
 		if strings.HasPrefix(surl, "/") {
 			surl = fmt.Sprintf("%s%s", baseURL, surl)
 		}
+		// Ensure stream URL for ESP32 is HTTP
+		if (mac != "" || detectedChip != "") && strings.HasPrefix(surl, "https://") {
+			surl = "http://" + strings.TrimPrefix(surl, "https://")
+		}
+
 		sep := "?"
 		if strings.Contains(surl, "?") {
 			sep = "&"
@@ -156,6 +175,7 @@ type AckPayload struct {
 	Token     string `json:"token"`
 	CommandID any    `json:"command_id"`
 	Mac       string `json:"mac"`
+	DeviceID  string `json:"device_id"`
 }
 
 // HandleAck handles POST /api/device/audio/ack
@@ -168,15 +188,42 @@ func (h *DeviceHandler) HandleAck(w http.ResponseWriter, r *http.Request) {
 		payload.Token = r.FormValue("token")
 		payload.CommandID = r.FormValue("command_id")
 		payload.Mac = r.FormValue("mac")
+		payload.DeviceID = r.FormValue("device_id")
 	}
 
 	mac := payload.Mac
 	if mac == "" {
+		mac = payload.DeviceID
+	}
+	if mac == "" {
 		mac = r.Header.Get("Device-Id")
+	}
+	if mac == "" {
+		mac = r.Header.Get("X-Device-Mac")
+	}
+	if mac == "" {
+		mac = r.Header.Get("X-MAC-Address")
+	}
+	if mac == "" {
+		mac = r.URL.Query().Get("mac")
+	}
+	if mac == "" {
+		mac = r.URL.Query().Get("device_id")
+	}
+
+	token := payload.Token
+	if token == "" {
+		token = r.URL.Query().Get("token")
+	}
+	if token == "" {
+		token = r.Header.Get("X-Token")
+	}
+	if token == "" && strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	}
 
 	ctx := r.Context()
-	ownerID, _ := h.deviceStore.ResolveOwner(ctx, payload.Token, mac)
+	ownerID, _ := h.deviceStore.ResolveOwner(ctx, token, mac)
 
 	var cmdID int64
 	switch v := payload.CommandID.(type) {
@@ -201,10 +248,11 @@ func (h *DeviceHandler) HandleAck(w http.ResponseWriter, r *http.Request) {
 }
 
 type StatusPayload struct {
-	Status  string `json:"status"`
-	Mac     string `json:"mac"`
-	VideoID string `json:"video_id"`
-	Token   string `json:"token"`
+	Status   string `json:"status"`
+	Mac      string `json:"mac"`
+	DeviceID string `json:"device_id"`
+	VideoID  string `json:"video_id"`
+	Token    string `json:"token"`
 }
 
 // HandleStatus handles POST /api/device/audio/status
@@ -216,9 +264,7 @@ func (h *DeviceHandler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
 		payload.Status = r.FormValue("status")
 		payload.Mac = r.FormValue("mac")
-		if payload.Mac == "" {
-			payload.Mac = r.FormValue("device_id")
-		}
+		payload.DeviceID = r.FormValue("device_id")
 		payload.VideoID = r.FormValue("video_id")
 		payload.Token = r.FormValue("token")
 	}
@@ -234,15 +280,41 @@ func (h *DeviceHandler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 
 	mac := payload.Mac
 	if mac == "" {
+		mac = payload.DeviceID
+	}
+	if mac == "" {
 		mac = r.Header.Get("Device-Id")
+	}
+	if mac == "" {
+		mac = r.Header.Get("X-Device-Mac")
+	}
+	if mac == "" {
+		mac = r.Header.Get("X-MAC-Address")
+	}
+	if mac == "" {
+		mac = r.URL.Query().Get("mac")
+	}
+	if mac == "" {
+		mac = r.URL.Query().Get("device_id")
+	}
+
+	token := payload.Token
+	if token == "" {
+		token = r.URL.Query().Get("token")
+	}
+	if token == "" {
+		token = r.Header.Get("X-Token")
+	}
+	if token == "" && strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	}
 
 	ctx := r.Context()
-	ownerID, _ := h.deviceStore.ResolveOwner(ctx, payload.Token, mac)
+	ownerID, _ := h.deviceStore.ResolveOwner(ctx, token, mac)
 	_ = h.audioStore.UpdatePlaybackStatus(ctx, ownerID, payload.VideoID, status)
 
-	if ownerID > 0 && (status == "finished" || status == "stopped" || status == "aborted" || status == "idle") {
-		h.notifyDeviceStatus(ownerID, status)
+	if ownerID > 0 {
+		h.notifyDeviceStatus(ownerID, status, payload.VideoID, mac)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -250,14 +322,16 @@ func (h *DeviceHandler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *DeviceHandler) notifyDeviceStatus(ownerID int64, status string) {
+func (h *DeviceHandler) notifyDeviceStatus(ownerID int64, status, videoID, mac string) {
 	if h.cfg.PythonBackendURL == "" {
 		return
 	}
 	go func() {
 		payload := map[string]any{
-			"user_id": ownerID,
-			"reason":  status,
+			"user_id":    ownerID,
+			"reason":     status,
+			"video_id":   videoID,
+			"device_mac": mac,
 		}
 		body, _ := json.Marshal(payload)
 		url := fmt.Sprintf("%s/internal/playback/end", strings.TrimRight(h.cfg.PythonBackendURL, "/"))

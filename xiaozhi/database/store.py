@@ -2976,12 +2976,15 @@ class HFJsonStore:
     def find_recent_audio_command_by_mac(self, mac_address: str, minutes: int = 20) -> Optional[Dict[str, Any]]:
         if not mac_address:
             return None
-        clean = mac_address.replace(":", "").replace("-", "").strip().lower()
+        clean = re.sub(r"[^0-9a-fA-F]", "", mac_address).lower()
+        if len(clean) != 12:
+            return None
+        mac_with_colons = ":".join(clean[i:i+2] for i in range(0, 12, 2))
         with self._lock:
             data = self._load()
             for cmd in reversed(data.get("audio_queue", [])):
                 url = str(cmd.get("stream_url", "")).lower()
-                if mac_address.lower() in url or clean in url:
+                if mac_with_colons in url or clean in url:
                     return cmd
         return None
 

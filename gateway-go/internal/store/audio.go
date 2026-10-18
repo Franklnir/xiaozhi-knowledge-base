@@ -30,6 +30,7 @@ func NewAudioStore(db *db.DB) *AudioStore {
 
 // GetPendingCommands retrieves pending commands for a user.
 // Parity with Python: If there are multiple pending commands, older ones are auto-acknowledged, keeping only the latest.
+// Stale commands older than 30 minutes are automatically marked as played.
 func (s *AudioStore) GetPendingCommands(ctx context.Context, ownerID int64) ([]AudioCommand, error) {
 	conn, err := s.db.Pool.Acquire(ctx)
 	if err != nil {
@@ -39,6 +40,13 @@ func (s *AudioStore) GetPendingCommands(ctx context.Context, ownerID int64) ([]A
 
 	// Bypass RLS as system
 	_, _ = conn.Exec(ctx, "SELECT set_config('app.user_role', 'system', true), set_config('app.is_admin', 'true', true);")
+
+	// Clean up stale pending commands older than 30 minutes
+	_, _ = conn.Exec(ctx, `
+		UPDATE audio_queue
+		SET status = 'played'
+		WHERE owner_id = $1 AND status = 'pending' AND created_at < NOW() - INTERVAL '30 minutes'
+	`, ownerID)
 
 	rows, err := conn.Query(ctx, `
 		SELECT id, owner_id, COALESCE(title, ''), stream_url, COALESCE(video_url, ''),

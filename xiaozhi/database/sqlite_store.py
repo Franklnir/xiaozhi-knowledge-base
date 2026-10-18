@@ -2522,7 +2522,10 @@ class SQLiteStore:
     def find_recent_audio_command_by_mac(self, mac_address: str, minutes: int = 20) -> Optional[Dict[str, Any]]:
         if not mac_address:
             return None
-        clean = mac_address.replace(":", "").replace("-", "").strip().lower()
+        clean = re.sub(r"[^0-9a-fA-F]", "", mac_address).lower()
+        if len(clean) != 12:
+            return None
+        mac_with_colons = ":".join(clean[i:i+2] for i in range(0, 12, 2))
         conn = self._get_conn()
         row = conn.execute(
             """
@@ -2532,7 +2535,7 @@ class SQLiteStore:
               AND datetime(created_at) >= datetime('now', ? || ' minutes') 
             ORDER BY id DESC LIMIT 1
             """,
-            (f"%{mac_address}%", f"%{clean}%", f"-{abs(minutes)}"),
+            (f"%{mac_with_colons}%", f"%{clean}%", f"-{abs(minutes)}"),
         ).fetchone()
         return dict(row) if row else None
 

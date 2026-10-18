@@ -228,9 +228,26 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	mac := q.Get("mac")
+	mac := strings.TrimSpace(q.Get("mac"))
+	if mac == "" {
+		mac = strings.TrimSpace(q.Get("device_id"))
+	}
 	if mac == "" {
 		mac = r.Header.Get("Device-Id")
+	}
+	if mac == "" {
+		mac = r.Header.Get("X-Device-Mac")
+	}
+	if mac == "" {
+		mac = r.Header.Get("X-MAC-Address")
+	}
+
+	token := strings.TrimSpace(q.Get("token"))
+	if token == "" {
+		token = r.Header.Get("X-Token")
+	}
+	if token == "" && strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	}
 
 	ownerIDStr := q.Get("owner_id")
@@ -239,7 +256,7 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		ownerID, _ = strconv.ParseInt(ownerIDStr, 10, 64)
 	}
 	if ownerID == 0 {
-		resolved, _ := h.deviceStore.ResolveOwner(r.Context(), q.Get("token"), mac)
+		resolved, _ := h.deviceStore.ResolveOwner(r.Context(), token, mac)
 		ownerID = resolved
 	}
 
@@ -254,6 +271,12 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		for _, match := range matches {
 			fi, err := os.Stat(match)
 			if err == nil && fi.Size() > 10240 {
+				f, err := os.Open(match)
+				if err != nil {
+					continue
+				}
+				defer f.Close()
+
 				log.Printf("[AUDIO CACHE HIT] Serving cached audio for %s (size=%d bytes, file=%s)", videoID, fi.Size(), match)
 				w.Header().Set("Content-Type", "audio/ogg")
 				w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -270,14 +293,13 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 					title = fmt.Sprintf("Cached Track %s", videoID)
 				}
 				sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
-				defer h.notifyPlaybackEnd(ownerID, sessionID, "finished")
-
-				f, err := os.Open(match)
-				if err == nil {
-					defer f.Close()
-					_, _ = io.Copy(w, f)
-					return
+				_, _ = io.Copy(w, f)
+				reason := "finished"
+				if r.Context().Err() != nil {
+					reason = "stopped"
 				}
+				h.notifyPlaybackEnd(ownerID, sessionID, reason)
+				return
 			}
 		}
 	}
@@ -410,6 +432,9 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	if cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
 	_ = cmd.Wait()
 	log.Printf("[STREAM END] Video %s finished, streamed %d bytes", videoID, totalBytes)
 }

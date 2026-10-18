@@ -3004,7 +3004,10 @@ class PostgresStore:
     def find_recent_audio_command_by_mac(self, mac_address: str, minutes: int = 20) -> Optional[Dict[str, Any]]:
         if not mac_address:
             return None
-        clean = mac_address.replace(":", "").replace("-", "").strip().lower()
+        clean = re.sub(r"[^0-9a-fA-F]", "", mac_address).lower()
+        if len(clean) != 12:
+            return None
+        mac_with_colons = ":".join(clean[i:i+2] for i in range(0, 12, 2))
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -3015,7 +3018,7 @@ class PostgresStore:
                       AND created_at >= NOW() - (%s || ' minutes')::INTERVAL 
                     ORDER BY id DESC LIMIT 1
                     """,
-                    (f"%{mac_address}%", f"%{clean}%", str(int(minutes))),
+                    (f"%{mac_with_colons}%", f"%{clean}%", str(int(minutes))),
                 )
                 row = cur.fetchone()
                 return dict(row) if row else None

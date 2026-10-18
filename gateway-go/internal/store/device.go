@@ -31,16 +31,29 @@ func XiaozhiTokenHash(token string) string {
 	return full
 }
 
-// NormalizeMAC standardizes MAC addresses into XX:XX:XX:XX:XX:XX format
-func NormalizeMAC(mac string) string {
+// CleanHexMAC returns the raw 12-char hex lowercase MAC, or empty string if invalid
+func CleanHexMAC(mac string) string {
 	mac = strings.TrimSpace(mac)
 	if strings.HasPrefix(strings.ToLower(mac), "esp32-") {
 		mac = mac[6:]
 	}
-	// remove all colons and hyphens
-	clean := strings.ReplaceAll(strings.ReplaceAll(mac, ":", ""), "-", "")
+	clean := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(mac, ":", ""), "-", ""))
 	if len(clean) != 12 {
-		return strings.ToUpper(mac)
+		return ""
+	}
+	for _, c := range clean {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return ""
+		}
+	}
+	return clean
+}
+
+// NormalizeMAC standardizes MAC addresses into XX:XX:XX:XX:XX:XX format, or empty string if invalid
+func NormalizeMAC(mac string) string {
+	clean := CleanHexMAC(mac)
+	if clean == "" {
+		return ""
 	}
 	var sb strings.Builder
 	for i := 0; i < 12; i += 2 {
@@ -50,15 +63,6 @@ func NormalizeMAC(mac string) string {
 		sb.WriteString(clean[i : i+2])
 	}
 	return strings.ToUpper(sb.String())
-}
-
-// CleanHexMAC returns the raw 12-char hex lowercase MAC
-func CleanHexMAC(mac string) string {
-	mac = strings.TrimSpace(mac)
-	if strings.HasPrefix(strings.ToLower(mac), "esp32-") {
-		mac = mac[6:]
-	}
-	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(mac, ":", ""), "-", ""))
 }
 
 // ResolveOwner resolves user owner_id based on token or ESP32 device MAC
@@ -85,7 +89,7 @@ func (s *DeviceStore) ResolveOwner(ctx context.Context, token, rawMAC string) (i
 	normMAC := NormalizeMAC(rawMAC)
 	hexMAC := CleanHexMAC(rawMAC)
 
-	if normMAC != "" {
+	if normMAC != "" && hexMAC != "" {
 		// 2. Active Slot in xiaozhi_tokens
 		var ownerID int64
 		err := conn.QueryRow(ctx, `
@@ -108,10 +112,8 @@ func (s *DeviceStore) ResolveOwner(ctx context.Context, token, rawMAC string) (i
 		if err == nil && ownerID > 0 {
 			return ownerID, nil
 		}
-	}
 
-	// 4. Strict Fallback: Only match recent audio command if stream_url explicitly contains this device's MAC!
-	if normMAC != "" || hexMAC != "" {
+		// 4. Strict Fallback: Only match recent audio command if stream_url explicitly contains this device's MAC!
 		var macMatchedOwnerID int64
 		err = conn.QueryRow(ctx, `
 			SELECT owner_id FROM audio_queue
