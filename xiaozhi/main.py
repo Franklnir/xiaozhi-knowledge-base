@@ -343,7 +343,7 @@ async def download_qr_image():
 
 
 # PWA Web App Endpoints for Mobile Installation
-@app.get("/manifest.json", include_in_schema=False)
+@app.api_route("/manifest.json", methods=["GET", "HEAD"], include_in_schema=False)
 async def pwa_manifest():
     manifest_file = STATIC_DIR / "manifest.json"
     if manifest_file.exists():
@@ -354,7 +354,7 @@ async def pwa_manifest():
     )
 
 
-@app.get("/sw.js", include_in_schema=False)
+@app.api_route("/sw.js", methods=["GET", "HEAD"], include_in_schema=False)
 async def pwa_service_worker():
     sw_file = STATIC_DIR / "sw.js"
     if sw_file.exists():
