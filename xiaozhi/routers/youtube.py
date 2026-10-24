@@ -546,12 +546,10 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip
       - -88 to -82 dBm (Sinyal Lemah): 16k
       - < -88 dBm (Sinyal Sangat Lemah): 12k (Batas minimum aman S3)
     ESP32-C3 (Single Core 160MHz, No PSRAM):
-      - Batas maksimum bitrate ditingkatkan ke 24k (High Quality C3)
-      - RSSI >= -65 dBm (Sinyal Sangat Kuat): 24k
-      - -75 to -65 dBm (Sinyal Kuat): 20k
-      - -82 to -75 dBm (Sinyal Sedang): 16k
-      - -88 to -82 dBm (Sinyal Lemah): 12k
-      - < -88 dBm (Sinyal Sangat Lemah): 8k
+      - RSSI >= -65 dBm (Sinyal Sangat Kuat): 16k
+      - -75 to -65 dBm (Sinyal Kuat): 12k
+      - -85 to -75 dBm (Sinyal Sedang): 10k
+      - < -85 dBm (Sinyal Lemah): 8k
     """
     br_str = (requested_br or "").lower().strip()
     valid_bitrates = {"6k", "8k", "9k", "10k", "11k", "12k", "16k", "20k", "24k", "30k", "32k", "48k"}
@@ -578,16 +576,14 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip
     if is_c3:
         if rssi is not None and rssi < 0:
             if rssi >= -65:
-                return "24k"
-            elif rssi >= -75:
-                return "20k"
-            elif rssi >= -82:
                 return "16k"
-            elif rssi >= -88:
+            elif rssi >= -75:
                 return "12k"
+            elif rssi >= -85:
+                return "10k"
             else:
                 return "8k"
-        return "24k"
+        return "16k"
 
     if rssi is not None and rssi < 0:
         if rssi >= -65:

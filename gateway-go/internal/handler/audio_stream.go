@@ -155,17 +155,17 @@ func ResolveBitrate(requested string, rssi *int, chip string) string {
 		if rssi != nil && *rssi < 0 {
 			r := *rssi
 			if r >= -65 {
-				return "24k"
-			} else if r >= -75 {
-				return "20k"
-			} else if r >= -82 {
 				return "16k"
-			} else if r >= -88 {
+			} else if r >= -75 {
 				return "12k"
+			} else if r >= -82 {
+				return "10k"
+			} else if r >= -88 {
+				return "8k"
 			}
-			return "8k"
+			return "6k"
 		}
-		return "24k"
+		return "16k"
 	}
 
 	if rssi != nil && *rssi < 0 {
