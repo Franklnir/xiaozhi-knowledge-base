@@ -1090,9 +1090,6 @@
                                 <h2 class="relay-room-name" title="{{ room.nama_tempat }}">{{ room.nama_tempat }}</h2>
                                 <span class="relay-channel-count-tag">{{ room.jumlah_relay }} Channel</span>
                             </div>
-                            <div class="relay-room-subline">
-                                <span class="relay-client-mono" title="{{ room.api_client_id }}">ID: {{ room.api_client_id }}</span>
-                            </div>
                         </div>
                     </div>
                     <div class="relay-room-actions-menu">
@@ -1174,56 +1171,17 @@
                         </div>
                     </div>
 
-                    <!-- Sync & Hardware Acknowledgment Indicator -->
-                    <div class="relay-sync-indicator {% if relay.pending_command %}is-pending{% endif %}" id="relaySync{{ room.id }}-{{ relay.relay_number }}">
+                    <!-- Sync & Hardware Acknowledgment Indicator (Hanya muncul jika sedang proses konfirmasi) -->
+                    <div class="relay-sync-indicator {% if relay.pending_command %}is-pending{% endif %}" id="relaySync{{ room.id }}-{{ relay.relay_number }}" style="{% if not relay.pending_command %}display: none;{% endif %}">
                         <span class="relay-sync-dot"></span>
                         <span id="relaySyncText{{ room.id }}-{{ relay.relay_number }}">
                             {% if relay.pending_command %}
                             Menunggu ESP32 konfirmasi {{ relay.desired_status }}...
-                            {% else %}
-                            Sinkron dengan status perangkat fisik.
                             {% endif %}
                         </span>
                     </div>
-
-                    <!-- Voice Command Chips (Copyable on Click) -->
-                    <div class="relay-voice-section">
-                        <div class="relay-voice-header-label">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
-                            <span>Ucapkan ke XiaoZhi AI:</span>
-                        </div>
-                        <div class="relay-voice-box">
-                            <div class="relay-voice-chip relay-voice-chip-on" onclick="copyVoiceCommand('{{ relay.voice_command_on|escape }}', this)" title="Klik untuk menyalin perintah ON">
-                                <span class="voice-badge-on">ON</span>
-                                <span class="voice-text">"{{ relay.voice_command_on }}"</span>
-                                <svg class="copy-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                            </div>
-                            <div class="relay-voice-chip relay-voice-chip-off" onclick="copyVoiceCommand('{{ relay.voice_command_off|escape }}', this)" title="Klik untuk menyalin perintah OFF">
-                                <span class="voice-badge-off">OFF</span>
-                                <span class="voice-text">"{{ relay.voice_command_off }}"</span>
-                                <svg class="copy-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 {% endfor %}
-            </div>
-
-            <!-- Room Card Footer -->
-            <div class="relay-room-footer">
-                <div style="display:flex; align-items:center; gap:6px; min-width:0;">
-                    <span style="font-size:10px; font-weight:800; color:var(--app-muted); text-transform:uppercase; letter-spacing:0.3px;">Endpoint:</span>
-                    <span class="relay-api-pill" title="{{ room.api_commands_path }}">{{ room.api_commands_path }}</span>
-                </div>
-                <button type="button" class="relay-head-btn" data-config-room="{{ room.id }}" style="font-size:11px; padding:4px 9px;">
-                    Setup ESP32 ➔
-                </button>
             </div>
         </article>
         {% endfor %}
@@ -1734,11 +1692,13 @@
         const syncTextEl = document.getElementById(`relaySyncText${roomId}-${relayNumber}`);
         if (syncEl && syncTextEl) {
             if (pending) {
+                syncEl.style.display = "flex";
                 syncEl.classList.add("is-pending");
                 syncTextEl.textContent = `Menunggu ESP32 konfirmasi ${desired}...`;
             } else {
+                syncEl.style.display = "none";
                 syncEl.classList.remove("is-pending");
-                syncTextEl.textContent = "Sinkron dengan status perangkat fisik.";
+                syncTextEl.textContent = "";
             }
         }
     }
