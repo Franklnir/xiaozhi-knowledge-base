@@ -1,5 +1,5 @@
 # Multi-stage build for ultra-lightweight Docker image (~15MB)
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
