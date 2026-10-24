@@ -77,67 +77,127 @@ def real_relay_page_payload(owner_id: int) -> Dict[str, Any]:
     return {"rooms": rooms}
 
 
-def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, source: str = "web_ui") -> dict:
-    store = get_store()
-    status = normalize_relay_state(command)
-    store.update_relay_status(owner_id, room["id"], relay["relay_number"], status)
+def _forward_mqtt_command(slug: str, relay_number: int, command: str, cmd_id: str) -> bool:
+    import json
+    import os
+    import urllib.request
+    
+    clean_slug = (slug or "").strip().lower()
+    if not clean_slug:
+        return False
+        
+    base_urls = [
+        os.getenv("GATEWAY_URL", "").rstrip("/"),
+        "http://xiaozhi-gateway:8080",
+        "http://127.0.0.1:8085",
+        "http://gateway:8080",
+        "http://localhost:8085",
+    ]
+    
+    payload = json.dumps({
+        "relay": int(relay_number),
+        "command": str(command).upper(),
+        "cmd_id": str(cmd_id),
+    }).encode("utf-8")
+    
+    for base in base_urls:
+        if not base:
+            continue
+        try:
+            target = f"{base}/api/device/relay/{clean_slug}/control"
+            req = urllib.request.Request(
+                target,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                if 200 <= resp.status < 300:
+                    return True
+        except Exception:
+            continue
+    return False
 
-    # Broadcast live SSE update for instant 2-way Web UI & MCP synchronization
+
+def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, source: str = "web_ui") -> dict:
+    target_status = normalize_relay_state(command)
+    current_status = str(relay.get("status", "OFF")).upper()
+    relay_num = int(relay.get("relay_number", 1))
+    slug = room.get("slug") or room.get("api_slug") or ""
+    
+    import time
+    cmd_id = f"cmd_{int(time.time() * 1000)}_{relay_num}"
+
+    # 1. Forward instant command to Go Gateway -> Mosquitto MQTT: xiaozhi/relay/{slug}/set
+    _forward_mqtt_command(slug, relay_num, target_status, cmd_id)
+
+    # 2. DO NOT update DB status immediately!
+    # Status in database represents confirmed physical state.
+    # Broadcast SSE update with status = current_status, pending = target_status, desired = target_status
     try:
         from xiaozhi.services.sse_service import broadcast_relay_update
         broadcast_relay_update(
             user_id=owner_id,
             room_id=room["id"],
-            relay_number=relay["relay_number"],
-            status=status,
+            relay_number=relay_num,
+            status=current_status,  # Still previous confirmed state!
             source=source,
             room_name=room.get("nama_tempat", ""),
             relay_name=relay.get("nama_relay", ""),
-            pending=status,
-            desired=status,
+            pending=target_status,  # Waiting for ESP32 hardware ACK!
+            desired=target_status,
         )
     except Exception:
         pass
 
     return {
         "success": True,
-        "message": f"Relay {relay['nama_relay']} di {room['nama_tempat']} berhasil diubah ke {status}.",
-        "room": room["nama_tempat"],
-        "relay": relay["nama_relay"],
-        "status": status,
+        "pending": True,
+        "message": f"Perintah {target_status} dikirim ke ESP32 ({room.get('nama_tempat', '')}). Menunggu validasi fisik...",
+        "room": room.get("nama_tempat", ""),
+        "relay": relay.get("nama_relay", ""),
+        "current_status": current_status,
+        "desired_status": target_status,
+        "cmd_id": cmd_id,
         "source": source,
     }
 
 
 def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui") -> dict:
+    target_status = normalize_relay_state(command)
     store = get_store()
-    status = normalize_relay_state(command)
     rooms = store.list_relay_rooms(owner_id)
     count = 0
+    import time
     for room in rooms:
+        slug = room.get("slug") or room.get("api_slug") or ""
         for relay in room.get("relays", []):
-            store.update_relay_status(owner_id, room["id"], relay["relay_number"], status)
+            relay_num = int(relay.get("relay_number", 1))
+            current_status = str(relay.get("status", "OFF")).upper()
+            cmd_id = f"cmd_{int(time.time() * 1000)}_{relay_num}"
+            _forward_mqtt_command(slug, relay_num, target_status, cmd_id)
             count += 1
             try:
                 from xiaozhi.services.sse_service import broadcast_relay_update
                 broadcast_relay_update(
                     user_id=owner_id,
                     room_id=room["id"],
-                    relay_number=relay["relay_number"],
-                    status=status,
+                    relay_number=relay_num,
+                    status=current_status,
                     source=source,
                     room_name=room.get("nama_tempat", ""),
                     relay_name=relay.get("nama_relay", ""),
-                    pending=status,
-                    desired=status,
+                    pending=target_status,
+                    desired=target_status,
                 )
             except Exception:
                 pass
     return {
         "success": True,
-        "message": f"Semua relay ({count}) berhasil diubah ke {status}.",
+        "pending": True,
+        "message": f"Perintah {target_status} untuk {count} relay dikirim ke ESP32. Menunggu konfirmasi fisik...",
         "count": count,
-        "status": status,
+        "desired_status": target_status,
         "source": source,
     }
 

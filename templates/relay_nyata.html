@@ -519,8 +519,35 @@
         transform: translateX(22px);
     }
     .relay-switch input:disabled + .relay-switch-slider {
-        opacity: 0.5;
+        opacity: 0.65;
         cursor: not-allowed;
+    }
+    .relay-tile.is-waiting-ack {
+        border-color: rgba(245, 158, 11, 0.75) !important;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18) !important;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .relay-tile.is-waiting-ack .relay-switch input:disabled + .relay-switch-slider {
+        opacity: 0.9;
+        cursor: wait;
+        border: 2px dashed #f59e0b;
+        background-color: rgba(245, 158, 11, 0.15) !important;
+    }
+    .relay-tile.is-waiting-ack .relay-bulb-icon {
+        animation: relayWaitingGlow 1.2s infinite ease-in-out;
+    }
+    @keyframes relayWaitingGlow {
+        0% { transform: scale(0.96); filter: drop-shadow(0 0 0 rgba(245, 158, 11, 0)); }
+        50% { transform: scale(1.05); filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.7)); }
+        100% { transform: scale(0.96); filter: drop-shadow(0 0 0 rgba(245, 158, 11, 0)); }
+    }
+    .relay-status-pill-badge.is-pending-validation {
+        background: #fef3c7 !important;
+        color: #b45309 !important;
+        border: 1px solid rgba(245, 158, 11, 0.6) !important;
+        animation: relayPulse 1.2s infinite ease-in-out;
+        font-weight: 800;
+        letter-spacing: 0.5px;
     }
 
     /* ── Sync & Pending Indicator ───────────────────────────────── */
@@ -2581,37 +2608,58 @@ void loop() {
         }, null, 2);
     }
 
-    // ── Paint Single Relay State ─────────────────────────────────
+    // ── Paint Single Relay State (Strict Hardware Validation) ───
     function paintRelay(roomId, relay) {
         const relayNumber = relay.relay_number;
         const status = String(relay.status || "OFF").toUpperCase();
         const pending = String(relay.pending_command || "").toUpperCase();
-        const desired = String(relay.desired_status || status).toUpperCase();
+        const desired = String(relay.desired_status || (pending || status)).toUpperCase();
 
         const itemEl = document.getElementById(`relayItem${roomId}-${relayNumber}`);
-        if (itemEl) {
-            itemEl.classList.toggle("is-on", status === "ON");
-            itemEl.classList.toggle("is-off", status !== "ON");
-        }
-
         const switchEl = document.getElementById(`relaySwitchInput${roomId}-${relayNumber}`);
-        if (switchEl) {
-            switchEl.checked = (status === "ON");
-        }
-
         const statusEl = document.getElementById(`relayStatus${roomId}-${relayNumber}`);
-        if (statusEl) {
-            statusEl.textContent = status;
-        }
-
         const syncEl = document.getElementById(`relaySync${roomId}-${relayNumber}`);
         const syncTextEl = document.getElementById(`relaySyncText${roomId}-${relayNumber}`);
-        if (syncEl && syncTextEl) {
-            if (pending) {
+
+        if (pending && pending !== status) {
+            // Sedang menunggu konfirmasi fisik dari mikrokontroler ESP32
+            if (itemEl) {
+                itemEl.classList.add("is-waiting-ack");
+                itemEl.classList.toggle("is-on", status === "ON");
+                itemEl.classList.toggle("is-off", status !== "ON");
+            }
+            if (switchEl) {
+                // Kunci saklar pada status fisik aslinya (jangan berubah dulu)
+                switchEl.checked = (status === "ON");
+                switchEl.disabled = true;
+            }
+            if (statusEl) {
+                statusEl.textContent = `⏳ Validasi ${desired}...`;
+                statusEl.className = "relay-status-pill-badge is-pending-validation";
+            }
+            if (syncEl && syncTextEl) {
                 syncEl.style.display = "flex";
                 syncEl.classList.add("is-pending");
-                syncTextEl.textContent = `Menunggu ESP32 konfirmasi ${desired}...`;
-            } else {
+                syncTextEl.textContent = `Menunggu konfirmasi fisik ESP32 (${desired})...`;
+            }
+        } else {
+            // Status telah terkonfirmasi fisik dari hardware ESP32
+            if (itemEl) {
+                itemEl.classList.remove("is-waiting-ack");
+                itemEl.classList.toggle("is-on", status === "ON");
+                itemEl.classList.toggle("is-off", status !== "ON");
+            }
+            if (switchEl) {
+                switchEl.checked = (status === "ON");
+                if (!VIRTUAL_ENABLED) {
+                    switchEl.disabled = false;
+                }
+            }
+            if (statusEl) {
+                statusEl.textContent = status;
+                statusEl.className = "relay-status-pill-badge";
+            }
+            if (syncEl && syncTextEl) {
                 syncEl.style.display = "none";
                 syncEl.classList.remove("is-pending");
                 syncTextEl.textContent = "";
@@ -2668,23 +2716,54 @@ void loop() {
         (room.relays || []).forEach((relay) => paintRelay(room.id, relay));
     }
 
-    // ── 1-Click Toggle Switch Handler (Optimistic UI) ────────────
+    // Map untuk timeout watchdog konfirmasi hardware ESP32 (Anti-Gantung jika alat mati)
+    const pendingHardwareWatchdogs = new Map();
+
+    // ── 1-Click Toggle Switch Handler (Strict Hardware Validation) ──
     async function handleSwitchToggle(roomId, relayNumber, inputEl) {
         if (VIRTUAL_ENABLED) {
             inputEl.checked = !inputEl.checked;
             window.alert("Nonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar Relay Nyata bisa digunakan.");
             return;
         }
-        const command = inputEl.checked ? "ON" : "OFF";
-        
-        // Optimistic visual transition
+
+        const targetCommand = inputEl.checked ? "ON" : "OFF";
+        const previousConfirmedState = !inputEl.checked;
+        const previousStatus = previousConfirmedState ? "ON" : "OFF";
+        const key = `${roomId}-${relayNumber}`;
+
+        // 1. REVERT seketika saklar ke posisi fisik aslinya (JANGAN langsung ON)
+        inputEl.checked = previousConfirmedState;
+        inputEl.disabled = true;
+
+        // 2. Beri indikator visual bahwa tombol sedang menunggu validasi fisik dari ESP32
         paintRelay(roomId, {
             relay_number: relayNumber,
-            status: command,
-            pending_command: command,
-            desired_status: command,
+            status: previousStatus,
+            pending_command: targetCommand,
+            desired_status: targetCommand,
         });
 
+        // 3. Pasang Watchdog Timeout 7 Detik:
+        // Jika ESP32 mati/offline dan tidak mengirim ACK via MQTT, batalkan aksi dan kembalikan UI
+        if (pendingHardwareWatchdogs.has(key)) {
+            clearTimeout(pendingHardwareWatchdogs.get(key));
+        }
+
+        const watchdogId = setTimeout(() => {
+            pendingHardwareWatchdogs.delete(key);
+            paintRelay(roomId, {
+                relay_number: relayNumber,
+                status: previousStatus,
+                pending_command: "",
+                desired_status: previousStatus,
+            });
+            showToast(`⚠️ ESP32 tidak merespons (Timeout 7s). Saklar dibatalkan karena tidak ada konfirmasi fisik dari mikrokontroler.`, "error");
+        }, 7000);
+
+        pendingHardwareWatchdogs.set(key, watchdogId);
+
+        // 4. Kirim perintah ke backend -> Gateway Go -> MQTT topic: xiaozhi/relay/{slug}/set
         try {
             const response = await fetch("/api/relay-nyata/control", {
                 method: "POST",
@@ -2694,24 +2773,30 @@ void loop() {
                     "X-CSRF-Token": CSRF_TOKEN,
                 },
                 credentials: "same-origin",
-                body: JSON.stringify({ room_id: Number(roomId), relay_number: Number(relayNumber), command }),
+                body: JSON.stringify({ room_id: Number(roomId), relay_number: Number(relayNumber), command: targetCommand }),
             });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || !payload.success) {
-                // Rollback on error
-                inputEl.checked = !inputEl.checked;
+                // Jika server menolak perintah, batalkan watchdog dan kembalikan saklar
+                clearTimeout(watchdogId);
+                pendingHardwareWatchdogs.delete(key);
                 paintRelay(roomId, {
                     relay_number: relayNumber,
-                    status: inputEl.checked ? "ON" : "OFF",
+                    status: previousStatus,
                     pending_command: "",
+                    desired_status: previousStatus,
                 });
-                showToast(payload.detail || "Gagal mengubah status relay.", "error");
-                return;
+                showToast(payload.detail || payload.message || "Gagal mengirim perintah ke ESP32.", "error");
             }
-            showToast(`Relay CH ${relayNumber} diubah ke ${command}`, "success");
-            paintRoom(payload.updated_room);
         } catch (err) {
-            inputEl.checked = !inputEl.checked;
+            clearTimeout(watchdogId);
+            pendingHardwareWatchdogs.delete(key);
+            paintRelay(roomId, {
+                relay_number: relayNumber,
+                status: previousStatus,
+                pending_command: "",
+                desired_status: previousStatus,
+            });
             showToast("Koneksi gagal. Coba lagi.", "error");
         }
     }
@@ -2722,6 +2807,39 @@ void loop() {
             window.alert("Nonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar Relay Nyata bisa digunakan.");
             return;
         }
+
+        // Tandai semua relay di ruangan ini ke status pending validasi
+        const switches = document.querySelectorAll(`input[id^="relaySwitchInput${roomId}-"]`);
+        switches.forEach((sw) => {
+            const parts = sw.id.split("-");
+            const rNum = Number(parts[1]);
+            const prevChecked = sw.checked;
+            const prevSt = prevChecked ? "ON" : "OFF";
+            const key = `${roomId}-${rNum}`;
+
+            sw.disabled = true;
+            paintRelay(roomId, {
+                relay_number: rNum,
+                status: prevSt,
+                pending_command: command,
+                desired_status: command,
+            });
+
+            if (pendingHardwareWatchdogs.has(key)) {
+                clearTimeout(pendingHardwareWatchdogs.get(key));
+            }
+            const wd = setTimeout(() => {
+                pendingHardwareWatchdogs.delete(key);
+                paintRelay(roomId, {
+                    relay_number: rNum,
+                    status: prevSt,
+                    pending_command: "",
+                    desired_status: prevSt,
+                });
+            }, 7000);
+            pendingHardwareWatchdogs.set(key, wd);
+        });
+
         try {
             const response = await fetch("/api/relay-nyata/room-control", {
                 method: "POST",
@@ -2735,11 +2853,10 @@ void loop() {
             });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || !payload.success) {
-                showToast(payload.detail || "Gagal mengubah semua relay.", "error");
-                return;
+                showToast(payload.detail || "Gagal mengirim perintah ruangan.", "error");
+            } else {
+                showToast(`Perintah ${command} dikirim. Menunggu validasi hardware ESP32...`, "info");
             }
-            showToast(`Semua relay ruangan diubah ke ${command}`, "success");
-            paintRoom(payload.updated_room);
         } catch (err) {
             showToast("Gagal menghubungi server.", "error");
         }
@@ -2801,22 +2918,44 @@ void loop() {
             relaySSE.addEventListener("relay_update", (e) => {
                 try {
                     const data = JSON.parse(e.data);
-                    paintRelay(data.room_id, {
-                        relay_number: data.relay_number,
-                        status: data.status,
-                        pending_command: data.pending || "",
-                        desired_status: data.desired || data.status
-                    });
+                    const key = `${data.room_id}-${data.relay_number}`;
 
-                    // Notifikasi jika dipicu oleh suara XiaoZhi AI
-                    if (data.source === "mcp_voice") {
-                        showToast(`🎙️ XiaoZhi AI: ${(data.relay_name || "Relay")} di ${(data.room_name || "Ruangan")} diubah ke ${data.status}`, "info");
-                    } else if (data.source === "device_ack") {
+                    if (data.source === "device_ack" || !data.pending) {
+                        // Mikrokontroler ESP32 telah mengonfirmasi eksekusi fisik relay!
+                        if (pendingHardwareWatchdogs.has(key)) {
+                            clearTimeout(pendingHardwareWatchdogs.get(key));
+                            pendingHardwareWatchdogs.delete(key);
+                        }
+
+                        // BARU SEKARANG status UI tombol diubah sesuai konfirmasi mikrokontroler!
+                        paintRelay(data.room_id, {
+                            relay_number: data.relay_number,
+                            status: data.status,
+                            pending_command: "",
+                            desired_status: data.status
+                        });
+
                         const roomId = Number(data.room_id);
                         if (!cachedRooms[roomId]) cachedRooms[roomId] = { id: roomId };
                         cachedRooms[roomId].device_connected = true;
                         cachedRooms[roomId].device_last_seen_at = new Date().toISOString();
                         paintDeviceConnection(cachedRooms[roomId]);
+
+                        if (data.source === "device_ack") {
+                            showToast(`✓ Konfirmasi ESP32: ${(data.relay_name || "Relay CH " + data.relay_number)} telah ${data.status}!`, "success");
+                        }
+                    } else {
+                        // Status pending dari MCP voice atau inisiator lain
+                        paintRelay(data.room_id, {
+                            relay_number: data.relay_number,
+                            status: data.status,
+                            pending_command: data.pending,
+                            desired_status: data.desired || data.pending
+                        });
+
+                        if (data.source === "mcp_voice") {
+                            showToast(`🎙️ XiaoZhi AI: Meminta ${(data.relay_name || "Relay")} ${data.desired}... menunggu konfirmasi ESP32`, "info");
+                        }
                     }
                 } catch (err) {}
             });
