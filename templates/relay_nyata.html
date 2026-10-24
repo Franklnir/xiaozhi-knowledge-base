@@ -1443,26 +1443,25 @@
     <div class="app-card relay-modal-panel" style="width: min(100%, 900px);">
         <div class="app-card-header">
             <div>
-                <h2 class="app-section-title" id="configModalTitle">Setup Firmware ESP32-C3 & API</h2>
-                <p class="app-section-subtitle">Generate kodingan Arduino C++ otomatis khusus mikrokontroler ESP32-C3 dan konfigurasi API.</p>
+                <h2 class="app-section-title" id="configModalTitle">Setup Firmware Mikrokontroler & API</h2>
+                <p class="app-section-subtitle">Generate kodingan Arduino C++ otomatis khusus mikrokontroler ESP32-S3, ESP32-S2, ESP32 Klasik, ESP32-C3, dan ESP8266.</p>
             </div>
             <button type="button" class="app-button app-button-ghost app-icon-button" data-close-config>&times;</button>
         </div>
 
-        <!-- ⚡ Keterangan Khusus ESP32-C3 (Pemberitahuan Kompatibilitas & Keamanan) -->
-        <!-- ⚡ Keterangan Kompatibilitas ESP32 & Keamanan 16-Channel Relay -->
+        <!-- ⚡ Keterangan Kompatibilitas ESP32 Multi-Chipset -->
         <div class="relay-esp32c3-banner">
-            <div class="banner-badge">ESP32 SAFE GPIO (1-16 CH)</div>
+            <div class="banner-badge" id="cfgBannerBadge">MULTI-CHIPSET SUPPORT</div>
             <div class="banner-content">
-                <strong>Firmware Universal ESP32 (Mendukung 1 hingga 16 Channel Relay)</strong>
-                <p>Firmware ini dikonfigurasi dengan pemetaan 16 GPIO aman (bebas konflik dengan internal SPI flash), proteksi chattering saat startup, dan sinkronisasi 2-arah real-time. Anda hanya perlu memasukkan nama & password Wi-Fi rumah.</p>
+                <strong id="cfgBannerTitle">Firmware Universal ESP32-S3, ESP32-S2, ESP32 & ESP8266 (1 s/d 16 Channel)</strong>
+                <p id="cfgBannerDesc">Pilih model mikrokontroler Anda pada opsi di bawah. Sistem secara otomatis menyesuaikan pemetaan pinout GPIO fisik yang aman (bebas konflik SPI flash internal), library Wi-Fi, dan proteksi chattering saat startup.</p>
             </div>
         </div>
 
         <!-- Tab Bar -->
         <div class="relay-cfg-tabs">
             <button type="button" class="relay-cfg-tab active" id="tabBtnArduino" onclick="switchConfigTab('arduino')">
-                <span>💻 Kode Arduino ESP32 (.ino)</span>
+                <span>💻 Kode Arduino ESP32 / S2 / S3 (.ino)</span>
             </button>
             <button type="button" class="relay-cfg-tab" id="tabBtnEndpoints" onclick="switchConfigTab('endpoints')">
                 <span>🔌 Endpoint & Parameter Teknis API</span>
@@ -1471,12 +1470,22 @@
 
         <!-- TAB 1: KODE ARDUINO GENERATOR -->
         <div id="tabPanelArduino" class="relay-tab-panel active">
-            <!-- Wi-Fi Customizer Bar -->
+            <!-- Wi-Fi & Board Customizer Bar -->
             <div class="relay-wifi-customizer-box">
                 <div style="font-size:12px; font-weight:800; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                    <span>📶 Konfigurasi Wi-Fi Rumah Anda (Otomatis Masuk ke Kode):</span>
+                    <span>📶 Konfigurasi Hardware & Wi-Fi (Otomatis Menyesuaikan Kodingan):</span>
                 </div>
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Pilihan Chipset / Board:</label>
+                        <select id="cfgBoardType" class="app-select" style="padding:6px 10px; font-size:12px; font-weight:700; color:#0284c7; background:rgba(2,132,199,0.06); border:1px solid rgba(2,132,199,0.3);" onchange="regenerateArduinoCode()">
+                            <option value="esp32_s3" selected>🚀 ESP32-S3 (Xtensa Dual-Core AI)</option>
+                            <option value="esp32_s2">⚡ ESP32-S2 (Xtensa Single-Core USB)</option>
+                            <option value="esp32_classic">📦 ESP32 Klasik (WROOM-32 / WROVER)</option>
+                            <option value="esp32_c3">🌱 ESP32-C3 (RISC-V Architecture)</option>
+                            <option value="esp8266">💡 ESP8266 (NodeMCU / D1 Mini)</option>
+                        </select>
+                    </div>
                     <div>
                         <label class="app-label" style="font-size:11px; margin-bottom:3px;">Nama Wi-Fi (SSID):</label>
                         <input type="text" id="cfgWifiSsid" class="app-input" style="padding:6px 10px; font-size:12px;" value="WIFI_RUMAH_ANDA" placeholder="Contoh: MyHome_WiFi" oninput="regenerateArduinoCode()">
@@ -1486,16 +1495,10 @@
                         <input type="text" id="cfgWifiPass" class="app-input" style="padding:6px 10px; font-size:12px;" value="PASSWORD_WIFI" placeholder="Contoh: Rahasia123" oninput="regenerateArduinoCode()">
                     </div>
                     <div>
-                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Protokol Komunikasi:</label>
-                        <div style="padding:6px 10px; font-size:11.5px; font-weight:750; color:#0284c7; background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:6px; display:flex; align-items:center; gap:6px; height:32px; box-sizing:border-box;">
-                            <span>⚡ MQTT Mosquitto (Realtime 2-Arah)</span>
-                        </div>
-                    </div>
-                    <div>
                         <label class="app-label" style="font-size:11px; margin-bottom:3px;">Tipe Modul Relay:</label>
                         <select id="cfgRelayLogic" class="app-select" style="padding:6px 10px; font-size:12px;" onchange="regenerateArduinoCode()">
-                            <option value="false" selected>ACTIVE HIGH (Relay ON saat 3.3V)</option>
-                            <option value="true">ACTIVE LOW (Relay Biru Songle pada umumnya)</option>
+                            <option value="false">ACTIVE HIGH (Relay ON saat 3.3V)</option>
+                            <option value="true" selected>ACTIVE LOW (Relay Biru Songle pada umumnya)</option>
                         </select>
                     </div>
                 </div>
@@ -1503,9 +1506,9 @@
 
             <!-- Pinout Diagram Mini Guide -->
             <div class="relay-pinout-guide">
-                <span class="guide-title">📌 Pemetaan Pin Fisik GPIO ESP32 Aman (1-16 Channel):</span>
+                <span class="guide-title" id="cfgPinoutTitle">📌 Pemetaan Pin Fisik GPIO Aman:</span>
                 <div id="cfgPinoutList" class="guide-pills"></div>
-                <span class="guide-note">⚠️ Pinout menggunakan GPIO [4, 5, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33] yang bebas bentrok internal flash SPI dan aman saat booting.</span>
+                <span class="guide-note" id="cfgPinoutNote">⚠️ Pinout bebas bentrok internal flash SPI dan aman saat booting.</span>
             </div>
 
             <!-- Code Container -->
@@ -1970,12 +1973,65 @@
         }
     }
 
-    const SAFE_PINS = [4, 5, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
+    const BOARD_PROFILES = {
+        esp32_s3: {
+            name: "ESP32-S3 (Xtensa Dual-Core AI)",
+            headerTitle: "ESP32-S3",
+            arduinoBoard: "ESP32S3 Dev Module",
+            pins: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21],
+            note: "Pinout GPIO [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21] aman untuk ESP32-S3 (Bebas dari strapping GPIO 0, 3, 45, 46 dan bebas dari SPI Flash/PSRAM Octal GPIO 26-37).",
+            includeWifi: "#include <WiFi.h>",
+            cdcBoot: true
+        },
+        esp32_s2: {
+            name: "ESP32-S2 (Xtensa Single-Core USB)",
+            headerTitle: "ESP32-S2",
+            arduinoBoard: "ESP32S2 Dev Module",
+            pins: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            note: "Pinout GPIO [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] aman untuk ESP32-S2 (Bebas dari strapping GPIO 0, 45, 46, SPI Flash 26-32, dan USB 19, 20).",
+            includeWifi: "#include <WiFi.h>",
+            cdcBoot: true
+        },
+        esp32_classic: {
+            name: "ESP32 Klasik (WROOM-32 / WROVER)",
+            headerTitle: "ESP32",
+            arduinoBoard: "ESP32 Dev Module / NodeMCU-32S",
+            pins: [4, 5, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33],
+            note: "Pinout GPIO [4, 5, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33] aman untuk ESP32 standar (Bebas dari SPI flash 6-11 dan strapping 0, 2, 12, 15).",
+            includeWifi: "#include <WiFi.h>",
+            cdcBoot: false
+        },
+        esp32_c3: {
+            name: "ESP32-C3 (RISC-V)",
+            headerTitle: "ESP32-C3",
+            arduinoBoard: "ESP32C3 Dev Module",
+            pins: [0, 1, 3, 4, 5, 6, 7, 10],
+            note: "Pinout GPIO [0, 1, 3, 4, 5, 6, 7, 10] aman untuk ESP32-C3 RISC-V.",
+            includeWifi: "#include <WiFi.h>",
+            cdcBoot: false
+        },
+        esp8266: {
+            name: "ESP8266 (NodeMCU / D1 Mini)",
+            headerTitle: "ESP8266",
+            arduinoBoard: "NodeMCU 1.0 (ESP-12E Module) / WeMos D1 Mini",
+            pins: [5, 4, 14, 12, 13, 15],
+            pinLabels: ["D1 (GPIO 5)", "D2 (GPIO 4)", "D5 (GPIO 14)", "D6 (GPIO 12)", "D7 (GPIO 13)", "D8 (GPIO 15)"],
+            note: "Pinout ESP8266 memakai D1(5), D2(4), D5(14), D6(12), D7(13), D8(15). Hindari D3/D4/D0 saat boot.",
+            includeWifi: "#include <ESP8266WiFi.h>",
+            cdcBoot: false
+        }
+    };
 
-    function buildArduinoCode(room, wifiSsid, wifiPass, activeLow, protocol) {
+    const SAFE_PINS = BOARD_PROFILES.esp32_s3.pins;
+
+    function buildArduinoCode(room, wifiSsid, wifiPass, activeLow, protocol, boardKey) {
         if (!room) return "// Memuat konfigurasi...";
-        const numRelays = Math.max(1, Math.min(Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)), SAFE_PINS.length));
-        const pins = SAFE_PINS.slice(0, numRelays).join(", ");
+        const key = boardKey || document.getElementById("cfgBoardType")?.value || "esp32_s3";
+        const profile = BOARD_PROFILES[key] || BOARD_PROFILES.esp32_s3;
+
+        const maxBoardPins = profile.pins.length;
+        const numRelays = Math.max(1, Math.min(Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)), maxBoardPins));
+        const pins = profile.pins.slice(0, numRelays).join(", ");
         const pinArray = `const int RELAY_PINS[NUM_RELAYS] = { ${pins} };`;
         const ssid = wifiSsid || "WIFI_RUMAH_ANDA";
         const pass = wifiPass || "PASSWORD_WIFI";
@@ -1985,26 +2041,34 @@
 
         const pinComments = Array.from({ length: numRelays }, (_, i) => {
             const r = (room.relays && room.relays[i]) ? room.relays[i] : { relay_number: i + 1, nama_relay: `Relay ${i + 1}` };
-            return ` * - Channel ${r.relay_number} (${r.nama_relay || 'Relay ' + (i + 1)}) -> GPIO ${SAFE_PINS[i]}`;
+            const label = profile.pinLabels ? profile.pinLabels[i] : `GPIO ${profile.pins[i]}`;
+            return ` * - Channel ${r.relay_number} (${r.nama_relay || 'Relay ' + (i + 1)}) -> ${label}`;
         }).join("\n");
+
+        const cdcBootCode = profile.cdcBoot ? `    #if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+    delay(1000); // Waktu inisialisasi USB CDC Serial bawaan ${profile.headerTitle}
+    #else
+    delay(500);
+    #endif` : `    delay(500);`;
 
         if (isMqtt) {
             return `/*
  * ============================================================
- * ESP32 FIRMWARE: RELAY NYATA XIAOZHI AI (HYBRID GO + MQTT)
+ * FIRMWARE RELAY NYATA XIAOZHI AI (HYBRID GO + MQTT)
  * ============================================================
+ * Mikrokontroler: ${profile.name}
+ * Target Board  : ${profile.arduinoBoard} (Pilih di Arduino IDE -> Tools -> Board)
  * Arsitektur    : Ultra-Lightweight Event-Driven MQTT (Eclipse Mosquitto)
- * Mikrokontroler: ESP32 / ESP32-C3 / ESP32 WROOM (RISC-V / Xtensa)
  * Ruangan       : ${room.nama_tempat}
  * Client ID     : ${room.api_client_id}
- * Jumlah Channel: ${numRelays} Channel Relay (Maks. 16 CH)
+ * Jumlah Channel: ${numRelays} Channel Relay (Maks. ${profile.pins.length} CH)
  *
- * Pemetaan Pinout Fisik Aman (Bebas Konflik SPI Flash):
+ * Pemetaan Pinout Fisik Aman:
 ${pinComments}
  *
  * Fitur Keamanan Hardware:
  * 1. Output diset level OFF sebelum pinMode OUTPUT (anti chattering).
- * 2. LWT (Last Will & Testament): Broker Mosquitto otomatis menandai status 'offline' jika ESP32 padam.
+ * 2. LWT (Last Will & Testament): Broker Mosquitto otomatis menandai status 'offline' jika perangkat padam.
  * 3. 2-Way Hardware Feedback: Mengirim status fisik sebenarnya ke topic 'state' setelah GPIO beralih.
  * 4. Deduplikasi ID Perintah: Mencegah eksekusi ganda jika ada retransmisi paket jaringan.
  * 5. Sangat Ringan: RAM < 2KB, CPU ~0%, Zero-Lag latensi < 5 milidetik.
@@ -2014,7 +2078,7 @@ ${pinComments}
  * - ArduinoJson (oleh Benoit Blanchon) versi 6.x atau 7.x
  */
 
-#include <WiFi.h>
+${profile.includeWifi}
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
@@ -2039,7 +2103,7 @@ const char* TOPIC_AVAILABILITY = "xiaozhi/relay/${slug}/availability";
 const char* TOPIC_ERROR        = "xiaozhi/relay/${slug}/err";
 
 // ============================================================
-// 3. KONFIGURASI PIN RELAY ESP32-C3
+// 3. KONFIGURASI PIN RELAY ${profile.headerTitle}
 // ============================================================
 const int NUM_RELAYS = ${numRelays};
 ${pinArray}
@@ -2208,7 +2272,7 @@ void reconnectMQTT() {
 
 void setup() {
     Serial.begin(115200);
-    delay(500);
+${cdcBootCode}
 
     // Proteksi hardware anti cetak-cetek saat startup
     for (int i = 0; i < NUM_RELAYS; i++) {
@@ -2218,8 +2282,10 @@ void setup() {
     }
 
     Serial.println("\\n==========================================");
-    Serial.printf(" XIAOZHI SMART RELAY (ESP32-C3) READY\\n");
-    Serial.printf(" Client: %s | Channels: %d\\n", CLIENT_ID, NUM_RELAYS);
+    Serial.printf(" XIAOZHI SMART RELAY (%s) READY\\n", "${profile.headerTitle}");
+    Serial.printf(" Board Target   : %s\\n", "${profile.arduinoBoard}");
+    Serial.printf(" Client ID      : %s\\n", CLIENT_ID);
+    Serial.printf(" Active Channels: %d\\n", NUM_RELAYS);
     Serial.println("==========================================");
 
     connectWiFi();
@@ -2531,7 +2597,7 @@ void connectWiFi() {
 
 void setup() {
     Serial.begin(115200);
-    delay(500);
+${cdcBootCode}
 
     // Proteksi: Set pin ke OFF sebelum mengaktifkan OUTPUT (anti cetak-cetek liar)
     for (int i = 0; i < NUM_RELAYS; i++) {
@@ -2541,7 +2607,8 @@ void setup() {
     }
 
     Serial.println("\\n==========================================");
-    Serial.printf(" ESP32-C3: %s (READY)\\n", CLIENT_ID);
+    Serial.printf(" %s: %s (READY)\\n", "${profile.headerTitle}", CLIENT_ID);
+    Serial.printf(" Board Target: %s\\n", "${profile.arduinoBoard}");
     Serial.println("==========================================");
 
     connectWiFi();
@@ -2579,19 +2646,40 @@ void loop() {
         const pass = document.getElementById("cfgWifiPass")?.value.trim() || "PASSWORD_WIFI";
         const activeLow = document.getElementById("cfgRelayLogic")?.value === "true";
         const proto = document.getElementById("cfgProtocol")?.value || "mqtt";
+        const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3";
+        const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3;
+
+        // Update Pinout Guide in UI dynamically
+        const numRelays = Math.max(1, Math.min(Number(currentConfigRoom.jumlah_relay || (currentConfigRoom.relays ? currentConfigRoom.relays.length : 1)), profile.pins.length));
+        const pinPills = Array.from({ length: numRelays }, (_, i) => {
+            const label = profile.pinLabels ? profile.pinLabels[i] : `GPIO ${profile.pins[i]}`;
+            return `<span class="guide-pill">CH ${i + 1}: ${label}</span>`;
+        }).join(" ");
+
+        const pinoutEl = document.getElementById("cfgPinoutList");
+        if (pinoutEl) pinoutEl.innerHTML = pinPills;
+
+        const pinoutTitleEl = document.getElementById("cfgPinoutTitle");
+        if (pinoutTitleEl) pinoutTitleEl.textContent = `📌 Pemetaan Pin Fisik GPIO ${profile.headerTitle} Aman (1-${numRelays} Channel):`;
+
+        const pinoutNoteEl = document.getElementById("cfgPinoutNote");
+        if (pinoutNoteEl) pinoutNoteEl.textContent = `⚠️ ${profile.note}`;
+
         const box = document.getElementById("arduinoCodeBox");
         if (box) {
-            box.textContent = buildArduinoCode(currentConfigRoom, ssid, pass, activeLow, proto);
+            box.textContent = buildArduinoCode(currentConfigRoom, ssid, pass, activeLow, proto, boardKey);
         }
     }
 
     function copyArduinoCode(btn) {
         const box = document.getElementById("arduinoCodeBox");
         if (!box) return;
+        const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3";
+        const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3;
         navigator.clipboard.writeText(box.textContent).then(() => {
             const orig = btn.innerHTML;
-            btn.innerHTML = "<span>✓ Kode Berhasil Disalin!</span>";
-            showToast("Kode Arduino ESP32-C3 berhasil disalin!", "success");
+            btn.innerHTML = `<span>✓ Kode ${profile.headerTitle} Disalin!</span>`;
+            showToast(`Kode Arduino ${profile.headerTitle} berhasil disalin!`, "success");
             setTimeout(() => { btn.innerHTML = orig; }, 1600);
         }).catch(() => {
             showToast("Gagal menyalin kode ke clipboard.", "error");
@@ -2618,7 +2706,7 @@ void loop() {
 
         const slug = room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-        document.getElementById("configModalTitle").textContent = `Setup ESP32-C3: ${room.nama_tempat}`;
+        document.getElementById("configModalTitle").textContent = `Setup Firmware: ${room.nama_tempat}`;
         const cmdUrlEl = document.getElementById("cfgCommandsUrl");
         if (cmdUrlEl) cmdUrlEl.value = room.api_commands_url || "";
         const statusUrlEl = document.getElementById("cfgStatusUrl");
@@ -2635,12 +2723,6 @@ void loop() {
         if (mqttStateEl) mqttStateEl.value = `xiaozhi/relay/${slug}/state`;
         const mqttLwtEl = document.getElementById("cfgMqttLwtTopic");
         if (mqttLwtEl) mqttLwtEl.value = `xiaozhi/relay/${slug}/availability`;
-
-        // Pinout Guide mapping (Up to 16 Relays)
-        const numRelays = Math.max(1, Math.min(Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)), SAFE_PINS.length));
-        const pinPills = Array.from({ length: numRelays }, (_, i) => `<span class="guide-pill">CH ${i + 1}: GPIO ${SAFE_PINS[i]}</span>`).join(" ");
-        const pinoutEl = document.getElementById("cfgPinoutList");
-        if (pinoutEl) pinoutEl.innerHTML = pinPills;
 
         switchConfigTab("arduino");
         regenerateArduinoCode();
