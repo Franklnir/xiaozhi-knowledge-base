@@ -2,385 +2,658 @@
 
 {% block content %}
 <style>
-    .dashboard-edit-panel {
-        max-height: calc(100vh - 32px);
-        overflow-y: auto;
+    /* Dashboard Modern Responsive Grid */
+    .dashboard-container {
+        display: grid;
+        gap: 22px;
     }
-    .dashboard-edit-footer {
-        position: sticky;
-        bottom: -1px;
+
+    .dashboard-grid {
+        display: grid;
+        gap: 22px;
+        grid-template-columns: minmax(0, 1.65fr) minmax(340px, 1fr);
+        align-items: start;
+    }
+
+    @media (max-width: 1080px) {
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Enhanced Stat Cards */
+    .dashboard-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    @media (max-width: 768px) {
+        .dashboard-stat-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    .stat-card-modern {
         background: var(--app-surface);
-        padding-top: 10px;
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+        padding: 16px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        box-shadow: var(--app-shadow);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .stat-card-modern:hover {
+        transform: translateY(-2px);
+    }
+
+    .stat-card-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .stat-card-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--app-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-card-num {
+        font-size: 26px;
+        font-weight: 800;
+        line-height: 1;
+        color: var(--app-text);
+    }
+
+    .stat-card-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+        background: var(--app-soft);
+        border: 1px solid var(--app-border);
+    }
+
+    :root[data-theme="neo"] .stat-card-modern {
+        border: 2px solid #111;
+        box-shadow: 4px 4px 0 #111;
+    }
+
+    :root[data-theme="neo"] .stat-card-modern:hover {
+        transform: translate(-2px, -2px);
+        box-shadow: 6px 6px 0 #111;
+    }
+
+    /* Quota Bar Strip */
+    .quota-strip {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 18px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius);
+        box-shadow: var(--app-shadow);
+    }
+
+    .quota-items {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .quota-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        border-radius: 6px;
+        background: var(--app-soft);
+        color: var(--app-text);
+        border: 1px solid var(--app-border);
+    }
+
+    .quota-badge.is-reached {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #fca5a5;
+    }
+
+    :root[data-theme="neo"] .quota-strip {
+        border: 2px solid #111;
+        box-shadow: 4px 4px 0 #111;
+    }
+
+    :root[data-theme="neo"] .quota-badge {
+        border: 1.5px solid #111;
+    }
+
+    /* Modal System */
+    .dash-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(2, 6, 23, 0.65);
+        backdrop-filter: blur(5px);
+        padding: 16px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .dash-modal-backdrop.is-open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .dash-modal-box {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border-strong);
+        border-radius: 12px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+        max-width: 680px;
+        width: 100%;
+        max-height: calc(100vh - 36px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transform: scale(0.96) translateY(8px);
+        transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .dash-modal-backdrop.is-open .dash-modal-box {
+        transform: scale(1) translateY(0);
+    }
+
+    :root[data-theme="neo"] .dash-modal-box {
+        border: 2.5px solid #111;
+        box-shadow: 8px 8px 0 #111;
+        border-radius: 8px;
+    }
+
+    .dash-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--app-border);
+        background: var(--app-surface);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .dash-modal-body {
+        padding: 20px 22px;
+        overflow-y: auto;
+        display: grid;
+        gap: 16px;
+    }
+
+    .dash-modal-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 16px 22px;
+        border-top: 1px solid var(--app-border);
+        background: var(--app-surface);
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+    }
+
+    /* Category Badges Styling */
+    .cat-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 3px 8px;
+        border-radius: 6px;
+        white-space: nowrap;
+        border: 1px solid transparent;
+    }
+    .cat-chip-tugas { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .cat-chip-pengumuman { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
+    .cat-chip-materi { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+    .cat-chip-api { background: #e0f2fe; color: #075985; border-color: #bae6fd; }
+    .cat-chip-default { background: #f1f5f9; color: #334155; border-color: #e2e8f0; }
+
+    :root[data-theme="dark"] .cat-chip-tugas { background: #78350f; color: #fef3c7; border-color: #92400e; }
+    :root[data-theme="dark"] .cat-chip-pengumuman { background: #4c1d95; color: #ede9fe; border-color: #5b21b6; }
+    :root[data-theme="dark"] .cat-chip-materi { background: #064e3b; color: #dcfce7; border-color: #047857; }
+    :root[data-theme="dark"] .cat-chip-api { background: #0c4a6e; color: #e0f2fe; border-color: #0369a1; }
+    :root[data-theme="dark"] .cat-chip-default { background: #1e293b; color: #cbd5e1; border-color: #334155; }
+
+    :root[data-theme="neo"] .cat-chip { border: 1.5px solid #111; box-shadow: 1.5px 1.5px 0 #111; }
+
+    /* Materials Table Row & Content */
+    .material-title-main {
+        font-size: 14.5px;
+        font-weight: 800;
+        color: var(--app-text);
+        line-height: 1.3;
+        display: block;
+    }
+
+    .material-meta-sub {
+        font-size: 11.5px;
+        color: var(--app-muted);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        margin-top: 3px;
+    }
+
+    .material-preview-box {
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--app-muted);
+        max-width: 480px;
+    }
+
+    /* MCP 3 Slot Controls */
+    @keyframes mcpPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes mcpSpin { to{transform:rotate(360deg)} }
+    @keyframes mcpShimmer { to{background-position:-200% 0} }
+    .mcp-loading { animation: mcpPulse 1.5s ease-in-out infinite; }
+    .mcp-spinner { display:inline-block; width:14px; height:14px; border:2px solid #e5e7eb; border-top-color:#0369a1; border-radius:50%; animation:mcpSpin .8s linear infinite; vertical-align:middle; margin-right:6px }
+    .mcp-bar { height:4px; border-radius:2px; background:#e5e7eb; overflow:hidden; margin-top:8px }
+    .mcp-bar-fill { height:100%; border-radius:2px; transition:width .5s ease }
+    .mcp-bar-fill.connecting { width:60%; background:linear-gradient(90deg,#0369a1,#38bdf8,#0369a1); background-size:200%; animation:mcpShimmer 1.5s linear infinite }
+    .mcp-bar-fill.connected { width:100%; background:#047857 }
+    .mcp-bar-fill.idle { width:0%; background:#b91c1c }
+
+    .mcp-slots-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    @media (max-width: 680px) {
+        .mcp-slots-grid {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+    }
+    .mcp-slot-tab {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 10px 12px;
+        min-height: 62px;
+        background: var(--app-surface-muted, #f8fafc);
+        border: 2px solid var(--app-border-strong);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-align: left;
+        position: relative;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .mcp-slot-tab:hover {
+        background: var(--app-surface);
+        border-color: var(--app-brand);
+    }
+    .mcp-slot-tab.active {
+        background: var(--app-surface);
+        border-color: #047857;
+        box-shadow: 0 0 0 2px rgba(4, 120, 87, 0.2);
+    }
+    :root[data-theme="neo"] .mcp-slot-tab {
+        border: 2px solid #111;
+        box-shadow: 3px 3px 0 #111;
+    }
+    :root[data-theme="neo"] .mcp-slot-tab.active {
+        border: 2.5px solid #047857;
+        box-shadow: 4px 4px 0 #047857;
+    }
+
+    .slot-tab-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        margin-bottom: 4px;
+    }
+    .slot-badge-tag {
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        color: var(--app-muted);
+        background: var(--app-soft);
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--app-border);
+    }
+    .mcp-slot-tab.active .slot-badge-tag {
+        color: #047857;
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+    }
+    .slot-radar-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .slot-radar-dot.connected { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .slot-radar-dot.connecting { background: #0284c7; animation: mcpPulse 1.2s infinite; }
+    .slot-radar-dot.idle { background: #94a3b8; }
+
+    .slot-main-label {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--app-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+    .mcp-slot-tab.active .slot-main-label {
+        color: #047857;
     }
 </style>
 
-<div class="app-page">
+<div class="app-page dashboard-container">
+    <!-- Header Zone -->
     <header class="app-page-header">
         <div>
-            <p class="app-eyebrow">Halo, {{ user.username }}</p>
-            <h1 class="app-title">Dashboard Xiaozhi Indonesia</h1>
-            <p class="app-subtitle">Kelola materi, catatan, dan data API realtime yang akan dibaca Xiaozhi saat menjawab pertanyaan.</p>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="app-eyebrow">Halo, {{ user.username }} 👋</span>
+                <span class="app-chip app-chip-neutral app-chip-small" style="font-size:10px;">ID {{ user.id }}</span>
+            </div>
+            <h1 class="app-title">Knowledge Base & Dashboard Xiaozhi</h1>
+            <p class="app-subtitle">Kelola database materi belajar, tugas, dan sumber data realtime yang diakses asisten suara cerdas Xiaozhi.</p>
         </div>
-        <div class="app-status-pill is-online">
-            <span class="app-status-dot"></span>
-            Knowledge base aktif
+        <div class="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+            <div class="app-status-pill is-online" title="Knowledge Base tersinkronisasi">
+                <span class="app-status-dot"></span>
+                RAG Pipeline Siap
+            </div>
+            <button type="button" onclick="openAddModal()" class="app-button app-button-success" style="font-weight:800; gap:6px;">
+                <span>➕</span> Tambah Materi
+            </button>
         </div>
     </header>
 
     {% if message %}
-    <div class="app-alert app-alert-info">
-        {{ message }}
+    {% set is_err = 'gagal' in message|lower or 'tidak ditemukan' in message|lower or 'error' in message|lower %}
+    <div class="app-alert {% if is_err %}app-alert-danger{% else %}app-alert-success{% endif %} flex items-center justify-between" id="dashboardFlashMsg">
+        <div class="flex items-center gap-2">
+            <span>{% if is_err %}⚠️{% else %}✅{% endif %}</span>
+            <span>{{ message }}</span>
+        </div>
+        <button type="button" onclick="document.getElementById('dashboardFlashMsg').style.display='none'" class="text-xs font-bold opacity-70 hover:opacity-100">&times;</button>
     </div>
     {% endif %}
 
     {% if quota.alerts %}
     <div class="app-alert app-alert-warning">
-        {{ quota.alerts|join(" ") }} Hubungi admin jika membutuhkan kapasitas tambahan.
+        <span>⚠️</span> {{ quota.alerts|join(" ") }} Hubungi admin jika membutuhkan kapasitas kuota tambahan.
     </div>
     {% endif %}
 
     {% if not mcp_status.connected and user.role != 'admin' %}
-    <div class="mb-6 rounded-xl border-2 border-black bg-amber-100 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-        <div class="flex items-center justify-between">
+    <div class="rounded-xl border-2 border-black bg-amber-100 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="flex items-center gap-3">
-                <span class="relative flex h-3 w-3">
+                <span class="relative flex h-3.5 w-3.5 flex-shrink-0">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-600"></span>
+                    <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-600"></span>
                 </span>
                 <div>
                     <h3 class="text-sm font-black text-black uppercase tracking-wider">Perhatian: Endpoint MCP Belum Terhubung</h3>
                     <p class="text-xs text-slate-700">Asisten suara Xiaozhi belum dapat membaca materi atau mengontrol perangkat hingga endpoint MCP Anda terhubung.</p>
                 </div>
             </div>
-            <a href="#mcp_token" class="rounded-lg border-2 border-black bg-amber-300 px-3 py-1.5 text-xs font-black text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-amber-400">Hubungkan Sekarang</a>
+            <a href="#mcpCard" class="rounded-lg border-2 border-black bg-amber-300 px-3.5 py-1.5 text-xs font-black text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-amber-400 text-center whitespace-nowrap">Hubungkan Sekarang ➔</a>
         </div>
     </div>
     {% endif %}
 
-    <section class="app-stat-grid">
-        <div class="app-stat-card">
-            <p class="app-stat-label">Total Materi</p>
-            <p class="app-stat-value">{{ stats.total }}</p>
-        </div>
-        <div class="app-stat-card">
-            <p class="app-stat-label">Tugas</p>
-            <p class="app-stat-value">{{ stats.tugas }}</p>
-        </div>
-        <div class="app-stat-card">
-            <p class="app-stat-label">Pengumuman</p>
-            <p class="app-stat-value">{{ stats.pengumuman }}</p>
-        </div>
-        <div class="app-stat-card">
-            <p class="app-stat-label">Materi</p>
-            <p class="app-stat-value">{{ stats.materi }}</p>
-        </div>
-    </section>
-
-    <section class="app-card">
-        <div class="app-card-header is-compact">
-            <div>
-                <h2 class="app-section-title">Batas Akun</h2>
-                <p class="app-section-subtitle">Kuota yang ditetapkan admin untuk akun ini.</p>
+    <!-- 4 Metric Cards -->
+    <section class="dashboard-stat-grid">
+        <div class="stat-card-modern">
+            <div class="stat-card-info">
+                <span class="stat-card-label">Total Materi</span>
+                <span class="stat-card-num">{{ stats.total }}</span>
             </div>
+            <div class="stat-card-icon" style="color:#0284c7; background:rgba(2,132,199,0.1);">📚</div>
         </div>
-        <div class="app-meta-row">
-            <span class="app-chip app-chip-small {% if quota.materials.reached %}app-chip-info{% else %}app-chip-neutral{% endif %}">
-                Total Materi: {{ quota.materials.label }}
+        <div class="stat-card-modern">
+            <div class="stat-card-info">
+                <span class="stat-card-label">Tugas & Latihan</span>
+                <span class="stat-card-num">{{ stats.tugas }}</span>
+            </div>
+            <div class="stat-card-icon" style="color:#d97706; background:rgba(217,119,6,0.1);">📝</div>
+        </div>
+        <div class="stat-card-modern">
+            <div class="stat-card-info">
+                <span class="stat-card-label">Pengumuman</span>
+                <span class="stat-card-num">{{ stats.pengumuman }}</span>
+            </div>
+            <div class="stat-card-icon" style="color:#7c3aed; background:rgba(124,58,237,0.1);">📢</div>
+        </div>
+        <div class="stat-card-modern">
+            <div class="stat-card-info">
+                <span class="stat-card-label">Materi Edukasi</span>
+                <span class="stat-card-num">{{ stats.materi }}</span>
+            </div>
+            <div class="stat-card-icon" style="color:#059669; background:rgba(5,150,105,0.1);">🎓</div>
+        </div>
+    </section>
+
+    <!-- Account Quota Bar -->
+    <section class="quota-strip">
+        <div class="flex items-center gap-2">
+            <span style="font-size:13px; font-weight:800; color:var(--app-text);">Kapasitas Akun:</span>
+            <span class="text-xs text-slate-500">Kuota paket knowledge base</span>
+        </div>
+        <div class="quota-items">
+            <span class="quota-badge {% if quota.materials.reached %}is-reached{% endif %}">
+                📦 Materi: <strong>{{ quota.materials.label }}</strong>
             </span>
-            <span class="app-chip app-chip-small app-chip-neutral">
-                Kata / Materi: {% if quota.words_per_material.unlimited %}Tanpa batas{% else %}{{ quota.words_per_material.limit }}{% endif %}
+            <span class="quota-badge">
+                ✍️ Maks Kata: <strong>{% if quota.words_per_material.unlimited %}Tanpa Batas{% else %}{{ quota.words_per_material.limit }} kata{% endif %}</strong>
             </span>
-            <span class="app-chip app-chip-small {% if quota.live_apis.reached %}app-chip-info{% else %}app-chip-neutral{% endif %}">
-                API Realtime: {{ quota.live_apis.label }}
+            <span class="quota-badge {% if quota.live_apis.reached %}is-reached{% endif %}">
+                ⚡ API Live: <strong>{{ quota.live_apis.label }}</strong>
             </span>
-            <span class="app-chip app-chip-small {% if quota.relay_rooms.reached %}app-chip-info{% else %}app-chip-neutral{% endif %}">
-                Perangkat Relay: {{ quota.relay_rooms.label }}
+            <span class="quota-badge {% if quota.relay_rooms.reached %}is-reached{% endif %}">
+                🔌 Relay IoT: <strong>{{ quota.relay_rooms.label }}</strong>
             </span>
         </div>
     </section>
 
-    <section class="app-content-grid">
+    <!-- Main Content Layout (Database Materi + Sidebar MCP) -->
+    <section class="dashboard-grid">
+        <!-- Main Column: Database Materi Table & Management -->
         <div class="app-card" id="databaseMateriSection" style="scroll-margin-top: 80px;">
-            <div class="app-card-header">
+            <div class="app-card-header flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h2 class="app-section-title">Database Materi</h2>
-                    <p class="app-section-subtitle">Semua data di sini menjadi sumber jawaban Xiaozhi. Repo: {{ hf_repo_id }}</p>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <h2 class="app-section-title">Database Materi Belajar</h2>
+                        <span id="badgeRowCount" class="app-chip app-chip-neutral app-chip-small">{{ materials|length }} item</span>
+                    </div>
+                    <p class="app-section-subtitle">Data materi ini menjadi sumber prompt RAG utama Xiaozhi saat menjawab suara.</p>
                 </div>
-                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                    <select id="filterCategory" onchange="filterTable()" class="app-select sm:w-56">
-                        <option value="all">Semua kategori</option>
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <button type="button" onclick="openCategoryModal()" class="app-button app-button-secondary app-button-small" style="font-weight:700;">
+                        🏷️ Kategori ({{ categories|length }})
+                    </button>
+                    <button type="button" onclick="openAddModal()" class="app-button app-button-success app-button-small" style="font-weight:800;">
+                        ➕ Tambah
+                    </button>
+                </div>
+            </div>
+
+            <!-- Toolbar Search & Filter -->
+            <div class="mb-4 flex flex-col sm:flex-row items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div style="position:relative; flex:1; width:100%;">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        name="materi_search_filter" 
+                        oninput="filterTable()" 
+                        placeholder="🔍 Cari judul, isi materi, kata kunci... (Tekan '/' untuk fokus)" 
+                        autocomplete="off" 
+                        autocorrect="off" 
+                        autocapitalize="off" 
+                        spellcheck="false" 
+                        class="app-input" 
+                        style="padding-right:32px; font-size:13.5px;"
+                    >
+                    <button 
+                        type="button" 
+                        id="clearSearchBtn" 
+                        onclick="clearSearchInput()" 
+                        style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; font-size:16px; color:var(--app-muted); cursor:pointer; display:none; line-height:1;" 
+                        title="Hapus pencarian"
+                    >&times;</button>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <select id="filterCategory" onchange="filterTable()" class="app-select w-full sm:w-48" style="font-size:13px;">
+                        <option value="all">Semua Kategori</option>
                         {% for cat in categories %}
                         <option value="{{ cat.name }}">{{ cat.name }}</option>
                         {% endfor %}
                     </select>
-                    <div style="position:relative; display:inline-flex; align-items:center;">
-                        <input 
-                            type="text" 
-                            id="searchInput" 
-                            name="materi_search_filter" 
-                            oninput="filterTable()" 
-                            placeholder="🔍 Cari data materi..." 
-                            autocomplete="off" 
-                            autocorrect="off" 
-                            autocapitalize="off" 
-                            spellcheck="false" 
-                            class="app-input sm:w-72" 
-                            style="padding-right:28px;"
-                        >
-                        <button 
-                            type="button" 
-                            id="clearSearchBtn" 
-                            onclick="clearSearchInput()" 
-                            style="position:absolute; right:8px; background:none; border:none; font-size:15px; color:var(--app-muted); cursor:pointer; display:none; line-height:1; padding:2px;" 
-                            title="Hapus pencarian"
-                        >&times;</button>
-                    </div>
                 </div>
             </div>
 
-            <div class="app-table-wrap" style="scrollbar-gutter: stable;">
+            <!-- Table Container -->
+            <div class="app-table-wrap" style="scrollbar-gutter: stable; max-height:640px; overflow-y:auto;">
                 <table class="app-table" id="dataTable">
                     <thead>
                         <tr>
-                            <th>Kategori</th>
-                            <th>Judul</th>
-                            <th>Isi Data</th>
-                            <th class="text-right">Aksi</th>
+                            <th style="width:130px;">Kategori</th>
+                            <th style="width:230px;">Judul & Info</th>
+                            <th>Isi Data Materi</th>
+                            <th class="text-right" style="width:170px;">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="dataTableBody">
                         {% for item in materials %}
-                        <tr class="data-row hover:bg-slate-50" data-category="{{ item.category }}" data-material-id="{{ item.id }}" data-live-api="{% if item.source_type == 'api_live' %}true{% else %}false{% endif %}" data-search="{{ (item.title ~ ' ' ~ item.category ~ ' ' ~ item.content ~ ' ' ~ item.keywords ~ ' ' ~ (item.api_label or ''))|lower|e }}">
+                        {% set cat_lower = (item.category or '')|lower %}
+                        <tr class="data-row hover:bg-slate-50 dark:hover:bg-slate-800/40" 
+                            data-category="{{ item.category }}" 
+                            data-material-id="{{ item.id }}" 
+                            data-live-api="{% if item.source_type == 'api_live' %}true{% else %}false{% endif %}" 
+                            data-search="{{ (item.title ~ ' ' ~ item.category ~ ' ' ~ item.content ~ ' ' ~ item.keywords ~ ' ' ~ (item.api_label or ''))|lower|e }}">
                             <td>
-                                <div class="app-meta-row">
-                                    <span class="app-chip app-chip-success app-chip-small">{{ item.category }}</span>
+                                <div class="flex flex-col gap-1 items-start">
+                                    <span class="cat-chip {% if 'tugas' in cat_lower %}cat-chip-tugas{% elif 'pengumuman' in cat_lower %}cat-chip-pengumuman{% elif 'materi' in cat_lower %}cat-chip-materi{% elif item.source_type == 'api_live' or 'api' in cat_lower %}cat-chip-api{% else %}cat-chip-default{% endif %}">
+                                        {{ item.category }}
+                                    </span>
                                     {% if item.source_type == 'api_live' %}
-                                    <span class="app-chip app-chip-info app-chip-small">Realtime</span>
+                                    <span class="cat-chip cat-chip-api text-[10px]">⚡ Realtime</span>
                                     {% endif %}
                                 </div>
                             </td>
                             <td>
-                                <span class="app-table-title">{{ item.title }}</span>
-                                <span class="app-table-subtext">ID {{ item.id }}{% if item.keywords %} · {{ item.keywords[:70] }}{% if item.keywords|length > 70 %}...{% endif %}{% endif %}</span>
+                                <span class="material-title-main">{{ item.title }}</span>
+                                <div class="material-meta-sub">
+                                    <span class="font-mono text-slate-500 font-bold">#{{ item.id }}</span>
+                                    {% if item.keywords %}
+                                    <span>· 🏷️ {{ item.keywords[:45] }}{% if item.keywords|length > 45 %}...{% endif %}</span>
+                                    {% endif %}
+                                </div>
                             </td>
-                            <td class="max-w-xl text-slate-600">
+                            <td>
                                 {% if item.source_type == 'api_live' %}
-                                <span class="mb-1 block text-xs font-bold text-sky-700">Endpoint: {{ item.api_label }}</span>
+                                <span class="mb-1 block text-xs font-bold text-sky-700 dark:text-sky-400">🔗 Endpoint: {{ item.api_label }}</span>
                                 {% endif %}
-                                <span class="app-content-preview" id="materialContent{{ item.id }}">{{ item.content[:180] }}{% if item.content|length > 180 %}...{% endif %}</span>
-                                {% if item.source_type == 'api_live' %}
-                                <span class="mt-2 block text-xs font-semibold text-emerald-700" id="liveApiRowStatus{{ item.id }}">Mengecek update... | Size tersimpan: {{ item.content_size_label or '0.00 MB' }}</span>
-                                {% endif %}
+                                <div class="material-preview-box" id="materialContent{{ item.id }}">
+                                    {{ item.content[:160] }}{% if item.content|length > 160 %}...{% endif %}
+                                </div>
+                                <div class="flex items-center gap-3 mt-1 text-[11px] text-slate-500">
+                                    <span>📄 {{ item.content.split()|length }} kata</span>
+                                    {% if item.source_type == 'api_live' %}
+                                    <span class="font-semibold text-emerald-700 dark:text-emerald-400" id="liveApiRowStatus{{ item.id }}">Mengecek update... | Size: {{ item.content_size_label or '0.00 MB' }}</span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td class="text-right">
-                                <div class="app-inline-actions">
-                                    <button type="button" onclick="editData(this)" data-item='{{ item|tojson }}' class="app-button app-button-ghost app-button-small app-button-link">Edit</button>
-                                    <form action="/delete_material/{{ item.id }}" method="POST" class="inline" onsubmit="return confirm('Hapus data ini?');">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                        <button type="submit" class="app-button app-button-ghost app-button-small app-button-text-danger">Hapus</button>
-                                    </form>
+                                <div class="app-inline-actions justify-end">
+                                    <button type="button" onclick="viewMaterial(this)" data-item='{{ item|tojson }}' class="app-button app-button-ghost app-button-small" style="color:var(--app-accent);" title="Lihat materi lengkap">👁️ Lihat</button>
+                                    <button type="button" onclick="editData(this)" data-item='{{ item|tojson }}' class="app-button app-button-ghost app-button-small app-button-link" title="Edit materi">✏️ Edit</button>
+                                    <button type="button" onclick="confirmDeleteMaterial({{ item.id }}, '{{ item.title|replace("'", "\\'") }}')" class="app-button app-button-ghost app-button-small app-button-text-danger" title="Hapus materi">🗑️</button>
                                 </div>
                             </td>
                         </tr>
                         {% else %}
-                        <tr>
-                            <td colspan="4" class="py-10 text-center text-sm text-slate-500">Belum ada data materi.</td>
+                        <tr id="emptyTableRow">
+                            <td colspan="4" class="py-12 text-center text-slate-500">
+                                <div style="font-size:36px; margin-bottom:10px;">📚</div>
+                                <h4 class="font-bold text-base text-slate-800 dark:text-slate-200">Belum Ada Materi Tersimpan</h4>
+                                <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Tambahkan catatan, materi edukasi, atau sambungkan endpoint API agar Xiaozhi dapat menjawab pertanyaan.</p>
+                                <button type="button" onclick="openAddModal()" class="app-button app-button-success app-button-small" style="font-weight:800;">➕ Tambah Materi Pertama</button>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+
+            <!-- Zero search results card -->
+            <div id="noSearchAlert" style="display:none;" class="py-10 text-center text-slate-500">
+                <div style="font-size:32px; margin-bottom:8px;">🔍</div>
+                <p class="font-bold text-sm text-slate-800 dark:text-slate-200">Tidak ada materi yang cocok dengan pencarian.</p>
+                <button type="button" onclick="clearSearchInput()" class="app-button app-button-ghost app-button-small app-button-link mt-2">Reset Pencarian</button>
+            </div>
         </div>
 
-        <aside class="app-sidebar">
-            <style>
-                @keyframes mcpPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-                @keyframes mcpSpin { to{transform:rotate(360deg)} }
-                @keyframes mcpShimmer { to{background-position:-200% 0} }
-                .mcp-loading { animation: mcpPulse 1.5s ease-in-out infinite; }
-                .mcp-spinner { display:inline-block; width:14px; height:14px; border:2px solid #e5e7eb; border-top-color:#0369a1; border-radius:50%; animation:mcpSpin .8s linear infinite; vertical-align:middle; margin-right:6px }
-                .mcp-bar { height:4px; border-radius:2px; background:#e5e7eb; overflow:hidden; margin-top:8px }
-                .mcp-bar-fill { height:100%; border-radius:2px; transition:width .5s ease }
-                .mcp-bar-fill.connecting { width:60%; background:linear-gradient(90deg,#0369a1,#38bdf8,#0369a1); background-size:200%; animation:mcpShimmer 1.5s linear infinite }
-                .mcp-bar-fill.connected { width:100%; background:#047857 }
-                .mcp-bar-fill.idle { width:0%; background:#b91c1c }
-                /* 50:50 Desktop Balance: Seimbangkan Database Materi & Koneksi XiaoZhi */
-                @media (min-width: 1024px) {
-                    .app-content-grid {
-                        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-                    }
-                }
-                /* 3 Slots MCP Grid Layout */
-                .mcp-slots-grid {
-                    display: grid !important;
-                    grid-template-columns: repeat(3, 1fr) !important;
-                    gap: 12px !important;
-                    margin-bottom: 18px !important;
-                    width: 100% !important;
-                    box-sizing: border-box !important;
-                }
-                @media (max-width: 680px) {
-                    .mcp-slots-grid {
-                        grid-template-columns: 1fr !important;
-                        gap: 10px !important;
-                    }
-                }
-                .mcp-slot-tab {
-                    display: flex !important;
-                    flex-direction: column !important;
-                    align-items: flex-start !important;
-                    justify-content: space-between !important;
-                    padding: 12px 14px !important;
-                    min-height: 68px !important;
-                    background: #f8fafc !important;
-                    border: 2px solid #0f172a !important;
-                    border-radius: 10px !important;
-                    cursor: pointer !important;
-                    box-shadow: 3px 3px 0px #0f172a !important;
-                    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
-                    text-align: left !important;
-                    position: relative !important;
-                    width: 100% !important;
-                    box-sizing: border-box !important;
-                    user-select: none !important;
-                }
-                .mcp-slot-tab:hover {
-                    background: #ffffff !important;
-                    transform: translate(-2px, -2px) !important;
-                    box-shadow: 5px 5px 0px #0f172a !important;
-                }
-                .mcp-slot-tab:active {
-                    transform: translate(1px, 1px) !important;
-                    box-shadow: 2px 2px 0px #0f172a !important;
-                }
-                .mcp-slot-tab.active {
-                    background: #ffffff !important;
-                    border: 2.5px solid #047857 !important;
-                    box-shadow: 4px 4px 0px #047857 !important;
-                    outline: 2px solid rgba(4, 120, 87, 0.25) !important;
-                }
-                .slot-tab-header {
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: space-between !important;
-                    width: 100% !important;
-                    margin-bottom: 6px !important;
-                }
-                .slot-badge-tag {
-                    font-size: 11px !important;
-                    font-weight: 900 !important;
-                    text-transform: uppercase !important;
-                    letter-spacing: 0.05em !important;
-                    color: #475569 !important;
-                    background: #e2e8f0 !important;
-                    padding: 2px 7px !important;
-                    border-radius: 5px !important;
-                    border: 1px solid #cbd5e1 !important;
-                    line-height: 1.2 !important;
-                    white-space: nowrap !important;
-                    flex-shrink: 0 !important;
-                }
-                .mcp-slot-tab.active .slot-badge-tag {
-                    color: #047857 !important;
-                    background: #ecfdf5 !important;
-                    border-color: #a7f3d0 !important;
-                }
-                .slot-status-wrap {
-                    display: inline-flex !important;
-                    align-items: center !important;
-                    gap: 6px !important;
-                    white-space: nowrap !important;
-                    flex-shrink: 0 !important;
-                }
-                .slot-radar-dot {
-                    width: 9px !important;
-                    height: 9px !important;
-                    border-radius: 50% !important;
-                    display: inline-block !important;
-                    flex-shrink: 0 !important;
-                }
-                .slot-radar-dot.connected {
-                    background: #10b981 !important;
-                    box-shadow: 0 0 8px #10b981 !important;
-                }
-                .slot-radar-dot.connecting {
-                    background: #0284c7 !important;
-                    animation: mcpPulse 1.2s infinite !important;
-                }
-                .slot-radar-dot.idle {
-                    background: #94a3b8 !important;
-                }
-                .slot-status-text {
-                    font-size: 11px !important;
-                    font-weight: 700 !important;
-                    color: #64748b !important;
-                }
-                .slot-main-label {
-                    font-size: 14px !important;
-                    font-weight: 800 !important;
-                    color: #0f172a !important;
-                    line-height: 1.3 !important;
-                    white-space: nowrap !important;
-                    overflow: hidden !important;
-                    text-overflow: ellipsis !important;
-                    max-width: 100% !important;
-                    display: block !important;
-                }
-                .mcp-slot-tab.active .slot-main-label {
-                    color: #047857 !important;
-                }
-                :root[data-theme="dark"] .mcp-slot-tab {
-                    background: #1e293b !important;
-                    border-color: #475569 !important;
-                    box-shadow: 3px 3px 0px #000 !important;
-                }
-                :root[data-theme="dark"] .mcp-slot-tab:hover {
-                    background: #273549 !important;
-                    border-color: #64748b !important;
-                    box-shadow: 5px 5px 0px #000 !important;
-                }
-                :root[data-theme="dark"] .mcp-slot-tab.active {
-                    background: #0f172a !important;
-                    border-color: #10b981 !important;
-                    box-shadow: 4px 4px 0px #10b981 !important;
-                    outline: 2px solid rgba(16, 185, 129, 0.25) !important;
-                }
-                :root[data-theme="dark"] .slot-badge-tag {
-                    color: #cbd5e1 !important;
-                    background: #334155 !important;
-                    border-color: #475569 !important;
-                }
-                :root[data-theme="dark"] .mcp-slot-tab.active .slot-badge-tag {
-                    color: #34d399 !important;
-                    background: #064e3b !important;
-                    border-color: #059669 !important;
-                }
-                :root[data-theme="dark"] .slot-main-label {
-                    color: #f8fafc !important;
-                }
-                :root[data-theme="dark"] .mcp-slot-tab.active .slot-main-label {
-                    color: #34d399 !important;
-                }
-            </style>
+        <!-- Sidebar Column: Koneksi XiaoZhi 3-Slot & Quick Hub -->
+        <aside class="space-y-6">
+            <!-- 3-Slot MCP Card -->
             <div class="app-card" id="mcpCard">
                 <div class="app-card-header is-compact">
                     <div>
                         <h2 class="app-section-title">Koneksi XiaoZhi (3 Slot)</h2>
-                        <p class="app-section-subtitle">Hubungkan hingga 3 perangkat XiaoZhi secara simultan.{% if user and user.role == 'admin' %} <span style="color:#047857; font-weight:700;">(Opsional untuk Admin)</span>{% endif %}</p>
+                        <p class="app-section-subtitle">Hubungkan hingga 3 perangkat fisik ESP32 XiaoZhi.{% if user and user.role == 'admin' %} <span style="color:#047857; font-weight:700;">(Opsional Admin)</span>{% endif %}</p>
                     </div>
                     <span id="mcpChip" class="app-chip app-chip-small app-chip-neutral">
                         Memeriksa...
                     </span>
                 </div>
 
-                <!-- 3 Slot Tabs Bar (Prominent Control Grid) -->
+                <!-- 3 Slot Tabs Bar -->
                 <div class="mcp-slots-grid">
                     <button type="button" class="mcp-slot-tab active" id="slotTab1" onclick="switchSlot(1)" title="Slot 1: XiaoZhi 1">
                         <div class="slot-tab-header">
                             <span class="slot-badge-tag">SLOT 1</span>
-                            <div class="slot-status-wrap">
+                            <div class="flex items-center gap-1.5">
                                 <span class="slot-radar-dot idle" id="slotDot1"></span>
-                                <span class="slot-status-text" id="slotStatusText1">Kosong</span>
+                                <span class="text-[10px] font-bold text-slate-500" id="slotStatusText1">Kosong</span>
                             </div>
                         </div>
                         <div class="slot-main-label" id="slotTabLabel1">XiaoZhi 1</div>
@@ -388,9 +661,9 @@
                     <button type="button" class="mcp-slot-tab" id="slotTab2" onclick="switchSlot(2)" title="Slot 2: XiaoZhi 2">
                         <div class="slot-tab-header">
                             <span class="slot-badge-tag">SLOT 2</span>
-                            <div class="slot-status-wrap">
+                            <div class="flex items-center gap-1.5">
                                 <span class="slot-radar-dot idle" id="slotDot2"></span>
-                                <span class="slot-status-text" id="slotStatusText2">Kosong</span>
+                                <span class="text-[10px] font-bold text-slate-500" id="slotStatusText2">Kosong</span>
                             </div>
                         </div>
                         <div class="slot-main-label" id="slotTabLabel2">XiaoZhi 2</div>
@@ -398,231 +671,385 @@
                     <button type="button" class="mcp-slot-tab" id="slotTab3" onclick="switchSlot(3)" title="Slot 3: XiaoZhi 3">
                         <div class="slot-tab-header">
                             <span class="slot-badge-tag">SLOT 3</span>
-                            <div class="slot-status-wrap">
+                            <div class="flex items-center gap-1.5">
                                 <span class="slot-radar-dot idle" id="slotDot3"></span>
-                                <span class="slot-status-text" id="slotStatusText3">Kosong</span>
+                                <span class="text-[10px] font-bold text-slate-500" id="slotStatusText3">Kosong</span>
                             </div>
                         </div>
                         <div class="slot-main-label" id="slotTabLabel3">XiaoZhi 3</div>
                     </button>
                 </div>
 
-                <div id="mcpAlert" class="app-alert app-alert-warning">
+                <div id="mcpAlert" class="app-alert app-alert-warning" style="margin-bottom:10px;">
                     Pilih slot untuk mengonfigurasi endpoint XiaoZhi.
                 </div>
                 <div class="mcp-bar"><div id="mcpBar" class="mcp-bar-fill idle"></div></div>
+
                 <div class="mt-4 space-y-3">
                     <input type="hidden" id="mcpCsrf" value="{{ csrf_token }}">
                     <div>
                         <div class="flex items-center justify-between mb-1">
-                            <label for="mcp_label" class="app-label !mb-0">Nama / Ruangan Perangkat</label>
-                            <button type="button" id="quickSaveLabelBtn" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline hidden" title="Simpan nama slot tanpa reset token">Perbarui Nama</button>
+                            <label for="mcp_label" class="app-label !mb-0 text-xs">Nama / Ruangan Perangkat</label>
+                            <button type="button" id="quickSaveLabelBtn" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline hidden" title="Simpan nama slot">Perbarui Nama</button>
                         </div>
-                        <input id="mcp_label" type="text" maxlength="60" placeholder="Contoh: XiaoZhi Ruang Kerja" autocomplete="off" class="app-input">
+                        <input id="mcp_label" type="text" maxlength="60" placeholder="Contoh: XiaoZhi Ruang Kerja" autocomplete="off" class="app-input text-xs">
                     </div>
 
-                    <!-- Hardware Board MAC Status (Read-Only Anti-Spoofing Box) -->
-                    <div id="mcpBoardLockBox" class="p-3 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 border-slate-200">
-                        <div class="flex items-center gap-2.5 min-w-0">
-                            <span id="mcpLockIcon" class="text-base select-none">⚪</span>
+                    <!-- Hardware Board MAC Status (Anti-Spoofing Box) -->
+                    <div id="mcpBoardLockBox" class="p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span id="mcpLockIcon" class="text-sm select-none">⚪</span>
                             <div class="min-w-0">
-                                <span class="font-bold text-slate-800 block" id="mcpBoardMacTitle">Hardware Board MAC (Terkunci Otomatis)</span>
-                                <span class="font-mono text-slate-600 block truncate" id="mcpBoardMacValue">Belum ada board terhubung</span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 block" id="mcpBoardMacTitle">Hardware Board MAC (Anti-Spoofing)</span>
+                                <span class="font-mono text-slate-500 block truncate" id="mcpBoardMacValue">Belum ada board terhubung</span>
                             </div>
                         </div>
-                        <div id="mcpBoardActionArea" class="flex-shrink-0">
-                            <!-- Dynamic detach board button -->
-                        </div>
+                        <div id="mcpBoardActionArea" class="flex-shrink-0"></div>
                     </div>
 
                     <div>
-                        <label for="mcp_token" class="app-label">Endpoint MCP WebSocket</label>
-                        <input id="mcp_token" type="password" placeholder="wss://api.xiaozhi.me/mcp/?token=..." autocomplete="off" class="app-input">
-                        <p class="app-field-hint" id="mcpPreviewHint">Endpoint wss:// dari XiaoZhi disimpan terenkripsi.</p>
+                        <label for="mcp_token" class="app-label text-xs">Endpoint MCP WebSocket</label>
+                        <input id="mcp_token" type="password" placeholder="wss://api.xiaozhi.me/mcp/?token=..." autocomplete="off" class="app-input text-xs">
+                        <p class="app-field-hint text-[11px]" id="mcpPreviewHint">Endpoint wss:// dari XiaoZhi disimpan terenkripsi.</p>
                     </div>
-                    <div class="flex gap-2">
-                        <button id="saveMcpBtn" class="app-button app-button-primary flex-1">Simpan Slot Ini</button>
-                        <button id="reconnectBtn" class="app-button app-button-secondary hidden">Reconnect</button>
-                        <button id="deleteBtn" class="app-button app-button-danger hidden">Hapus</button>
+
+                    <div class="flex gap-2 pt-1">
+                        <button id="saveMcpBtn" class="app-button app-button-primary flex-1 text-xs">Simpan Slot Ini</button>
+                        <button id="reconnectBtn" class="app-button app-button-secondary hidden text-xs">Reconnect</button>
+                        <button id="deleteBtn" class="app-button app-button-danger hidden text-xs">Hapus</button>
                     </div>
                 </div>
 
-                <a href="/riwayat-chat" class="app-button app-button-full mt-3" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Riwayat Chat')"{% endif %}>Buka Riwayat Chat{% if user and user.role != 'admin' and not mcp_connected %} 🔒{% endif %}</a>
-                <div id="mcpStatusDetail" class="mt-3 app-field-hint text-xs">Memuat status perangkat...</div>
+                <div class="pt-3 border-t border-slate-200 dark:border-slate-800 mt-4">
+                    <a href="/riwayat-chat" class="app-button app-button-full text-xs" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Riwayat Chat')"{% endif %}>
+                        💬 Buka Riwayat Percakapan Chat{% if user and user.role != 'admin' and not mcp_connected %} 🔒{% endif %}
+                    </a>
+                    <div id="mcpStatusDetail" class="mt-2 app-field-hint text-[11px] text-center">Memuat status perangkat...</div>
+                </div>
             </div>
 
+            <!-- Quick Tips & Hub Card -->
             <div class="app-card">
                 <div class="app-card-header is-compact">
                     <div>
-                        <h2 class="app-section-title">Tambah Materi</h2>
-                        <p class="app-section-subtitle">Simpan materi manual atau hubungkan endpoint API realtime.</p>
+                        <h3 class="app-section-title text-sm">💡 Tips Knowledge Base</h3>
+                        <p class="app-section-subtitle text-xs">Optimasi jawaban asisten suara Anda.</p>
                     </div>
                 </div>
-                <form action="/add_material" method="POST" class="app-form-section" id="addMaterialForm" onsubmit="return handleAddMaterialSubmit(event)">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <!-- Web Scraper Quick Tool -->
-                    <div class="app-muted-panel mb-2" style="border: 2px dashed var(--app-border, #cbd5e1); border-radius: 10px; padding: 12px 14px; background: rgba(34, 197, 94, 0.05);">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                            <span style="font-size: 12.5px; font-weight: 800; display:flex; align-items:center; gap: 6px;">
-                                <span>🌐</span> Ambil Konten dari Link Web (Scraper)
-                            </span>
-                            <span class="app-chip app-chip-success app-chip-small" style="font-size: 10.5px;">Auto-Fill RAG</span>
-                        </div>
-                        <div style="display:flex; gap: 8px; flex-wrap: wrap;">
-                            <input id="scrape_target_url" type="url" placeholder="https://contoh.com/artikel-edukasi" class="app-input" style="flex: 1; min-width: 200px; font-size: 12.5px; padding: 7px 10px;">
-                            <button type="button" id="btnScrapeUrl" onclick="executeWebScraper()" class="app-button app-button-secondary" style="font-size: 12px; font-weight: 800; padding: 7px 14px; white-space: nowrap;">
-                                🚀 Scrape Sekarang
-                            </button>
-                        </div>
-                        <div id="scrapeStatusHint" style="font-size: 11px; color: var(--app-muted); margin-top: 6px; display:none;"></div>
+                <div class="space-y-2.5 text-xs text-slate-600 dark:text-slate-400">
+                    <div class="flex items-start gap-2">
+                        <span class="text-emerald-600 font-bold">1.</span>
+                        <span><strong>Web Scraper:</strong> Ekstrak artikel bersih dari tautan berita atau modul belajar otomatis.</span>
                     </div>
-
-                    <div>
-                        <label for="title" class="app-label">Judul</label>
-                        <input id="title" type="text" name="title" required maxlength="160" placeholder="Contoh: Catatan pertemuan 6" class="app-input">
+                    <div class="flex items-start gap-2">
+                        <span class="text-sky-600 font-bold">2.</span>
+                        <span><strong>API Live:</strong> Gunakan kategori <code>data dari api</code> jika ingin menyuplai data harga atau status realtime ke Xiaozhi.</span>
                     </div>
-                    <div>
-                        <label for="category" class="app-label">Kategori</label>
-                        <select id="category" name="category" required class="app-select">
-                            {% for cat in categories %}
-                            <option value="{{ cat.name }}">{{ cat.name }}</option>
-                            {% endfor %}
-                        </select>
+                    <div class="flex items-start gap-2">
+                        <span class="text-amber-600 font-bold">3.</span>
+                        <span><strong>Kata Kunci:</strong> Tambahkan sinonim atau kata kunci spesifik agar relevansi pencarian RAG semakin akurat.</span>
                     </div>
-                    <div id="liveApiFields" class="app-muted-panel hidden border-sky-100 bg-sky-50">
-                        <div class="flex items-start justify-between gap-3">
-                            <div>
-                                <h3 class="text-sm font-bold text-slate-950">Sumber API Realtime</h3>
-                                <p class="app-section-subtitle">Raw JSON terbaru disiapkan untuk Xiaozhi.</p>
-                            </div>
-                            <span class="app-chip app-chip-info app-chip-small">Live</span>
-                        </div>
-                        <div class="mt-3">
-                            <label for="api_url" class="app-label">Endpoint API</label>
-                            <input id="api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input">
-                        </div>
-                        <div class="mt-3 flex items-center justify-between gap-2">
-                            <span class="text-xs font-semibold text-slate-500" id="liveApiStatus">Data API akan tampil di Isi Data.</span>
-                            <button type="button" class="app-button app-button-small" id="liveApiRefreshButton">Refresh</button>
-                        </div>
-                    </div>
-                    <div>
-                        <label for="content" class="app-label">Isi Data</label>
-                        <textarea id="content" name="content" rows="7" placeholder="Tulis isi materi secara lengkap dan terstruktur." class="app-textarea"></textarea>
-                        <p class="app-field-hint">
-                            Batas kata per materi: {% if quota.words_per_material.unlimited %}tanpa batas{% else %}{{ quota.words_per_material.limit }} kata{% endif %}.
-                        </p>
-                    </div>
-                    <div>
-                        <label for="keywords" class="app-label">Kata Kunci</label>
-                        <input id="keywords" type="text" name="keywords" maxlength="300" placeholder="Contoh: analisis bisnis, tugas, penjualan" class="app-input">
-                    </div>
-                    <button type="submit" class="app-button app-button-success app-button-full" {% if quota.materials.reached %}disabled{% endif %}>
-                        {% if quota.materials.reached %}Batas Materi Tercapai{% else %}Simpan Materi{% endif %}
-                    </button>
-                </form>
-            </div>
-
-            <div class="app-card">
-                <div class="app-card-header is-compact">
-                    <div>
-                        <h2 class="app-section-title">Kategori</h2>
-                        <p class="app-section-subtitle">Kelompokkan materi agar mudah dicari.</p>
-                    </div>
-                    <span class="app-chip app-chip-neutral app-chip-small">{{ categories|length }} item</span>
-                </div>
-                <form action="/add_category" method="POST" class="flex gap-2">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input type="text" name="name" required maxlength="80" placeholder="Nama kategori" class="app-input min-w-0 flex-1">
-                    <button type="submit" class="app-button app-button-primary">Tambah</button>
-                </form>
-                <div class="app-list-panel mt-4 max-h-72 overflow-y-auto">
-                    {% for cat in categories %}
-                    <div class="app-list-row">
-                        <span class="text-sm font-semibold text-slate-700">{{ cat.name }}</span>
-                        {% if cat.name|trim|lower != 'data dari api' %}
-                        <form action="/delete_category/{{ cat.id }}" method="POST" onsubmit="return confirm('Hapus kategori ini?');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="app-button app-button-ghost app-button-small app-button-text-danger">Hapus</button>
-                        </form>
-                        {% else %}
-                        <span class="app-chip app-chip-small app-chip-neutral">Permanent</span>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
                 </div>
             </div>
         </aside>
     </section>
 </div>
 
-<div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto bg-slate-950/50 p-4">
-    <div class="app-card dashboard-edit-panel w-full max-w-2xl shadow-xl">
-        <div class="mb-4 flex items-center justify-between gap-3">
+<!-- ============================================================== -->
+<!-- MODAL 1: TAMBAH MATERI BARU (CREATE)                          -->
+<!-- ============================================================== -->
+<div id="addMaterialModal" class="dash-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="addMatTitle">
+    <div class="dash-modal-box">
+        <div class="dash-modal-header">
             <div>
-                <h3 class="app-section-title">Edit Materi</h3>
-                <p class="app-section-subtitle">Perbarui sumber data yang dipakai Xiaozhi.</p>
+                <h3 class="app-section-title" id="addMatTitle">Tambah Materi Baru</h3>
+                <p class="app-section-subtitle">Simpan catatan, artikel modul, atau hubungkan endpoint API live.</p>
             </div>
-            <button type="button" onclick="closeModal()" class="app-button app-button-ghost app-icon-button app-button-muted" aria-label="Tutup">&times;</button>
+            <button type="button" onclick="closeAddModal()" class="app-button app-button-ghost app-icon-button" aria-label="Tutup">&times;</button>
         </div>
-        <form id="editForm" method="POST" class="app-form-section">
+
+        <form action="/add_material" method="POST" id="addMaterialForm" onsubmit="return handleAddMaterialSubmit(event)">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <div>
-                <label for="edit_title" class="app-label">Judul</label>
-                <input id="edit_title" type="text" name="title" required maxlength="160" class="app-input">
-            </div>
-            <div>
-                <label for="edit_category" class="app-label">Kategori</label>
-                <select id="edit_category" name="category" required class="app-select">
-                    {% for cat in categories %}
-                    <option value="{{ cat.name }}">{{ cat.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div id="editLiveApiFields" class="app-muted-panel hidden border-sky-100 bg-sky-50">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-950">Sumber API Realtime</h3>
-                        <p class="app-section-subtitle">Raw JSON terbaru disiapkan untuk Xiaozhi.</p>
+            
+            <div class="dash-modal-body">
+                <!-- Web Scraper Quick Tool -->
+                <div style="border: 2px dashed var(--app-border-strong); border-radius: 8px; padding: 12px 14px; background: rgba(5, 150, 105, 0.04);">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-black flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                            <span>🌐</span> Ambil Konten Otomatis dari URL Web (Scraper)
+                        </span>
+                        <span class="app-chip app-chip-success app-chip-small" style="font-size:10px;">Auto-Fill RAG</span>
                     </div>
-                    <span class="app-chip app-chip-info app-chip-small">Live</span>
+                    <div class="flex gap-2 flex-wrap">
+                        <input id="scrape_target_url" type="url" placeholder="https://contoh.com/artikel-edukasi" class="app-input flex-1 min-w-[200px] text-xs">
+                        <button type="button" id="btnScrapeUrl" onclick="executeWebScraper()" class="app-button app-button-secondary text-xs font-bold whitespace-nowrap">
+                            🚀 Scrape Sekarang
+                        </button>
+                    </div>
+                    <div id="scrapeStatusHint" class="text-[11px] mt-2 hidden"></div>
                 </div>
-                <div class="mt-3">
-                    <label for="edit_api_url" class="app-label">Endpoint API</label>
-                    <input id="edit_api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input">
+
+                <div>
+                    <label for="title" class="app-label">Judul Materi <span class="text-rose-600">*</span></label>
+                    <input id="title" type="text" name="title" required maxlength="160" placeholder="Contoh: Modul Pertemuan 4 - Jaringan Komputer" class="app-input">
                 </div>
-                <div class="mt-3 flex items-center justify-between gap-2">
-                    <span class="text-xs font-semibold text-slate-500" id="editLiveApiStatus">Data API akan tampil di Isi Data.</span>
-                    <button type="button" class="app-button app-button-small" id="editLiveApiRefreshButton">Refresh</button>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="category" class="app-label !mb-0">Kategori <span class="text-rose-600">*</span></label>
+                            <button type="button" onclick="openCategoryModal()" class="text-xs text-emerald-700 dark:text-emerald-400 font-bold hover:underline">+ Kategori Baru</button>
+                        </div>
+                        <select id="category" name="category" required class="app-select">
+                            {% for cat in categories %}
+                            <option value="{{ cat.name }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="keywords" class="app-label">Kata Kunci / Tags (Opsional)</label>
+                        <input id="keywords" type="text" name="keywords" maxlength="300" placeholder="Contoh: ip address, subnetting, ujian" class="app-input">
+                    </div>
+                </div>
+
+                <!-- Live API Fields Toggle -->
+                <div id="liveApiFields" class="p-3 rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-800 hidden space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-sky-900 dark:text-sky-300">Endpoint Sumber API Realtime</span>
+                        <span class="app-chip app-chip-info app-chip-small">Live</span>
+                    </div>
+                    <input id="api_url" type="url" name="api_url" placeholder="https://api.domain.com/data-json" autocomplete="off" class="app-input text-xs">
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[11px] font-semibold text-slate-500" id="liveApiStatus">Data JSON terbaru akan ditarik otomatis.</span>
+                        <button type="button" class="app-button app-button-small text-xs" id="liveApiRefreshButton">Preview API</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label for="content" class="app-label !mb-0">Isi Materi / Pengetahuan <span class="text-rose-600">*</span></label>
+                        <span class="text-[11px] font-mono text-slate-500" id="addWordCountDisplay">0 kata</span>
+                    </div>
+                    <textarea id="content" name="content" rows="7" required placeholder="Tuliskan materi secara lengkap, runtut, dan jelas agar mudah dipahami oleh asisten suara saat pengguna bertanya..." class="app-textarea" oninput="updateWordCounter(this, 'addWordCountDisplay')"></textarea>
+                    <p class="app-field-hint">
+                        Batas kata: {% if quota.words_per_material.unlimited %}Tanpa batas{% else %}{{ quota.words_per_material.limit }} kata per materi{% endif %}.
+                    </p>
                 </div>
             </div>
-            <div>
-                <label for="edit_content" class="app-label">Isi Data</label>
-                <textarea id="edit_content" name="content" rows="8" class="app-textarea"></textarea>
-            </div>
-            <div>
-                <label for="edit_keywords" class="app-label">Kata Kunci</label>
-                <input id="edit_keywords" type="text" name="keywords" maxlength="300" class="app-input">
-            </div>
-            <div class="dashboard-edit-footer flex justify-end gap-2">
-                <button type="button" onclick="closeModal()" class="app-button">Batal</button>
-                <button type="submit" class="app-button app-button-primary">Simpan</button>
+
+            <div class="dash-modal-footer">
+                <button type="button" onclick="closeAddModal()" class="app-button">Batal</button>
+                <button type="submit" class="app-button app-button-success" {% if quota.materials.reached %}disabled title="Batas kuota materi tercapai"{% endif %}>
+                    {% if quota.materials.reached %}Batas Materi Tercapai{% else %}⚡ Simpan & Vektorisasi{% endif %}
+                </button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Real-Time Material Indexing & Vectorization Progress Modal -->
-<div id="materialProgressModal" class="app-modal" role="dialog" aria-modal="true" style="display:none;">
-    <div class="app-modal-box" style="max-width: 460px; text-align: center; padding: 28px 22px;">
-        <div style="width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 50%; background: #ecfdf5; border: 2px solid #047857; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+<!-- ============================================================== -->
+<!-- MODAL 2: EDIT MATERI (UPDATE)                                 -->
+<!-- ============================================================== -->
+<div id="editModal" class="dash-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="editMatTitle">
+    <div class="dash-modal-box">
+        <div class="dash-modal-header">
+            <div>
+                <h3 class="app-section-title" id="editMatTitle">Edit Data Materi</h3>
+                <p class="app-section-subtitle">Perbarui judul, kategori, atau teks materi yang disimpan.</p>
+            </div>
+            <button type="button" onclick="closeModal()" class="app-button app-button-ghost app-icon-button" aria-label="Tutup">&times;</button>
+        </div>
+
+        <form id="editForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            
+            <div class="dash-modal-body">
+                <div>
+                    <label for="edit_title" class="app-label">Judul Materi <span class="text-rose-600">*</span></label>
+                    <input id="edit_title" type="text" name="title" required maxlength="160" class="app-input">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="edit_category" class="app-label">Kategori <span class="text-rose-600">*</span></label>
+                        <select id="edit_category" name="category" required class="app-select">
+                            {% for cat in categories %}
+                            <option value="{{ cat.name }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit_keywords" class="app-label">Kata Kunci</label>
+                        <input id="edit_keywords" type="text" name="keywords" maxlength="300" class="app-input">
+                    </div>
+                </div>
+
+                <!-- Edit Live API Fields -->
+                <div id="editLiveApiFields" class="p-3 rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-800 hidden space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-sky-900 dark:text-sky-300">Sumber API Realtime</span>
+                        <span class="app-chip app-chip-info app-chip-small">Live</span>
+                    </div>
+                    <input id="edit_api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input text-xs">
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[11px] font-semibold text-slate-500" id="editLiveApiStatus">Data API akan tampil di Isi Data.</span>
+                        <button type="button" class="app-button app-button-small text-xs" id="editLiveApiRefreshButton">Refresh</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label for="edit_content" class="app-label !mb-0">Isi Data Materi <span class="text-rose-600">*</span></label>
+                        <span class="text-[11px] font-mono text-slate-500" id="editWordCountDisplay">0 kata</span>
+                    </div>
+                    <textarea id="edit_content" name="content" rows="8" required class="app-textarea" oninput="updateWordCounter(this, 'editWordCountDisplay')"></textarea>
+                </div>
+            </div>
+
+            <div class="dash-modal-footer">
+                <button type="button" onclick="closeModal()" class="app-button">Batal</button>
+                <button type="submit" class="app-button app-button-primary">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- MODAL 3: LIHAT DETAIL MATERI (READ FULL)                      -->
+<!-- ============================================================== -->
+<div id="viewModal" class="dash-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="viewModalTitle">
+    <div class="dash-modal-box" style="max-width: 640px;">
+        <div class="dash-modal-header">
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span id="viewCatBadge" class="cat-chip cat-chip-default">Kategori</span>
+                    <span id="viewIdBadge" class="text-xs font-mono text-slate-500">#0</span>
+                </div>
+                <h3 class="app-section-title" id="viewModalTitle">Judul Materi</h3>
+            </div>
+            <button type="button" onclick="closeViewModal()" class="app-button app-button-ghost app-icon-button" aria-label="Tutup">&times;</button>
+        </div>
+
+        <div class="dash-modal-body">
+            <div id="viewKeywordsWrap" class="text-xs text-slate-500 flex items-center gap-1.5 pb-2 border-b border-slate-200 dark:border-slate-800">
+                <span class="font-bold">🏷️ Kata Kunci:</span>
+                <span id="viewKeywordsText">-</span>
+            </div>
+
+            <div class="relative">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-bold text-slate-600 dark:text-slate-300">Isi Lengkap:</span>
+                    <button type="button" id="copyContentBtn" onclick="copyFullContent()" class="app-button app-button-ghost app-button-small text-xs font-bold" style="color:var(--app-sky);">
+                        📋 Salin Teks
+                    </button>
+                </div>
+                <div id="viewFullContent" class="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-sans text-xs leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap max-h-72 overflow-y-auto select-text"></div>
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                <span id="viewMetaStats">0 kata · 0 karakter</span>
+                <span id="viewLiveEndpointText" class="text-sky-600 truncate max-w-[280px]"></span>
+            </div>
+        </div>
+
+        <div class="dash-modal-footer">
+            <button type="button" onclick="closeViewModal()" class="app-button">Tutup</button>
+            <button type="button" id="viewEditDirectBtn" class="app-button app-button-primary">✏️ Edit Materi Ini</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- MODAL 4: KELOLA KATEGORI                                      -->
+<!-- ============================================================== -->
+<div id="categoryModal" class="dash-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="catModalTitle">
+    <div class="dash-modal-box" style="max-width: 520px;">
+        <div class="dash-modal-header">
+            <div>
+                <h3 class="app-section-title" id="catModalTitle">Kelola Kategori</h3>
+                <p class="app-section-subtitle">Kelompokkan materi agar mudah dikelompokkan dan difilter.</p>
+            </div>
+            <button type="button" onclick="closeCategoryModal()" class="app-button app-button-ghost app-icon-button" aria-label="Tutup">&times;</button>
+        </div>
+
+        <div class="dash-modal-body">
+            <!-- Add category form -->
+            <form action="/add_category" method="POST" class="flex gap-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="text" name="name" required maxlength="80" placeholder="Nama kategori baru..." class="app-input flex-1 text-xs">
+                <button type="submit" class="app-button app-button-primary text-xs font-bold whitespace-nowrap">
+                    ➕ Tambah
+                </button>
+            </form>
+
+            <div class="mt-2">
+                <span class="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-2">Daftar Kategori Tersedia ({{ categories|length }}):</span>
+                <div class="space-y-1.5 max-h-60 overflow-y-auto p-1">
+                    {% for cat in categories %}
+                    <div class="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-slate-800 dark:text-slate-200">{{ cat.name }}</span>
+                            {% if cat.name|trim|lower == 'data dari api' %}
+                            <span class="app-chip app-chip-small app-chip-info text-[10px]">Sistem</span>
+                            {% endif %}
+                        </div>
+
+                        {% if cat.name|trim|lower != 'data dari api' %}
+                        <form action="/delete_category/{{ cat.id }}" method="POST" onsubmit="return confirm('Hapus kategori \'{{ cat.name }}\'? Materi dalam kategori ini tidak ikut terhapus.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="app-button app-button-ghost app-button-small app-button-text-danger text-xs py-0 px-2" title="Hapus kategori">&times; Hapus</button>
+                        </form>
+                        {% else %}
+                        <span class="text-[10px] text-slate-400 font-bold">Permanen</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="dash-modal-footer">
+            <button type="button" onclick="closeCategoryModal()" class="app-button">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- MODAL 5: KONFIRMASI HAPUS MATERI (DELETE CONFIRM)             -->
+<!-- ============================================================== -->
+<div id="deleteModal" class="dash-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dash-modal-box" style="max-width: 440px;">
+        <div class="dash-modal-header" style="border-bottom:none; padding-bottom:0;">
+            <div style="font-size:32px;">⚠️</div>
+            <button type="button" onclick="closeDeleteModal()" class="app-button app-button-ghost app-icon-button">&times;</button>
+        </div>
+        <div class="dash-modal-body" style="padding-top:10px;">
+            <h3 class="app-section-title text-base">Hapus Materi Ini?</h3>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mt-1" id="deleteTargetPrompt">
+                Apakah Anda yakin ingin menghapus materi ini? Data yang terhapus tidak dapat dikembalikan.
+            </p>
+        </div>
+        <form id="deleteForm" method="POST" class="dash-modal-footer">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="button" onclick="closeDeleteModal()" class="app-button text-xs">Batal</button>
+            <button type="submit" class="app-button app-button-danger text-xs font-bold">Ya, Hapus Materi</button>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- REAL-TIME SSE VECTORIZATION PROGRESS MODAL                     -->
+<!-- ============================================================== -->
+<div id="materialProgressModal" class="dash-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dash-modal-box" style="max-width: 460px; text-align: center; padding: 28px 24px;">
+        <div style="width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 50%; background: #ecfdf5; border: 2px solid #047857; display: flex; align-items: center; justify-content: center; font-size: 26px;">
             ⚡
         </div>
         <h3 id="matProgStepTitle" style="font-size: 17px; font-weight: 800; color: var(--app-text); margin: 0 0 6px;">
             Memproses Vektorisasi Materi...
         </h3>
         <p id="matProgMessage" style="font-size: 12.5px; color: var(--app-muted); margin: 0 0 18px; line-height: 1.5;">
-            Menghubungkan ke SSE pipeline...
+            Menghubungkan ke SSE pipeline fast indexing...
         </p>
 
         <!-- Progress bar track -->
@@ -639,7 +1066,235 @@
 
 <script>
     const DASHBOARD_CSRF_TOKEN = {{ csrf_token|tojson }};
+    let activeViewingItem = null;
 
+    // Word counter utility
+    function updateWordCounter(textarea, targetId) {
+        if (!textarea) return;
+        const text = textarea.value.trim();
+        const words = text ? text.split(/\s+/).length : 0;
+        const target = document.getElementById(targetId);
+        if (target) {
+            target.textContent = `${words} kata`;
+        }
+    }
+
+    // Modal controllers
+    function openAddModal() {
+        const modal = document.getElementById('addMaterialModal');
+        if (modal) {
+            modal.classList.add('is-open');
+            document.body.style.overflow = 'hidden';
+            setTimeout(() => {
+                const titleInp = document.getElementById('title');
+                if (titleInp) titleInp.focus();
+            }, 100);
+        }
+    }
+
+    function closeAddModal() {
+        const modal = document.getElementById('addMaterialModal');
+        if (modal) {
+            modal.classList.remove('is-open');
+            document.body.style.overflow = '';
+        }
+    }
+
+    function openCategoryModal() {
+        const modal = document.getElementById('categoryModal');
+        if (modal) {
+            modal.classList.add('is-open');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeCategoryModal() {
+        const modal = document.getElementById('categoryModal');
+        if (modal) {
+            modal.classList.remove('is-open');
+            document.body.style.overflow = '';
+        }
+    }
+
+    function viewMaterial(btn) {
+        if (!btn || !btn.dataset.item) return;
+        try {
+            const item = JSON.parse(btn.dataset.item);
+            activeViewingItem = item;
+            
+            document.getElementById('viewModalTitle').textContent = item.title || 'Tanpa Judul';
+            document.getElementById('viewIdBadge').textContent = '#' + (item.id || '');
+            
+            const catBadge = document.getElementById('viewCatBadge');
+            if (catBadge) {
+                catBadge.textContent = item.category || 'Umum';
+                const catLower = (item.category || '').toLowerCase();
+                catBadge.className = 'cat-chip ' + (
+                    catLower.includes('tugas') ? 'cat-chip-tugas' :
+                    catLower.includes('pengumuman') ? 'cat-chip-pengumuman' :
+                    catLower.includes('materi') ? 'cat-chip-materi' :
+                    (item.source_type === 'api_live' || catLower.includes('api')) ? 'cat-chip-api' : 'cat-chip-default'
+                );
+            }
+
+            const kwWrap = document.getElementById('viewKeywordsWrap');
+            const kwText = document.getElementById('viewKeywordsText');
+            if (item.keywords && item.keywords.trim()) {
+                if (kwWrap) kwWrap.style.display = 'flex';
+                if (kwText) kwText.textContent = item.keywords;
+            } else {
+                if (kwWrap) kwWrap.style.display = 'none';
+            }
+
+            const contentBox = document.getElementById('viewFullContent');
+            if (contentBox) contentBox.textContent = item.content || '';
+
+            const words = item.content ? item.content.trim().split(/\s+/).length : 0;
+            const chars = item.content ? item.content.length : 0;
+            const metaStats = document.getElementById('viewMetaStats');
+            if (metaStats) metaStats.textContent = `${words} kata · ${chars} karakter`;
+
+            const liveEndpoint = document.getElementById('viewLiveEndpointText');
+            if (liveEndpoint) {
+                if (item.source_type === 'api_live' && item.api_url) {
+                    liveEndpoint.textContent = '🔗 ' + item.api_url;
+                } else {
+                    liveEndpoint.textContent = '';
+                }
+            }
+
+            const directEditBtn = document.getElementById('viewEditDirectBtn');
+            if (directEditBtn) {
+                directEditBtn.onclick = () => {
+                    closeViewModal();
+                    openEditWithItem(item);
+                };
+            }
+
+            const modal = document.getElementById('viewModal');
+            if (modal) {
+                modal.classList.add('is-open');
+                document.body.style.overflow = 'hidden';
+            }
+        } catch(e) {
+            console.error('Error viewing material:', e);
+        }
+    }
+
+    function closeViewModal() {
+        const modal = document.getElementById('viewModal');
+        if (modal) {
+            modal.classList.remove('is-open');
+            document.body.style.overflow = '';
+        }
+    }
+
+    function copyFullContent() {
+        if (!activeViewingItem || !activeViewingItem.content) return;
+        navigator.clipboard.writeText(activeViewingItem.content).then(() => {
+            const btn = document.getElementById('copyContentBtn');
+            if (btn) {
+                const old = btn.innerHTML;
+                btn.innerHTML = '✅ Tersalin!';
+                btn.style.color = '#059669';
+                setTimeout(() => {
+                    btn.innerHTML = old;
+                    btn.style.color = 'var(--app-sky)';
+                }, 2000);
+            }
+        }).catch(err => {
+            alert('Gagal menyalin: ' + err.message);
+        });
+    }
+
+    function confirmDeleteMaterial(id, title) {
+        const form = document.getElementById('deleteForm');
+        const prompt = document.getElementById('deleteTargetPrompt');
+        if (form) form.action = '/delete_material/' + encodeURIComponent(id);
+        if (prompt) {
+            prompt.innerHTML = `Apakah Anda yakin ingin menghapus materi <strong>"${escapeHtml(title)}"</strong> (ID #${id})? Tindakan ini permanen.`;
+        }
+        const modal = document.getElementById('deleteModal');
+        if (modal) {
+            modal.classList.add('is-open');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeDeleteModal() {
+        const modal = document.getElementById('deleteModal');
+        if (modal) {
+            modal.classList.remove('is-open');
+            document.body.style.overflow = '';
+        }
+    }
+
+    function editData(button) {
+        if (!button || !button.dataset.item) return;
+        try {
+            const item = JSON.parse(button.dataset.item);
+            openEditWithItem(item);
+        } catch (e) {
+            console.error('Error opening edit modal:', e);
+        }
+    }
+
+    function openEditWithItem(item) {
+        liveApiContexts.edit.lastHash = "";
+        liveApiContexts.edit.lastContent = "";
+        document.getElementById("edit_title").value = item.title || "";
+        document.getElementById("edit_category").value = item.category || "";
+        document.getElementById("edit_content").value = item.content || "";
+        document.getElementById("edit_keywords").value = item.keywords || "";
+        document.getElementById("edit_api_url").value = item.api_url || "";
+        document.getElementById("editForm").action = "/update_material/" + encodeURIComponent(item.id);
+        updateWordCounter(document.getElementById("edit_content"), "editWordCountDisplay");
+        syncLiveApiFields("edit");
+        const modal = document.getElementById("editModal");
+        if (modal) {
+            modal.classList.add('is-open');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeModal() {
+        const modal = document.getElementById("editModal");
+        if (modal) {
+            modal.classList.remove('is-open');
+            document.body.style.overflow = '';
+        }
+        clearLiveApiTimer("edit");
+    }
+
+    // Keyboard Shortcuts: '/' focuses search, 'Escape' closes modals
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeAddModal();
+            closeModal();
+            closeViewModal();
+            closeCategoryModal();
+            closeDeleteModal();
+        } else if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+            e.preventDefault();
+            const search = document.getElementById('searchInput');
+            if (search) {
+                search.focus();
+                search.select();
+            }
+        }
+    });
+
+    // Close on backdrop click
+    document.querySelectorAll('.dash-modal-backdrop').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this && this.id !== 'materialProgressModal') {
+                this.classList.remove('is-open');
+                document.body.style.overflow = '';
+            }
+        });
+    });
+
+    // Real-Time SSE Submission Handler
     async function handleAddMaterialSubmit(event) {
         event.preventDefault();
         const form = event.target;
@@ -660,11 +1315,12 @@
         const titleEl = document.getElementById('matProgStepTitle');
         const msgEl = document.getElementById('matProgMessage');
 
-        modal.style.display = 'flex';
+        closeAddModal();
+        modal.classList.add('is-open');
         bar.style.width = '5%';
         percentText.innerText = '5%';
         titleEl.innerText = 'Memulai Vektorisasi...';
-        msgEl.innerText = 'Mengirim data materi ke server...';
+        msgEl.innerText = 'Mengirim data materi ke pipeline RAG Xiaozhi...';
 
         try {
             const formData = new FormData();
@@ -724,11 +1380,11 @@
                             msgEl.innerText = parsed.message || 'Materi berhasil disimpan dan divektorisasi.';
                             setTimeout(() => {
                                 window.location.href = '/dashboard?message=Data+materi+berhasil+ditambahkan+dan+divektorisasi.';
-                            }, 700);
+                            }, 600);
                             return true;
                         } else if (currentEvent === 'error') {
                             alert('Gagal: ' + (parsed.message || 'Terjadi kesalahan'));
-                            modal.style.display = 'none';
+                            modal.classList.remove('is-open');
                             return false;
                         }
                     } catch(err) {}
@@ -750,7 +1406,7 @@
             .replaceAll("'", "&#039;");
     }
 
-    function previewText(value, maxLength = 130) {
+    function previewText(value, maxLength = 160) {
         const text = String(value ?? "").replace(/\s+/g, " ").trim();
         if (text.length <= maxLength) return text;
         return `${text.slice(0, maxLength - 3).trim()}...`;
@@ -803,34 +1459,26 @@
             clearBtn.style.display = input.length > 0 ? "block" : "none";
         }
         const filterCat = document.getElementById("filterCategory").value;
-        document.querySelectorAll(".data-row").forEach((row) => {
+        const rows = document.querySelectorAll(".data-row");
+        let visibleCount = 0;
+
+        rows.forEach((row) => {
             const matchSearch = !input || (row.dataset.search && row.dataset.search.includes(input));
             const matchCat = filterCat === "all" || row.dataset.category === filterCat;
-            row.style.display = matchSearch && matchCat ? "" : "none";
+            const isVisible = matchSearch && matchCat;
+            row.style.display = isVisible ? "" : "none";
+            if (isVisible) visibleCount++;
         });
-    }
 
-    function editData(button) {
-        const item = JSON.parse(button.dataset.item);
-        liveApiContexts.edit.lastHash = "";
-        liveApiContexts.edit.lastContent = "";
-        document.getElementById("edit_title").value = item.title || "";
-        document.getElementById("edit_category").value = item.category || "";
-        document.getElementById("edit_content").value = item.content || "";
-        document.getElementById("edit_keywords").value = item.keywords || "";
-        document.getElementById("edit_api_url").value = item.api_url || "";
-        document.getElementById("editForm").action = "/update_material/" + encodeURIComponent(item.id);
-        syncLiveApiFields("edit");
-        const modal = document.getElementById("editModal");
-        modal.classList.remove("hidden");
-        modal.classList.add("flex");
-    }
+        const badgeCount = document.getElementById("badgeRowCount");
+        if (badgeCount) {
+            badgeCount.textContent = `${visibleCount} item`;
+        }
 
-    function closeModal() {
-        const modal = document.getElementById("editModal");
-        modal.classList.add("hidden");
-        modal.classList.remove("flex");
-        clearLiveApiTimer("edit");
+        const noSearchAlert = document.getElementById("noSearchAlert");
+        if (noSearchAlert) {
+            noSearchAlert.style.display = (visibleCount === 0 && rows.length > 0) ? "block" : "none";
+        }
     }
 
     async function postJson(url, body) {
@@ -893,8 +1541,8 @@
         const ctx = liveApiContexts[mode];
         ctx.status.textContent = message;
         ctx.status.className = isError
-            ? "text-xs font-semibold text-red-700"
-            : "text-xs font-semibold text-slate-500";
+            ? "text-[11px] font-semibold text-red-700"
+            : "text-[11px] font-semibold text-slate-500";
     }
 
     async function refreshLiveApiPreview(mode, showChecking = false) {
@@ -946,7 +1594,7 @@
         ctx.content.readOnly = live;
         ctx.content.placeholder = live
             ? "Data dari API akan tampil otomatis dan diperbarui realtime."
-            : "";
+            : "Tulis isi materi secara lengkap dan terstruktur...";
         if (!live) {
             clearLiveApiTimer(mode);
             ctx.lastHash = "";
@@ -1002,7 +1650,7 @@
             if (contentEl) contentEl.textContent = previewText(payload.content);
             if (statusEl) {
                 statusEl.textContent = liveApiMetaText(payload);
-                statusEl.className = "mt-1 block text-xs font-semibold text-emerald-700";
+                statusEl.className = "font-semibold text-emerald-700 dark:text-emerald-400";
             }
             if (previousHash && previousHash !== payload.content_hash) {
                 flashElement(row);
@@ -1012,7 +1660,7 @@
             const statusEl = document.getElementById(`liveApiRowStatus${materialId}`);
             if (statusEl) {
                 statusEl.textContent = error.message || "Live API gagal dibaca.";
-                statusEl.className = "mt-1 block text-xs font-semibold text-red-700";
+                statusEl.className = "font-semibold text-red-700";
             }
         } finally {
             liveMaterialInflight.delete(materialId);
@@ -1028,6 +1676,7 @@
         window.setInterval(refreshAllSavedLiveMaterials, 5000);
     }
 </script>
+
 <script>
 let mcpPoll = null, mcpBusy = false;
 let currentSlot = 1;
@@ -1090,14 +1739,14 @@ function renderActiveSlotForm() {
     if (boardMacTitle && boardMacValue && boardActionArea) {
         if (s.is_locked && s.board_mac) {
             if (lockIcon) lockIcon.textContent = "🔒";
-            if (boardLockBox) boardLockBox.className = "p-3 rounded-lg border text-xs flex items-center justify-between gap-3 bg-emerald-50 border-emerald-300";
-            boardMacTitle.innerHTML = "Hardware MAC Terkunci <span class='text-emerald-700 font-bold'>(Anti-Spoofing Aktif)</span>";
-            boardMacValue.innerHTML = `<strong class="text-emerald-800 font-mono tracking-wider">${s.board_mac}</strong> <span class="text-slate-500 font-normal">→ ${s.label || ('Slot ' + currentSlot)}</span>`;
-            boardActionArea.innerHTML = `<span class="inline-flex items-center gap-1 font-mono text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300 font-bold text-[11px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>Terikat</span>`;
+            if (boardLockBox) boardLockBox.className = "p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800";
+            boardMacTitle.innerHTML = "Hardware MAC Terkunci <span class='text-emerald-700 dark:text-emerald-400 font-bold'>(Anti-Spoofing)</span>";
+            boardMacValue.innerHTML = `<strong class="text-emerald-800 dark:text-emerald-300 font-mono tracking-wider">${s.board_mac}</strong> <span class="text-slate-500 font-normal">→ ${s.label || ('Slot ' + currentSlot)}</span>`;
+            boardActionArea.innerHTML = `<span class="inline-flex items-center gap-1 font-mono text-emerald-800 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 font-bold text-[11px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>Terikat</span>`;
         } else {
             if (lockIcon) lockIcon.textContent = "⚪";
-            if (boardLockBox) boardLockBox.className = "p-3 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 border-slate-200";
-            boardMacTitle.textContent = "Hardware Board MAC (Terkunci Otomatis)";
+            if (boardLockBox) boardLockBox.className = "p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800";
+            boardMacTitle.textContent = "Hardware Board MAC (Anti-Spoofing)";
             boardMacValue.innerHTML = `<span class="text-slate-500 italic">Belum ada board terhubung (ESP32 mengunci otomatis saat online)</span>`;
             boardActionArea.innerHTML = "";
         }
@@ -1105,7 +1754,7 @@ function renderActiveSlotForm() {
 
     if (previewHint) {
         if (s.saved && s.preview) {
-            previewHint.innerHTML = "Tersimpan: <code style='color:#0284c7;font-weight:700;'>" + s.preview + "</code> (Isi endpoint baru di atas jika ingin menimpa/mengganti token).";
+            previewHint.innerHTML = "Tersimpan: <code style='color:#0284c7;font-weight:700;'>" + s.preview + "</code> (Isi endpoint baru di atas jika ingin menimpa token).";
         } else {
             previewHint.textContent = "Endpoint wss:// dari XiaoZhi disimpan terenkripsi.";
         }
@@ -1124,11 +1773,9 @@ function renderActiveSlotForm() {
     if (s.is_restricted || (s.saved && !s.is_active)) {
         if (alertBox) {
             alertBox.className = "app-alert app-alert-danger";
-            alertBox.innerHTML = `<strong>⚠️ Slot ${currentSlot} Dinonaktifkan oleh Admin (Akses Plus)</strong><br><span style="font-size:12px;">Slot 2 & 3 dibatasi untuk akun Anda. Silakan hubungi admin untuk membuka paket langganan Akses Plus.</span>`;
+            alertBox.innerHTML = `<strong>⚠️ Slot ${currentSlot} Dinonaktifkan oleh Admin (Akses Plus)</strong><br><span style="font-size:11px;">Slot 2 & 3 dibatasi untuk akun Anda. Hubungi admin untuk membuka paket langganan Akses Plus.</span>`;
         }
-        if (bar) {
-            bar.className = "mcp-bar-fill idle";
-        }
+        if (bar) bar.className = "mcp-bar-fill idle";
         if (detail) {
             detail.textContent = `Slot ${currentSlot} (${s.label}): Dinonaktifkan oleh Admin (Akses Plus)`;
             detail.style.color = "#ef4444";
@@ -1144,9 +1791,7 @@ function renderActiveSlotForm() {
             alertBox.className = "app-alert " + (s.connected ? "app-alert-success" : s.saved ? "app-alert-info" : "app-alert-warning");
             alertBox.textContent = s.connected ? (s.label + " Terhubung (" + s.statusText + ")") : s.saved ? (s.statusText || "Menghubungkan...") : ("Slot " + currentSlot + " belum tersimpan.");
         }
-        if (bar) {
-            bar.className = "mcp-bar-fill " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
-        }
+        if (bar) bar.className = "mcp-bar-fill " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
         if (detail) {
             const reqStr = latestRequestId ? ` | ID: ${latestRequestId}` : "";
             detail.textContent = "Slot " + currentSlot + " (" + s.label + "): " + s.statusText + " | " + (s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("id-ID") : "-") + reqStr;
@@ -1401,7 +2046,7 @@ async function executeWebScraper() {
     const oldBtnText = btn.innerHTML;
     btn.innerHTML = '⏳ Mengekstrak...';
     statusHint.style.display = 'block';
-    statusHint.style.color = '#0284c7';
+    statusHint.className = 'text-[11px] mt-2 text-sky-700 dark:text-sky-400 font-semibold';
     statusHint.textContent = 'Menghubungkan ke website dan mengekstrak artikel bersih...';
 
     try {
@@ -1423,24 +2068,24 @@ async function executeWebScraper() {
             if (titleField && d.title) titleField.value = d.title;
             if (contentField && d.content) {
                 contentField.value = `🌐 Sumber: ${d.url}\n\n${d.content}`;
+                updateWordCounter(contentField, 'addWordCountDisplay');
             }
             if (kwField) {
                 kwField.value = d.keywords || `web, ${d.hostname || 'artikel'}`;
             }
 
-            statusHint.style.color = '#059669';
+            statusHint.className = 'text-[11px] mt-2 text-emerald-700 dark:text-emerald-400 font-semibold';
             statusHint.innerHTML = `✅ Berhasil mengekstrak <strong>${d.word_count || 0} kata</strong> dari <strong>${d.hostname}</strong>. Judul, konten, dan kata kunci telah terisi di form bawah.`;
 
             if (titleField) {
-                titleField.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 titleField.focus();
             }
         } else {
-            statusHint.style.color = '#dc2626';
+            statusHint.className = 'text-[11px] mt-2 text-rose-700 dark:text-rose-400 font-semibold';
             statusHint.textContent = '❌ ' + (res.message || 'Gagal mengekstrak isi website.');
         }
     } catch (e) {
-        statusHint.style.color = '#dc2626';
+        statusHint.className = 'text-[11px] mt-2 text-rose-700 dark:text-rose-400 font-semibold';
         statusHint.textContent = '❌ Terjadi kesalahan jaringan saat scrape: ' + e.message;
     } finally {
         btn.disabled = false;
