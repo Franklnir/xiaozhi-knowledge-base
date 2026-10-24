@@ -200,6 +200,33 @@ def generate_real_relay_api_config(nama_tempat: str) -> Dict[str, Any]:
     }
 
 
+def generate_relay_voice_commands(nama_tempat: str, nama_relay: str, relay_number: int) -> tuple[str, str]:
+    """
+    Generate natural, unique Indonesian voice commands for turning ON and OFF a relay device.
+    Combines device/load name and room name to guarantee uniqueness across different rooms and devices.
+    Example:
+      nama_tempat='Kamar Utama', nama_relay='Lampu', relay_number=1
+      -> ('nyalakan lampu kamar utama', 'matikan lampu kamar utama')
+    """
+    room_clean = clean_text(nama_tempat or "ruangan", max_len=80, min_len=1, field="Nama tempat").lower().strip()
+    relay_clean = clean_text(nama_relay or f"relay {relay_number}", max_len=80, min_len=1, field="Nama relay").lower().strip()
+
+    # Normalize punctuation and special symbols
+    room_norm = re.sub(r"[^a-zA-Z0-9\s]+", " ", room_clean).strip()
+    relay_norm = re.sub(r"[^a-zA-Z0-9\s]+", " ", relay_clean).strip()
+
+    # If the relay name already contains the room name, avoid repeating it
+    if room_norm and room_norm in relay_norm:
+        target = relay_norm
+    elif room_norm:
+        target = f"{relay_norm} {room_norm}"
+    else:
+        target = relay_norm or f"relay {relay_number}"
+
+    target = re.sub(r"\s+", " ", target).strip()
+    return f"nyalakan {target}", f"matikan {target}"
+
+
 @router.post("/relay-nyata/toggle-simulasi")
 async def toggle_simulasi(request: Request, csrf_token: str = Form(...)):
     user = get_current_user(request)
@@ -242,11 +269,18 @@ async def add_relay_room(
         jumlah_relay = parse_int_range(form.get("jumlah_relay"), field="Jumlah relay", minimum=1, maximum=REAL_RELAY_MAX_RELAYS)
         relays = []
         for index in range(1, jumlah_relay + 1):
+            nama_relay = str(form.get(f"relay_{index}_nama", "")).strip() or f"Relay {index}"
+            voice_on = str(form.get(f"relay_{index}_on", "")).strip()
+            voice_off = str(form.get(f"relay_{index}_off", "")).strip()
+            if not voice_on or not voice_off:
+                auto_on, auto_off = generate_relay_voice_commands(nama_tempat, nama_relay, index)
+                voice_on = voice_on or auto_on
+                voice_off = voice_off or auto_off
             relays.append({
                 "relay_number": index,
-                "nama_relay": str(form.get(f"relay_{index}_nama", "")),
-                "voice_command_on": str(form.get(f"relay_{index}_on", "")),
-                "voice_command_off": str(form.get(f"relay_{index}_off", "")),
+                "nama_relay": nama_relay,
+                "voice_command_on": voice_on,
+                "voice_command_off": voice_off,
                 "status": str(form.get(f"relay_{index}_status", "OFF")),
             })
         if not api_slug or not api_token or not api_client_id:
@@ -277,11 +311,18 @@ async def update_relay_room(
         jumlah_relay = parse_int_range(form.get("jumlah_relay"), field="Jumlah relay", minimum=1, maximum=REAL_RELAY_MAX_RELAYS)
         relays = []
         for index in range(1, jumlah_relay + 1):
+            nama_relay = str(form.get(f"relay_{index}_nama", "")).strip() or f"Relay {index}"
+            voice_on = str(form.get(f"relay_{index}_on", "")).strip()
+            voice_off = str(form.get(f"relay_{index}_off", "")).strip()
+            if not voice_on or not voice_off:
+                auto_on, auto_off = generate_relay_voice_commands(nama_tempat, nama_relay, index)
+                voice_on = voice_on or auto_on
+                voice_off = voice_off or auto_off
             relays.append({
                 "relay_number": index,
-                "nama_relay": str(form.get(f"relay_{index}_nama", "")),
-                "voice_command_on": str(form.get(f"relay_{index}_on", "")),
-                "voice_command_off": str(form.get(f"relay_{index}_off", "")),
+                "nama_relay": nama_relay,
+                "voice_command_on": voice_on,
+                "voice_command_off": voice_off,
                 "status": str(form.get(f"relay_{index}_status", "OFF")),
             })
         store.update_relay_room(user["id"], room_id, nama_tempat, relays)

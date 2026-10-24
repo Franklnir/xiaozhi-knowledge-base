@@ -1,11 +1,27 @@
 from xiaozhi.database.sqlite_store import SQLiteStore
-from xiaozhi.routers.relay_nyata import generate_real_relay_api_config
+from xiaozhi.routers.relay_nyata import generate_real_relay_api_config, generate_relay_voice_commands
 
 def test_generate_api_config():
     config = generate_real_relay_api_config("Kamar Tidur Utama")
     assert config["api_slug"].startswith("kamar-tidur-utama")
     assert config["api_client_id"].startswith("device-kamar-tidur-utama")
     assert len(config["api_token"]) >= 32
+
+def test_generate_relay_voice_commands():
+    # 1. Combining room and relay name
+    cmd_on, cmd_off = generate_relay_voice_commands("Kamar Tidur Utama", "Lampu Utama", 1)
+    assert cmd_on == "nyalakan lampu utama kamar tidur utama"
+    assert cmd_off == "matikan lampu utama kamar tidur utama"
+
+    # 2. If room name is already included in relay name, don't repeat room name
+    cmd_on, cmd_off = generate_relay_voice_commands("Kamar", "Lampu Kamar", 1)
+    assert cmd_on == "nyalakan lampu kamar"
+    assert cmd_off == "matikan lampu kamar"
+
+    # 3. Default fallback when empty
+    cmd_on, cmd_off = generate_relay_voice_commands("Dapur", "", 2)
+    assert cmd_on == "nyalakan relay 2 dapur"
+    assert cmd_off == "matikan relay 2 dapur"
 
 def test_sqlite_relay_crud_cycle(tmp_path):
     db_file = str(tmp_path / "test_relay.db")

@@ -452,34 +452,83 @@
         animation: relayPulse 1.2s infinite;
     }
 
-    /* ── Voice Command Speech Bubbles ───────────────────────────── */
+    /* ── Voice Command Section on Room Cards ────────────────────── */
+    .relay-voice-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 4px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 9px;
+        padding: 8px 10px;
+    }
+    .relay-voice-header-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--app-muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        letter-spacing: 0.2px;
+    }
     .relay-voice-box {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        margin-top: 2px;
     }
     .relay-voice-chip {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 5px 10px;
-        border-radius: 8px;
+        padding: 4px 9px;
+        border-radius: 7px;
         font-size: 11.5px;
         font-weight: 600;
-        background: var(--app-surface);
-        border: 1px dashed var(--app-border-strong);
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border-strong);
         color: var(--app-text);
         cursor: pointer;
         transition: all 0.15s ease;
         position: relative;
     }
-    .relay-voice-chip:hover {
-        background: var(--app-soft);
-        border-style: solid;
-        border-color: #0284c7;
-        color: #0284c7;
+    .relay-voice-chip-on:hover {
+        background: rgba(16, 185, 129, 0.08);
+        border-color: #10b981;
+        color: #047857;
         transform: translateY(-1px);
+    }
+    .relay-voice-chip-off:hover {
+        background: rgba(239, 68, 68, 0.08);
+        border-color: #ef4444;
+        color: #b91c1c;
+        transform: translateY(-1px);
+    }
+    .voice-badge-on {
+        background: #10b981;
+        color: #ffffff;
+        font-size: 9.5px;
+        font-weight: 800;
+        padding: 2px 5px;
+        border-radius: 4px;
+        line-height: 1;
+        letter-spacing: 0.3px;
+        flex-shrink: 0;
+    }
+    .voice-badge-off {
+        background: #ef4444;
+        color: #ffffff;
+        font-size: 9.5px;
+        font-weight: 800;
+        padding: 2px 5px;
+        border-radius: 4px;
+        line-height: 1;
+        letter-spacing: 0.3px;
+        flex-shrink: 0;
+    }
+    .voice-text {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px;
     }
     .relay-voice-chip .copy-icon {
         opacity: 0.45;
@@ -487,6 +536,92 @@
     }
     .relay-voice-chip:hover .copy-icon {
         opacity: 1;
+    }
+
+    /* ── Voice Auto-Generator Preview in Modal ───────────────────── */
+    .relay-voice-gen-preview {
+        background: var(--app-surface);
+        border: 1.5px dashed var(--app-border-strong);
+        border-radius: 10px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .relay-voice-gen-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .relay-voice-gen-title {
+        font-size: 11.5px;
+        font-weight: 750;
+        color: var(--app-text);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .relay-voice-gen-badge {
+        font-size: 10px;
+        font-weight: 750;
+        padding: 2px 7px;
+        border-radius: 5px;
+        background: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+    }
+    .relay-voice-gen-bubbles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 8px;
+    }
+    .relay-voice-gen-chip {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 10px;
+        border-radius: 7px;
+        border: 1px solid var(--app-border);
+        background: var(--app-soft);
+        font-size: 11.5px;
+    }
+    .relay-voice-gen-chip.relay-gen-on {
+        border-color: #a7f3d0;
+        background: rgba(16, 185, 129, 0.05);
+    }
+    .relay-voice-gen-chip.relay-gen-off {
+        border-color: #fecaca;
+        background: rgba(239, 68, 68, 0.05);
+    }
+    .gen-chip-tag {
+        font-size: 10px;
+        font-weight: 800;
+        padding: 2px 5px;
+        border-radius: 4px;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .gen-chip-tag.on {
+        background: #10b981;
+        color: #ffffff;
+    }
+    .gen-chip-tag.off {
+        background: #ef4444;
+        color: #ffffff;
+    }
+    .gen-chip-text {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-weight: 600;
+        color: var(--app-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .relay-voice-gen-hint {
+        font-size: 10.5px;
+        color: var(--app-muted);
+        line-height: 1.35;
     }
 
     /* ── Room Card Footer Toolbar ───────────────────────────────── */
@@ -800,20 +935,28 @@
                     </div>
 
                     <!-- Voice Command Chips (Copyable on Click) -->
-                    <div class="relay-voice-box">
-                        <div class="relay-voice-chip" onclick="copyVoiceCommand('{{ relay.voice_command_on|escape }}', this)" title="Klik untuk menyalin perintah ON">
-                            <span>🎙️ "{{ relay.voice_command_on }}"</span>
-                            <svg class="copy-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                            </svg>
+                    <div class="relay-voice-section">
+                        <div class="relay-voice-header-label">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                            <span>Ucapkan ke XiaoZhi AI:</span>
                         </div>
-                        <div class="relay-voice-chip" onclick="copyVoiceCommand('{{ relay.voice_command_off|escape }}', this)" title="Klik untuk menyalin perintah OFF">
-                            <span>🎙️ "{{ relay.voice_command_off }}"</span>
-                            <svg class="copy-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                            </svg>
+                        <div class="relay-voice-box">
+                            <div class="relay-voice-chip relay-voice-chip-on" onclick="copyVoiceCommand('{{ relay.voice_command_on|escape }}', this)" title="Klik untuk menyalin perintah ON">
+                                <span class="voice-badge-on">ON</span>
+                                <span class="voice-text">"{{ relay.voice_command_on }}"</span>
+                                <svg class="copy-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </div>
+                            <div class="relay-voice-chip relay-voice-chip-off" onclick="copyVoiceCommand('{{ relay.voice_command_off|escape }}', this)" title="Klik untuk menyalin perintah OFF">
+                                <span class="voice-badge-off">OFF</span>
+                                <span class="voice-text">"{{ relay.voice_command_off }}"</span>
+                                <svg class="copy-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1098,23 +1241,62 @@
         relayModal.classList.remove("is-open");
     }
 
+    function computeVoiceCommands(roomName, relayName, channelNumber) {
+        const roomClean = String(roomName || "ruangan").trim().toLowerCase().replace(/[^a-z0-9\s]+/g, " ").replace(/\s+/g, " ").trim();
+        const relayClean = String(relayName || `relay ${channelNumber}`).trim().toLowerCase().replace(/[^a-z0-9\s]+/g, " ").replace(/\s+/g, " ").trim();
+        let target = relayClean || `relay ${channelNumber}`;
+        if (roomClean && !target.includes(roomClean)) {
+            target = `${target} ${roomClean}`;
+        }
+        target = target.replace(/\s+/g, " ").trim();
+        return {
+            on: `nyalakan ${target}`,
+            off: `matikan ${target}`
+        };
+    }
+
+    function updateVoiceCommandPreviews() {
+        const roomName = namaTempat ? namaTempat.value : "";
+        const total = Math.max(1, Math.min(Number(jumlahRelay.value || 1), MAX_RELAYS));
+        for (let index = 1; index <= total; index += 1) {
+            const relayNameInput = document.getElementById(`relay${index}Nama`);
+            const relayName = relayNameInput ? relayNameInput.value : `Relay ${index}`;
+            const cmds = computeVoiceCommands(roomName, relayName, index);
+
+            const onPreview = document.getElementById(`previewOn${index}`);
+            const offPreview = document.getElementById(`previewOff${index}`);
+            const onInput = document.getElementById(`relay${index}On`);
+            const offInput = document.getElementById(`relay${index}Off`);
+
+            if (onPreview) onPreview.textContent = `"${cmds.on}"`;
+            if (offPreview) offPreview.textContent = `"${cmds.off}"`;
+            if (onInput) onInput.value = cmds.on;
+            if (offInput) offInput.value = cmds.off;
+        }
+    }
+
     function renderRelayInputs(count, relays = []) {
         const total = Math.max(1, Math.min(Number(count || 1), MAX_RELAYS));
+        const roomName = namaTempat ? namaTempat.value : "";
         relayFields.innerHTML = Array.from({ length: total }, (_, index) => {
             const number = index + 1;
             const relay = relays[index] || {};
-            const defaultOn = relay.voice_command_on || `nyalakan relay ${number}`;
-            const defaultOff = relay.voice_command_off || `matikan relay ${number}`;
+            const initialRelayName = relay.nama_relay || `Lampu ${number}`;
+            const initialCmds = computeVoiceCommands(roomName, initialRelayName, number);
+            const defaultOn = relay.voice_command_on || initialCmds.on;
+            const defaultOff = relay.voice_command_off || initialCmds.off;
             return `
-                <div class="app-muted-panel" style="background:var(--app-soft); border:1px solid var(--app-border); border-radius:10px; padding:14px;">
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                        <strong style="font-size:13px; color:var(--app-text);">Channel Relay ${number}</strong>
-                        <span class="app-chip app-chip-small" style="font-size:10.5px;">CH ${number}</span>
+                <div class="app-muted-panel" style="background:var(--app-soft); border:1px solid var(--app-border); border-radius:12px; padding:15px; margin-bottom:10px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                        <strong style="font-size:13.5px; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                            <span>⚡ Channel Relay ${number}</span>
+                        </strong>
+                        <span class="app-chip app-chip-small" style="font-size:10.5px; font-weight:800;">CH ${number}</span>
                     </div>
-                    <div class="relay-form-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    <div class="relay-form-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
                         <div>
                             <label class="app-label" for="relay${number}Nama">Nama Beban / Perangkat</label>
-                            <input id="relay${number}Nama" name="relay_${number}_nama" class="app-input" required maxlength="80" value="${escapeHtml(relay.nama_relay || `Lampu ${number}`)}" placeholder="Lampu Utama">
+                            <input id="relay${number}Nama" name="relay_${number}_nama" class="app-input" required maxlength="80" value="${escapeHtml(initialRelayName)}" placeholder="Contoh: Lampu Utama, Kipas" oninput="updateVoiceCommandPreviews()">
                         </div>
                         <div>
                             <label class="app-label" for="relay${number}Status">Status Awal</label>
@@ -1123,18 +1305,36 @@
                                 <option value="ON" ${relay.status === "ON" ? "selected" : ""}>ON (Nyala)</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="app-label" for="relay${number}On">Perintah Suara ON</label>
-                            <input id="relay${number}On" name="relay_${number}_on" class="app-input" required maxlength="120" value="${escapeHtml(defaultOn)}" placeholder="nyalakan lampu">
+                    </div>
+
+                    <!-- Live Auto-Generated Speech Box (No manual typing, prevents duplicate errors) -->
+                    <div class="relay-voice-gen-preview">
+                        <div class="relay-voice-gen-header">
+                            <span class="relay-voice-gen-title">🎙️ Perintah Suara XiaoZhi AI (Otomatis)</span>
+                            <span class="relay-voice-gen-badge">⚡ Bebas Duplikat</span>
                         </div>
-                        <div>
-                            <label class="app-label" for="relay${number}Off">Perintah Suara OFF</label>
-                            <input id="relay${number}Off" name="relay_${number}_off" class="app-input" required maxlength="120" value="${escapeHtml(defaultOff)}" placeholder="matikan lampu">
+                        <div class="relay-voice-gen-bubbles">
+                            <div class="relay-voice-gen-chip relay-gen-on">
+                                <span class="gen-chip-tag on">🟢 ON</span>
+                                <span class="gen-chip-text" id="previewOn${number}">"${escapeHtml(defaultOn)}"</span>
+                            </div>
+                            <div class="relay-voice-gen-chip relay-gen-off">
+                                <span class="gen-chip-tag off">🔴 OFF</span>
+                                <span class="gen-chip-text" id="previewOff${number}">"${escapeHtml(defaultOff)}"</span>
+                            </div>
+                        </div>
+                        <div class="relay-voice-gen-hint">
+                            💡 Ucapkan kalimat di atas ke mikrofon XiaoZhi AI untuk menyalakan atau mematikan perangkat ini.
                         </div>
                     </div>
+
+                    <!-- Hidden inputs submitted with the form -->
+                    <input type="hidden" id="relay${number}On" name="relay_${number}_on" value="${escapeHtml(defaultOn)}">
+                    <input type="hidden" id="relay${number}Off" name="relay_${number}_off" value="${escapeHtml(defaultOff)}">
                 </div>
             `;
         }).join("");
+        updateVoiceCommandPreviews();
     }
 
     function fillApiConfig(config) {
@@ -1508,6 +1708,7 @@
     document.getElementById("openAddRelay")?.addEventListener("click", openAddForm);
     document.getElementById("generateApiButton")?.addEventListener("click", () => generateApiConfig());
     relayForm?.addEventListener("submit", validateRelayForm);
+    namaTempat?.addEventListener("input", updateVoiceCommandPreviews);
     jumlahRelay?.addEventListener("change", () => renderRelayInputs(jumlahRelay.value));
 
     document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeRelayModal));
