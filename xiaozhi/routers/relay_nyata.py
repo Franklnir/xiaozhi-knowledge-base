@@ -354,11 +354,12 @@ def real_relay_status_payload(owner_id: int) -> dict:
 
 def generate_real_relay_api_config(nama_tempat: str) -> Dict[str, Any]:
     nama_tempat = clean_text(nama_tempat, max_len=80, min_len=2, field="Nama tempat")
-    slug = slugify_topic_part(nama_tempat)
+    slug = slugify_topic_part(nama_tempat) if nama_tempat else "relay"
     suffix = secrets.token_hex(3)
+    unique_slug = f"{slug}-{suffix}"
     return {
-        "api_slug": slug,
-        "api_client_id": f"device-{slug}-{suffix}",
+        "api_slug": unique_slug,
+        "api_client_id": f"device-{unique_slug}",
         "api_token": secrets.token_urlsafe(32),
     }
 
@@ -477,17 +478,26 @@ async def add_relay_room(
                 "voice_command_off": voice_off,
                 "status": str(form.get(f"relay_{index}_status", "OFF")),
             })
-        if not api_slug or not api_token or not api_client_id:
-            config = generate_real_relay_api_config(nama_tempat)
-            api_slug = api_slug or config["api_slug"]
-            api_token = api_token or config["api_token"]
-            api_client_id = api_client_id or config["api_client_id"]
+        # Pastikan api_slug selalu unik di database
+        clean_slug = slugify_topic_part(api_slug) if api_slug else ""
+        if not clean_slug or store.find_relay_room_by_slug(clean_slug):
+            base_slug = slugify_topic_part(nama_tempat) if nama_tempat else "relay"
+            clean_slug = f"{base_slug}-{secrets.token_hex(3)}"
+            while store.find_relay_room_by_slug(clean_slug):
+                clean_slug = f"{base_slug}-{secrets.token_hex(3)}"
+        
+        api_slug = clean_slug
+        if not api_token:
+            api_token = secrets.token_urlsafe(32)
+        if not api_client_id:
+            api_client_id = f"device-{api_slug}"
+
         store.add_relay_room(user["id"], nama_tempat, api_slug, api_token, api_client_id, relays)
         success_msg = f"Ruangan '{nama_tempat}' berhasil ditambahkan."
         if was_virtual_active:
             success_msg += " Simulasi Virtual otomatis dinonaktifkan agar perintah suara langsung mengontrol Relay Fisik."
         return redirect_with_message("/relay-nyata", success_msg)
-    except ValueError as exc:
+    except Exception as exc:
         return redirect_with_message("/relay-nyata", f"Gagal: {exc}")
 
 
@@ -539,7 +549,7 @@ async def update_relay_room(
         if was_virtual_active:
             success_msg += " Simulasi Virtual otomatis dinonaktifkan agar perintah suara langsung mengontrol Relay Fisik."
         return redirect_with_message("/relay-nyata", success_msg)
-    except ValueError as exc:
+    except Exception as exc:
         return redirect_with_message("/relay-nyata", f"Gagal: {exc}")
 
 

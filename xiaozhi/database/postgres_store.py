@@ -2358,16 +2358,26 @@ class PostgresStore:
         t_cipher = encrypt_secret(api_token.strip()) if api_token.strip() else None
         t_hash = hashlib.sha256(api_token.strip().encode()).hexdigest() if api_token.strip() else None
         now = utc_now()
+        target_slug = api_slug.strip()
 
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM relay_rooms WHERE api_slug = %s", (target_slug,))
+                if cur.fetchone():
+                    target_slug = f"{target_slug}-{secrets.token_hex(3)}"
+                    while True:
+                        cur.execute("SELECT 1 FROM relay_rooms WHERE api_slug = %s", (target_slug,))
+                        if not cur.fetchone():
+                            break
+                        target_slug = f"{api_slug.strip()}-{secrets.token_hex(3)}"
+
                 cur.execute(
                     """
                     INSERT INTO relay_rooms (owner_id, nama_tempat, api_slug, api_token_ciphertext, api_token_hash, api_client_id, created_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
-                    (int(owner_id), nama_tempat.strip(), api_slug.strip(), t_cipher, t_hash, api_client_id.strip(), now),
+                    (int(owner_id), nama_tempat.strip(), target_slug, t_cipher, t_hash, api_client_id.strip(), now),
                 )
                 room_id = cur.fetchone()["id"]
                 for relay in relays:
