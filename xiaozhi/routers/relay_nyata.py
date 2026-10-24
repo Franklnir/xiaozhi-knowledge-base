@@ -407,9 +407,25 @@ async def toggle_simulasi(request: Request, csrf_token: str = Form(...)):
 @router.post("/api/relay-nyata/generate-api")
 async def generate_api(request: Request):
     user = require_user(request)
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
     nama_tempat = str(body.get("nama_tempat", "")).strip()
-    config = generate_real_relay_api_config(nama_tempat)
+    if not nama_tempat or len(nama_tempat) < 2:
+        nama_tempat = "Ruangan Relay"
+    try:
+        config = generate_real_relay_api_config(nama_tempat)
+    except Exception:
+        slug = slugify_topic_part(nama_tempat) if nama_tempat else "relay"
+        suffix = secrets.token_hex(3)
+        config = {
+            "api_slug": f"{slug}-{suffix}",
+            "api_client_id": f"device-{slug}-{suffix}",
+            "api_token": secrets.token_urlsafe(32),
+        }
     return {"success": True, "config": config, **config}
 
 
@@ -428,13 +444,11 @@ async def add_relay_room(
     store = get_store()
     validate_csrf(request, csrf_token, user)
 
-    # 1. Pastikan simulasi smarthome virtual dinonaktifkan terlebih dahulu!
+    # 1. Pastikan simulasi virtual otomatis dinonaktifkan saat user menambahkan Relay Fisik
     feature_settings = store.get_feature_settings(user["id"])
-    if bool(feature_settings.get("virtual_smarthome_enabled", True)):
-        return redirect_with_message(
-            "/relay-nyata",
-            "Gagal: Simulasi Smart Home Virtual sedang aktif! Anda wajib menonaktifkan simulasi virtual terlebih dahulu di menu Profil / Smart Home sebelum menambahkan Relay Nyata fisik."
-        )
+    was_virtual_active = bool(feature_settings.get("virtual_smarthome_enabled", False))
+    if was_virtual_active:
+        store.set_feature_setting(user["id"], "virtual_smarthome_enabled", False)
 
     # 2. Cek kuota relay rooms user
     quota = store.user_quota(user["id"])
@@ -469,7 +483,10 @@ async def add_relay_room(
             api_token = api_token or config["api_token"]
             api_client_id = api_client_id or config["api_client_id"]
         store.add_relay_room(user["id"], nama_tempat, api_slug, api_token, api_client_id, relays)
-        return redirect_with_message("/relay-nyata", f"Ruangan '{nama_tempat}' berhasil ditambahkan.")
+        success_msg = f"Ruangan '{nama_tempat}' berhasil ditambahkan."
+        if was_virtual_active:
+            success_msg += " Simulasi Virtual otomatis dinonaktifkan agar perintah suara langsung mengontrol Relay Fisik."
+        return redirect_with_message("/relay-nyata", success_msg)
     except ValueError as exc:
         return redirect_with_message("/relay-nyata", f"Gagal: {exc}")
 
@@ -486,13 +503,11 @@ async def update_relay_room(
     store = get_store()
     validate_csrf(request, csrf_token, user)
 
-    # 1. Pastikan simulasi virtual tidak aktif saat edit
+    # 1. Pastikan simulasi virtual otomatis dinonaktifkan saat edit relay fisik
     feature_settings = store.get_feature_settings(user["id"])
-    if bool(feature_settings.get("virtual_smarthome_enabled", True)):
-        return redirect_with_message(
-            "/relay-nyata",
-            "Gagal: Simulasi Smart Home Virtual sedang aktif! Nonaktifkan simulasi virtual terlebih dahulu sebelum mengubah konfigurasi Relay Nyata."
-        )
+    was_virtual_active = bool(feature_settings.get("virtual_smarthome_enabled", False))
+    if was_virtual_active:
+        store.set_feature_setting(user["id"], "virtual_smarthome_enabled", False)
 
     # 2. Pastikan ruangan milik user yang login
     existing_room = store.get_relay_room(user["id"], room_id)
@@ -520,7 +535,10 @@ async def update_relay_room(
                 "status": str(form.get(f"relay_{index}_status", "OFF")),
             })
         store.update_relay_room(user["id"], room_id, nama_tempat, relays)
-        return redirect_with_message("/relay-nyata", f"Ruangan '{nama_tempat}' berhasil diperbarui.")
+        success_msg = f"Ruangan '{nama_tempat}' berhasil diperbarui."
+        if was_virtual_active:
+            success_msg += " Simulasi Virtual otomatis dinonaktifkan agar perintah suara langsung mengontrol Relay Fisik."
+        return redirect_with_message("/relay-nyata", success_msg)
     except ValueError as exc:
         return redirect_with_message("/relay-nyata", f"Gagal: {exc}")
 

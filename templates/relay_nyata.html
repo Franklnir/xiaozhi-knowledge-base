@@ -1391,6 +1391,14 @@
             <input type="hidden" name="api_token" id="apiToken">
             <input type="hidden" name="api_client_id" id="apiClientId">
 
+            <div id="virtualAutoDisableNote" class="app-alert app-alert-info" style="display:none; margin-bottom:14px; font-size:12.5px; border-radius:10px; align-items:flex-start; gap:8px;">
+                <span style="font-size:16px;">💡</span>
+                <div>
+                    <strong>Simulasi Virtual Otomatis Dinonaktifkan:</strong>
+                    <div style="margin-top:2px; opacity:0.9;">Mode Simulasi Virtual sedang aktif. Saat Anda menyimpan Relay Nyata ini, sistem akan <strong>otomatis menonaktifkan</strong> simulasi virtual agar perintah suara XiaoZhi langsung mengendalikan Relay Fisik ESP32 Anda.</div>
+                </div>
+            </div>
+
             <div class="relay-form-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
                 <div>
                     <label class="app-label" for="namaTempat">Nama tempat / ruangan</label>
@@ -1711,16 +1719,10 @@
     }
 
     function validateRelayForm(event) {
-        if (VIRTUAL_ENABLED) {
-            event.preventDefault();
-            window.alert("⚠️ Mode Simulasi Virtual Sedang Aktif!\n\nUntuk menambahkan atau mengedit Relay Nyata, Anda wajib menonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar tidak terjadi tabrakan konfigurasi perintah suara.");
-            showToast("⚠️ Nonaktifkan Simulasi Virtual terlebih dahulu!", "error");
-            return false;
-        }
         const duplicate = findDuplicateRelayCommand();
         if (!duplicate) return;
         event.preventDefault();
-        window.alert(`Gagal menyimpan Relay Nyata. Perintah suara "${duplicate.command}" sudah dipakai di ${duplicate.location}.`);
+        window.alert(`Gagal menyimpan Relay Nyata. Perintah suara "${duplicate.command}" sudah dipakai di ${duplicate.location}. Silakan ganti nama perangkat agar perintah suara unik.`);
         duplicate.input?.focus();
     }
 
@@ -1749,10 +1751,18 @@
     function updateVoiceCommandPreviews() {
         const roomName = namaTempat ? namaTempat.value : "";
         const total = Math.max(1, Math.min(Number(jumlahRelay.value || 1), MAX_RELAYS));
+        const seenCommands = new Set();
+
         for (let index = 1; index <= total; index += 1) {
             const relayNameInput = document.getElementById(`relay${index}Nama`);
-            const relayName = relayNameInput ? relayNameInput.value : `Relay ${index}`;
-            const cmds = computeVoiceCommands(roomName, relayName, index);
+            let relayName = relayNameInput ? relayNameInput.value.trim() : `Relay ${index}`;
+            if (!relayName) relayName = `Relay ${index}`;
+
+            let cmds = computeVoiceCommands(roomName, relayName, index);
+            if (seenCommands.has(cmds.on)) {
+                cmds = computeVoiceCommands(roomName, `${relayName} ${index}`, index);
+            }
+            seenCommands.add(cmds.on);
 
             const onPreview = document.getElementById(`previewOn${index}`);
             const offPreview = document.getElementById(`previewOff${index}`);
@@ -1846,55 +1856,81 @@
     }
 
     async function generateApiConfig() {
-        const roomName = namaTempat.value.trim();
+        let roomName = namaTempat ? namaTempat.value.trim() : "";
         if (!roomName) {
-            window.alert("Nama tempat wajib diisi sebelum Generate API.");
-            return;
+            roomName = `Ruangan ${ROOMS.length + 1}`;
+            if (namaTempat) {
+                namaTempat.value = roomName;
+                updateVoiceCommandPreviews();
+            }
         }
-        const response = await fetch("/api/relay-nyata/generate-api", {
-            method: "POST",
-            headers: {
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "X-CSRF-Token": CSRF_TOKEN,
-            },
-            credentials: "same-origin",
-            body: JSON.stringify({ nama_tempat: roomName }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !payload.success) {
-            window.alert(payload.detail || "Gagal generate API.");
-            return;
+        const btn = document.getElementById("generateApiButton");
+        const origText = btn ? btn.innerHTML : "";
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `⏳ Menghasilkan...`;
         }
-        fillApiConfig(payload.config || payload);
+        try {
+            const response = await fetch("/api/relay-nyata/generate-api", {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": CSRF_TOKEN,
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({ nama_tempat: roomName }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) {
+                showToast(payload.detail || payload.message || "Gagal generate API.", "error");
+                return;
+            }
+            fillApiConfig(payload.config || payload);
+            showToast("✓ API & Token berhasil digenerate!", "success");
+        } catch (err) {
+            showToast("Koneksi gagal saat generate API.", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origText;
+            }
+        }
     }
 
     function openAddForm() {
-        if (VIRTUAL_ENABLED) {
-            window.alert("⚠️ Mode Simulasi Virtual Masih Aktif!\n\nUntuk menambahkan Relay Nyata fisik, Anda harus menonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar tidak terjadi tabrakan konfigurasi perintah suara asisten XiaoZhi.\n\nSilakan klik tombol 'Nonaktifkan Simulasi Virtual' pada bilah peringatan di atas.");
-            showToast("⚠️ Nonaktifkan Simulasi Virtual terlebih dahulu!", "error");
-            return;
-        }
         document.getElementById("relayModalTitle").textContent = "Tambah Ruangan Relay Nyata";
         relayForm.action = "/relay-nyata/add";
         relayForm.reset();
+
+        const vNote = document.getElementById("virtualAutoDisableNote");
+        if (vNote) {
+            vNote.style.display = VIRTUAL_ENABLED ? "flex" : "none";
+        }
+
+        const defaultRoomName = `Ruangan ${ROOMS.length + 1}`;
+        namaTempat.value = defaultRoomName;
         jumlahRelay.value = "1";
         renderRelayInputs(1);
-        document.getElementById("apiPreview").innerHTML = "<span>API belum digenerate. Jika langsung disimpan, sistem tetap membuat token otomatis.</span>";
+        
+        document.getElementById("apiPreview").innerHTML = "<span>Menghasilkan API & token otomatis...</span>";
         ["apiSlug", "apiToken", "apiClientId"].forEach((id) => {
-            document.getElementById(id).value = "";
+            const el = document.getElementById(id);
+            if (el) el.value = "";
         });
         openRelayModal();
+        generateApiConfig();
     }
 
     function openEditForm(roomId) {
-        if (VIRTUAL_ENABLED) {
-            window.alert("⚠️ Mode Simulasi Virtual Masih Aktif!\n\nUntuk mengubah konfigurasi Relay Nyata fisik, Anda harus menonaktifkan Simulasi Smart Home Virtual terlebih dahulu.");
-            showToast("⚠️ Nonaktifkan Simulasi Virtual terlebih dahulu!", "error");
-            return;
-        }
         const room = ROOMS.find((item) => Number(item.id) === Number(roomId));
         if (!room) return;
+
+        const vNote = document.getElementById("virtualAutoDisableNote");
+        if (vNote) {
+            vNote.style.display = VIRTUAL_ENABLED ? "flex" : "none";
+        }
+
         document.getElementById("relayModalTitle").textContent = `Edit Ruangan: ${room.nama_tempat}`;
         relayForm.action = `/relay-nyata/update/${encodeURIComponent(room.id)}`;
         namaTempat.value = room.nama_tempat || "";
@@ -2680,9 +2716,7 @@ void loop() {
             }
             if (switchEl) {
                 switchEl.checked = (status === "ON");
-                if (!VIRTUAL_ENABLED) {
-                    switchEl.disabled = false;
-                }
+                switchEl.disabled = false;
             }
             if (statusEl) {
                 statusEl.textContent = status;
@@ -2822,7 +2856,18 @@ void loop() {
     async function handleSwitchToggle(roomId, relayNumber, inputEl) {
         if (VIRTUAL_ENABLED) {
             inputEl.checked = !inputEl.checked;
-            window.alert("Nonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar Relay Nyata bisa digunakan.");
+            if (window.confirm("Mode Simulasi Smart Home Virtual sedang aktif.\n\nApakah Anda ingin menonaktifkan Simulasi Virtual sekarang agar saklar Relay Fisik dapat dikontrol?")) {
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "/relay-nyata/toggle-simulasi";
+                const inputCsrf = document.createElement("input");
+                inputCsrf.type = "hidden";
+                inputCsrf.name = "csrf_token";
+                inputCsrf.value = CSRF_TOKEN;
+                form.appendChild(inputCsrf);
+                document.body.appendChild(form);
+                form.submit();
+            }
             return;
         }
 
@@ -2902,7 +2947,18 @@ void loop() {
     // ── Master Room Control (Semua ON / Semua OFF) ────────────────
     async function controlRoomAll(roomId, command) {
         if (VIRTUAL_ENABLED) {
-            window.alert("Nonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar Relay Nyata bisa digunakan.");
+            if (window.confirm("Mode Simulasi Smart Home Virtual sedang aktif.\n\nApakah Anda ingin menonaktifkan Simulasi Virtual sekarang agar saklar Relay Fisik dapat dikontrol?")) {
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "/relay-nyata/toggle-simulasi";
+                const inputCsrf = document.createElement("input");
+                inputCsrf.type = "hidden";
+                inputCsrf.name = "csrf_token";
+                inputCsrf.value = CSRF_TOKEN;
+                form.appendChild(inputCsrf);
+                document.body.appendChild(form);
+                form.submit();
+            }
             return;
         }
 

@@ -250,7 +250,7 @@ def test_relay_virtual_smarthome_guard_and_16_channel_security(tmp_path):
     # 1. Pastikan default: virtual_smarthome_enabled adalah True
     store.set_feature_setting(user_id, "virtual_smarthome_enabled", True)
 
-    # A. Coba tambah relay saat virtual aktif -> Wajib ditolak!
+    # A. Coba tambah relay saat virtual aktif -> Otomatis dinonaktifkan & notif diberikan!
     add_data = {
         "csrf_token": csrf,
         "nama_tempat": "Ruang Tamu Virtual",
@@ -260,11 +260,13 @@ def test_relay_virtual_smarthome_guard_and_16_channel_security(tmp_path):
     }
     resp = client.post("/relay-nyata/add", data=add_data, cookies=cookies)
     assert resp.status_code == 303
-    assert "Simulasi+Smart+Home+Virtual+sedang+aktif" in resp.headers["location"] or "Simulasi Smart Home Virtual sedang aktif" in resp.headers["location"]
-    assert len(store.list_relay_rooms(user_id)) == 0
+    assert "Simulasi+Virtual+otomatis+dinonaktifkan" in resp.headers["location"] or "Simulasi Virtual otomatis dinonaktifkan" in resp.headers["location"]
+    assert store.get_feature_settings(user_id).get("virtual_smarthome_enabled") is False
+    assert len(store.list_relay_rooms(user_id)) == 1
 
-    # B. Nonaktifkan Simulasi Virtual -> Sekarang tambah relay fisik diizinkan
-    store.set_feature_setting(user_id, "virtual_smarthome_enabled", False)
+    # Bersihkan room untuk tes berikutnya
+    for r in store.list_relay_rooms(user_id):
+        store.delete_relay_room(user_id, r["id"])
 
     # C. Coba tambah relay dengan 17 channel (> 16 limit) -> Wajib ditolak oleh sistem!
     add_invalid_17 = {
