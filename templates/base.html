@@ -3,7 +3,16 @@
 <html lang="id" {% if current_theme != 'default' %}data-theme="{{ current_theme }}" {% endif %}>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+    <!-- PWA Web App Manifest & Mobile Meta -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Xiaozhi AI">
+    <meta name="application-name" content="Xiaozhi AI">
+    <meta name="theme-color" content="#047857">
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
@@ -1197,8 +1206,381 @@
             background: #f0fdf4 !important;
         }
 
-        /* RESPONSIVE */
-        @media (max-width: 900px) {
+        /* ══════════════════════════════════════════════════════════════════
+           PWA INSTALL OVERLAY BANNER & MOBILE ADAPTIVE SYSTEM
+           ══════════════════════════════════════════════════════════════════ */
+        :root {
+            --pwa-banner-height: 64px;
+        }
+        body.has-pwa-banner {
+            padding-top: var(--pwa-banner-height);
+        }
+        body.has-pwa-banner .app-nav-aside {
+            top: var(--pwa-banner-height);
+            height: calc(100vh - var(--pwa-banner-height));
+        }
+        body.has-pwa-banner .app-sidebar-toggle {
+            top: calc(12px + var(--pwa-banner-height));
+        }
+        body.has-pwa-banner .app-guest-header {
+            top: var(--pwa-banner-height);
+        }
+
+        /* Overlay Banner Top */
+        .pwa-install-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100000;
+            background: #ffffff;
+            border-bottom: 2px solid var(--app-border-strong);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            padding: 8px 14px;
+            animation: pwaSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            box-sizing: border-box;
+        }
+        @keyframes pwaSlideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        :root[data-theme="neo"] .pwa-install-banner {
+            background: #ffe600;
+            border-bottom: 2.5px solid #111111;
+            box-shadow: 0 4px 0 #111111;
+            color: #111111;
+        }
+        :root[data-theme="dark"] .pwa-install-banner {
+            background: #18181b;
+            border-bottom: 2px solid #3f3f46;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            color: #f8fafc;
+        }
+
+        .pwa-banner-content {
+            max-width: var(--app-wide-max);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .pwa-banner-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+        .pwa-banner-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 9px;
+            background: #ffffff;
+            border: 1.5px solid #111111;
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.12);
+        }
+        :root[data-theme="neo"] .pwa-banner-icon {
+            border: 2px solid #111111;
+            box-shadow: 2px 2px 0 #111111;
+        }
+        .pwa-banner-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .pwa-banner-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .pwa-banner-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13.5px;
+            font-weight: 800;
+            line-height: 1.25;
+            color: inherit;
+        }
+        .pwa-banner-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 2px 6px;
+            border-radius: 99px;
+            background: #10b981;
+            color: #ffffff;
+        }
+        :root[data-theme="neo"] .pwa-banner-badge {
+            background: #111111;
+            color: #ffe600;
+            border: 1px solid #111111;
+        }
+        .pwa-banner-desc {
+            font-size: 12px;
+            color: var(--app-muted);
+            line-height: 1.35;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        :root[data-theme="neo"] .pwa-banner-desc {
+            color: #262626;
+            font-weight: 600;
+        }
+        .pwa-banner-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .pwa-btn-install {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 800;
+            border-radius: 8px;
+            border: 1.5px solid #111111;
+            background: #047857;
+            color: #ffffff;
+            cursor: pointer;
+            white-space: nowrap;
+            box-shadow: 2.5px 2.5px 0 #111111;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        :root[data-theme="neo"] .pwa-btn-install {
+            background: #111111;
+            color: #ffffff;
+            border: 2px solid #111111;
+            box-shadow: 3px 3px 0 #111111;
+        }
+        :root[data-theme="neo"] .pwa-btn-install:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 4px 4px 0 #111111;
+            background: #000000;
+        }
+        :root[data-theme="neo"] .pwa-btn-install:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0 #111111;
+        }
+        :root[data-theme="dark"] .pwa-btn-install {
+            background: #10b981;
+            color: #022c22;
+            border-color: #34d399;
+        }
+        .pwa-btn-dismiss {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: transparent;
+            border: 1.5px solid transparent;
+            display: grid;
+            place-items: center;
+            font-size: 16px;
+            font-weight: 800;
+            color: inherit;
+            cursor: pointer;
+            opacity: 0.75;
+            transition: opacity 0.15s, background-color 0.15s;
+        }
+        .pwa-btn-dismiss:hover {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.08);
+        }
+        :root[data-theme="neo"] .pwa-btn-dismiss:hover {
+            background: rgba(0, 0, 0, 0.12);
+        }
+
+        /* Modal Panduan iOS / Android Fallback */
+        .pwa-guide-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 100005;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .pwa-guide-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+        .pwa-guide-box {
+            position: relative;
+            z-index: 2;
+            background: var(--app-surface);
+            border: 2.5px solid #111111;
+            border-radius: 16px;
+            box-shadow: 6px 6px 0 #111111;
+            max-width: 440px;
+            width: 100%;
+            padding: 22px 20px;
+            color: var(--app-text);
+            animation: mcpPopIn 0.22s ease-out;
+            box-sizing: border-box;
+        }
+        :root[data-theme="dark"] .pwa-guide-box {
+            border-color: #3f3f46;
+            box-shadow: 0 16px 36px rgba(0,0,0,0.6);
+        }
+        .pwa-guide-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .pwa-guide-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: #dcfce7;
+            border: 2px solid #111111;
+            display: grid;
+            place-items: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        :root[data-theme="dark"] .pwa-guide-icon {
+            background: rgba(16, 185, 129, 0.18);
+            border-color: #10b981;
+        }
+        .pwa-guide-heading {
+            font-size: 17px;
+            font-weight: 900;
+            margin: 0 0 4px;
+            line-height: 1.3;
+            color: var(--app-text);
+        }
+        .pwa-guide-sub {
+            font-size: 12.5px;
+            color: var(--app-muted);
+            margin: 0;
+            line-height: 1.45;
+        }
+        .pwa-guide-close {
+            margin-left: auto;
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--app-muted);
+            cursor: pointer;
+            padding: 0 4px;
+            line-height: 1;
+        }
+        .pwa-steps-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .pwa-step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            background: var(--app-surface-muted);
+            border: 1.5px solid var(--app-border-strong);
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        :root[data-theme="neo"] .pwa-step-item {
+            border: 2px solid #111111;
+            box-shadow: 2px 2px 0 #111111;
+            background: #fffde7;
+        }
+        .pwa-step-num {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #111111;
+            color: #ffffff;
+            font-weight: 900;
+            font-size: 12px;
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        :root[data-theme="neo"] .pwa-step-num {
+            background: #ffe600;
+            color: #111111;
+            border: 1.5px solid #111111;
+        }
+        .pwa-step-text {
+            font-size: 13px;
+            line-height: 1.45;
+            color: var(--app-text);
+        }
+        .pwa-guide-footer {
+            display: flex;
+            justify-content: flex-end;
+        }
+        .pwa-btn-understand {
+            width: 100%;
+            padding: 11px 16px;
+            font-size: 14px;
+            font-weight: 850;
+            border-radius: 10px;
+            border: 2px solid #111111;
+            background: #ffe600;
+            color: #111111;
+            cursor: pointer;
+            box-shadow: 3px 3px 0 #111111;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .pwa-btn-understand:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 4px 4px 0 #111111;
+        }
+        .pwa-btn-understand:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0 #111111;
+        }
+
+        /* Responsive Guest Header */
+        .app-guest-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--app-surface);
+            border-bottom: 1px solid var(--app-border);
+            padding: 0 clamp(12px, 2.5vw, 24px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 40;
+            box-shadow: var(--app-shadow);
+            transition: top 0.2s ease;
+        }
+        :root[data-theme="neo"] .app-guest-header {
+            border-bottom: 2.5px solid #111111;
+            box-shadow: 0 3px 0 #111111;
+        }
+        .app-guest-nav {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: nowrap;
+        }
+
+        /* RESPONSIVE BREAKPOINTS (Mobile & Tablet) */
+        @media (max-width: 1024px) {
             .app-nav-aside {
                 transform: translateX(-100%);
                 box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
@@ -1206,23 +1588,101 @@
             .app-nav-aside.is-open { transform: translateX(0); }
             .app-sidebar-toggle { display: grid; }
             .app-sidebar-overlay.is-visible { display: block; }
-            .app-main-wrapper { margin-left: 0; }
-            .app-main { padding: 16px 14px; padding-top: 68px; }
+            .app-main-wrapper { margin-left: 0; max-width: 100vw; }
+            .app-main { padding: clamp(14px, 2vw, 20px); padding-top: 68px; }
             .app-content-grid { grid-template-columns: 1fr; }
-            .app-stat-grid { grid-template-columns: repeat(2, 1fr); }
+            .app-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .app-page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-            .app-toolbar { width: 100%; justify-content: flex-start; }
-            .app-table-wrap { -webkit-overflow-scrolling: touch; }
+            .app-toolbar { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
         }
-        @media (max-width: 560px) {
-            .app-stat-grid { grid-template-columns: 1fr; }
-            .auth-card { width: 100%; padding: 20px 16px; min-height: auto; }
-            .auth-layout { padding: 16px; }
-            .app-title { font-size: 22px; }
-            .app-section-title { font-size: 16px; }
-            .app-meta-row { gap: 6px; }
-            .app-meta-row .app-chip { font-size: 11px; padding: 4px 6px; }
-            .app-card { padding: 16px 12px; }
+
+        @media (max-width: 640px) {
+            :root {
+                --pwa-banner-height: 74px;
+            }
+            .pwa-banner-content {
+                gap: 8px;
+            }
+            .pwa-banner-title {
+                font-size: 12.5px;
+            }
+            .pwa-banner-desc {
+                display: none;
+            }
+            .pwa-btn-install {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+            .app-guest-header {
+                height: 54px;
+                padding: 0 10px;
+            }
+            .app-guest-header .app-brand-sub {
+                display: none;
+            }
+            .app-guest-header .app-brand-name {
+                font-size: 13.5px;
+            }
+            .app-guest-header .app-brand-mark {
+                width: 32px;
+                height: 32px;
+            }
+            .app-guest-nav .app-button {
+                padding: 6px 9px;
+                font-size: 11.5px;
+                min-height: 32px;
+            }
+            .app-guest-nav a:not(.app-button-primary):nth-child(1) {
+                display: none;
+            }
+            .app-main {
+                padding: 12px 10px;
+                padding-top: 64px;
+                padding-bottom: 32px;
+            }
+            .app-stat-grid {
+                grid-template-columns: 1fr;
+            }
+            .auth-card {
+                width: 100%;
+                padding: 18px 14px;
+                min-height: auto;
+            }
+            .auth-layout {
+                padding: 12px;
+            }
+            .app-title {
+                font-size: 21px;
+            }
+            .app-section-title {
+                font-size: 15.5px;
+            }
+            .app-meta-row {
+                gap: 6px;
+            }
+            .app-card {
+                padding: 14px 10px;
+            }
+            /* Cegah iOS Safari auto-zoom pada input form */
+            .app-input, .app-select, .app-textarea {
+                font-size: 16px !important;
+            }
+            .app-table-wrap {
+                -webkit-overflow-scrolling: touch;
+                margin: 0 -4px;
+            }
+            .app-table th, .app-table td {
+                padding: 9px 10px;
+                font-size: 12px;
+            }
+            .relay-mode-nav-container {
+                flex-direction: column;
+                gap: 8px;
+            }
+            .relay-mode-btn {
+                width: 100%;
+                justify-content: center;
+            }
         }
 
         /* MODAL (shared component) */
@@ -1427,6 +1887,98 @@
 {% set is_auth_page = (page in ['login', 'register', 'forgot_password', 'reset_password'] or (request and (request.url.path.startswith('/login') or request.url.path.startswith('/register') or request.url.path.startswith('/logout') or request.url.path.startswith('/auth/')))) %}
 {% set show_mcp_block_overlay = (user and user.role != 'admin' and not mcp_connected and not is_doc_page and not is_flasher_page and not is_auth_page) %}
 <body class="{% if is_admin_page %}is-admin-page{% endif %}">
+    <!-- PWA Mobile Install Banner Overlay -->
+    <aside id="pwaInstallBanner" class="pwa-install-banner" aria-label="Instal Aplikasi Xiaozhi" style="display:none;">
+        <div class="pwa-banner-content">
+            <div class="pwa-banner-left">
+                <div class="pwa-banner-icon">
+                    <img src="/static/img/favicon-32x32.png" alt="Xiaozhi Icon" width="36" height="36" onerror="this.src='/static/img/logo.png'">
+                </div>
+                <div class="pwa-banner-text">
+                    <div class="pwa-banner-title">
+                        <span>Xiaozhi AI</span>
+                        <span class="pwa-banner-badge">Aplikasi Cerdas</span>
+                    </div>
+                    <p class="pwa-banner-desc">Pasang ke layar utama HP/Tablet untuk akses cepat tanpa ketik domain!</p>
+                </div>
+            </div>
+            <div class="pwa-banner-actions">
+                <button type="button" id="pwaInstallBtn" class="pwa-btn-install" onclick="window.triggerPwaInstall()">
+                    <span class="pwa-btn-icon">⚡</span>
+                    <span>Pasang Aplikasi</span>
+                </button>
+                <button type="button" class="pwa-btn-dismiss" onclick="window.dismissPwaBanner()" title="Tutup" aria-label="Tutup Banner">
+                    ✕
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Modal Panduan Install PWA iOS / Fallback -->
+    <div id="pwaGuideModal" class="pwa-guide-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="pwaGuideTitle">
+        <div class="pwa-guide-backdrop" onclick="window.closePwaGuide()"></div>
+        <div class="pwa-guide-box">
+            <div class="pwa-guide-header">
+                <div class="pwa-guide-icon">📲</div>
+                <div>
+                    <h3 id="pwaGuideTitle" class="pwa-guide-heading">Pasang Xiaozhi AI di Layar Utama</h3>
+                    <p class="pwa-guide-sub">Akses instan seperti aplikasi native tanpa perlu membuka browser lagi.</p>
+                </div>
+                <button type="button" class="pwa-guide-close" onclick="window.closePwaGuide()" aria-label="Tutup Dialog">✕</button>
+            </div>
+            
+            <!-- Petunjuk Safari iOS -->
+            <div id="pwaIosSteps" class="pwa-steps-list">
+                <div class="pwa-step-item">
+                    <div class="pwa-step-num">1</div>
+                    <div class="pwa-step-text">
+                        Ketuk ikon <strong>Bagikan / Share</strong> (<span style="font-size:16px;">⎋</span> / <span>📤</span>) di bilah bawah browser Safari Anda.
+                    </div>
+                </div>
+                <div class="pwa-step-item">
+                    <div class="pwa-step-num">2</div>
+                    <div class="pwa-step-text">
+                        Geser ke bawah dan pilih <strong>"Tambahkan ke Layar Utama"</strong> (<em>Add to Home Screen</em> ➕).
+                    </div>
+                </div>
+                <div class="pwa-step-item">
+                    <div class="pwa-step-num">3</div>
+                    <div class="pwa-step-text">
+                        Ketuk <strong>"Tambah"</strong> di pojok kanan atas. Ikon Xiaozhi AI akan langsung muncul di beranda HP Anda!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Petunjuk Chrome Android jika prompt dicegah browser -->
+            <div id="pwaAndroidSteps" class="pwa-steps-list" style="display:none;">
+                <div class="pwa-step-item">
+                    <div class="pwa-step-num">1</div>
+                    <div class="pwa-step-text">
+                        Ketuk tombol menu titik tiga (<strong>⋮</strong>) di pojok kanan atas browser Chrome HP Anda.
+                    </div>
+                </div>
+                <div class="pwa-step-item">
+                    <div class="pwa-step-num">2</div>
+                    <div class="pwa-step-text">
+                        Pilih <strong>"Instal aplikasi"</strong> atau <strong>"Tambahkan ke Layar Utama"</strong>.
+                    </div>
+                </div>
+                <div class="pwa-step-item">
+                    <div class="pwa-step-num">3</div>
+                    <div class="pwa-step-text">
+                        Konfirmasi instalasi. Aplikasi Xiaozhi AI siap dibuka langsung dari layar HP Anda!
+                    </div>
+                </div>
+            </div>
+
+            <div class="pwa-guide-footer">
+                <button type="button" class="pwa-btn-understand" onclick="window.closePwaGuide()">
+                    Mengerti, Saya Pasang Sekarang 👍
+                </button>
+            </div>
+        </div>
+    </div>
+
     {% if show_mcp_block_overlay %}
     <!-- Blocking Overlay: MCP Connection Required -->
     <div class="mcp-blocking-overlay" id="mcpRequiredOverlay" role="dialog" aria-modal="true" aria-labelledby="mcpModalTitle">
@@ -1783,8 +2335,8 @@
         </div>
     </aside>
     {% else %}
-    <!-- Public Header for Visitors & Search Engines -->
-    <header style="position:fixed; top:0; left:0; right:0; height:60px; background:var(--app-surface); border-bottom:1px solid var(--app-border); padding:0 20px; display:flex; justify-content:space-between; align-items:center; z-index:40; box-shadow:var(--app-shadow);">
+    <!-- Public Header for Visitors & Search Engines (Mobile & Tablet Adaptive) -->
+    <header class="app-guest-header">
         <a href="/" class="app-brand" style="text-decoration:none;">
             <span class="app-brand-mark">
                 <img src="/static/img/logo.png" alt="Xiaozhi Logo" width="38" height="38" loading="eager">
@@ -1794,7 +2346,7 @@
                 <span class="app-brand-sub">Platform AI & IoT</span>
             </div>
         </a>
-        <div style="display:flex; gap:10px; align-items:center;">
+        <div class="app-guest-nav">
             <a href="/firmware/marketplace" class="app-button" style="text-decoration:none;">Marketplace</a>
             <a href="/web-flasher" class="app-button" style="text-decoration:none;">⚡ Flasher</a>
             <a href="/dokumentasi" class="app-button" style="text-decoration:none;">Dokumentasi</a>
@@ -2304,5 +2856,119 @@
     </script>
     {% endif %}
 
+    <!-- PWA Service Worker & Mobile Adaptive Detection Script -->
+    <script>
+        (function() {
+            // 1. Registrasi Service Worker untuk PWA caching dan instalasi
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                        .then(function(reg) {
+                            // Service Worker terdaftar sukses
+                        })
+                        .catch(function(err) {
+                            console.debug('[PWA] Service Worker registration skipped:', err);
+                        });
+                });
+            }
+
+            // 2. Deteksi Mobile / Tablet dan Standalone Mode
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                                 window.navigator.standalone === true ||
+                                 document.referrer.includes('android-app://');
+
+            const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua) ||
+                             (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && window.innerWidth <= 1024);
+
+            const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+
+            const isDismissed = sessionStorage.getItem('xiaozhi_pwa_banner_dismissed') === 'true';
+
+            window.pwaDeferredPrompt = null;
+
+            // 3. Tangkap event prompt instalasi native (Chromium / Android Chrome)
+            window.addEventListener('beforeinstallprompt', function(e) {
+                e.preventDefault();
+                window.pwaDeferredPrompt = e;
+                if (isMobile && !isStandalone && !isDismissed) {
+                    showPwaBanner();
+                }
+            });
+
+            // 4. Deteksi otomatis saat dibuka di mobile browser (iOS Safari, Samsung, dll)
+            window.addEventListener('DOMContentLoaded', function() {
+                if (isMobile && !isStandalone && !isDismissed) {
+                    // Delay sejenak agar rendering UI utama selesai
+                    setTimeout(function() {
+                        showPwaBanner();
+                    }, 700);
+                }
+            });
+
+            function showPwaBanner() {
+                const banner = document.getElementById('pwaInstallBanner');
+                if (banner && !isStandalone && !isDismissed) {
+                    banner.style.display = 'block';
+                    document.body.classList.add('has-pwa-banner');
+                }
+            }
+
+            window.dismissPwaBanner = function() {
+                const banner = document.getElementById('pwaInstallBanner');
+                if (banner) {
+                    banner.style.display = 'none';
+                    document.body.classList.remove('has-pwa-banner');
+                }
+                try {
+                    sessionStorage.setItem('xiaozhi_pwa_banner_dismissed', 'true');
+                } catch (e) {}
+            };
+
+            window.triggerPwaInstall = async function() {
+                // Jika event browser prompt tersedia (Android Chrome/Edge)
+                if (window.pwaDeferredPrompt) {
+                    try {
+                        window.pwaDeferredPrompt.prompt();
+                        const choice = await window.pwaDeferredPrompt.userChoice;
+                        if (choice && choice.outcome === 'accepted') {
+                            window.dismissPwaBanner();
+                        }
+                    } catch (e) {
+                        console.error('[PWA] Prompt error:', e);
+                    }
+                    window.pwaDeferredPrompt = null;
+                    return;
+                }
+
+                // Fallback untuk iOS Safari atau browser mobile lain
+                const guideModal = document.getElementById('pwaGuideModal');
+                const iosSteps = document.getElementById('pwaIosSteps');
+                const androidSteps = document.getElementById('pwaAndroidSteps');
+                if (guideModal) {
+                    if (isIOS) {
+                        if (iosSteps) iosSteps.style.display = 'flex';
+                        if (androidSteps) androidSteps.style.display = 'none';
+                    } else {
+                        if (iosSteps) iosSteps.style.display = 'none';
+                        if (androidSteps) androidSteps.style.display = 'flex';
+                    }
+                    guideModal.style.display = 'flex';
+                }
+            };
+
+            window.closePwaGuide = function() {
+                const guideModal = document.getElementById('pwaGuideModal');
+                if (guideModal) {
+                    guideModal.style.display = 'none';
+                }
+            };
+
+            window.addEventListener('appinstalled', function() {
+                window.dismissPwaBanner();
+                console.log('[PWA] Aplikasi Xiaozhi AI berhasil diinstal ke layar utama!');
+            });
+        })();
+    </script>
 </body>
 </html>

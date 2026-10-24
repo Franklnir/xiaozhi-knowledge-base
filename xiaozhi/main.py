@@ -342,6 +342,34 @@ async def download_qr_image():
     )
 
 
+# PWA Web App Endpoints for Mobile Installation
+@app.get("/manifest.json", include_in_schema=False)
+async def pwa_manifest():
+    manifest_file = STATIC_DIR / "manifest.json"
+    if manifest_file.exists():
+        return FileResponse(path=str(manifest_file), media_type="application/manifest+json")
+    return Response(
+        content='{"name":"Xiaozhi Indonesia","short_name":"Xiaozhi AI","start_url":"/","display":"standalone"}',
+        media_type="application/manifest+json",
+    )
+
+
+@app.get("/sw.js", include_in_schema=False)
+async def pwa_service_worker():
+    sw_file = STATIC_DIR / "sw.js"
+    if sw_file.exists():
+        return FileResponse(
+            path=str(sw_file),
+            media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+        )
+    return Response(
+        content='self.addEventListener("fetch",()=>{});',
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"},
+    )
+
+
 # SEO Endpoints
 
 
