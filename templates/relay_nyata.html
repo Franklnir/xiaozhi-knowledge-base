@@ -277,8 +277,11 @@
 
     <section class="relay-toolbar">
         <div>
-            <h2 class="app-section-title">Perangkat Relay</h2>
-            <p class="app-section-subtitle">{{ rooms|length }} ruangan terdaftar. Polling ESP32/8266 dll: {{ api_defaults.poll_interval_ms }} ms.</p>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <h2 class="app-section-title">Perangkat Relay</h2>
+                <span id="sseLiveBadge" class="app-chip app-chip-small" style="font-size:11px; font-weight:600; background:rgba(16, 185, 129, 0.12); color:#10b981; border:1px solid rgba(16, 185, 129, 0.3);">⚡ Live Sinkron (SSE)</span>
+            </div>
+            <p class="app-section-subtitle">{{ rooms|length }} ruangan terdaftar. Sinkronisasi instan 2-arah aktif.</p>
         </div>
         <button type="button" class="app-button app-button-primary relay-add-button" id="openAddRelay" {% if quota.relay_rooms.reached %}disabled{% endif %}>
             <span class="relay-plus">+</span>
@@ -739,9 +742,112 @@
             if (!response.ok || !payload.success) return;
             (payload.rooms || []).forEach((room) => paintRoom(room));
         } catch (error) {
-            // Polling berikutnya akan mencoba lagi.
+            // Polling fallback jika offline
         }
     }
+
+    // ── Real-Time 2-Way SSE Event Stream ──────────────────────────
+    let relaySSE = null;
+    let sseFallbackTimer = null;
+
+    function updateSSEBadge(connected, text) {
+        const badge = document.getElementById("sseLiveBadge");
+        if (!badge) return;
+        if (connected) {
+            badge.textContent = text || "⚡ Live Sinkron (SSE)";
+            badge.style.background = "rgba(16, 185, 129, 0.12)";
+            badge.style.color = "#10b981";
+            badge.style.borderColor = "rgba(16, 185, 129, 0.3)";
+        } else {
+            badge.textContent = text || "⚠️ Reconnecting (Fallback Polling)";
+            badge.style.background = "rgba(245, 158, 11, 0.12)";
+            badge.style.color = "#f59e0b";
+            badge.style.borderColor = "rgba(245, 158, 11, 0.3)";
+        }
+    }
+
+    function initRelaySSE() {
+        if (!window.EventSource) {
+            startFallbackPolling(10000);
+            updateSSEBadge(false, "● Mode Polling (No SSE)");
+            return;
+        }
+
+        if (relaySSE) {
+            relaySSE.close();
+            relaySSE = null;
+        }
+
+        try {
+            relaySSE = new EventSource("/api/relay-nyata/stream");
+
+            relaySSE.addEventListener("connected", () => {
+                stopFallbackPolling();
+                updateSSEBadge(true, "⚡ Live Sinkron (SSE)");
+            });
+
+            relaySSE.addEventListener("relay_update", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    paintRelay(data.room_id, {
+                        relay_number: data.relay_number,
+                        status: data.status,
+                        pending_command: data.pending || "",
+                        desired_status: data.desired || data.status
+                    });
+
+                    // Notifikasi jika dipicu oleh suara XiaoZhi
+                    if (data.source === "mcp_voice" && window.App && App.toast) {
+                        App.toast.info("🎙️ XiaoZhi: " + (data.relay_name || "Relay") + " di " + (data.room_name || "Ruangan") + " diubah ke " + data.status);
+                    }
+                } catch (err) {
+                    console.error("Relay SSE parse error:", err);
+                }
+            });
+
+            relaySSE.addEventListener("device_status", (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    paintDeviceConnection({
+                        id: data.room_id,
+                        device_connected: data.device_connected,
+                        device_last_seen_at: data.device_last_seen_at,
+                        device_connection_label: data.device_connection_label
+                    });
+                } catch (err) {}
+            });
+
+            relaySSE.onerror = () => {
+                updateSSEBadge(false, "⚠️ Terputus (Fallback Polling)");
+                startFallbackPolling(15000);
+            };
+        } catch (err) {
+            startFallbackPolling(15000);
+        }
+    }
+
+    function startFallbackPolling(intervalMs) {
+        if (!sseFallbackTimer) {
+            sseFallbackTimer = window.setInterval(refreshRelayStatuses, intervalMs || 15000);
+        }
+    }
+
+    function stopFallbackPolling() {
+        if (sseFallbackTimer) {
+            clearInterval(sseFallbackTimer);
+            sseFallbackTimer = null;
+        }
+    }
+
+    // Auto-refresh saat tab kembali aktif
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            refreshRelayStatuses();
+            if (!relaySSE || relaySSE.readyState === EventSource.CLOSED) {
+                initRelaySSE();
+            }
+        }
+    });
 
     document.getElementById("openAddRelay").addEventListener("click", openAddForm);
     document.getElementById("generateApiButton").addEventListener("click", () => generateApiConfig());
@@ -762,6 +868,6 @@
     });
 
     renderRelayInputs(1);
-    window.setInterval(refreshRelayStatuses, Math.max(1000, POLL_INTERVAL_MS));
+    initRelaySSE();
 </script>
 {% endblock %}

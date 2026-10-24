@@ -3,7 +3,7 @@ import secrets
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from xiaozhi.config import (
     REAL_RELAY_MAX_RELAYS,
@@ -74,20 +74,39 @@ def real_relay_page_payload(owner_id: int) -> Dict[str, Any]:
     return {"rooms": rooms}
 
 
-def control_real_relay(owner_id: int, room: dict, relay: dict, command: str) -> dict:
+def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, source: str = "web_ui") -> dict:
     store = get_store()
     status = normalize_relay_state(command)
     store.update_relay_status(owner_id, room["id"], relay["relay_number"], status)
+
+    # Broadcast live SSE update for instant 2-way Web UI & MCP synchronization
+    try:
+        from xiaozhi.services.sse_service import broadcast_relay_update
+        broadcast_relay_update(
+            user_id=owner_id,
+            room_id=room["id"],
+            relay_number=relay["relay_number"],
+            status=status,
+            source=source,
+            room_name=room.get("nama_tempat", ""),
+            relay_name=relay.get("nama_relay", ""),
+            pending=status,
+            desired=status,
+        )
+    except Exception:
+        pass
+
     return {
         "success": True,
         "message": f"Relay {relay['nama_relay']} di {room['nama_tempat']} berhasil diubah ke {status}.",
         "room": room["nama_tempat"],
         "relay": relay["nama_relay"],
         "status": status,
+        "source": source,
     }
 
 
-def control_all_real_relays(owner_id: int, command: str) -> dict:
+def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui") -> dict:
     store = get_store()
     status = normalize_relay_state(command)
     rooms = store.list_relay_rooms(owner_id)
@@ -96,11 +115,27 @@ def control_all_real_relays(owner_id: int, command: str) -> dict:
         for relay in room.get("relays", []):
             store.update_relay_status(owner_id, room["id"], relay["relay_number"], status)
             count += 1
+            try:
+                from xiaozhi.services.sse_service import broadcast_relay_update
+                broadcast_relay_update(
+                    user_id=owner_id,
+                    room_id=room["id"],
+                    relay_number=relay["relay_number"],
+                    status=status,
+                    source=source,
+                    room_name=room.get("nama_tempat", ""),
+                    relay_name=relay.get("nama_relay", ""),
+                    pending=status,
+                    desired=status,
+                )
+            except Exception:
+                pass
     return {
         "success": True,
         "message": f"Semua relay ({count}) berhasil diubah ke {status}.",
         "count": count,
         "status": status,
+        "source": source,
     }
 
 
@@ -293,10 +328,33 @@ async def relay_nyata_control(request: Request, cmd: RealRelayControlCommand):
     if not relay:
         raise HTTPException(status_code=404, detail="Relay tidak ditemukan.")
     try:
-        response = control_real_relay(user["id"], room, relay, cmd.command)
+        response = control_real_relay(user["id"], room, relay, cmd.command, source="web_ui")
+        response["updated_room"] = store.get_relay_room(user["id"], cmd.room_id)
         return response
     except ValueError as exc:
         return JSONResponse({"success": False, "message": str(exc)}, status_code=400)
+
+
+@router.get("/api/relay-nyata/stream")
+async def relay_nyata_stream(request: Request):
+    """
+    Real-time Server-Sent Events stream for 2-way live relay synchronization.
+    Instantly pushes state updates triggered by XiaoZhi Voice Assistant (MCP),
+    Web UI switches, or ESP32 hardware ACKs without polling.
+    """
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sesi tidak valid.")
+    from xiaozhi.services.sse_service import stream_relay_events
+    return StreamingResponse(
+        stream_relay_events(user["id"], request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/api/device/relay/{api_slug}/commands")
@@ -320,4 +378,32 @@ async def device_relay_status(request: Request, api_slug: str, cmd: RealRelayDev
     if not owner:
         raise HTTPException(status_code=404, detail="API slug tidak ditemukan.")
     store.ack_relay_command(owner["user_id"], owner["room_id"], cmd.command_id)
+
+    # 2-way broadcast: device is online and command acknowledged
+    try:
+        from xiaozhi.services.sse_service import broadcast_relay_device_status, broadcast_relay_update
+        broadcast_relay_device_status(
+            user_id=owner["user_id"],
+            room_id=owner["room_id"],
+            connected=True,
+            last_seen_at=utc_now(),
+            device_label="ESP32/8266 terhubung",
+        )
+        updated_room = store.get_relay_room(owner["user_id"], owner["room_id"])
+        if updated_room:
+            for r in updated_room.get("relays", []):
+                broadcast_relay_update(
+                    user_id=owner["user_id"],
+                    room_id=owner["room_id"],
+                    relay_number=r["relay_number"],
+                    status=r.get("status", "OFF"),
+                    source="device_ack",
+                    room_name=updated_room.get("nama_tempat", ""),
+                    relay_name=r.get("nama_relay", ""),
+                    pending="",
+                    desired=r.get("status", "OFF"),
+                )
+    except Exception:
+        pass
+
     return {"success": True}

@@ -250,6 +250,116 @@ async def stream_chat_history_events(
         chat_history_hub.unsubscribe(user_id, q)
 
 
+# ── Real-Time Relay Smart Home Hub (SSE) ────────────────────────────────────
+
+class RelayEventHub:
+    """Manages active SSE connections for real-time relay status updates per user."""
+
+    def __init__(self) -> None:
+        self._subscribers: Dict[int, Set[asyncio.Queue]] = {}
+
+    def emit(self, user_id: int, data: Dict[str, Any], event_type: str = "relay_update") -> None:
+        """Broadcast relay event to user's active SSE connections."""
+        queues = self._subscribers.get(int(user_id), set())
+        if not queues:
+            return
+        payload = {
+            "type": event_type,
+            "data": data,
+            "timestamp": utc_now(),
+        }
+        for q in list(queues):
+            try:
+                q.put_nowait(payload)
+            except Exception:
+                pass
+
+    async def subscribe(self, user_id: int) -> asyncio.Queue:
+        q: asyncio.Queue = asyncio.Queue(maxsize=100)
+        uid = int(user_id)
+        if uid not in self._subscribers:
+            self._subscribers[uid] = set()
+        self._subscribers[uid].add(q)
+        return q
+
+    def unsubscribe(self, user_id: int, q: asyncio.Queue) -> None:
+        uid = int(user_id)
+        if uid in self._subscribers:
+            self._subscribers[uid].discard(q)
+            if not self._subscribers[uid]:
+                del self._subscribers[uid]
+
+
+relay_event_hub = RelayEventHub()
+
+
+def broadcast_relay_update(
+    user_id: int,
+    room_id: int,
+    relay_number: int,
+    status: str,
+    source: str = "web_ui",
+    room_name: str = "",
+    relay_name: str = "",
+    pending: str = "",
+    desired: str = "",
+) -> None:
+    """Global helper to broadcast relay state changes in real time."""
+    relay_event_hub.emit(
+        user_id=int(user_id),
+        data={
+            "room_id": int(room_id),
+            "relay_number": int(relay_number),
+            "status": str(status).upper(),
+            "pending": str(pending).upper(),
+            "desired": str(desired or status).upper(),
+            "source": source,
+            "room_name": room_name,
+            "relay_name": relay_name,
+        },
+        event_type="relay_update",
+    )
+
+
+def broadcast_relay_device_status(
+    user_id: int,
+    room_id: int,
+    connected: bool,
+    last_seen_at: str = "",
+    device_label: str = "",
+) -> None:
+    """Global helper to broadcast device online/offline status."""
+    relay_event_hub.emit(
+        user_id=int(user_id),
+        data={
+            "room_id": int(room_id),
+            "device_connected": bool(connected),
+            "device_last_seen_at": last_seen_at or utc_now(),
+            "device_connection_label": device_label,
+        },
+        event_type="device_status",
+    )
+
+
+async def stream_relay_events(user_id: int, request: Request) -> AsyncGenerator[str, None]:
+    """Generator for streaming real-time relay state changes to Web UI via SSE."""
+    q = await relay_event_hub.subscribe(user_id)
+    try:
+        yield format_sse("connected", {"status": "ok", "user_id": user_id, "message": "Stream Relay Nyata aktif."})
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                payload = await asyncio.wait_for(q.get(), timeout=15.0)
+                event_name = payload.get("type", "relay_update")
+                yield format_sse(event_name, payload.get("data", {}))
+            except asyncio.TimeoutError:
+                # Keep-alive heartbeat comment
+                yield ": keepalive\n\n"
+    finally:
+        relay_event_hub.unsubscribe(user_id, q)
+
+
 # ── 2. AI Chat Streaming (Token-by-Token Typing Effect) ──────────────────────
 
 async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request) -> AsyncGenerator[str, None]:

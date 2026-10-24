@@ -130,7 +130,7 @@ def setup_mode_filtering(store):
             response = {"success": False, "message": "Mode Relay Nyata aktif, tetapi target dari tool simulasi tidak cocok dengan perintah suara Relay Nyata yang tersimpan."}
             record_mcp_tool_history(owner_id, name, f"{target} {action}".strip(), arguments, response)
             return response
-        response = control_real_relay(owner_id, matched["room"], matched["relay"], matched["command"])
+        response = control_real_relay(owner_id, matched["room"], matched["relay"], matched["command"], source="mcp_voice")
         response["message"] = f"{response['message']} Tool simulasi diabaikan karena mode Relay Nyata aktif."
         response["routed_from"] = name
         record_mcp_tool_history(owner_id, name, f"{target} {action}".strip(), arguments, response)

@@ -1644,7 +1644,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         relay = matched["relay"]
         command = matched["command"]
         try:
-            response = control_real_relay(owner_id, room, relay, command)
+            response = control_real_relay(owner_id, room, relay, command, source="mcp_voice")
             record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message, "room_id": room["id"], "relay": relay["relay_number"], "command": command}, response)
             return response
         except ValueError as exc:
