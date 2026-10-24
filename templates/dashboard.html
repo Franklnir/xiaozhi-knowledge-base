@@ -21,6 +21,19 @@
         }
     }
 
+    /* Icon Utilities */
+    .dash-icon {
+        display: inline-block;
+        vertical-align: -0.15em;
+        stroke: currentColor;
+        flex-shrink: 0;
+    }
+    .btn-icon {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
     /* Enhanced Stat Cards */
     .dashboard-stat-grid {
         display: grid;
@@ -58,7 +71,7 @@
     }
 
     .stat-card-label {
-        font-size: 12px;
+        font-size: 11.5px;
         font-weight: 700;
         color: var(--app-muted);
         text-transform: uppercase;
@@ -79,9 +92,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
         flex-shrink: 0;
-        background: var(--app-soft);
         border: 1px solid var(--app-border);
     }
 
@@ -388,7 +399,7 @@
     <header class="app-page-header">
         <div>
             <div style="display:flex; align-items:center; gap:8px;">
-                <span class="app-eyebrow">Halo, {{ user.username }} 👋</span>
+                <span class="app-eyebrow">Halo, {{ user.username }}</span>
                 <span class="app-chip app-chip-neutral app-chip-small" style="font-size:10px;">ID {{ user.id }}</span>
             </div>
             <h1 class="app-title">Knowledge Base & Dashboard Xiaozhi</h1>
@@ -399,8 +410,9 @@
                 <span class="app-status-dot"></span>
                 RAG Pipeline Siap
             </div>
-            <button type="button" onclick="openAddModal()" class="app-button app-button-success" style="font-weight:800; gap:6px;">
-                <span>➕</span> Tambah Materi
+            <button type="button" onclick="openAddModal()" class="app-button app-button-success btn-icon" style="font-weight:800;">
+                <svg class="dash-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Tambah Materi</span>
             </button>
         </div>
     </header>
@@ -409,7 +421,11 @@
     {% set is_err = 'gagal' in message|lower or 'tidak ditemukan' in message|lower or 'error' in message|lower %}
     <div class="app-alert {% if is_err %}app-alert-danger{% else %}app-alert-success{% endif %} flex items-center justify-between" id="dashboardFlashMsg">
         <div class="flex items-center gap-2">
-            <span>{% if is_err %}⚠️{% else %}✅{% endif %}</span>
+            {% if is_err %}
+            <svg class="dash-icon text-rose-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            {% else %}
+            <svg class="dash-icon text-emerald-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            {% endif %}
             <span>{{ message }}</span>
         </div>
         <button type="button" onclick="document.getElementById('dashboardFlashMsg').style.display='none'" class="text-xs font-bold opacity-70 hover:opacity-100">&times;</button>
@@ -417,8 +433,9 @@
     {% endif %}
 
     {% if quota.alerts %}
-    <div class="app-alert app-alert-warning">
-        <span>⚠️</span> {{ quota.alerts|join(" ") }} Hubungi admin jika membutuhkan kapasitas kuota tambahan.
+    <div class="app-alert app-alert-warning flex items-center gap-2">
+        <svg class="dash-icon text-amber-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        <span>{{ quota.alerts|join(" ") }} Hubungi admin jika membutuhkan kapasitas kuota tambahan.</span>
     </div>
     {% endif %}
 
@@ -447,28 +464,36 @@
                 <span class="stat-card-label">Total Materi</span>
                 <span class="stat-card-num">{{ stats.total }}</span>
             </div>
-            <div class="stat-card-icon" style="color:#0284c7; background:rgba(2,132,199,0.1);">📚</div>
+            <div class="stat-card-icon" style="color:#0284c7; background:rgba(2,132,199,0.08);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            </div>
         </div>
         <div class="stat-card-modern">
             <div class="stat-card-info">
                 <span class="stat-card-label">Tugas & Latihan</span>
                 <span class="stat-card-num">{{ stats.tugas }}</span>
             </div>
-            <div class="stat-card-icon" style="color:#d97706; background:rgba(217,119,6,0.1);">📝</div>
+            <div class="stat-card-icon" style="color:#d97706; background:rgba(217,119,6,0.08);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            </div>
         </div>
         <div class="stat-card-modern">
             <div class="stat-card-info">
                 <span class="stat-card-label">Pengumuman</span>
                 <span class="stat-card-num">{{ stats.pengumuman }}</span>
             </div>
-            <div class="stat-card-icon" style="color:#7c3aed; background:rgba(124,58,237,0.1);">📢</div>
+            <div class="stat-card-icon" style="color:#7c3aed; background:rgba(124,58,237,0.08);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            </div>
         </div>
         <div class="stat-card-modern">
             <div class="stat-card-info">
                 <span class="stat-card-label">Materi Edukasi</span>
                 <span class="stat-card-num">{{ stats.materi }}</span>
             </div>
-            <div class="stat-card-icon" style="color:#059669; background:rgba(5,150,105,0.1);">🎓</div>
+            <div class="stat-card-icon" style="color:#059669; background:rgba(5,150,105,0.08);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+            </div>
         </div>
     </section>
 
@@ -480,16 +505,20 @@
         </div>
         <div class="quota-items">
             <span class="quota-badge {% if quota.materials.reached %}is-reached{% endif %}">
-                📦 Materi: <strong>{{ quota.materials.label }}</strong>
+                <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                Materi: <strong>{{ quota.materials.label }}</strong>
             </span>
             <span class="quota-badge">
-                ✍️ Maks Kata: <strong>{% if quota.words_per_material.unlimited %}Tanpa Batas{% else %}{{ quota.words_per_material.limit }} kata{% endif %}</strong>
+                <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                Maks Kata: <strong>{% if quota.words_per_material.unlimited %}Tanpa Batas{% else %}{{ quota.words_per_material.limit }} kata{% endif %}</strong>
             </span>
             <span class="quota-badge {% if quota.live_apis.reached %}is-reached{% endif %}">
-                ⚡ API Live: <strong>{{ quota.live_apis.label }}</strong>
+                <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                API Live: <strong>{{ quota.live_apis.label }}</strong>
             </span>
             <span class="quota-badge {% if quota.relay_rooms.reached %}is-reached{% endif %}">
-                🔌 Relay IoT: <strong>{{ quota.relay_rooms.label }}</strong>
+                <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+                Relay IoT: <strong>{{ quota.relay_rooms.label }}</strong>
             </span>
         </div>
     </section>
@@ -507,11 +536,13 @@
                     <p class="app-section-subtitle">Data materi ini menjadi sumber prompt RAG utama Xiaozhi saat menjawab suara.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                    <button type="button" onclick="openCategoryModal()" class="app-button app-button-secondary app-button-small" style="font-weight:700;">
-                        🏷️ Kategori ({{ categories|length }})
+                    <button type="button" onclick="openCategoryModal()" class="app-button app-button-secondary app-button-small btn-icon" style="font-weight:700;">
+                        <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                        <span>Kategori ({{ categories|length }})</span>
                     </button>
-                    <button type="button" onclick="openAddModal()" class="app-button app-button-success app-button-small" style="font-weight:800;">
-                        ➕ Tambah
+                    <button type="button" onclick="openAddModal()" class="app-button app-button-success app-button-small btn-icon" style="font-weight:800;">
+                        <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>Tambah</span>
                     </button>
                 </div>
             </div>
@@ -519,18 +550,21 @@
             <!-- Toolbar Search & Filter -->
             <div class="mb-4 flex flex-col sm:flex-row items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-800">
                 <div style="position:relative; flex:1; width:100%;">
+                    <div style="position:absolute; left:12px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--app-muted);">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </div>
                     <input 
                         type="text" 
                         id="searchInput" 
                         name="materi_search_filter" 
                         oninput="filterTable()" 
-                        placeholder="🔍 Cari judul, isi materi, kata kunci... (Tekan '/' untuk fokus)" 
+                        placeholder="Cari judul, isi materi, kata kunci... (Tekan '/' untuk fokus)" 
                         autocomplete="off" 
                         autocorrect="off" 
                         autocapitalize="off" 
                         spellcheck="false" 
                         class="app-input" 
-                        style="padding-right:32px; font-size:13.5px;"
+                        style="padding-left:36px; padding-right:32px; font-size:13.5px;"
                     >
                     <button 
                         type="button" 
@@ -558,7 +592,7 @@
                             <th style="width:130px;">Kategori</th>
                             <th style="width:230px;">Judul & Info</th>
                             <th>Isi Data Materi</th>
-                            <th class="text-right" style="width:170px;">Aksi</th>
+                            <th class="text-right" style="width:180px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="dataTableBody">
@@ -575,7 +609,10 @@
                                         {{ item.category }}
                                     </span>
                                     {% if item.source_type == 'api_live' %}
-                                    <span class="cat-chip cat-chip-api text-[10px]">⚡ Realtime</span>
+                                    <span class="cat-chip cat-chip-api text-[10px] gap-1">
+                                        <svg class="dash-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                        Realtime
+                                    </span>
                                     {% endif %}
                                 </div>
                             </td>
@@ -584,19 +621,28 @@
                                 <div class="material-meta-sub">
                                     <span class="font-mono text-slate-500 font-bold">#{{ item.id }}</span>
                                     {% if item.keywords %}
-                                    <span>· 🏷️ {{ item.keywords[:45] }}{% if item.keywords|length > 45 %}...{% endif %}</span>
+                                    <span class="flex items-center gap-1">
+                                        <svg class="dash-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                        {{ item.keywords[:45] }}{% if item.keywords|length > 45 %}...{% endif %}
+                                    </span>
                                     {% endif %}
                                 </div>
                             </td>
                             <td>
                                 {% if item.source_type == 'api_live' %}
-                                <span class="mb-1 block text-xs font-bold text-sky-700 dark:text-sky-400">🔗 Endpoint: {{ item.api_label }}</span>
+                                <div class="mb-1 flex items-center gap-1.5 text-xs font-bold text-sky-700 dark:text-sky-400">
+                                    <svg class="dash-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                                    <span>Endpoint: {{ item.api_label }}</span>
+                                </div>
                                 {% endif %}
                                 <div class="material-preview-box" id="materialContent{{ item.id }}">
                                     {{ item.content[:160] }}{% if item.content|length > 160 %}...{% endif %}
                                 </div>
-                                <div class="flex items-center gap-3 mt-1 text-[11px] text-slate-500">
-                                    <span>📄 {{ item.content.split()|length }} kata</span>
+                                <div class="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">
+                                    <span class="flex items-center gap-1">
+                                        <svg class="dash-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                        {{ item.content.split()|length }} kata
+                                    </span>
                                     {% if item.source_type == 'api_live' %}
                                     <span class="font-semibold text-emerald-700 dark:text-emerald-400" id="liveApiRowStatus{{ item.id }}">Mengecek update... | Size: {{ item.content_size_label or '0.00 MB' }}</span>
                                     {% endif %}
@@ -604,19 +650,32 @@
                             </td>
                             <td class="text-right">
                                 <div class="app-inline-actions justify-end">
-                                    <button type="button" onclick="viewMaterial(this)" data-item='{{ item|tojson }}' class="app-button app-button-ghost app-button-small" style="color:var(--app-accent);" title="Lihat materi lengkap">👁️ Lihat</button>
-                                    <button type="button" onclick="editData(this)" data-item='{{ item|tojson }}' class="app-button app-button-ghost app-button-small app-button-link" title="Edit materi">✏️ Edit</button>
-                                    <button type="button" onclick="confirmDeleteMaterial({{ item.id }}, '{{ item.title|replace("'", "\\'") }}')" class="app-button app-button-ghost app-button-small app-button-text-danger" title="Hapus materi">🗑️</button>
+                                    <button type="button" onclick="viewMaterial(this)" data-item='{{ item|tojson }}' class="app-button app-button-ghost app-button-small btn-icon" style="color:var(--app-accent);" title="Lihat materi lengkap">
+                                        <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        <span>Lihat</span>
+                                    </button>
+                                    <button type="button" onclick="editData(this)" data-item='{{ item|tojson }}' class="app-button app-button-ghost app-button-small app-button-link btn-icon" title="Edit materi">
+                                        <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                                        <span>Edit</span>
+                                    </button>
+                                    <button type="button" onclick="confirmDeleteMaterial({{ item.id }}, '{{ item.title|replace("'", "\\'") }}')" class="app-button app-button-ghost app-button-small app-button-text-danger" title="Hapus materi">
+                                        <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
                         {% else %}
                         <tr id="emptyTableRow">
                             <td colspan="4" class="py-12 text-center text-slate-500">
-                                <div style="font-size:36px; margin-bottom:10px;">📚</div>
+                                <div class="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                                </div>
                                 <h4 class="font-bold text-base text-slate-800 dark:text-slate-200">Belum Ada Materi Tersimpan</h4>
                                 <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Tambahkan catatan, materi edukasi, atau sambungkan endpoint API agar Xiaozhi dapat menjawab pertanyaan.</p>
-                                <button type="button" onclick="openAddModal()" class="app-button app-button-success app-button-small" style="font-weight:800;">➕ Tambah Materi Pertama</button>
+                                <button type="button" onclick="openAddModal()" class="app-button app-button-success app-button-small btn-icon" style="font-weight:800;">
+                                    <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                    <span>Tambah Materi Pertama</span>
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -626,7 +685,9 @@
 
             <!-- Zero search results card -->
             <div id="noSearchAlert" style="display:none;" class="py-10 text-center text-slate-500">
-                <div style="font-size:32px; margin-bottom:8px;">🔍</div>
+                <div class="w-10 h-10 mx-auto mb-2 text-slate-400">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
                 <p class="font-bold text-sm text-slate-800 dark:text-slate-200">Tidak ada materi yang cocok dengan pencarian.</p>
                 <button type="button" onclick="clearSearchInput()" class="app-button app-button-ghost app-button-small app-button-link mt-2">Reset Pencarian</button>
             </div>
@@ -698,7 +759,9 @@
                     <!-- Hardware Board MAC Status (Anti-Spoofing Box) -->
                     <div id="mcpBoardLockBox" class="p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                         <div class="flex items-center gap-2 min-w-0">
-                            <span id="mcpLockIcon" class="text-sm select-none">⚪</span>
+                            <span id="mcpLockIcon" class="flex-shrink-0 select-none">
+                                <svg class="dash-icon text-slate-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            </span>
                             <div class="min-w-0">
                                 <span class="font-bold text-slate-800 dark:text-slate-200 block" id="mcpBoardMacTitle">Hardware Board MAC (Anti-Spoofing)</span>
                                 <span class="font-mono text-slate-500 block truncate" id="mcpBoardMacValue">Belum ada board terhubung</span>
@@ -721,8 +784,12 @@
                 </div>
 
                 <div class="pt-3 border-t border-slate-200 dark:border-slate-800 mt-4">
-                    <a href="/riwayat-chat" class="app-button app-button-full text-xs" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Riwayat Chat')"{% endif %}>
-                        💬 Buka Riwayat Percakapan Chat{% if user and user.role != 'admin' and not mcp_connected %} 🔒{% endif %}
+                    <a href="/riwayat-chat" class="app-button app-button-full text-xs btn-icon justify-center" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Riwayat Chat')"{% endif %}>
+                        <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                        <span>Buka Riwayat Percakapan Chat</span>
+                        {% if user and user.role != 'admin' and not mcp_connected %}
+                        <svg class="dash-icon text-slate-400 ml-1" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        {% endif %}
                     </a>
                     <div id="mcpStatusDetail" class="mt-2 app-field-hint text-[11px] text-center">Memuat status perangkat...</div>
                 </div>
@@ -731,22 +798,27 @@
             <!-- Quick Tips & Hub Card -->
             <div class="app-card">
                 <div class="app-card-header is-compact">
-                    <div>
-                        <h3 class="app-section-title text-sm">💡 Tips Knowledge Base</h3>
-                        <p class="app-section-subtitle text-xs">Optimasi jawaban asisten suara Anda.</p>
+                    <div class="flex items-center gap-2">
+                        <div class="text-amber-500">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="18" x2="15" y2="18"></line><line x1="10" y1="22" x2="14" y2="22"></line><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="app-section-title text-sm">Tips Knowledge Base</h3>
+                            <p class="app-section-subtitle text-xs">Optimasi respons asisten suara Anda.</p>
+                        </div>
                     </div>
                 </div>
                 <div class="space-y-2.5 text-xs text-slate-600 dark:text-slate-400">
                     <div class="flex items-start gap-2">
-                        <span class="text-emerald-600 font-bold">1.</span>
+                        <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 font-bold text-[10px] flex-shrink-0 mt-0.5">1</span>
                         <span><strong>Web Scraper:</strong> Ekstrak artikel bersih dari tautan berita atau modul belajar otomatis.</span>
                     </div>
                     <div class="flex items-start gap-2">
-                        <span class="text-sky-600 font-bold">2.</span>
+                        <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 font-bold text-[10px] flex-shrink-0 mt-0.5">2</span>
                         <span><strong>API Live:</strong> Gunakan kategori <code>data dari api</code> jika ingin menyuplai data harga atau status realtime ke Xiaozhi.</span>
                     </div>
                     <div class="flex items-start gap-2">
-                        <span class="text-amber-600 font-bold">3.</span>
+                        <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 font-bold text-[10px] flex-shrink-0 mt-0.5">3</span>
                         <span><strong>Kata Kunci:</strong> Tambahkan sinonim atau kata kunci spesifik agar relevansi pencarian RAG semakin akurat.</span>
                     </div>
                 </div>
@@ -776,14 +848,16 @@
                 <div style="border: 2px dashed var(--app-border-strong); border-radius: 8px; padding: 12px 14px; background: rgba(5, 150, 105, 0.04);">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs font-black flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-                            <span>🌐</span> Ambil Konten Otomatis dari URL Web (Scraper)
+                            <svg class="dash-icon text-emerald-600" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                            <span>Ambil Konten Otomatis dari URL Web (Scraper)</span>
                         </span>
                         <span class="app-chip app-chip-success app-chip-small" style="font-size:10px;">Auto-Fill RAG</span>
                     </div>
                     <div class="flex gap-2 flex-wrap">
                         <input id="scrape_target_url" type="url" placeholder="https://contoh.com/artikel-edukasi" class="app-input flex-1 min-w-[200px] text-xs">
-                        <button type="button" id="btnScrapeUrl" onclick="executeWebScraper()" class="app-button app-button-secondary text-xs font-bold whitespace-nowrap">
-                            🚀 Scrape Sekarang
+                        <button type="button" id="btnScrapeUrl" onclick="executeWebScraper()" class="app-button app-button-secondary text-xs font-bold whitespace-nowrap btn-icon">
+                            <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>Scrape Sekarang</span>
                         </button>
                     </div>
                     <div id="scrapeStatusHint" class="text-[11px] mt-2 hidden"></div>
@@ -815,7 +889,10 @@
                 <!-- Live API Fields Toggle -->
                 <div id="liveApiFields" class="p-3 rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-800 hidden space-y-2">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-sky-900 dark:text-sky-300">Endpoint Sumber API Realtime</span>
+                        <span class="text-xs font-bold text-sky-900 dark:text-sky-300 flex items-center gap-1.5">
+                            <svg class="dash-icon text-sky-600" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            <span>Endpoint Sumber API Realtime</span>
+                        </span>
                         <span class="app-chip app-chip-info app-chip-small">Live</span>
                     </div>
                     <input id="api_url" type="url" name="api_url" placeholder="https://api.domain.com/data-json" autocomplete="off" class="app-input text-xs">
@@ -839,8 +916,9 @@
 
             <div class="dash-modal-footer">
                 <button type="button" onclick="closeAddModal()" class="app-button">Batal</button>
-                <button type="submit" class="app-button app-button-success" {% if quota.materials.reached %}disabled title="Batas kuota materi tercapai"{% endif %}>
-                    {% if quota.materials.reached %}Batas Materi Tercapai{% else %}⚡ Simpan & Vektorisasi{% endif %}
+                <button type="submit" class="app-button app-button-success btn-icon" {% if quota.materials.reached %}disabled title="Batas kuota materi tercapai"{% endif %}>
+                    <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    <span>{% if quota.materials.reached %}Batas Materi Tercapai{% else %}Simpan & Vektorisasi{% endif %}</span>
                 </button>
             </div>
         </form>
@@ -887,7 +965,10 @@
                 <!-- Edit Live API Fields -->
                 <div id="editLiveApiFields" class="p-3 rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-800 hidden space-y-2">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-sky-900 dark:text-sky-300">Sumber API Realtime</span>
+                        <span class="text-xs font-bold text-sky-900 dark:text-sky-300 flex items-center gap-1.5">
+                            <svg class="dash-icon text-sky-600" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            <span>Sumber API Realtime</span>
+                        </span>
                         <span class="app-chip app-chip-info app-chip-small">Live</span>
                     </div>
                     <input id="edit_api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input text-xs">
@@ -908,7 +989,10 @@
 
             <div class="dash-modal-footer">
                 <button type="button" onclick="closeModal()" class="app-button">Batal</button>
-                <button type="submit" class="app-button app-button-primary">Simpan Perubahan</button>
+                <button type="submit" class="app-button app-button-primary btn-icon">
+                    <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    <span>Simpan Perubahan</span>
+                </button>
             </div>
         </form>
     </div>
@@ -932,15 +1016,17 @@
 
         <div class="dash-modal-body">
             <div id="viewKeywordsWrap" class="text-xs text-slate-500 flex items-center gap-1.5 pb-2 border-b border-slate-200 dark:border-slate-800">
-                <span class="font-bold">🏷️ Kata Kunci:</span>
+                <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                <span class="font-bold">Kata Kunci:</span>
                 <span id="viewKeywordsText">-</span>
             </div>
 
             <div class="relative">
                 <div class="flex items-center justify-between mb-1.5">
                     <span class="text-xs font-bold text-slate-600 dark:text-slate-300">Isi Lengkap:</span>
-                    <button type="button" id="copyContentBtn" onclick="copyFullContent()" class="app-button app-button-ghost app-button-small text-xs font-bold" style="color:var(--app-sky);">
-                        📋 Salin Teks
+                    <button type="button" id="copyContentBtn" onclick="copyFullContent()" class="app-button app-button-ghost app-button-small text-xs font-bold btn-icon" style="color:var(--app-sky);">
+                        <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        <span id="copyBtnText">Salin Teks</span>
                     </button>
                 </div>
                 <div id="viewFullContent" class="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-sans text-xs leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap max-h-72 overflow-y-auto select-text"></div>
@@ -954,7 +1040,10 @@
 
         <div class="dash-modal-footer">
             <button type="button" onclick="closeViewModal()" class="app-button">Tutup</button>
-            <button type="button" id="viewEditDirectBtn" class="app-button app-button-primary">✏️ Edit Materi Ini</button>
+            <button type="button" id="viewEditDirectBtn" class="app-button app-button-primary btn-icon">
+                <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                <span>Edit Materi Ini</span>
+            </button>
         </div>
     </div>
 </div>
@@ -977,8 +1066,9 @@
             <form action="/add_category" method="POST" class="flex gap-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="text" name="name" required maxlength="80" placeholder="Nama kategori baru..." class="app-input flex-1 text-xs">
-                <button type="submit" class="app-button app-button-primary text-xs font-bold whitespace-nowrap">
-                    ➕ Tambah
+                <button type="submit" class="app-button app-button-primary text-xs font-bold whitespace-nowrap btn-icon">
+                    <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>Tambah</span>
                 </button>
             </form>
 
@@ -997,7 +1087,10 @@
                         {% if cat.name|trim|lower != 'data dari api' %}
                         <form action="/delete_category/{{ cat.id }}" method="POST" onsubmit="return confirm('Hapus kategori \'{{ cat.name }}\'? Materi dalam kategori ini tidak ikut terhapus.');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="app-button app-button-ghost app-button-small app-button-text-danger text-xs py-0 px-2" title="Hapus kategori">&times; Hapus</button>
+                            <button type="submit" class="app-button app-button-ghost app-button-small app-button-text-danger text-xs py-0 px-2 btn-icon" title="Hapus kategori">
+                                <svg class="dash-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                <span>Hapus</span>
+                            </button>
                         </form>
                         {% else %}
                         <span class="text-[10px] text-slate-400 font-bold">Permanen</span>
@@ -1020,7 +1113,9 @@
 <div id="deleteModal" class="dash-modal-backdrop" role="dialog" aria-modal="true">
     <div class="dash-modal-box" style="max-width: 440px;">
         <div class="dash-modal-header" style="border-bottom:none; padding-bottom:0;">
-            <div style="font-size:32px;">⚠️</div>
+            <div class="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 flex items-center justify-center text-rose-600">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            </div>
             <button type="button" onclick="closeDeleteModal()" class="app-button app-button-ghost app-icon-button">&times;</button>
         </div>
         <div class="dash-modal-body" style="padding-top:10px;">
@@ -1032,7 +1127,10 @@
         <form id="deleteForm" method="POST" class="dash-modal-footer">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="button" onclick="closeDeleteModal()" class="app-button text-xs">Batal</button>
-            <button type="submit" class="app-button app-button-danger text-xs font-bold">Ya, Hapus Materi</button>
+            <button type="submit" class="app-button app-button-danger text-xs font-bold btn-icon">
+                <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <span>Ya, Hapus Materi</span>
+            </button>
         </form>
     </div>
 </div>
@@ -1042,8 +1140,8 @@
 <!-- ============================================================== -->
 <div id="materialProgressModal" class="dash-modal-backdrop" role="dialog" aria-modal="true">
     <div class="dash-modal-box" style="max-width: 460px; text-align: center; padding: 28px 24px;">
-        <div style="width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 50%; background: #ecfdf5; border: 2px solid #047857; display: flex; align-items: center; justify-content: center; font-size: 26px;">
-            ⚡
+        <div style="width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 50%; background: #ecfdf5; border: 2px solid #047857; display: flex; align-items: center; justify-content: center;" class="text-emerald-700">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
         </div>
         <h3 id="matProgStepTitle" style="font-size: 17px; font-weight: 800; color: var(--app-text); margin: 0 0 6px;">
             Memproses Vektorisasi Materi...
@@ -1059,7 +1157,10 @@
 
         <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 800; color: var(--app-muted);">
             <span id="matProgPercent">0%</span>
-            <span>⚡ SSE FastMCP Stream</span>
+            <span class="flex items-center gap-1">
+                <svg class="dash-icon text-emerald-600" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                <span>SSE FastMCP Stream</span>
+            </span>
         </div>
     </div>
 </div>
@@ -1157,7 +1258,7 @@
             const liveEndpoint = document.getElementById('viewLiveEndpointText');
             if (liveEndpoint) {
                 if (item.source_type === 'api_live' && item.api_url) {
-                    liveEndpoint.textContent = '🔗 ' + item.api_url;
+                    liveEndpoint.textContent = item.api_url;
                 } else {
                     liveEndpoint.textContent = '';
                 }
@@ -1192,13 +1293,14 @@
     function copyFullContent() {
         if (!activeViewingItem || !activeViewingItem.content) return;
         navigator.clipboard.writeText(activeViewingItem.content).then(() => {
+            const btnText = document.getElementById('copyBtnText');
             const btn = document.getElementById('copyContentBtn');
-            if (btn) {
-                const old = btn.innerHTML;
-                btn.innerHTML = '✅ Tersalin!';
+            if (btnText && btn) {
+                const old = btnText.textContent;
+                btnText.textContent = 'Tersalin!';
                 btn.style.color = '#059669';
                 setTimeout(() => {
-                    btn.innerHTML = old;
+                    btnText.textContent = old;
                     btn.style.color = 'var(--app-sky)';
                 }, 2000);
             }
@@ -1376,7 +1478,7 @@
                         } else if (currentEvent === 'done') {
                             bar.style.width = '100%';
                             percentText.innerText = '100%';
-                            titleEl.innerText = '✅ Selesai!';
+                            titleEl.innerText = 'Selesai!';
                             msgEl.innerText = parsed.message || 'Materi berhasil disimpan dan divektorisasi.';
                             setTimeout(() => {
                                 window.location.href = '/dashboard?message=Data+materi+berhasil+ditambahkan+dan+divektorisasi.';
@@ -1738,13 +1840,17 @@ function renderActiveSlotForm() {
 
     if (boardMacTitle && boardMacValue && boardActionArea) {
         if (s.is_locked && s.board_mac) {
-            if (lockIcon) lockIcon.textContent = "🔒";
+            if (lockIcon) {
+                lockIcon.innerHTML = `<svg class="dash-icon text-emerald-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
+            }
             if (boardLockBox) boardLockBox.className = "p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800";
             boardMacTitle.innerHTML = "Hardware MAC Terkunci <span class='text-emerald-700 dark:text-emerald-400 font-bold'>(Anti-Spoofing)</span>";
             boardMacValue.innerHTML = `<strong class="text-emerald-800 dark:text-emerald-300 font-mono tracking-wider">${s.board_mac}</strong> <span class="text-slate-500 font-normal">→ ${s.label || ('Slot ' + currentSlot)}</span>`;
             boardActionArea.innerHTML = `<span class="inline-flex items-center gap-1 font-mono text-emerald-800 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 font-bold text-[11px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>Terikat</span>`;
         } else {
-            if (lockIcon) lockIcon.textContent = "⚪";
+            if (lockIcon) {
+                lockIcon.innerHTML = `<svg class="dash-icon text-slate-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+            }
             if (boardLockBox) boardLockBox.className = "p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800";
             boardMacTitle.textContent = "Hardware Board MAC (Anti-Spoofing)";
             boardMacValue.innerHTML = `<span class="text-slate-500 italic">Belum ada board terhubung (ESP32 mengunci otomatis saat online)</span>`;
@@ -1773,7 +1879,7 @@ function renderActiveSlotForm() {
     if (s.is_restricted || (s.saved && !s.is_active)) {
         if (alertBox) {
             alertBox.className = "app-alert app-alert-danger";
-            alertBox.innerHTML = `<strong>⚠️ Slot ${currentSlot} Dinonaktifkan oleh Admin (Akses Plus)</strong><br><span style="font-size:11px;">Slot 2 & 3 dibatasi untuk akun Anda. Hubungi admin untuk membuka paket langganan Akses Plus.</span>`;
+            alertBox.innerHTML = `<strong>Slot ${currentSlot} Dinonaktifkan oleh Admin (Akses Plus)</strong><br><span style="font-size:11px;">Slot 2 & 3 dibatasi untuk akun Anda. Hubungi admin untuk membuka paket langganan Akses Plus.</span>`;
         }
         if (bar) bar.className = "mcp-bar-fill idle";
         if (detail) {
@@ -2044,7 +2150,7 @@ async function executeWebScraper() {
 
     btn.disabled = true;
     const oldBtnText = btn.innerHTML;
-    btn.innerHTML = '⏳ Mengekstrak...';
+    btn.innerHTML = `<span class="mcp-spinner" style="margin:0 4px 0 0;"></span> Mengekstrak...`;
     statusHint.style.display = 'block';
     statusHint.className = 'text-[11px] mt-2 text-sky-700 dark:text-sky-400 font-semibold';
     statusHint.textContent = 'Menghubungkan ke website dan mengekstrak artikel bersih...';
@@ -2067,7 +2173,7 @@ async function executeWebScraper() {
 
             if (titleField && d.title) titleField.value = d.title;
             if (contentField && d.content) {
-                contentField.value = `🌐 Sumber: ${d.url}\n\n${d.content}`;
+                contentField.value = `Sumber: ${d.url}\n\n${d.content}`;
                 updateWordCounter(contentField, 'addWordCountDisplay');
             }
             if (kwField) {
@@ -2075,18 +2181,18 @@ async function executeWebScraper() {
             }
 
             statusHint.className = 'text-[11px] mt-2 text-emerald-700 dark:text-emerald-400 font-semibold';
-            statusHint.innerHTML = `✅ Berhasil mengekstrak <strong>${d.word_count || 0} kata</strong> dari <strong>${d.hostname}</strong>. Judul, konten, dan kata kunci telah terisi di form bawah.`;
+            statusHint.innerHTML = `Berhasil mengekstrak <strong>${d.word_count || 0} kata</strong> dari <strong>${d.hostname}</strong>. Judul, konten, dan kata kunci telah terisi di form bawah.`;
 
             if (titleField) {
                 titleField.focus();
             }
         } else {
             statusHint.className = 'text-[11px] mt-2 text-rose-700 dark:text-rose-400 font-semibold';
-            statusHint.textContent = '❌ ' + (res.message || 'Gagal mengekstrak isi website.');
+            statusHint.textContent = 'Gagal: ' + (res.message || 'Gagal mengekstrak isi website.');
         }
     } catch (e) {
         statusHint.className = 'text-[11px] mt-2 text-rose-700 dark:text-rose-400 font-semibold';
-        statusHint.textContent = '❌ Terjadi kesalahan jaringan saat scrape: ' + e.message;
+        statusHint.textContent = 'Gagal: Terjadi kesalahan jaringan saat scrape: ' + e.message;
     } finally {
         btn.disabled = false;
         btn.innerHTML = oldBtnText;
