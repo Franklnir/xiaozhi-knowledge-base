@@ -269,7 +269,7 @@ func (h *RelayHandler) HandlePostControl(w http.ResponseWriter, r *http.Request)
 	if err == nil && len(relays) > 0 {
 		isAuthorized := false
 		for _, rItem := range relays {
-			if rItem.Relay == payload.Relay {
+			if rItem.RelayNumber == payload.Relay {
 				isAuthorized = true
 				break
 			}
