@@ -64,6 +64,7 @@ async def get_state(request: Request):
 
 
 @router.post("/relay", response_model=ApiResponse)
+@router.post("/relays/channel", response_model=ApiResponse)
 async def control_relay(request: Request, cmd: RelayCommand):
     """Control a specific relay (1-8)."""
     user = require_user(request)
