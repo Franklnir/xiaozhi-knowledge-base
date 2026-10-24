@@ -14,6 +14,7 @@ type Config struct {
 	ServerBaseURL    string
 	PythonBackendURL string
 	AudioCacheDir    string
+	MQTTBrokerURL    string
 }
 
 func LoadConfig() *Config {
@@ -51,6 +52,7 @@ func LoadConfig() *Config {
 	baseURL := getEnvOrDefault("SERVER_BASE_URL", "https://xiaozhiscig.biz.id")
 	pythonURL := getEnvOrDefault("PYTHON_BACKEND_URL", "http://127.0.0.1:8080")
 	audioCacheDir := getEnvOrDefault("AUDIO_CACHE_DIR", "/app/data/audio_cache")
+	mqttURL := getEnvOrDefault("MQTT_BROKER_URL", "tcp://xiaozhi-mosquitto:1883")
 
 	return &Config{
 		Port:             port,
@@ -58,6 +60,7 @@ func LoadConfig() *Config {
 		ServerBaseURL:    baseURL,
 		PythonBackendURL: pythonURL,
 		AudioCacheDir:    audioCacheDir,
+		MQTTBrokerURL:    mqttURL,
 	}
 }
 

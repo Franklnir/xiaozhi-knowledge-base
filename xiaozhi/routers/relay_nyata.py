@@ -540,3 +540,56 @@ async def device_relay_status(request: Request, api_slug: str, cmd: RealRelayDev
 
     return {"success": True}
 
+
+@router.post("/api/internal/relay/broadcast")
+async def internal_relay_broadcast(request: Request):
+    """
+    Internal webhook called by gateway-go to notify Python's SSE stream
+    whenever ESP32 polls commands or confirms hardware status.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "detail": "JSON tidak valid"}, status_code=400)
+
+    user_id = data.get("user_id")
+    room_id = data.get("room_id")
+    room_name = str(data.get("room_name", ""))
+    relays = data.get("relays", [])
+
+    if not user_id or not room_id:
+        return JSONResponse({"success": False, "detail": "user_id dan room_id diperlukan."}, status_code=400)
+
+    try:
+        from xiaozhi.services.sse_service import broadcast_relay_device_status, broadcast_relay_update
+        broadcast_relay_device_status(
+            user_id=int(user_id),
+            room_id=int(room_id),
+            connected=True,
+            last_seen_at=utc_now(),
+            device_label="ESP32 Terhubung",
+        )
+
+        for r in relays:
+            if isinstance(r, dict) and "relay" in r:
+                r_num = int(r["relay"])
+                r_status = str(r.get("status", "OFF")).upper()
+                r_name = str(r.get("name", f"Relay {r_num}"))
+                r_desired = str(r.get("desired_status", r_status)).upper()
+                broadcast_relay_update(
+                    user_id=int(user_id),
+                    room_id=int(room_id),
+                    relay_number=r_num,
+                    status=r_status,
+                    source="device_ack",
+                    room_name=room_name,
+                    relay_name=r_name,
+                    pending="",
+                    desired=r_desired,
+                )
+    except Exception as exc:
+        return JSONResponse({"success": False, "detail": str(exc)}, status_code=500)
+
+    return {"success": True}
+
+

@@ -17,6 +17,7 @@ import (
 	"gateway-go/internal/db"
 	"gateway-go/internal/handler"
 	"gateway-go/internal/hub"
+	"gateway-go/internal/relaymqtt"
 	"gateway-go/internal/store"
 )
 
@@ -26,6 +27,7 @@ func main() {
 	log.Println("==================================================")
 	log.Println("  Xiaozhi IoT Gateway (Go - Chi / net/http)")
 	log.Printf("  Target Port : %s", cfg.Port)
+	log.Printf("  MQTT Broker : %s", cfg.MQTTBrokerURL)
 	log.Println("==================================================")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -41,16 +43,24 @@ func main() {
 	// Stores
 	deviceStore := store.NewDeviceStore(database)
 	audioStore := store.NewAudioStore(database)
+	relayStore := store.NewRelayStore(database)
 
 	// Hubs (Real-Time Pub/Sub & Device Registry)
 	sseHub := hub.NewSSEHub()
 	deviceHub := hub.NewDeviceHub()
+
+	// MQTT Relay Engine (Mosquitto Integration)
+	mqttRelay := relaymqtt.NewRelayMQTTService(cfg, relayStore, sseHub)
+	if err := mqttRelay.Start(ctx); err != nil {
+		log.Printf("[MQTT] Warning: %v", err)
+	}
 
 	// Handlers
 	devHandler := handler.NewDeviceHandler(cfg, deviceStore, audioStore)
 	streamHandler := handler.NewAudioStreamHandler(cfg, deviceStore, audioStore)
 	sseHandler := handler.NewSSEHandler(cfg, sseHub, deviceHub)
 	wsHandler := handler.NewWSDeviceHandler(cfg, deviceStore, audioStore, sseHub, deviceHub)
+	relayHandler := handler.NewRelayHandler(cfg, relayStore, sseHub, mqttRelay)
 
 	// Router
 	r := chi.NewRouter()
@@ -90,6 +100,11 @@ func main() {
 	r.Get("/api/device/audio/commands", devHandler.HandleGetCommands)
 	r.Post("/api/device/audio/ack", devHandler.HandleAck)
 	r.Post("/api/device/audio/status", devHandler.HandleStatus)
+
+	// Relay IoT Polling, Confirmation & Real-Time MQTT Control Endpoints
+	r.Get("/api/device/relay/{slug}/commands", relayHandler.HandleGetCommands)
+	r.Post("/api/device/relay/{slug}/status", relayHandler.HandlePostStatus)
+	r.Post("/api/device/relay/{slug}/control", relayHandler.HandlePostControl)
 
 	// High-Performance Audio Streaming Pipeline
 	r.Get("/api/audio/stream/{video_id}", streamHandler.HandleStream)

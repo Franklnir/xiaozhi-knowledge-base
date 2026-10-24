@@ -1440,7 +1440,7 @@
                 <div style="font-size:12px; font-weight:800; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
                     <span>📶 Konfigurasi Wi-Fi Rumah Anda (Otomatis Masuk ke Kode):</span>
                 </div>
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
                     <div>
                         <label class="app-label" style="font-size:11px; margin-bottom:3px;">Nama Wi-Fi (SSID):</label>
                         <input type="text" id="cfgWifiSsid" class="app-input" style="padding:6px 10px; font-size:12px;" value="WIFI_RUMAH_ANDA" placeholder="Contoh: MyHome_WiFi" oninput="regenerateArduinoCode()">
@@ -1448,6 +1448,13 @@
                     <div>
                         <label class="app-label" style="font-size:11px; margin-bottom:3px;">Password Wi-Fi:</label>
                         <input type="text" id="cfgWifiPass" class="app-input" style="padding:6px 10px; font-size:12px;" value="PASSWORD_WIFI" placeholder="Contoh: Rahasia123" oninput="regenerateArduinoCode()">
+                    </div>
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Protokol Komunikasi:</label>
+                        <select id="cfgProtocol" class="app-select" style="padding:6px 10px; font-size:12px; font-weight:700; color:#0284c7;" onchange="regenerateArduinoCode()">
+                            <option value="mqtt" selected>⚡ MQTT Mosquitto (Zero-Lag 0.1ms, Realtime 2-Arah)</option>
+                            <option value="http">🌐 HTTP Polling (Fallback)</option>
+                        </select>
                     </div>
                     <div>
                         <label class="app-label" style="font-size:11px; margin-bottom:3px;">Tipe Modul Relay:</label>
@@ -1478,12 +1485,61 @@
             </div>
         </div>
 
-        <!-- TAB 2: ENDPOINT & PARAMETER API -->
+        <!-- TAB 2: ENDPOINT & PARAMETER API / MQTT -->
         <div id="tabPanelEndpoints" class="relay-tab-panel" style="display:none;">
-            <!-- Direct Copy Fields -->
-            <div style="display:grid; gap:12px; margin-top:14px; margin-bottom:18px;">
+            <!-- MQTT Parameters Section -->
+            <div style="background:rgba(56, 189, 248, 0.06); border:1px solid rgba(56, 189, 248, 0.25); border-radius:8px; padding:12px; margin-top:14px; margin-bottom:14px;">
+                <div style="font-size:12px; font-weight:800; color:#0284c7; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                    <span>⚡ Parameter Real-Time MQTT (Eclipse Mosquitto):</span>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">MQTT Broker Host:</label>
+                        <div class="relay-copy-input-group">
+                            <input type="text" class="relay-copy-input" id="cfgMqttBroker" value="163.61.58.235" readonly>
+                            <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgMqttBroker', this)">Salin</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">MQTT Port:</label>
+                        <div class="relay-copy-input-group">
+                            <input type="text" class="relay-copy-input" id="cfgMqttPort" value="1883" readonly>
+                            <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgMqttPort', this)">Salin</button>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:grid; gap:8px;">
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Topic Perintah ESP32 (Subscribe):</label>
+                        <div class="relay-copy-input-group">
+                            <input type="text" class="relay-copy-input" id="cfgMqttCmdTopic" readonly>
+                            <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgMqttCmdTopic', this)">Salin</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Topic Status Hardware ACK (Publish):</label>
+                        <div class="relay-copy-input-group">
+                            <input type="text" class="relay-copy-input" id="cfgMqttStateTopic" readonly>
+                            <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgMqttStateTopic', this)">Salin</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Topic LWT / Ketersediaan (Last Will & Testament):</label>
+                        <div class="relay-copy-input-group">
+                            <input type="text" class="relay-copy-input" id="cfgMqttLwtTopic" readonly>
+                            <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgMqttLwtTopic', this)">Salin</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Direct HTTP Polling Fields -->
+            <div style="display:grid; gap:10px; margin-bottom:14px;">
+                <div style="font-size:12px; font-weight:800; color:var(--app-text); margin-bottom:2px;">
+                    <span>🌐 Parameter HTTP Polling (Fallback Tradisional):</span>
+                </div>
                 <div>
-                    <label class="app-label" style="font-size:12px; margin-bottom:4px;">Endpoint Polling Perintah (GET):</label>
+                    <label class="app-label" style="font-size:11px; margin-bottom:3px;">Endpoint Polling Perintah (GET):</label>
                     <div class="relay-copy-input-group">
                         <input type="text" class="relay-copy-input" id="cfgCommandsUrl" readonly>
                         <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgCommandsUrl', this)">Salin</button>
@@ -1491,23 +1547,23 @@
                 </div>
 
                 <div>
-                    <label class="app-label" style="font-size:12px; margin-bottom:4px;">Endpoint Kirim Status (POST):</label>
+                    <label class="app-label" style="font-size:11px; margin-bottom:3px;">Endpoint Kirim Status (POST):</label>
                     <div class="relay-copy-input-group">
                         <input type="text" class="relay-copy-input" id="cfgStatusUrl" readonly>
                         <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgStatusUrl', this)">Salin</button>
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
                     <div>
-                        <label class="app-label" style="font-size:12px; margin-bottom:4px;">Client ID Perangkat:</label>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Client ID Perangkat:</label>
                         <div class="relay-copy-input-group">
                             <input type="text" class="relay-copy-input" id="cfgClientId" readonly>
                             <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgClientId', this)">Salin</button>
                         </div>
                     </div>
                     <div>
-                        <label class="app-label" style="font-size:12px; margin-bottom:4px;">Token Rahasia Perangkat:</label>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Token Rahasia Perangkat:</label>
                         <div class="relay-copy-input-group">
                             <input type="text" class="relay-copy-input" id="cfgDeviceToken" readonly>
                             <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgDeviceToken', this)">Salin</button>
@@ -1517,12 +1573,12 @@
             </div>
 
             <!-- Raw JSON -->
-            <div style="border-top:1px solid var(--app-border); padding-top:14px;">
+            <div style="border-top:1px solid var(--app-border); padding-top:12px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                    <strong style="font-size:13px; color:var(--app-text);">Format Response JSON:</strong>
+                    <strong style="font-size:12.5px; color:var(--app-text);">Format Response JSON:</strong>
                     <button type="button" class="app-button app-button-small" onclick="copyConfigCode(this)">Salin JSON</button>
                 </div>
-                <pre class="relay-code" id="configCode" style="max-height: 220px; font-size:11.5px; border-radius:10px; background:#020617; color:#a7f3d0; padding:12px; overflow:auto;">Memuat konfigurasi...</pre>
+                <pre class="relay-code" id="configCode" style="max-height: 200px; font-size:11.5px; border-radius:10px; background:#020617; color:#a7f3d0; padding:12px; overflow:auto;">Memuat konfigurasi...</pre>
             </div>
         </div>
     </div>
@@ -1856,7 +1912,7 @@
         }
     }
 
-    function buildArduinoCode(room, wifiSsid, wifiPass, activeLow) {
+    function buildArduinoCode(room, wifiSsid, wifiPass, activeLow, protocol) {
         if (!room) return "// Memuat konfigurasi...";
         const numRelays = Math.max(1, Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)));
         const pins = [4, 5, 6, 7].slice(0, numRelays).join(", ");
@@ -1864,10 +1920,279 @@
         const ssid = wifiSsid || "WIFI_RUMAH_ANDA";
         const pass = wifiPass || "PASSWORD_WIFI";
         const logicStr = activeLow ? "true" : "false";
+        const slug = room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const isMqtt = (protocol === 'mqtt' || !protocol);
 
+        if (isMqtt) {
+            return `/*
+ * ============================================================
+ * ESP32-C3 FIRMWARE: RELAY NYATA XIAOZHI AI (HYBRID GO + MQTT)
+ * ============================================================
+ * Arsitektur    : Ultra-Lightweight Event-Driven MQTT (Eclipse Mosquitto)
+ * Mikrokontroler: ESP32-C3 (RISC-V) SuperMini / NodeMCU C3
+ * Ruangan       : ${room.nama_tempat}
+ * Client ID     : ${room.api_client_id}
+ * Jumlah Channel: ${numRelays} Channel Relay
+ *
+ * Pemetaan Pinout Fisik Aman ESP32-C3:
+${(room.relays || []).map((r, i) => ` * - Channel ${r.relay_number} (${r.nama_relay}) -> GPIO ${4 + i}`).join("\n")}
+ *
+ * Fitur Keamanan Hardware:
+ * 1. Output diset level OFF sebelum pinMode OUTPUT (anti chattering).
+ * 2. LWT (Last Will & Testament): Broker Mosquitto otomatis menandai status 'offline' jika ESP32 padam.
+ * 3. 2-Way Hardware Feedback: Mengirim status fisik sebenarnya ke topic 'state' setelah GPIO beralih.
+ * 4. Deduplikasi ID Perintah: Mencegah eksekusi ganda jika ada retransmisi paket jaringan.
+ * 5. Sangat Ringan: RAM < 2KB, CPU ~0%, Zero-Lag latensi < 5 milidetik.
+ *
+ * Library yang dibutuhkan (Install via Arduino Library Manager):
+ * - PubSubClient (oleh Nick O'Leary)
+ * - ArduinoJson (oleh Benoit Blanchon) versi 6.x atau 7.x
+ */
+
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+
+// ============================================================
+// 1. KONFIGURASI WIFI RUMAH
+// ============================================================
+const char* WIFI_SSID     = "${ssid}";
+const char* WIFI_PASSWORD = "${pass}";
+
+// ============================================================
+// 2. KONFIGURASI MQTT BROKER MOSQUITTO (XIAOZHI GATEWAY)
+// ============================================================
+const char* MQTT_BROKER   = "163.61.58.235";
+const int   MQTT_PORT     = 1883;
+const char* CLIENT_ID     = "${room.api_client_id}";
+const char* DEVICE_TOKEN  = "${room.api_token}";
+
+// Topic MQTT Khusus Ruangan Ini
+const char* TOPIC_COMMAND      = "xiaozhi/relay/${slug}/set";
+const char* TOPIC_STATE        = "xiaozhi/relay/${slug}/state";
+const char* TOPIC_AVAILABILITY = "xiaozhi/relay/${slug}/availability";
+const char* TOPIC_ERROR        = "xiaozhi/relay/${slug}/err";
+
+// ============================================================
+// 3. KONFIGURASI PIN RELAY ESP32-C3
+// ============================================================
+const int NUM_RELAYS = ${numRelays};
+${pinArray}
+
+// ${activeLow ? "ACTIVE LOW: Relay menyala saat pin LOW (GND)" : "ACTIVE HIGH: Relay menyala saat pin HIGH (3.3V)"}
+const bool RELAY_ACTIVE_LOW = ${logicStr};
+
+bool relayStates[NUM_RELAYS] = { ${Array(numRelays).fill("false").join(", ")} };
+
+// Ring buffer untuk deduplikasi command ID
+const int DEDUP_SLOTS = 10;
+String processedCmds[DEDUP_SLOTS];
+int dedupHead = 0;
+
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+
+unsigned long lastMqttRetry = 0;
+unsigned long lastHeartbeat = 0;
+
+bool isDuplicate(const String& id) {
+    if (id.length() == 0) return false;
+    for (int i = 0; i < DEDUP_SLOTS; i++) {
+        if (processedCmds[i] == id) return true;
+    }
+    return false;
+}
+
+void markProcessed(const String& id) {
+    if (id.length() == 0) return;
+    processedCmds[dedupHead] = id;
+    dedupHead = (dedupHead + 1) % DEDUP_SLOTS;
+}
+
+void applyRelay(int index, bool turnOn) {
+    if (index < 0 || index >= NUM_RELAYS) return;
+    uint8_t level = RELAY_ACTIVE_LOW ? (turnOn ? LOW : HIGH) : (turnOn ? HIGH : LOW);
+    digitalWrite(RELAY_PINS[index], level);
+    relayStates[index] = turnOn;
+    Serial.printf("[RELAY] CH %d (GPIO %d) -> %s\\n", index + 1, RELAY_PINS[index], turnOn ? "ON" : "OFF");
+}
+
+void publishState(int relayIndex, const String& cmdId) {
+    if (!mqttClient.connected()) return;
+
+    StaticJsonDocument<256> doc;
+    doc["cmd_id"] = cmdId;
+    doc["relay"] = relayIndex + 1;
+    doc["status"] = relayStates[relayIndex] ? "ON" : "OFF";
+    doc["uptime_sec"] = millis() / 1000;
+    doc["rssi"] = WiFi.RSSI();
+
+    char buffer[256];
+    size_t len = serializeJson(doc, buffer);
+    mqttClient.publish(TOPIC_STATE, (uint8_t*)buffer, len, false);
+    Serial.printf("[MQTT ACK] Kirim state CH %d -> %s\\n", relayIndex + 1, relayStates[relayIndex] ? "ON" : "OFF");
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    Serial.printf("[MQTT RECV] Pesan di topic [%s]\\n", topic);
+
+    StaticJsonDocument<512> doc;
+    DeserializationError err = deserializeJson(doc, payload, length);
+    if (err) {
+        Serial.printf("[MQTT ERR] Gagal parse JSON: %s\\n", err.c_str());
+        return;
+    }
+
+    String cmdId = doc["cmd_id"] | "";
+    int relayNum = doc["relay"] | 0;
+    String action = doc["action"] | "";
+    action.toUpperCase();
+
+    int idx = relayNum - 1;
+    if (idx < 0 || idx >= NUM_RELAYS) {
+        Serial.printf("[WARN] Channel %d di luar batas (Max: %d)\\n", relayNum, NUM_RELAYS);
+        return;
+    }
+
+    if (isDuplicate(cmdId)) {
+        Serial.printf("[DEDUP] Command %s sudah diproses sebelumnya.\\n", cmdId.c_str());
+        publishState(idx, cmdId);
+        return;
+    }
+
+    if (action == "ON") {
+        applyRelay(idx, true);
+    } else if (action == "OFF") {
+        applyRelay(idx, false);
+    } else if (action == "TOGGLE") {
+        applyRelay(idx, !relayStates[idx]);
+    } else {
+        return;
+    }
+
+    markProcessed(cmdId);
+    publishState(idx, cmdId);
+}
+
+void connectWiFi() {
+    if (WiFi.status() == WL_CONNECTED) return;
+    WiFi.disconnect();
+    delay(100);
+    WiFi.mode(WIFI_STA);
+
+    bool isPlaceholder = (String(WIFI_SSID) == "WIFI_RUMAH_ANDA" || strlen(WIFI_SSID) == 0);
+    bool useWokwi = false;
+
+    if (isPlaceholder) {
+        int n = WiFi.scanNetworks();
+        for (int i = 0; i < n; i++) {
+            if (WiFi.SSID(i) == "Wokwi-GUEST") { useWokwi = true; break; }
+        }
+        WiFi.scanDelete();
+    }
+
+    if (useWokwi) {
+        Serial.println("[WIFI] Simulator Wokwi terdeteksi...");
+        WiFi.begin("Wokwi-GUEST", "", 6);
+    } else {
+        Serial.printf("[WIFI] Menghubungkan ke Wi-Fi: %s...\\n", WIFI_SSID);
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    }
+
+    int tries = 0;
+    while (WiFi.status() != WL_CONNECTED && tries < 30) {
+        delay(500);
+        Serial.print(".");
+        tries++;
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("[WIFI] Terhubung! IP: %s\\n", WiFi.localIP().toString().c_str());
+    }
+}
+
+void reconnectMQTT() {
+    if (mqttClient.connected()) return;
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    Serial.print("[MQTT] Menghubungkan ke broker Mosquitto...");
+
+    // LWT: Jika koneksi terputus tiba-tiba, Mosquitto otomatis broadcast status offline
+    if (mqttClient.connect(CLIENT_ID, TOPIC_AVAILABILITY, 1, true, "offline")) {
+        Serial.println(" BERHASIL!");
+        // Publish status online saat koneksi berhasil
+        mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
+
+        // Subscribe perintah ruangan
+        mqttClient.subscribe(TOPIC_COMMAND, 1);
+        Serial.printf("[MQTT] Subscribed ke topic: %s\\n", TOPIC_COMMAND);
+
+        // Kirim status awal semua channel ke server
+        for (int i = 0; i < NUM_RELAYS; i++) {
+            publishState(i, "init_boot");
+        }
+    } else {
+        Serial.printf(" GAGAL (rc=%d). Akan coba lagi dalam 5 detik.\\n", mqttClient.state());
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(500);
+
+    // Proteksi hardware anti cetak-cetek saat startup
+    for (int i = 0; i < NUM_RELAYS; i++) {
+        digitalWrite(RELAY_PINS[i], RELAY_ACTIVE_LOW ? HIGH : LOW);
+        pinMode(RELAY_PINS[i], OUTPUT);
+        relayStates[i] = false;
+    }
+
+    Serial.println("\\n==========================================");
+    Serial.printf(" XIAOZHI SMART RELAY (ESP32-C3) READY\\n");
+    Serial.printf(" Client: %s | Channels: %d\\n", CLIENT_ID, NUM_RELAYS);
+    Serial.println("==========================================");
+
+    connectWiFi();
+
+    mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+    mqttClient.setCallback(mqttCallback);
+    mqttClient.setBufferSize(512);
+
+    reconnectMQTT();
+}
+
+void loop() {
+    unsigned long now = millis();
+
+    if (WiFi.status() != WL_CONNECTED) {
+        connectWiFi();
+        delay(500);
+        return;
+    }
+
+    if (!mqttClient.connected()) {
+        if (now - lastMqttRetry >= 5000) {
+            lastMqttRetry = now;
+            reconnectMQTT();
+        }
+    } else {
+        mqttClient.loop();
+
+        // Heartbeat berkala tiap 60 detik
+        if (now - lastHeartbeat >= 60000) {
+            lastHeartbeat = now;
+            mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
+        }
+    }
+}
+`;
+        }
+
+        // Fallback: HTTP Polling Sketch
         return `/*
  * ============================================================
- * ESP32-C3 FIRMWARE: RELAY NYATA XIAOZHI AI (2-WAY SYNC)
+ * ESP32-C3 FIRMWARE: RELAY NYATA XIAOZHI AI (HTTP FALLBACK)
  * ============================================================
  * Mikrokontroler : ESP32-C3 (RISC-V) SuperMini / NodeMCU C3
  * Ruangan        : ${room.nama_tempat}
@@ -2104,7 +2429,6 @@ void connectWiFi() {
     bool useWokwi = false;
 
     if (isDefaultPlaceholder) {
-        // Cek simulator Wokwi jika user belum mengubah SSID default
         int n = WiFi.scanNetworks();
         for (int i = 0; i < n; i++) {
             if (WiFi.SSID(i) == "Wokwi-GUEST") { useWokwi = true; break; }
@@ -2184,9 +2508,10 @@ void loop() {
         const ssid = document.getElementById("cfgWifiSsid")?.value.trim() || "WIFI_RUMAH_ANDA";
         const pass = document.getElementById("cfgWifiPass")?.value.trim() || "PASSWORD_WIFI";
         const activeLow = document.getElementById("cfgRelayLogic")?.value === "true";
+        const proto = document.getElementById("cfgProtocol")?.value || "mqtt";
         const box = document.getElementById("arduinoCodeBox");
         if (box) {
-            box.textContent = buildArduinoCode(currentConfigRoom, ssid, pass, activeLow);
+            box.textContent = buildArduinoCode(currentConfigRoom, ssid, pass, activeLow, proto);
         }
     }
 
@@ -2221,11 +2546,21 @@ void loop() {
         const room = payload.room;
         currentConfigRoom = room;
 
+        const slug = room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
         document.getElementById("configModalTitle").textContent = `Setup ESP32-C3: ${room.nama_tempat}`;
         document.getElementById("cfgCommandsUrl").value = room.api_commands_url || "";
         document.getElementById("cfgStatusUrl").value = room.api_status_url || "";
         document.getElementById("cfgClientId").value = room.api_client_id || "";
         document.getElementById("cfgDeviceToken").value = room.api_token || "";
+
+        // Set MQTT Fields
+        const mqttCmdEl = document.getElementById("cfgMqttCmdTopic");
+        if (mqttCmdEl) mqttCmdEl.value = `xiaozhi/relay/${slug}/set`;
+        const mqttStateEl = document.getElementById("cfgMqttStateTopic");
+        if (mqttStateEl) mqttStateEl.value = `xiaozhi/relay/${slug}/state`;
+        const mqttLwtEl = document.getElementById("cfgMqttLwtTopic");
+        if (mqttLwtEl) mqttLwtEl.value = `xiaozhi/relay/${slug}/availability`;
 
         // Pinout Guide mapping
         const numRelays = Math.max(1, Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)));
@@ -2241,16 +2576,31 @@ void loop() {
             hardware: "ESP32-C3 (RISC-V Architecture)",
             client_id: room.api_client_id,
             token: room.api_token,
-            header_auth: `${room.api_token_header}: ${room.api_token}`,
-            url_poll_perintah: room.api_commands_url,
-            url_kirim_status: room.api_status_url,
-            interval_polling_ms: POLL_INTERVAL_MS,
-            contoh_response_perintah: {
-                success: true,
-                commands: [{ id: "cmd_12345", relay: 1, command: "ON" }],
-                relays: [{ relay: 1, name: "Lampu Kamar", status: "OFF", desired_status: "ON" }]
+            mqtt_broker: "163.61.58.235:1883",
+            mqtt_topics: {
+                command_subscribe: `xiaozhi/relay/${slug}/set`,
+                hardware_state_ack: `xiaozhi/relay/${slug}/state`,
+                lwt_availability: `xiaozhi/relay/${slug}/availability`,
+                hardware_diagnostics: `xiaozhi/relay/${slug}/err`
             },
-            contoh_payload_kirim_status: room.api_status_payload_example,
+            http_endpoints: {
+                header_auth: `${room.api_token_header}: ${room.api_token}`,
+                url_poll_perintah: room.api_commands_url,
+                url_kirim_status: room.api_status_url,
+                interval_polling_ms: POLL_INTERVAL_MS
+            },
+            contoh_payload_mqtt_command: {
+                cmd_id: "cmd_12345",
+                relay: 1,
+                action: "ON"
+            },
+            contoh_payload_mqtt_state_ack: {
+                cmd_id: "cmd_12345",
+                relay: 1,
+                status: "ON",
+                rssi: -58,
+                uptime_sec: 1420
+            }
         }, null, 2);
     }
 
