@@ -146,9 +146,9 @@
     /* ── Room Card Container ────────────────────────────────────── */
     .relay-room-card {
         background: var(--app-surface);
-        border: 1px solid var(--app-border);
+        border: 1.5px solid var(--app-border);
         border-radius: 14px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
         transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
         display: flex;
         flex-direction: column;
@@ -156,14 +156,14 @@
     }
     .relay-room-card:hover {
         border-color: var(--app-border-strong);
-        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
     }
 
     /* ── Room Card Header ───────────────────────────────────────── */
     .relay-room-header {
-        padding: 16px 18px 14px;
+        padding: 16px 18px 12px;
         border-bottom: 1px solid var(--app-border);
-        background: linear-gradient(180deg, var(--app-surface), var(--app-surface-muted));
+        background: var(--app-surface);
         display: flex;
         flex-direction: column;
         gap: 12px;
@@ -172,52 +172,101 @@
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
     }
     .relay-room-identity {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 12px;
         min-width: 0;
+        flex: 1;
     }
     .relay-room-icon-badge {
-        width: 40px;
-        height: 40px;
+        width: 38px;
+        height: 38px;
         border-radius: 10px;
-        background: linear-gradient(135deg, #0284c7, #0369a1);
+        background: #0284c7;
         color: white;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 3px 10px rgba(3, 105, 161, 0.25);
+        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
     }
     .relay-room-meta {
         min-width: 0;
+        flex: 1;
+    }
+    .relay-title-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px 10px;
+        margin-bottom: 4px;
     }
     .relay-room-name {
         font-size: 16px;
         font-weight: 800;
         color: var(--app-text);
-        line-height: 1.25;
+        line-height: 1.3;
         margin: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        word-break: break-word;
     }
-    .relay-room-details {
-        font-size: 12px;
+    .relay-channel-count-tag {
+        font-size: 10.5px;
+        font-weight: 800;
+        background: var(--app-surface-muted);
+        color: var(--app-text);
+        border: 1px solid var(--app-border);
+        padding: 2px 7px;
+        border-radius: 5px;
+        white-space: nowrap;
+    }
+    .relay-room-subline {
+        font-size: 11px;
         color: var(--app-muted);
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin-top: 3px;
+        gap: 6px;
     }
+    .relay-client-mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px;
+        opacity: 0.8;
+        word-break: break-all;
+    }
+
+    /* Header Action Buttons */
     .relay-room-actions-menu {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
         flex-shrink: 0;
+    }
+    .relay-head-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid var(--app-border);
+        background: var(--app-surface);
+        color: var(--app-text);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .relay-head-btn:hover {
+        background: var(--app-surface-muted);
+        transform: translateY(-1px);
+    }
+    .relay-head-btn-del {
+        color: #ef4444;
+    }
+    .relay-head-btn-del:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
     }
 
     /* ── Room Master Switch Bar ─────────────────────────────────── */
@@ -226,51 +275,93 @@
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        background: var(--app-soft);
-        border-radius: 9px;
-        padding: 8px 12px;
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 8px;
+        padding: 7px 10px;
     }
     .relay-room-connection-status {
         display: flex;
         align-items: center;
-        gap: 7px;
-        font-size: 11.5px;
-        font-weight: 650;
-        color: var(--app-muted);
-    }
-    .relay-master-btn-group {
-        display: flex;
-        align-items: center;
         gap: 6px;
+        font-size: 11px;
+        min-width: 0;
     }
-    .relay-master-btn {
+    .relay-conn-badge {
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        padding: 5px 10px;
-        border-radius: 6px;
-        font-size: 11.5px;
+        padding: 2px 7px;
+        border-radius: 5px;
+        font-size: 10.5px;
+        font-weight: 750;
+        letter-spacing: 0.2px;
+    }
+    .relay-conn-badge.is-online {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+    }
+    .relay-conn-badge.is-offline {
+        background: #f1f5f9;
+        color: #64748b;
+        border: 1px solid #cbd5e1;
+    }
+    .conn-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+    }
+    .relay-conn-badge.is-online .conn-dot {
+        background: #10b981;
+        box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    }
+    .relay-conn-badge.is-offline .conn-dot {
+        background: #94a3b8;
+    }
+    .conn-seen-text {
+        font-size: 10.5px;
+        opacity: 0.75;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Master Buttons */
+    .relay-master-btn-group {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-shrink: 0;
+    }
+    .relay-master-pill-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 5px;
+        font-size: 10.5px;
         font-weight: 750;
         cursor: pointer;
         border: 1px solid transparent;
         transition: all 0.15s ease;
     }
-    .relay-master-btn-on {
+    .relay-master-pill-btn.on {
         background: #ecfdf5;
         border-color: #a7f3d0;
         color: #047857;
     }
-    .relay-master-btn-on:hover {
+    .relay-master-pill-btn.on:hover {
         background: #d1fae5;
         border-color: #6ee7b7;
         transform: translateY(-1px);
     }
-    .relay-master-btn-off {
+    .relay-master-pill-btn.off {
         background: #fef2f2;
         border-color: #fecaca;
         color: #b91c1c;
     }
-    .relay-master-btn-off:hover {
+    .relay-master-pill-btn.off:hover {
         background: #fee2e2;
         border-color: #fca5a5;
         transform: translateY(-1px);
@@ -284,82 +375,81 @@
         gap: 12px;
     }
 
-    /* ── Modern Tactile Relay Tile ──────────────────────────────── */
+    /* ── Tactile Relay Tile ─────────────────────────────────────── */
     .relay-tile {
-        background: var(--app-surface-muted);
+        background: var(--app-surface);
         border: 1.5px solid var(--app-border);
-        border-radius: 12px;
-        padding: 14px;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 10px;
+        padding: 12px 14px;
+        transition: all 0.2s ease;
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        position: relative;
+        gap: 8px;
     }
     .relay-tile.is-on {
-        background: linear-gradient(145deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.02));
-        border-color: rgba(16, 185, 129, 0.45);
-        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.08);
+        background: #ffffff;
+        border-color: #10b981;
+        box-shadow: 0 3px 12px rgba(16, 185, 129, 0.1);
     }
     .relay-tile.is-off {
-        background: var(--app-surface-muted);
+        background: var(--app-surface);
         border-color: var(--app-border);
     }
 
-    /* ── Relay Tile Header: Icon, Name & Toggle ──────────────────── */
+    /* Relay Tile Head */
     .relay-tile-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
     }
     .relay-tile-info {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
         min-width: 0;
+        flex: 1;
     }
     .relay-bulb-icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--app-soft);
-        color: var(--app-muted);
+        background: #f1f5f9;
+        color: #64748b;
         flex-shrink: 0;
-        transition: all 0.25s ease;
+        transition: all 0.2s ease;
     }
     .relay-tile.is-on .relay-bulb-icon {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        color: #ffffff;
-        box-shadow: 0 0 16px rgba(245, 158, 11, 0.45), 0 2px 8px rgba(217, 119, 6, 0.3);
-        transform: scale(1.04);
+        background: #fef3c7;
+        color: #d97706;
+        box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
     }
     .relay-tile-title-group {
         min-width: 0;
+        flex: 1;
     }
     .relay-channel-tag {
-        font-size: 10.5px;
+        font-size: 10px;
         font-weight: 800;
         letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--app-muted);
-        display: inline-block;
+        display: block;
+        line-height: 1.2;
     }
     .relay-name-text {
-        font-size: 14px;
+        font-size: 14.5px;
         font-weight: 750;
         color: var(--app-text);
         line-height: 1.3;
-        margin: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        margin: 2px 0 0 0;
+        word-break: break-word;
     }
 
-    /* ── iOS-Style Tactile Toggle Switch ────────────────────────── */
+    /* iOS Toggle Switch */
     .relay-toggle-control {
         display: flex;
         align-items: center;
@@ -367,21 +457,20 @@
         flex-shrink: 0;
     }
     .relay-status-pill-badge {
-        font-size: 11px;
+        font-size: 10.5px;
         font-weight: 800;
-        padding: 3px 8px;
-        border-radius: 6px;
+        padding: 2px 7px;
+        border-radius: 5px;
         text-transform: uppercase;
-        letter-spacing: 0.4px;
-        transition: all 0.2s ease;
+        letter-spacing: 0.3px;
     }
     .relay-tile.is-on .relay-status-pill-badge {
         background: #10b981;
         color: #ffffff;
     }
     .relay-tile.is-off .relay-status-pill-badge {
-        background: var(--app-soft);
-        color: var(--app-muted);
+        background: #e2e8f0;
+        color: #475569;
     }
 
     .relay-switch {
@@ -430,12 +519,13 @@
 
     /* ── Sync & Pending Indicator ───────────────────────────────── */
     .relay-sync-indicator {
-        font-size: 11.5px;
+        font-size: 11px;
         line-height: 1.4;
         color: var(--app-muted);
         display: flex;
         align-items: center;
         gap: 6px;
+        margin-top: -2px;
     }
     .relay-sync-indicator.is-pending {
         color: #d97706;
@@ -452,20 +542,20 @@
         animation: relayPulse 1.2s infinite;
     }
 
-    /* ── Voice Command Section on Room Cards ────────────────────── */
+    /* ── Voice Command Section on Room Cards (Compact Dual-Pill Grid) ── */
     .relay-voice-section {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 5px;
         margin-top: 4px;
-        background: var(--app-surface);
+        background: rgba(0, 0, 0, 0.025);
         border: 1px solid var(--app-border);
-        border-radius: 9px;
-        padding: 8px 10px;
+        border-radius: 8px;
+        padding: 6px 8px;
     }
     .relay-voice-header-label {
-        font-size: 11px;
-        font-weight: 700;
+        font-size: 10px;
+        font-weight: 750;
         color: var(--app-muted);
         display: flex;
         align-items: center;
@@ -473,44 +563,52 @@
         letter-spacing: 0.2px;
     }
     .relay-voice-box {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 6px;
     }
+    @media (max-width: 440px) {
+        .relay-voice-box {
+            grid-template-columns: 1fr;
+        }
+    }
     .relay-voice-chip {
-        display: inline-flex;
+        display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 6px;
-        padding: 4px 9px;
-        border-radius: 7px;
-        font-size: 11.5px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 11px;
         font-weight: 600;
-        background: var(--app-surface-muted);
-        border: 1px solid var(--app-border-strong);
+        background: #ffffff;
+        border: 1px solid var(--app-border);
         color: var(--app-text);
         cursor: pointer;
         transition: all 0.15s ease;
-        position: relative;
+        min-width: 0;
+    }
+    .relay-voice-chip:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     }
     .relay-voice-chip-on:hover {
-        background: rgba(16, 185, 129, 0.08);
+        background: #ecfdf5;
         border-color: #10b981;
         color: #047857;
-        transform: translateY(-1px);
     }
     .relay-voice-chip-off:hover {
-        background: rgba(239, 68, 68, 0.08);
+        background: #fef2f2;
         border-color: #ef4444;
         color: #b91c1c;
-        transform: translateY(-1px);
     }
     .voice-badge-on {
         background: #10b981;
         color: #ffffff;
-        font-size: 9.5px;
+        font-size: 9px;
         font-weight: 800;
         padding: 2px 5px;
-        border-radius: 4px;
+        border-radius: 3px;
         line-height: 1;
         letter-spacing: 0.3px;
         flex-shrink: 0;
@@ -518,20 +616,28 @@
     .voice-badge-off {
         background: #ef4444;
         color: #ffffff;
-        font-size: 9.5px;
+        font-size: 9px;
         font-weight: 800;
         padding: 2px 5px;
-        border-radius: 4px;
+        border-radius: 3px;
         line-height: 1;
         letter-spacing: 0.3px;
         flex-shrink: 0;
     }
     .voice-text {
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 11px;
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--app-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        min-width: 0;
     }
     .relay-voice-chip .copy-icon {
-        opacity: 0.45;
+        opacity: 0.35;
+        flex-shrink: 0;
         transition: opacity 0.15s ease;
     }
     .relay-voice-chip:hover .copy-icon {
@@ -646,6 +752,151 @@
         overflow: hidden;
         text-overflow: ellipsis;
         max-width: 170px;
+    }
+
+    /* ── Neo Theme Neobrutalist Polishing Overrides ─────────────── */
+    :root[data-theme="neo"] .relay-room-card {
+        background: #ffffff;
+        border: 2px solid #111111;
+        border-radius: 12px;
+        box-shadow: 4px 4px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-room-card:hover {
+        box-shadow: 6px 6px 0 #111111;
+        border-color: #111111;
+    }
+    :root[data-theme="neo"] .relay-room-header {
+        background: #fffef2;
+        border-bottom: 2px solid #111111;
+    }
+    :root[data-theme="neo"] .relay-room-icon-badge {
+        background: #0057ff;
+        color: #ffffff;
+        border: 2px solid #111111;
+        box-shadow: 2px 2px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-channel-count-tag {
+        background: #ffffff;
+        border: 1.5px solid #111111;
+        box-shadow: 1.5px 1.5px 0 #111111;
+        color: #111111;
+    }
+    :root[data-theme="neo"] .relay-client-mono {
+        background: #ffffff;
+        border: 1px solid #111111;
+        padding: 1px 6px;
+        border-radius: 4px;
+        color: #111111;
+    }
+    :root[data-theme="neo"] .relay-head-btn {
+        background: #ffffff;
+        border: 1.5px solid #111111;
+        box-shadow: 2px 2px 0 #111111;
+        color: #111111;
+    }
+    :root[data-theme="neo"] .relay-head-btn:hover {
+        background: #fff06a;
+        transform: translate(-1px, -1px);
+        box-shadow: 3px 3px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-head-btn:active {
+        transform: translate(1px, 1px);
+        box-shadow: 0 0 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-head-btn-del:hover {
+        background: #fee2e2;
+        color: #d90429;
+    }
+    :root[data-theme="neo"] .relay-room-master-bar {
+        background: #ffffff;
+        border: 2px solid #111111;
+        box-shadow: 2.5px 2.5px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-conn-badge {
+        border: 1.5px solid #111111;
+    }
+    :root[data-theme="neo"] .relay-conn-badge.is-online {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    :root[data-theme="neo"] .relay-conn-badge.is-offline {
+        background: #f1f5f9;
+        color: #475569;
+    }
+    :root[data-theme="neo"] .relay-master-pill-btn {
+        border: 1.5px solid #111111;
+        box-shadow: 1.5px 1.5px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-master-pill-btn:hover {
+        transform: translate(-1px, -1px);
+        box-shadow: 2.5px 2.5px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-master-pill-btn:active {
+        transform: translate(1px, 1px);
+        box-shadow: 0 0 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-tile {
+        background: #ffffff;
+        border: 2px solid #111111;
+        border-radius: 10px;
+        box-shadow: 3px 3px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-tile.is-on {
+        background: #f0fdf4;
+        border-color: #111111;
+        box-shadow: 3px 3px 0 #10b981;
+    }
+    :root[data-theme="neo"] .relay-tile.is-off {
+        background: #ffffff;
+        border-color: #111111;
+    }
+    :root[data-theme="neo"] .relay-bulb-icon {
+        border: 1.5px solid #111111;
+        box-shadow: 1px 1px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-tile.is-on .relay-bulb-icon {
+        background: #fff06a;
+        color: #111111;
+    }
+    :root[data-theme="neo"] .relay-status-pill-badge {
+        border: 1.5px solid #111111;
+    }
+    :root[data-theme="neo"] .relay-switch-slider {
+        border: 2px solid #111111;
+    }
+    :root[data-theme="neo"] .relay-switch-slider:before {
+        border: 1.5px solid #111111;
+    }
+    :root[data-theme="neo"] .relay-voice-section {
+        background: #fffbe8;
+        border: 1.5px solid #111111;
+    }
+    :root[data-theme="neo"] .relay-voice-chip {
+        background: #ffffff;
+        border: 1.5px solid #111111;
+        box-shadow: 1.5px 1.5px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-voice-chip:hover {
+        transform: translate(-1px, -1px);
+        box-shadow: 2.5px 2.5px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-voice-chip:active {
+        transform: translate(1px, 1px);
+        box-shadow: 0 0 0 #111111;
+    }
+    :root[data-theme="neo"] .voice-badge-on,
+    :root[data-theme="neo"] .voice-badge-off {
+        border: 1px solid #111111;
+    }
+    :root[data-theme="neo"] .relay-room-footer {
+        background: #ffffff;
+        border-top: 2px solid #111111;
+    }
+    :root[data-theme="neo"] .relay-api-pill {
+        background: #fff06a;
+        border: 1.5px solid #111111;
+        color: #111111;
+        box-shadow: 1.5px 1.5px 0 #111111;
     }
 
     /* ── Enhanced Modals ────────────────────────────────────────── */
@@ -835,33 +1086,34 @@
                             </svg>
                         </div>
                         <div class="relay-room-meta">
-                            <h2 class="relay-room-name">{{ room.nama_tempat }}</h2>
-                            <div class="relay-room-details">
-                                <span>{{ room.jumlah_relay }} Relay</span>
-                                <span>•</span>
-                                <span class="app-chip app-chip-small" style="font-size:10.5px; padding:2px 6px;">{{ room.api_client_id }}</span>
+                            <div class="relay-title-row">
+                                <h2 class="relay-room-name" title="{{ room.nama_tempat }}">{{ room.nama_tempat }}</h2>
+                                <span class="relay-channel-count-tag">{{ room.jumlah_relay }} Channel</span>
+                            </div>
+                            <div class="relay-room-subline">
+                                <span class="relay-client-mono" title="{{ room.api_client_id }}">ID: {{ room.api_client_id }}</span>
                             </div>
                         </div>
                     </div>
                     <div class="relay-room-actions-menu">
-                        <button type="button" class="app-button app-button-small app-button-sky" data-config-room="{{ room.id }}" title="Lihat Konfigurasi API ESP32">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <button type="button" class="relay-head-btn" data-config-room="{{ room.id }}" title="Lihat Konfigurasi API ESP32">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="3"></circle>
                                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                             </svg>
-                            API
+                            <span>API</span>
                         </button>
-                        <button type="button" class="app-button app-button-small" data-edit-room="{{ room.id }}" title="Edit Ruangan & Relay">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <button type="button" class="relay-head-btn" data-edit-room="{{ room.id }}" title="Edit Ruangan & Relay">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
-                            Edit
+                            <span>Edit</span>
                         </button>
                         <form action="/relay-nyata/delete/{{ room.id }}" method="POST" onsubmit="return confirm('Hapus seluruh ruangan {{ room.nama_tempat }} dan semua relainya?');" style="margin:0;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="app-button app-button-small app-button-text-danger" title="Hapus Ruangan">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <button type="submit" class="relay-head-btn relay-head-btn-del" title="Hapus Ruangan">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="3 6 5 6 21 6"></polyline>
                                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                 </svg>
@@ -873,19 +1125,19 @@
                 <!-- Master Room Quick Controls & Device Connection -->
                 <div class="relay-room-master-bar">
                     <div class="relay-room-connection-status">
-                        <span class="app-status-pill relay-connection-pill {% if room.device_connected %}is-online{% else %}is-offline{% endif %}" data-device-connection-room="{{ room.id }}" style="padding: 3px 8px; font-size: 11.5px;">
-                            <span class="app-status-dot"></span>
+                        <span class="relay-conn-badge {% if room.device_connected %}is-online{% else %}is-offline{% endif %}" data-device-connection-room="{{ room.id }}">
+                            <span class="conn-dot"></span>
                             <span data-device-connection-label>{{ room.device_connection_label }}</span>
                         </span>
-                        <span style="font-size:11px; opacity:0.8;">Seen: <span id="roomSeen{{ room.id }}">{{ room.device_last_seen_at or "belum ada" }}</span></span>
+                        <span class="conn-seen-text">Seen: <span id="roomSeen{{ room.id }}">{{ room.device_last_seen_at or "belum ada" }}</span></span>
                     </div>
 
                     <!-- ⚡ Master Room Control: Nyalakan Semua & Matikan Semua -->
                     <div class="relay-master-btn-group">
-                        <button type="button" class="relay-master-btn relay-master-btn-on" onclick="controlRoomAll({{ room.id }}, 'ON')" title="Nyalakan semua relay di ruangan ini">
+                        <button type="button" class="relay-master-pill-btn on" onclick="controlRoomAll({{ room.id }}, 'ON')" title="Nyalakan semua relay di ruangan ini">
                             ⚡ Semua ON
                         </button>
-                        <button type="button" class="relay-master-btn relay-master-btn-off" onclick="controlRoomAll({{ room.id }}, 'OFF')" title="Matikan semua relay di ruangan ini">
+                        <button type="button" class="relay-master-pill-btn off" onclick="controlRoomAll({{ room.id }}, 'OFF')" title="Matikan semua relay di ruangan ini">
                             💤 Semua OFF
                         </button>
                     </div>
@@ -965,8 +1217,11 @@
 
             <!-- Room Card Footer -->
             <div class="relay-room-footer">
-                <span class="relay-api-pill" title="{{ room.api_commands_path }}">{{ room.api_commands_path }}</span>
-                <button type="button" class="app-button app-button-small" data-config-room="{{ room.id }}" style="font-size:11.5px; padding:4px 10px;">
+                <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                    <span style="font-size:10px; font-weight:800; color:var(--app-muted); text-transform:uppercase; letter-spacing:0.3px;">Endpoint:</span>
+                    <span class="relay-api-pill" title="{{ room.api_commands_path }}">{{ room.api_commands_path }}</span>
+                </div>
+                <button type="button" class="relay-head-btn" data-config-room="{{ room.id }}" style="font-size:11px; padding:4px 9px;">
                     Setup ESP32 ➔
                 </button>
             </div>
@@ -1499,7 +1754,7 @@
         const connected = deviceConnected(room);
         const label = connected ? "ESP32 Terhubung" : (room.device_last_seen_at ? "ESP32 Terputus" : "Belum Terhubung");
         document.querySelectorAll(`[data-device-connection-room="${room.id}"]`).forEach((el) => {
-            el.className = `app-status-pill relay-connection-pill ${connected ? "is-online" : "is-offline"}`;
+            el.className = `relay-conn-badge ${connected ? "is-online" : "is-offline"}`;
             const labelEl = el.querySelector("[data-device-connection-label]");
             if (labelEl) labelEl.textContent = label;
         });
