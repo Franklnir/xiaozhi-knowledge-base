@@ -183,6 +183,88 @@ class TestWebScraper(unittest.TestCase):
         finally:
             mcp_active_owner_ctx.reset(token)
 
+    def test_clean_indonesian_news_noise(self):
+        from xiaozhi.services.scraper_service import clean_indonesian_news_noise
+
+        dirty_text = """
+        Kementerian Pendidikan mengumumkan kurikulum baru untuk teknologi kecerdasan buatan.
+        Baca juga: 5 Kampus Terbaik dengan Jurusan AI di Indonesia
+        Simak video: Wawancara Eksklusif dengan Mendikbudristek
+        Kurikulum ini akan diterapkan serempak pada jenjang SMA dan SMK.
+        Halaman selanjutnya: Rincian Mata Pelajaran AI
+        Download aplikasi Kompas.com sekarang untuk info lebih lanjut.
+        Ikuti berita terkini dan mendalam di Google News.
+        Pembelajaran akan berbasis proyek mikrokontroler seperti ESP32.
+        """
+        cleaned = clean_indonesian_news_noise(dirty_text)
+        self.assertIn("Kementerian Pendidikan mengumumkan", cleaned)
+        self.assertIn("Kurikulum ini akan diterapkan", cleaned)
+        self.assertIn("ESP32", cleaned)
+        self.assertNotIn("Baca juga:", cleaned)
+        self.assertNotIn("Simak video:", cleaned)
+        self.assertNotIn("Halaman selanjutnya", cleaned)
+        self.assertNotIn("Download aplikasi", cleaned)
+        self.assertNotIn("Google News", cleaned)
+
+    def test_extract_youtube_video_id(self):
+        from xiaozhi.services.scraper_service import extract_youtube_video_id
+
+        self.assertEqual(extract_youtube_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        self.assertEqual(extract_youtube_video_id("https://youtu.be/dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        self.assertEqual(extract_youtube_video_id("https://m.youtube.com/watch?v=dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        self.assertEqual(extract_youtube_video_id("https://youtube.com/shorts/dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        self.assertEqual(extract_youtube_video_id("https://youtube.com/live/dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        self.assertIsNone(extract_youtube_video_id("https://example.com/not-youtube"))
+
+    def test_jina_markdown_response_parser(self):
+        from xiaozhi.services.scraper_service import _parse_jina_markdown_response
+
+        jina_output = """Title: Belajar Mikrokontroler ESP32
+URL Source: https://medium.com/@dev/belajar-esp32
+Published Time: 2026-01-15T08:00:00Z
+
+Markdown Content:
+# Belajar Mikrokontroler ESP32
+
+ESP32 adalah mikrokontroler berkemampuan Wi-Fi dan Bluetooth berbiaya rendah dan hemat daya.
+Sangat cocok untuk IoT dan voice assistant modern.
+"""
+        res = _parse_jina_markdown_response(jina_output, "https://medium.com/@dev/belajar-esp32", 10000)
+        self.assertIsNotNone(res)
+        self.assertTrue(res["success"])
+        self.assertEqual(res["title"], "Belajar Mikrokontroler ESP32")
+        self.assertIn("ESP32 adalah mikrokontroler", res["content"])
+        self.assertEqual(res["source_engine"], "jina_reader")
+
+    def test_youtube_transcript_mock(self):
+        from xiaozhi.services.scraper_service import extract_youtube_transcript
+
+        mock_transcript = [
+            {"text": "Halo teman-teman semua", "start": 0.0, "duration": 2.5},
+            {"text": "hari ini kita belajar IoT ESP32", "start": 3.0, "duration": 4.0},
+            {"text": "pertama kita siapkan kabel data", "start": 35.0, "duration": 3.0},
+        ]
+
+        mock_instance = MagicMock()
+        mock_fetched = MagicMock()
+        mock_fetched.to_raw_data.return_value = mock_transcript
+        mock_instance.fetch.return_value = mock_fetched
+
+        with patch("xiaozhi.services.scraper_service.YouTubeTranscriptApi", return_value=mock_instance) as mock_cls:
+            mock_cls.get_transcript = MagicMock(return_value=mock_transcript)
+            mock_cls.fetch = mock_instance.fetch
+            with patch("xiaozhi.services.scraper_service.urllib.request.urlopen") as mock_oembed:
+                mock_resp = MagicMock()
+                mock_resp.read.return_value = b'{"title": "Tutorial ESP32 Pemula", "author_name": "Kelas Robotika"}'
+                mock_oembed.return_value.__enter__.return_value = mock_resp
+
+                res = extract_youtube_transcript("dQw4w9WgXcQ", "https://youtube.com/watch?v=dQw4w9WgXcQ")
+                self.assertTrue(res["success"])
+                self.assertIn("Tutorial ESP32 Pemula", res["title"])
+                self.assertIn("[00:00] Halo teman-teman semua", res["content"])
+                self.assertIn("[00:35] pertama kita siapkan kabel data", res["content"])
+                self.assertEqual(res["source_type"], "youtube_transcript")
+
 
 if __name__ == "__main__":
     unittest.main()

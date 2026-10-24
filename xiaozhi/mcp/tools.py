@@ -3063,12 +3063,15 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def scrape_webpage(url: str, max_chars: int = 4000) -> dict:
         """
-        Baca dan ambil konten teks bersih dari link website / artikel / berita dari internet secara realtime.
+        Baca dan ambil konten teks bersih secara realtime dari:
+        1. Link website / artikel / berita internet (otomatis dibersihkan dari iklan dan noise).
+        2. Dokumen PDF online (ekstraksi teks dokumen modul per halaman).
+        3. Video YouTube edukasi (otomatis mengambil transkrip percakapan / subtitle video).
         Gunakan tool ini saat user memberikan link/URL (https://...) atau meminta membaca, merangkum,
-        atau mengekstrak isi dari suatu halaman web.
+        atau mengekstrak isi dari suatu halaman web, PDF, atau video YouTube.
 
         Args:
-            url: URL publik halaman web yang ingin dibaca (misal: "https://id.wikipedia.org/wiki/Kecerdasan_buatan").
+            url: URL publik halaman web, PDF, atau YouTube yang ingin dibaca (misal: "https://id.wikipedia.org/wiki/Kecerdasan_buatan" atau "https://www.youtube.com/watch?v=...").
             max_chars: Batas maksimal karakter teks yang diekstrak (default: 4000).
         """
         owner_id = mcp_active_owner_ctx.get()
@@ -3086,7 +3089,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             "success": True,
             "message": "Konten halaman web berhasil diambil.",
             "instruksi_xiaozhi": (
-                "Pahami dan jelaskan isi artikel/halaman web ini secara lengkap, terstruktur (poin-poin penting), "
+                "Pahami dan jelaskan isi artikel/dokumen/transkrip ini secara lengkap, terstruktur (poin-poin penting), "
                 "dan mudah dipahami sesuai pertanyaan pengguna berdasarkan data 'isi_konten' di atas."
             ),
             "url": res["url"],
@@ -3094,19 +3097,20 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             "deskripsi": res.get("description", ""),
             "jumlah_kata": res.get("word_count", 0),
             "isi_konten": res.get("content", ""),
+            "tipe_sumber": res.get("source_type", "web_article"),
             "terpotong": res.get("is_truncated", False)
         }
 
     @mcp_server.tool()
     def scrape_and_save_to_knowledge(url: str, title: str = "", category: str = "Web Scraping") -> dict:
         """
-        Scrape artikel atau konten halaman web dari URL dan langsung simpan ke Knowledge Base (RAG) milik user.
-        Gunakan tool ini saat user meminta menyimpan materi dari link web ke perpustakaan/knowledge base mereka.
+        Scrape artikel web, dokumen PDF, atau transkrip video YouTube dari link URL dan langsung simpan ke Knowledge Base (RAG) milik user.
+        Gunakan tool ini saat user meminta menyimpan materi dari link web, PDF, atau video edukasi ke perpustakaan/knowledge base mereka.
 
         Args:
-            url: Link URL halaman web yang ingin disimpan.
-            title: Judul materi kustom opsional (jika kosong, akan otomatis mengambil judul dari halaman web).
-            category: Kategori materi (default: "Web Scraping").
+            url: Link URL halaman web, dokumen PDF, atau video YouTube yang ingin disimpan.
+            title: Judul materi kustom opsional (jika kosong, akan otomatis mengambil judul dari halaman/video/dokumen).
+            category: Kategori materi (default: "Web Scraping", otomatis disesuaikan jadi "Dokumen Modul" atau "Video Edukasi").
         """
         owner_id = mcp_active_owner_ctx.get()
         if owner_id is None:
