@@ -291,16 +291,16 @@ async def download_mobile_app():
     if local_apk.exists():
         return FileResponse(
             path=str(local_apk),
-            filename="espbridge-xiaozhi-v1.4.6.apk",
+            filename="espbridge-xiaozhi-v1.4.7.apk",
             media_type="application/octet-stream",
             headers={
-                "Content-Disposition": 'attachment; filename="espbridge-xiaozhi-v1.4.6.apk"',
+                "Content-Disposition": 'attachment; filename="espbridge-xiaozhi-v1.4.7.apk"',
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "X-Content-Type-Options": "nosniff",
             }
         )
     return RedirectResponse(
-        url="https://github.com/Franklnir/Chronchi/releases/latest/download/espbridge-xiaozhi-latest.apk",
+        url="https://github.com/Franklnir/Chronchi/releases/download/v1.4.7/espbridge-xiaozhi-latest.apk",
         status_code=302
     )
 
@@ -308,20 +308,20 @@ async def download_mobile_app():
 @app.get("/download/app.zip", include_in_schema=False)
 @app.get("/download/espbridge.zip", include_in_schema=False)
 async def download_mobile_app_zip():
-    """Serve lightweight ZIP archive (31MB) to guarantee 100% completion without browser APK hangs."""
+    """Serve lightweight ZIP archive (33MB) to guarantee 100% completion without browser APK hangs."""
     local_zip = STATIC_DIR / "download" / "espbridge.zip"
     if local_zip.exists():
         return FileResponse(
             path=str(local_zip),
-            filename="espbridge-xiaozhi-v1.4.6.zip",
+            filename="espbridge-xiaozhi-v1.4.7.zip",
             media_type="application/zip",
             headers={
-                "Content-Disposition": 'attachment; filename="espbridge-xiaozhi-v1.4.6.zip"',
+                "Content-Disposition": 'attachment; filename="espbridge-xiaozhi-v1.4.7.zip"',
                 "Cache-Control": "no-cache",
             }
         )
     return RedirectResponse(
-        url="https://github.com/Franklnir/Chronchi/releases/latest/download/espbridge-xiaozhi-latest.apk",
+        url="https://github.com/Franklnir/Chronchi/releases/download/v1.4.7/espbridge-xiaozhi-latest.apk",
         status_code=302
     )
 
