@@ -119,7 +119,7 @@ def _forward_mqtt_command(slug: str, relay_number: int, command: str, cmd_id: st
     return False
 
 
-def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, source: str = "web_ui") -> dict:
+def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, source: str = "web_ui", wait_for_ack: bool = None) -> dict:
     target_status = normalize_relay_state(command)
     current_status = str(relay.get("status", "OFF")).upper()
     relay_num = int(relay.get("relay_number", 1))
@@ -131,9 +131,7 @@ def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, sou
     # 1. Forward instant command to Go Gateway -> Mosquitto MQTT: xiaozhi/relay/{slug}/set
     _forward_mqtt_command(slug, relay_num, target_status, cmd_id)
 
-    # 2. DO NOT update DB status immediately!
-    # Status in database represents confirmed physical state.
-    # Broadcast SSE update with status = current_status, pending = target_status, desired = target_status
+    # 2. Broadcast SSE update with status = current_status, pending = target_status, desired = target_status
     try:
         from xiaozhi.services.sse_service import broadcast_relay_update
         broadcast_relay_update(
@@ -150,6 +148,59 @@ def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, sou
     except Exception:
         pass
 
+    if wait_for_ack is None:
+        wait_for_ack = (source == "mcp_voice")
+
+    store = get_store()
+
+    # 3. Jika dipanggil oleh XiaoZhi Voice (MCP), tunggu konfirmasi fisik hardware ESP32 secara aktif (hingga 2.5 detik)
+    if wait_for_ack:
+        deadline = time.time() + 2.5
+        confirmed = False
+        while time.time() < deadline:
+            time.sleep(0.08)
+            try:
+                refreshed_room = store.get_relay_room(owner_id, room["id"])
+                if refreshed_room:
+                    for r in refreshed_room.get("relays", []):
+                        if int(r.get("relay_number", 0)) == relay_num:
+                            if str(r.get("status", "")).upper() == target_status:
+                                confirmed = True
+                                break
+            except Exception:
+                pass
+            if confirmed:
+                break
+
+        action_word = "dinyalakan" if target_status == "ON" else "dimatikan"
+        status_word = "aktif (ON)" if target_status == "ON" else "mati (OFF)"
+        if confirmed:
+            return {
+                "success": True,
+                "pending": False,
+                "validated": True,
+                "message": f"Berhasil! {relay.get('nama_relay', 'Relay')} di {room.get('nama_tempat', '')} telah {action_word} dan terkonfirmasi fisik {status_word} oleh perangkat ESP32.",
+                "room": room.get("nama_tempat", ""),
+                "relay": relay.get("nama_relay", ""),
+                "current_status": target_status,
+                "desired_status": target_status,
+                "cmd_id": cmd_id,
+                "source": source,
+            }
+        else:
+            return {
+                "success": False,
+                "pending": True,
+                "validated": False,
+                "message": f"Perintah {action_word} {relay.get('nama_relay', 'relay')} telah dikirim, namun mikrokontroler ESP32 di {room.get('nama_tempat', '')} belum memberikan konfirmasi fisik balik. Silakan pastikan perangkat menyala dan terhubung.",
+                "room": room.get("nama_tempat", ""),
+                "relay": relay.get("nama_relay", ""),
+                "current_status": current_status,
+                "desired_status": target_status,
+                "cmd_id": cmd_id,
+                "source": source,
+            }
+
     return {
         "success": True,
         "pending": True,
@@ -163,7 +214,7 @@ def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, sou
     }
 
 
-def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui") -> dict:
+def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui", wait_for_ack: bool = None) -> dict:
     target_status = normalize_relay_state(command)
     store = get_store()
     rooms = store.list_relay_rooms(owner_id)
@@ -192,6 +243,54 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui")
                 )
             except Exception:
                 pass
+
+    if wait_for_ack is None:
+        wait_for_ack = (source == "mcp_voice")
+
+    if wait_for_ack and count > 0:
+        deadline = time.time() + 2.5
+        all_confirmed = False
+        while time.time() < deadline:
+            time.sleep(0.1)
+            try:
+                refreshed_rooms = store.list_relay_rooms(owner_id)
+                all_match = True
+                for r_room in refreshed_rooms:
+                    for r_relay in r_room.get("relays", []):
+                        if str(r_relay.get("status", "")).upper() != target_status:
+                            all_match = False
+                            break
+                    if not all_match:
+                        break
+                if all_match:
+                    all_confirmed = True
+                    break
+            except Exception:
+                pass
+
+        action_word = "dinyalakan" if target_status == "ON" else "dimatikan"
+        status_word = "aktif (ON)" if target_status == "ON" else "mati (OFF)"
+        if all_confirmed:
+            return {
+                "success": True,
+                "pending": False,
+                "validated": True,
+                "message": f"Berhasil! Seluruh {count} relay telah {action_word} dan terkonfirmasi fisik {status_word} oleh perangkat ESP32.",
+                "count": count,
+                "desired_status": target_status,
+                "source": source,
+            }
+        else:
+            return {
+                "success": False,
+                "pending": True,
+                "validated": False,
+                "message": f"Perintah {action_word} untuk {count} relay telah dikirim, namun sebagian perangkat ESP32 belum memberikan konfirmasi balik fisik lengkap.",
+                "count": count,
+                "desired_status": target_status,
+                "source": source,
+            }
+
     return {
         "success": True,
         "pending": True,

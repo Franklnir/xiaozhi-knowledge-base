@@ -103,16 +103,14 @@ def setup_mode_filtering(store):
             return response
         if name == "all_relays_on":
             try:
-                response = control_all_real_relays(owner_id, "ON")
-                response["message"] = f"{response['message']} Tool simulasi diabaikan karena mode Relay Nyata aktif."
+                response = control_all_real_relays(owner_id, "ON", source="mcp_voice")
             except ValueError as exc:
                 response = {"success": False, "message": str(exc)}
             record_mcp_tool_history(owner_id, name, "nyalakan semua relay", arguments, response)
             return response
         if name == "all_relays_off":
             try:
-                response = control_all_real_relays(owner_id, "OFF")
-                response["message"] = f"{response['message']} Tool simulasi diabaikan karena mode Relay Nyata aktif."
+                response = control_all_real_relays(owner_id, "OFF", source="mcp_voice")
             except ValueError as exc:
                 response = {"success": False, "message": str(exc)}
             record_mcp_tool_history(owner_id, name, "matikan semua relay", arguments, response)
@@ -127,11 +125,10 @@ def setup_mode_filtering(store):
                 target = smart_home_room_name(channel_text)
         matched = match_real_relay_for_target(owner_id, target=target, action=action, channel=channel)
         if not matched:
-            response = {"success": False, "message": "Mode Relay Nyata aktif, tetapi target dari tool simulasi tidak cocok dengan perintah suara Relay Nyata yang tersimpan."}
+            response = {"success": False, "message": "Perintah suara tidak cocok dengan daftar Relay Nyata yang tersimpan."}
             record_mcp_tool_history(owner_id, name, f"{target} {action}".strip(), arguments, response)
             return response
         response = control_real_relay(owner_id, matched["room"], matched["relay"], matched["command"], source="mcp_voice")
-        response["message"] = f"{response['message']} Tool simulasi diabaikan karena mode Relay Nyata aktif."
         response["routed_from"] = name
         record_mcp_tool_history(owner_id, name, f"{target} {action}".strip(), arguments, response)
         return response
