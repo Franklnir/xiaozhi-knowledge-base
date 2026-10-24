@@ -16,6 +16,7 @@ import (
 	"gateway-go/internal/config"
 	"gateway-go/internal/db"
 	"gateway-go/internal/handler"
+	"gateway-go/internal/hub"
 	"gateway-go/internal/store"
 )
 
@@ -41,9 +42,15 @@ func main() {
 	deviceStore := store.NewDeviceStore(database)
 	audioStore := store.NewAudioStore(database)
 
+	// Hubs (Real-Time Pub/Sub & Device Registry)
+	sseHub := hub.NewSSEHub()
+	deviceHub := hub.NewDeviceHub()
+
 	// Handlers
 	devHandler := handler.NewDeviceHandler(cfg, deviceStore, audioStore)
 	streamHandler := handler.NewAudioStreamHandler(cfg, deviceStore, audioStore)
+	sseHandler := handler.NewSSEHandler(cfg, sseHub, deviceHub)
+	wsHandler := handler.NewWSDeviceHandler(cfg, deviceStore, audioStore, sseHub, deviceHub)
 
 	// Router
 	r := chi.NewRouter()
@@ -63,11 +70,21 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	// Health Check
+	// Health & Diagnostics
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","service":"gateway-go"}`))
 	})
+	r.Get("/api/internal/status", sseHandler.HandleSystemStatus)
+	r.Get("/api/internal/device/stats", sseHandler.HandleDeviceStats)
+
+	// Admin Server-Sent Events (SSE) Stream & Internal Broadcast
+	r.Get("/admin/api/logs/stream", sseHandler.HandleLogsStream)
+	r.Post("/api/internal/sse/emit", sseHandler.HandleInternalEmit)
+
+	// Persistent WebSocket ESP32 Connections (Goroutines ~2KB RAM/conn)
+	r.Get("/ws/device/audio/{device_id}", wsHandler.HandleDeviceAudioWS)
+	r.Get("/ws/device/{device_id}", wsHandler.HandleDeviceAudioWS)
 
 	// Device Polling & Audio Queue Endpoints
 	r.Get("/api/device/audio/commands", devHandler.HandleGetCommands)

@@ -129,3 +129,81 @@ func (s *DeviceStore) ResolveOwner(ctx context.Context, token, rawMAC string) (i
 
 	return 0, nil
 }
+
+// RecordDeviceActivity updates last_active_at timestamps for a device
+func (s *DeviceStore) RecordDeviceActivity(ctx context.Context, rawMAC string, ownerID int64) error {
+	normMAC := NormalizeMAC(rawMAC)
+	if normMAC == "" {
+		return nil
+	}
+
+	conn, err := s.db.Pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Release()
+
+	_, _ = conn.Exec(ctx, "SELECT set_config('app.user_role', 'system', true), set_config('app.is_admin', 'true', true);")
+
+	_, _ = conn.Exec(ctx, `
+		UPDATE registered_devices
+		SET last_active_at = NOW()
+		WHERE LOWER(device_id) = LOWER($1)
+	`, normMAC)
+
+	if ownerID > 0 {
+		_, _ = conn.Exec(ctx, `
+			UPDATE board_binding_history
+			SET last_active_at = NOW()
+			WHERE LOWER(device_mac) = LOWER($1) AND user_id = $2 AND status = 'ACTIVE'
+		`, normMAC, ownerID)
+	} else {
+		_, _ = conn.Exec(ctx, `
+			UPDATE board_binding_history
+			SET last_active_at = NOW()
+			WHERE LOWER(device_mac) = LOWER($1) AND status = 'ACTIVE'
+		`, normMAC)
+	}
+
+	return nil
+}
+
+// GetDeviceInfo retrieves device name and registered owner
+func (s *DeviceStore) GetDeviceInfo(ctx context.Context, rawMAC string) (ownerID int64, name string, devType string) {
+	normMAC := NormalizeMAC(rawMAC)
+	hexMAC := CleanHexMAC(rawMAC)
+	if normMAC == "" && hexMAC == "" {
+		return 0, "", ""
+	}
+
+	conn, err := s.db.Pool.Acquire(ctx)
+	if err != nil {
+		return 0, "", ""
+	}
+	defer conn.Release()
+
+	_, _ = conn.Exec(ctx, "SELECT set_config('app.user_role', 'system', true), set_config('app.is_admin', 'true', true);")
+
+	var dbOwnerID *int64
+	var dbName *string
+	var dbType *string
+	err = conn.QueryRow(ctx, `
+		SELECT owner_id, name, device_type
+		FROM registered_devices
+		WHERE LOWER(device_id) = LOWER($1) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = $2
+		ORDER BY id DESC LIMIT 1
+	`, normMAC, hexMAC).Scan(&dbOwnerID, &dbName, &dbType)
+
+	if err == nil {
+		if dbOwnerID != nil {
+			ownerID = *dbOwnerID
+		}
+		if dbName != nil {
+			name = *dbName
+		}
+		if dbType != nil {
+			devType = *dbType
+		}
+	}
+	return ownerID, name, devType
+}

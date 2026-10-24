@@ -86,12 +86,57 @@ class AdminLogHub:
         self._subscribers.discard(q)
 
 
+import os
+import queue
+import threading
+import urllib.request
+
+_GATEWAY_EMIT_URL = os.getenv("GATEWAY_INTERNAL_URL", "http://gateway:8080/api/internal/sse/emit")
+_emit_queue: queue.Queue = queue.Queue(maxsize=1000)
+
+def _gateway_dispatcher_worker():
+    """Background daemon worker sending logs to Go Gateway SSE Hub."""
+    while True:
+        try:
+            payload = _emit_queue.get()
+            if payload is None:
+                break
+            data = json.dumps(payload).encode("utf-8")
+            urls = [_GATEWAY_EMIT_URL, "http://127.0.0.1:8085/api/internal/sse/emit"]
+            for target_url in urls:
+                try:
+                    req = urllib.request.Request(
+                        target_url,
+                        data=data,
+                        headers={"Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=1.0) as resp:
+                        if resp.status == 200:
+                            break
+                except Exception:
+                    pass
+            _emit_queue.task_done()
+        except Exception:
+            pass
+
+_dispatcher_thread = threading.Thread(target=_gateway_dispatcher_worker, daemon=True, name="go-sse-dispatcher")
+_dispatcher_thread.start()
+
 admin_log_hub = AdminLogHub()
 
 
 def log_admin_event(category: str, message: str, metadata: Optional[Dict[str, Any]] = None):
     """Global helper to emit an admin log event for SSE subscribers."""
     admin_log_hub.emit(category, message, metadata)
+    try:
+        _emit_queue.put_nowait({
+            "category": category,
+            "message": message,
+            "metadata": metadata or {}
+        })
+    except queue.Full:
+        pass
 
 
 async def stream_admin_logs(request: Request) -> AsyncGenerator[str, None]:
