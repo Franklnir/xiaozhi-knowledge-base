@@ -285,7 +285,7 @@ async def _worker_loop():
         vid = item["video_id"]
         youtube_url = item["youtube_url"]
         sample_rate = item.get("sample_rate", 16000)
-        bitrate = item.get("bitrate", "16k")
+        bitrate = item.get("bitrate", "24k")
         duration_sec = item.get("duration_sec")
 
         _queue_set.discard(vid)
@@ -311,7 +311,7 @@ async def _execute_download_and_cache(
     video_id: str,
     youtube_url: str,
     sample_rate: int = 16000,
-    bitrate: str = "16k",
+    bitrate: str = "24k",
     duration_sec: Optional[int] = None,
 ):
     safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
@@ -494,7 +494,7 @@ async def enqueue_precache(
     video_id: str,
     youtube_url: str,
     sample_rate: int = 16000,
-    bitrate: str = "16k",
+    bitrate: str = "24k",
     duration_sec: Optional[int] = None,
 ) -> bool:
     """
