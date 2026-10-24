@@ -205,6 +205,7 @@ class SQLiteStore:
                 FOREIGN KEY (room_id) REFERENCES relay_rooms(id) ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS idx_relay_device_room ON relay_devices(room_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_relay_room_num ON relay_devices(room_id, relay_number);
 
             -- Audio queue
             CREATE TABLE IF NOT EXISTS audio_queue (
