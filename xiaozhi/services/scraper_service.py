@@ -134,6 +134,12 @@ def clean_indonesian_news_noise(text: str) -> str:
     if not text:
         return ""
 
+    # 1. Hapus pola inline 'baca juga', 'simak video', 'halaman selanjutnya'
+    text = re.sub(r"(?i)\b(?:baca\s+juga|simak\s+video(?:\s+\w+)?|tonton\s+juga|lihat\s+foto|artikel\s+terkait)\s*:\s*[^.\n]+[.]?", "", text)
+    text = re.sub(r"(?i)\bhalaman\s+selanjutnya\s*:?\s*[^.\n]*[.]?", "", text)
+    text = re.sub(r"(?i)\bdownload\s+aplikasi\s+[^.\n]+sekarang[^.\n]*[.]?", "", text)
+    text = re.sub(r"(?i)\bikuti\s+berita\s+terkini\s+dan\s+mendalam\s+di\s+google\s+news[^.\n]*[.]?", "", text)
+
     noise_patterns = [
         r"(?i)^\s*(?:baca\s+juga|simak\s+video|tonton\s+juga|lihat\s+foto|artikel\s+terkait|berita\s+terkait|video\s+terkait)\s*:?.*$",
         r"(?i)^\s*(?:halaman\s+selanjutnya|pilihan\s+editor|editor\s*:\s*[\w\s,\.]+|penulis\s*:\s*[\w\s,\.]+|kontributor\s*:\s*[\w\s,\.]+)\b.*$",
