@@ -2123,6 +2123,10 @@ void reconnectMQTT() {
 
     Serial.print("[MQTT] Menghubungkan ke broker Mosquitto...");
 
+    // Bersihkan socket TCP lama yang menggantung sebelum mencoba koneksi baru (anti rc=-2)
+    espClient.stop();
+    delay(50);
+
     // LWT: Jika koneksi terputus tiba-tiba, Mosquitto otomatis broadcast status offline
     if (mqttClient.connect(CLIENT_ID, TOPIC_AVAILABILITY, 1, true, "offline")) {
         Serial.println(" BERHASIL!");
@@ -2185,8 +2189,8 @@ void loop() {
     } else {
         mqttClient.loop();
 
-        // Heartbeat berkala tiap 60 detik
-        if (now - lastHeartbeat >= 60000) {
+        // Heartbeat berkala tiap 15 detik agar koneksi tetap segar dan tidak terkena timeout broker
+        if (now - lastHeartbeat >= 15000) {
             lastHeartbeat = now;
             mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
         }
