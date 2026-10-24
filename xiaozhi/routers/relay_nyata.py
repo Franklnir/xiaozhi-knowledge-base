@@ -1,6 +1,7 @@
 import hashlib
 import re
 import secrets
+import time
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query, Request, Form
@@ -32,6 +33,7 @@ from xiaozhi.services.mcp_service import is_mcp_connected
 from xiaozhi.database.models import RealRelayControlCommand, RealRelayDeviceStatusCommand
 
 router = APIRouter()
+_relay_device_last_broadcast: Dict[int, float] = {}
 
 
 @router.get("/relay-nyata", response_class=HTMLResponse)
@@ -440,6 +442,24 @@ async def device_relay_commands(request: Request, api_slug: str, token: str = Qu
         store.ack_relay_command(owner["user_id"], owner["room_id"])
     except Exception:
         pass
+
+    # Broadcast status online ke SSE browser (dibatasi 5 detik per ruangan agar tidak banjir event)
+    now_ts = time.time()
+    room_id = owner["room_id"]
+    last_broadcast = _relay_device_last_broadcast.get(room_id, 0.0)
+    if (now_ts - last_broadcast) >= 5.0:
+        _relay_device_last_broadcast[room_id] = now_ts
+        try:
+            from xiaozhi.services.sse_service import broadcast_relay_device_status
+            broadcast_relay_device_status(
+                user_id=owner["user_id"],
+                room_id=room_id,
+                connected=True,
+                last_seen_at=utc_now(),
+                device_label="ESP32 Terhubung",
+            )
+        except Exception:
+            pass
 
     room = store.get_relay_room(owner["user_id"], owner["room_id"])
     commands = store.get_pending_relay_commands(owner["user_id"], owner["room_id"])

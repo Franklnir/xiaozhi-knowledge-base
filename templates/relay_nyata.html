@@ -303,21 +303,27 @@
         border: 1px solid #a7f3d0;
     }
     .relay-conn-badge.is-offline {
-        background: #f1f5f9;
-        color: #64748b;
-        border: 1px solid #cbd5e1;
+        background: #fef2f2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
     }
     .conn-dot {
-        width: 6px;
-        height: 6px;
+        width: 7px;
+        height: 7px;
         border-radius: 50%;
+        transition: background-color 0.25s ease;
     }
     .relay-conn-badge.is-online .conn-dot {
         background: #10b981;
-        box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+        animation: onlineDotPulse 1.8s infinite ease-in-out;
     }
     .relay-conn-badge.is-offline .conn-dot {
-        background: #94a3b8;
+        background: #ef4444;
+    }
+    @keyframes onlineDotPulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.35); opacity: 0.65; }
     }
     .conn-seen-text {
         font-size: 10.5px;
@@ -1528,6 +1534,10 @@
 <script>
     const CSRF_TOKEN = {{ csrf_token|tojson }};
     const ROOMS = {{ rooms|tojson }};
+    const cachedRooms = {};
+    (ROOMS || []).forEach((r) => {
+        cachedRooms[r.id] = Object.assign({}, r);
+    });
     const MAX_RELAYS = {{ api_defaults.max_relays|tojson }};
     const POLL_INTERVAL_MS = {{ api_defaults.poll_interval_ms|tojson }};
     const DEVICE_ONLINE_WINDOW_SECONDS = {{ api_defaults.device_online_window_seconds|tojson }};
@@ -2275,27 +2285,51 @@ void loop() {
         }
     }
 
-    function deviceConnected(room) {
-        if (typeof room.device_connected === "boolean") return room.device_connected;
-        const seenAt = Date.parse(room.device_last_seen_at || "");
+    function isRoomDeviceOnline(room) {
+        if (!room || !room.device_last_seen_at) return false;
+        const seenAt = Date.parse(room.device_last_seen_at);
         if (!Number.isFinite(seenAt)) return false;
-        return Date.now() - seenAt <= DEVICE_ONLINE_WINDOW_SECONDS * 1000;
+        // Jeda toleransi online: 15 detik (ESP32 polling setiap 1000ms)
+        const ageSec = (Date.now() - seenAt) / 1000;
+        return ageSec <= 15;
     }
 
     function paintDeviceConnection(room) {
-        const connected = deviceConnected(room);
+        if (!room) return;
+        const connected = isRoomDeviceOnline(room);
         const label = connected ? "ESP32 Terhubung" : (room.device_last_seen_at ? "ESP32 Terputus" : "Belum Terhubung");
         document.querySelectorAll(`[data-device-connection-room="${room.id}"]`).forEach((el) => {
             el.className = `relay-conn-badge ${connected ? "is-online" : "is-offline"}`;
             const labelEl = el.querySelector("[data-device-connection-label]");
             if (labelEl) labelEl.textContent = label;
         });
+
+        const seenEl = document.getElementById(`roomSeen${room.id}`);
+        if (seenEl) {
+            if (!room.device_last_seen_at) {
+                seenEl.textContent = "belum ada";
+            } else {
+                const seenAt = Date.parse(room.device_last_seen_at);
+                if (Number.isFinite(seenAt)) {
+                    const ageSec = Math.max(0, Math.floor((Date.now() - seenAt) / 1000));
+                    if (ageSec < 5) {
+                        seenEl.textContent = "baru saja (live)";
+                    } else if (ageSec < 60) {
+                        seenEl.textContent = `${ageSec}d lalu`;
+                    } else if (ageSec < 3600) {
+                        seenEl.textContent = `${Math.floor(ageSec / 60)}m lalu`;
+                    } else {
+                        seenEl.textContent = room.device_last_seen_at;
+                    }
+                } else {
+                    seenEl.textContent = room.device_last_seen_at;
+                }
+            }
+        }
     }
 
     function paintRoom(room) {
         if (!room) return;
-        const seenEl = document.getElementById(`roomSeen${room.id}`);
-        if (seenEl) seenEl.textContent = room.device_last_seen_at || "belum ada";
         paintDeviceConnection(room);
         (room.relays || []).forEach((relay) => paintRelay(room.id, relay));
     }
@@ -2443,6 +2477,12 @@ void loop() {
                     // Notifikasi jika dipicu oleh suara XiaoZhi AI
                     if (data.source === "mcp_voice") {
                         showToast(`🎙️ XiaoZhi AI: ${(data.relay_name || "Relay")} di ${(data.room_name || "Ruangan")} diubah ke ${data.status}`, "info");
+                    } else if (data.source === "device_ack") {
+                        const roomId = Number(data.room_id);
+                        if (!cachedRooms[roomId]) cachedRooms[roomId] = { id: roomId };
+                        cachedRooms[roomId].device_connected = true;
+                        cachedRooms[roomId].device_last_seen_at = new Date().toISOString();
+                        paintDeviceConnection(cachedRooms[roomId]);
                     }
                 } catch (err) {}
             });
@@ -2450,12 +2490,14 @@ void loop() {
             relaySSE.addEventListener("device_status", (e) => {
                 try {
                     const data = JSON.parse(e.data);
-                    paintDeviceConnection({
-                        id: data.room_id,
-                        device_connected: data.device_connected,
-                        device_last_seen_at: data.device_last_seen_at,
-                        device_connection_label: data.device_connection_label
-                    });
+                    const roomId = Number(data.room_id);
+                    if (!cachedRooms[roomId]) {
+                        cachedRooms[roomId] = { id: roomId };
+                    }
+                    cachedRooms[roomId].device_connected = data.device_connected;
+                    cachedRooms[roomId].device_last_seen_at = data.device_last_seen_at;
+                    cachedRooms[roomId].device_connection_label = data.device_connection_label;
+                    paintDeviceConnection(cachedRooms[roomId]);
                 } catch (err) {}
             });
 
@@ -2514,5 +2556,12 @@ void loop() {
     // Inisialisasi awal
     renderRelayInputs(1);
     initRelaySSE();
+
+    // Liveness watcher real-time: cek status online/offline setiap 2 detik
+    window.setInterval(() => {
+        Object.values(cachedRooms).forEach((r) => {
+            paintDeviceConnection(r);
+        });
+    }, 2000);
 </script>
 {% endblock %}

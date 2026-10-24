@@ -351,6 +351,21 @@ async def stream_relay_events(user_id: int, request: Request) -> AsyncGenerator[
     q = await relay_event_hub.subscribe(user_id)
     try:
         yield format_sse("connected", {"status": "ok", "user_id": user_id, "message": "Stream Relay Nyata aktif."})
+        # Kirim status perangkat awal untuk semua ruangan saat browser terhubung
+        try:
+            from xiaozhi.dependencies import get_store
+            store = get_store()
+            rooms = store.list_relay_rooms(user_id)
+            for room in rooms:
+                yield format_sse("device_status", {
+                    "room_id": room["id"],
+                    "device_connected": room.get("device_connected", False),
+                    "device_last_seen_at": room.get("device_last_seen_at", ""),
+                    "device_connection_label": room.get("device_connection_label", "Belum Terhubung"),
+                })
+        except Exception:
+            pass
+
         while True:
             if await request.is_disconnected():
                 break
