@@ -259,16 +259,20 @@ class RelayEventHub:
         self._subscribers: Dict[int, Set[asyncio.Queue]] = {}
 
     def emit(self, user_id: int, data: Dict[str, Any], event_type: str = "relay_update") -> None:
-        """Broadcast relay event to user's active SSE connections."""
-        queues = self._subscribers.get(int(user_id), set())
-        if not queues:
-            return
+        """Broadcast relay event to user's active SSE connections (and all active dashboard viewers)."""
         payload = {
             "type": event_type,
             "data": data,
             "timestamp": utc_now(),
         }
-        for q in list(queues):
+        # Kumpulkan semua antrean aktif (target user + siapapun yang sedang membuka halaman relay)
+        target_queues = set()
+        if int(user_id) in self._subscribers:
+            target_queues.update(self._subscribers[int(user_id)])
+        for uid, qs in self._subscribers.items():
+            target_queues.update(qs)
+
+        for q in list(target_queues):
             try:
                 q.put_nowait(payload)
             except Exception:

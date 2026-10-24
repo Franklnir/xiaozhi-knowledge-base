@@ -2163,6 +2163,7 @@ void setup() {
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
     mqttClient.setCallback(mqttCallback);
     mqttClient.setBufferSize(512);
+    mqttClient.setKeepAlive(60);
 
     reconnectMQTT();
 }
@@ -2718,6 +2719,76 @@ void loop() {
 
     // Map untuk timeout watchdog konfirmasi hardware ESP32 (Anti-Gantung jika alat mati)
     const pendingHardwareWatchdogs = new Map();
+    // Map untuk micro-polling loop verifikasi adaptif (Real-Time Dual-Channel tanpa refresh)
+    const activeVerificationLoops = new Map();
+
+    function stopRelayVerification(key) {
+        if (activeVerificationLoops.has(key)) {
+            clearInterval(activeVerificationLoops.get(key));
+            activeVerificationLoops.delete(key);
+        }
+        if (pendingHardwareWatchdogs.has(key)) {
+            clearTimeout(pendingHardwareWatchdogs.get(key));
+            pendingHardwareWatchdogs.delete(key);
+        }
+    }
+
+    function startRelayVerificationLoop(roomId, relayNumber, targetCommand) {
+        const key = `${roomId}-${relayNumber}`;
+        if (activeVerificationLoops.has(key)) {
+            clearInterval(activeVerificationLoops.get(key));
+        }
+
+        let attempts = 0;
+        const maxAttempts = 20; // 20 * 300ms = 6 detik durasi polling adaptif
+        const intervalId = setInterval(async () => {
+            attempts++;
+            if (attempts > maxAttempts) {
+                if (activeVerificationLoops.has(key)) {
+                    clearInterval(activeVerificationLoops.get(key));
+                    activeVerificationLoops.delete(key);
+                }
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/relay-nyata/state", {
+                    headers: { "Accept": "application/json" },
+                    credentials: "same-origin",
+                });
+                if (!res.ok) return;
+                const data = await res.json().catch(() => ({}));
+                if (!data || !data.success || !Array.isArray(data.rooms)) return;
+
+                const targetRoom = data.rooms.find(r => Number(r.id) === Number(roomId));
+                if (!targetRoom || !Array.isArray(targetRoom.relays)) return;
+
+                const targetRelay = targetRoom.relays.find(r => Number(r.relay_number) === Number(relayNumber));
+                if (!targetRelay) return;
+
+                const currentStatus = String(targetRelay.status || "OFF").toUpperCase();
+                if (currentStatus === targetCommand) {
+                    // Konfirmasi fisik hardware mikrokontroler ESP32 valid seketika!
+                    stopRelayVerification(key);
+
+                    paintRelay(roomId, {
+                        relay_number: relayNumber,
+                        status: currentStatus,
+                        pending_command: "",
+                        desired_status: currentStatus,
+                    });
+
+                    paintDeviceConnection(targetRoom);
+
+                    showToast(`✓ Konfirmasi ESP32: ${(targetRelay.nama_relay || "Relay CH " + relayNumber)} telah ${currentStatus}!`, "success");
+                }
+            } catch (e) {
+                // Ignore transient network errors during fast micro-poll
+            }
+        }, 300);
+
+        activeVerificationLoops.set(key, intervalId);
+    }
 
     // ── 1-Click Toggle Switch Handler (Strict Hardware Validation) ──
     async function handleSwitchToggle(roomId, relayNumber, inputEl) {
@@ -2732,7 +2803,7 @@ void loop() {
         const previousStatus = previousConfirmedState ? "ON" : "OFF";
         const key = `${roomId}-${relayNumber}`;
 
-        // 1. REVERT seketika saklar ke posisi fisik aslinya (JANGAN langsung ON)
+        // 1. REVERT seketika saklar ke posisi fisik aslinya (JANGAN langsung ON sebelum ESP32 konfirmasi)
         inputEl.checked = previousConfirmedState;
         inputEl.disabled = true;
 
@@ -2746,12 +2817,10 @@ void loop() {
 
         // 3. Pasang Watchdog Timeout 7 Detik:
         // Jika ESP32 mati/offline dan tidak mengirim ACK via MQTT, batalkan aksi dan kembalikan UI
-        if (pendingHardwareWatchdogs.has(key)) {
-            clearTimeout(pendingHardwareWatchdogs.get(key));
-        }
+        stopRelayVerification(key);
 
         const watchdogId = setTimeout(() => {
-            pendingHardwareWatchdogs.delete(key);
+            stopRelayVerification(key);
             paintRelay(roomId, {
                 relay_number: relayNumber,
                 status: previousStatus,
@@ -2778,8 +2847,7 @@ void loop() {
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || !payload.success) {
                 // Jika server menolak perintah, batalkan watchdog dan kembalikan saklar
-                clearTimeout(watchdogId);
-                pendingHardwareWatchdogs.delete(key);
+                stopRelayVerification(key);
                 paintRelay(roomId, {
                     relay_number: relayNumber,
                     status: previousStatus,
@@ -2787,10 +2855,12 @@ void loop() {
                     desired_status: previousStatus,
                 });
                 showToast(payload.detail || payload.message || "Gagal mengirim perintah ke ESP32.", "error");
+            } else {
+                // Dual-channel realtime: jalankan adaptive micro-polling loop seketika!
+                startRelayVerificationLoop(roomId, relayNumber, targetCommand);
             }
         } catch (err) {
-            clearTimeout(watchdogId);
-            pendingHardwareWatchdogs.delete(key);
+            stopRelayVerification(key);
             paintRelay(roomId, {
                 relay_number: relayNumber,
                 status: previousStatus,
@@ -2825,11 +2895,9 @@ void loop() {
                 desired_status: command,
             });
 
-            if (pendingHardwareWatchdogs.has(key)) {
-                clearTimeout(pendingHardwareWatchdogs.get(key));
-            }
+            stopRelayVerification(key);
             const wd = setTimeout(() => {
-                pendingHardwareWatchdogs.delete(key);
+                stopRelayVerification(key);
                 paintRelay(roomId, {
                     relay_number: rNum,
                     status: prevSt,
@@ -2856,6 +2924,12 @@ void loop() {
                 showToast(payload.detail || "Gagal mengirim perintah ruangan.", "error");
             } else {
                 showToast(`Perintah ${command} dikirim. Menunggu validasi hardware ESP32...`, "info");
+                // Jalankan Fast-Verification Loop seketika untuk semua channel
+                switches.forEach((sw) => {
+                    const parts = sw.id.split("-");
+                    const rNum = Number(parts[1]);
+                    startRelayVerificationLoop(roomId, rNum, command);
+                });
             }
         } catch (err) {
             showToast("Gagal menghubungi server.", "error");
@@ -2922,10 +2996,7 @@ void loop() {
 
                     if (data.source === "device_ack" || !data.pending) {
                         // Mikrokontroler ESP32 telah mengonfirmasi eksekusi fisik relay!
-                        if (pendingHardwareWatchdogs.has(key)) {
-                            clearTimeout(pendingHardwareWatchdogs.get(key));
-                            pendingHardwareWatchdogs.delete(key);
-                        }
+                        stopRelayVerification(key);
 
                         // BARU SEKARANG status UI tombol diubah sesuai konfirmasi mikrokontroler!
                         paintRelay(data.room_id, {
@@ -2955,6 +3026,7 @@ void loop() {
 
                         if (data.source === "mcp_voice") {
                             showToast(`🎙️ XiaoZhi AI: Meminta ${(data.relay_name || "Relay")} ${data.desired}... menunggu konfirmasi ESP32`, "info");
+                            startRelayVerificationLoop(data.room_id, data.relay_number, data.desired || data.pending);
                         }
                     }
                 } catch (err) {}
@@ -2976,16 +3048,16 @@ void loop() {
 
             relaySSE.onerror = () => {
                 updateSSEBadge(false, "Reconnecting (Polling)");
-                startFallbackPolling(15000);
+                startFallbackPolling(2500);
             };
         } catch (err) {
-            startFallbackPolling(15000);
+            startFallbackPolling(2500);
         }
     }
 
     function startFallbackPolling(intervalMs) {
         if (!sseFallbackTimer) {
-            sseFallbackTimer = window.setInterval(refreshRelayStatuses, intervalMs || 15000);
+            sseFallbackTimer = window.setInterval(refreshRelayStatuses, intervalMs || 2500);
         }
     }
 
