@@ -1,3 +1,4 @@
+import hashlib
 import re
 import secrets
 from typing import Any, Dict
@@ -219,7 +220,7 @@ async def generate_api(request: Request):
     body = await request.json()
     nama_tempat = str(body.get("nama_tempat", "")).strip()
     config = generate_real_relay_api_config(nama_tempat)
-    return {"success": True, **config}
+    return {"success": True, "config": config, **config}
 
 
 @router.post("/relay-nyata/add")
@@ -248,11 +249,11 @@ async def add_relay_room(
                 "voice_command_off": str(form.get(f"relay_{index}_off", "")),
                 "status": str(form.get(f"relay_{index}_status", "OFF")),
             })
-        if not api_slug:
+        if not api_slug or not api_token or not api_client_id:
             config = generate_real_relay_api_config(nama_tempat)
-            api_slug = config["api_slug"]
-            api_token = config["api_token"]
-            api_client_id = config["api_client_id"]
+            api_slug = api_slug or config["api_slug"]
+            api_token = api_token or config["api_token"]
+            api_client_id = api_client_id or config["api_client_id"]
         store.add_relay_room(user["id"], nama_tempat, api_slug, api_token, api_client_id, relays)
         return redirect_with_message("/relay-nyata", f"Ruangan '{nama_tempat}' berhasil ditambahkan.")
     except ValueError as exc:
@@ -314,6 +315,10 @@ async def relay_room_config(request: Request, room_id: int):
     room = store.get_relay_room(user["id"], room_id)
     if not room:
         raise HTTPException(status_code=404, detail="Ruangan tidak ditemukan.")
+    base_url = str(request.base_url).rstrip("/")
+    room["api_commands_url"] = f"{base_url}{room.get('api_commands_path', '')}"
+    room["api_status_url"] = f"{base_url}{room.get('api_status_path', '')}"
+    room["api_token_header"] = "X-Device-Token"
     return {"success": True, "room": room}
 
 
@@ -379,24 +384,71 @@ async def relay_nyata_stream(request: Request):
 @router.get("/api/device/relay/{api_slug}/commands")
 async def device_relay_commands(request: Request, api_slug: str, token: str = Query("")):
     store = get_store()
-    if not token:
+    auth_token = token or request.headers.get("X-Device-Token", "")
+    if not auth_token:
         raise HTTPException(status_code=400, detail="Token diperlukan.")
     owner = store.find_relay_room_by_slug(api_slug)
     if not owner:
         raise HTTPException(status_code=404, detail="API slug tidak ditemukan.")
+    if owner.get("api_token") and auth_token != owner["api_token"]:
+        auth_hash = hashlib.sha256(auth_token.encode()).hexdigest()
+        if auth_hash != owner.get("api_token_hash"):
+            raise HTTPException(status_code=401, detail="Token perangkat tidak valid.")
+
+    try:
+        store.ack_relay_command(owner["user_id"], owner["room_id"])
+    except Exception:
+        pass
+
+    room = store.get_relay_room(owner["user_id"], owner["room_id"])
     commands = store.get_pending_relay_commands(owner["user_id"], owner["room_id"])
-    return {"success": True, "commands": commands}
+    relays = [
+        {
+            "relay": r["relay_number"],
+            "name": r.get("nama_relay", f"Relay {r['relay_number']}"),
+            "status": r.get("status", "OFF"),
+            "desired_status": r.get("desired_status", r.get("status", "OFF")),
+        }
+        for r in (room.get("relays", []) if room else [])
+    ]
+    return {"success": True, "commands": commands, "relays": relays}
 
 
 @router.post("/api/device/relay/{api_slug}/status")
 async def device_relay_status(request: Request, api_slug: str, cmd: RealRelayDeviceStatusCommand):
     store = get_store()
-    if not cmd.token:
+    auth_token = cmd.token or request.headers.get("X-Device-Token", "")
+    if not auth_token:
         raise HTTPException(status_code=400, detail="Token diperlukan.")
     owner = store.find_relay_room_by_slug(api_slug)
     if not owner:
         raise HTTPException(status_code=404, detail="API slug tidak ditemukan.")
+    if owner.get("api_token") and auth_token != owner["api_token"]:
+        auth_hash = hashlib.sha256(auth_token.encode()).hexdigest()
+        if auth_hash != owner.get("api_token_hash"):
+            raise HTTPException(status_code=401, detail="Token perangkat tidak valid.")
+
     store.ack_relay_command(owner["user_id"], owner["room_id"], cmd.command_id)
+
+    # If single relay was reported
+    relay_num = cmd.relay or cmd.relay_number
+    relay_st = cmd.status or cmd.command or cmd.state
+    if relay_num and relay_st:
+        try:
+            st_clean = normalize_relay_state(str(relay_st))
+            store.update_relay_status(owner["user_id"], owner["room_id"], int(relay_num), st_clean)
+        except Exception:
+            pass
+
+    # If batch relays array was reported
+    if cmd.relays:
+        for r in cmd.relays:
+            if isinstance(r, dict) and "relay" in r and "status" in r:
+                try:
+                    st_clean = normalize_relay_state(str(r["status"]))
+                    store.update_relay_status(owner["user_id"], owner["room_id"], int(r["relay"]), st_clean)
+                except Exception:
+                    pass
 
     # 2-way broadcast: device is online and command acknowledged
     try:
@@ -426,3 +478,4 @@ async def device_relay_status(request: Request, api_slug: str, cmd: RealRelayDev
         pass
 
     return {"success": True}
+

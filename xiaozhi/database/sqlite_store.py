@@ -26,6 +26,7 @@ from xiaozhi.core.security import (
     decrypt_secret,
     encrypt_secret,
     hash_password,
+    mask_secret,
     normalize_token_hash,
     normalize_username,
     normalize_username_prefix,
@@ -1989,16 +1990,39 @@ class SQLiteStore:
             (owner_id,)
         ).fetchall()
         result = []
+        now_ts = datetime.now(timezone.utc)
         for room in rooms:
+            room_dict = dict(room)
             devices = conn.execute(
                 "SELECT * FROM relay_devices WHERE room_id = ? ORDER BY relay_number",
-                (room["id"],)
+                (room_dict["id"],)
             ).fetchall()
+            slug = str(room_dict.get("api_slug") or "")
+            token = str(room_dict.get("api_token") or "")
+            last_seen = room_dict.get("device_last_seen_at")
+            connected = False
+            if last_seen:
+                try:
+                    last_dt = datetime.fromisoformat(str(last_seen))
+                    connected = (now_ts - last_dt).total_seconds() <= 15
+                except Exception:
+                    pass
             result.append({
-                "id": room["id"],
-                "nama_tempat": room["nama_tempat"],
-                "api_slug": room["api_slug"],
-                "api_client_id": room["api_client_id"],
+                "id": room_dict["id"],
+                "nama_tempat": room_dict["nama_tempat"],
+                "api_slug": slug,
+                "api_client_id": room_dict.get("api_client_id") or f"device-{slug}",
+                "api_token": token,
+                "api_token_masked": mask_secret(token) if token else "********",
+                "api_base_path": f"/api/device/relay/{slug}",
+                "api_commands_path": f"/api/device/relay/{slug}/commands",
+                "api_status_path": f"/api/device/relay/{slug}/status",
+                "jumlah_relay": len(devices),
+                "device_connected": connected,
+                "device_connection_label": "ESP32 Terhubung" if connected else ("ESP32 Terputus" if last_seen else "Belum Terhubung"),
+                "device_last_seen_at": str(last_seen or ""),
+                "created_at": str(room_dict.get("created_at") or ""),
+                "updated_at": str(room_dict.get("updated_at") or ""),
                 "relays": [dict(d) for d in devices],
             })
         return result
@@ -2035,15 +2059,50 @@ class SQLiteStore:
         ).fetchone()
         if not room:
             return None
+        room_dict = dict(room)
         devices = conn.execute(
             "SELECT * FROM relay_devices WHERE room_id = ? ORDER BY relay_number",
             (room_id,)
         ).fetchall()
+        relays = [dict(d) for d in devices]
+        slug = str(room_dict.get("api_slug") or "")
+        token = str(room_dict.get("api_token") or "")
+        last_seen = room_dict.get("device_last_seen_at")
+        connected = False
+        if last_seen:
+            try:
+                last_dt = datetime.fromisoformat(str(last_seen))
+                connected = (datetime.now(timezone.utc) - last_dt).total_seconds() <= 15
+            except Exception:
+                pass
         return {
-            "id": room["id"],
-            "nama_tempat": room["nama_tempat"],
-            "api_slug": room["api_slug"],
-            "relays": [dict(d) for d in devices],
+            "id": room_dict["id"],
+            "nama_tempat": room_dict["nama_tempat"],
+            "api_slug": slug,
+            "api_client_id": room_dict.get("api_client_id") or f"device-{slug}",
+            "api_token": token,
+            "api_token_masked": mask_secret(token) if token else "********",
+            "api_token_header": "X-Device-Token",
+            "api_base_path": f"/api/device/relay/{slug}",
+            "api_commands_path": f"/api/device/relay/{slug}/commands",
+            "api_status_path": f"/api/device/relay/{slug}/status",
+            "api_commands_url": f"/api/device/relay/{slug}/commands",
+            "api_status_url": f"/api/device/relay/{slug}/status",
+            "jumlah_relay": len(relays),
+            "device_connected": connected,
+            "device_connection_label": "ESP32 Terhubung" if connected else ("ESP32 Terputus" if last_seen else "Belum Terhubung"),
+            "device_last_seen_at": str(last_seen or ""),
+            "created_at": str(room_dict.get("created_at") or ""),
+            "updated_at": str(room_dict.get("updated_at") or ""),
+            "relays": relays,
+            "api_status_payload_example": {
+                "token": token or "TOKEN_PERANGKAT",
+                "command_id": "cmd_12345",
+                "relays": [
+                    {"relay": r["relay_number"], "status": r["status"]}
+                    for r in relays
+                ],
+            },
         }
 
     def update_relay_room(self, owner_id: int, room_id: int, nama_tempat: str, relays: List[Dict]) -> None:
@@ -2059,8 +2118,10 @@ class SQLiteStore:
                 ON CONFLICT(room_id, relay_number) DO UPDATE SET
                     nama_relay=excluded.nama_relay,
                     voice_command_on=excluded.voice_command_on,
-                    voice_command_off=excluded.voice_command_off
+                    voice_command_off=excluded.voice_command_off,
+                    status=excluded.status
             """, (room_id, relay.get("relay_number", 1), relay.get("nama_relay", ""), relay.get("voice_command_on", ""), relay.get("voice_command_off", ""), relay.get("status", "OFF")))
+        conn.execute("DELETE FROM relay_devices WHERE room_id = ? AND relay_number > ?", (room_id, len(relays)))
         conn.commit()
 
     def delete_relay_room(self, owner_id: int, room_id: int) -> bool:
@@ -2068,6 +2129,38 @@ class SQLiteStore:
         cursor = conn.execute("DELETE FROM relay_rooms WHERE id = ? AND owner_id = ?", (room_id, owner_id))
         conn.commit()
         return cursor.rowcount > 0
+
+    def find_relay_room_by_slug(self, api_slug: str) -> Optional[Dict[str, Any]]:
+        conn = self._get_conn()
+        room = conn.execute(
+            "SELECT * FROM relay_rooms WHERE api_slug = ?",
+            (api_slug.strip(),)
+        ).fetchone()
+        if not room:
+            return None
+        room_dict = dict(room)
+        return {
+            "user_id": room_dict["owner_id"],
+            "room_id": room_dict["id"],
+            "nama_tempat": room_dict["nama_tempat"],
+            "api_slug": room_dict["api_slug"],
+            "api_client_id": room_dict.get("api_client_id", ""),
+            "api_token": room_dict.get("api_token", ""),
+            "api_token_hash": "",
+        }
+
+    def ack_relay_command(self, owner_id: int, room_id: int, command_id: str = None) -> None:
+        conn = self._get_conn()
+        now = utc_now()
+        try:
+            conn.execute("ALTER TABLE relay_rooms ADD COLUMN device_last_seen_at TEXT")
+        except Exception:
+            pass
+        conn.execute(
+            "UPDATE relay_rooms SET updated_at = ?, device_last_seen_at = ? WHERE id = ? AND owner_id = ?",
+            (now, now, room_id, owner_id)
+        )
+        conn.commit()
 
     def update_relay_status(self, owner_id: int, room_id: int, relay_number: int, status: str) -> None:
         conn = self._get_conn()

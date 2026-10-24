@@ -1175,7 +1175,7 @@
             window.alert(payload.detail || "Gagal generate API.");
             return;
         }
-        fillApiConfig(payload.config);
+        fillApiConfig(payload.config || payload);
     }
 
     function openAddForm() {
@@ -1197,8 +1197,9 @@
         document.getElementById("relayModalTitle").textContent = `Edit Ruangan: ${room.nama_tempat}`;
         relayForm.action = `/relay-nyata/update/${encodeURIComponent(room.id)}`;
         namaTempat.value = room.nama_tempat || "";
-        jumlahRelay.value = String(room.jumlah_relay || 1);
-        renderRelayInputs(room.jumlah_relay || 1, room.relays || []);
+        const count = room.jumlah_relay || (room.relays ? room.relays.length : 1);
+        jumlahRelay.value = String(count);
+        renderRelayInputs(count, room.relays || []);
         fillApiConfig({
             api_slug: room.api_slug,
             api_client_id: room.api_client_id,

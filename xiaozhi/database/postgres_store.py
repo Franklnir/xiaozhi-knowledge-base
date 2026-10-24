@@ -30,6 +30,7 @@ from xiaozhi.core.security import (
     decrypt_secret,
     encrypt_secret,
     hash_password,
+    mask_secret,
     normalize_token_hash,
     normalize_username,
     normalize_username_prefix,
@@ -361,6 +362,7 @@ class PostgresStore:
                             CONSTRAINT chk_relay_device_status CHECK (status IN ('ON', 'OFF'))
                         );
                         CREATE INDEX IF NOT EXISTS idx_relay_device_room ON relay_devices(room_id);
+                        ALTER TABLE relay_rooms ADD COLUMN IF NOT EXISTS device_last_seen_at TIMESTAMPTZ;
                     """)
 
                     # 8. Audio Queue
@@ -2305,14 +2307,35 @@ class PostgresStore:
                 cur.execute("SELECT * FROM relay_rooms WHERE owner_id = %s ORDER BY id ASC", (int(owner_id),))
                 rooms = cur.fetchall()
                 result = []
+                now_utc = datetime.now(timezone.utc)
                 for room in rooms:
                     cur.execute("SELECT * FROM relay_devices WHERE room_id = %s ORDER BY relay_number ASC", (room["id"],))
                     devices = cur.fetchall()
+                    slug = str(room.get("api_slug") or "")
+                    token = decrypt_secret(room["api_token_ciphertext"]) if room.get("api_token_ciphertext") else ""
+                    last_seen = room.get("device_last_seen_at")
+                    connected = False
+                    if last_seen:
+                        try:
+                            # 15 seconds window for online status
+                            age = (now_utc - last_seen).total_seconds()
+                            connected = (age <= 15)
+                        except Exception:
+                            pass
                     result.append({
                         "id": room["id"],
                         "nama_tempat": room["nama_tempat"],
-                        "api_slug": room["api_slug"],
-                        "api_client_id": room["api_client_id"],
+                        "api_slug": slug,
+                        "api_client_id": room.get("api_client_id") or f"device-{slug}",
+                        "api_token": token,
+                        "api_token_masked": mask_secret(token) if token else "********",
+                        "api_base_path": f"/api/device/relay/{slug}",
+                        "api_commands_path": f"/api/device/relay/{slug}/commands",
+                        "api_status_path": f"/api/device/relay/{slug}/status",
+                        "jumlah_relay": len(devices),
+                        "device_connected": connected,
+                        "device_connection_label": "ESP32 Terhubung" if connected else ("ESP32 Terputus" if last_seen else "Belum Terhubung"),
+                        "device_last_seen_at": _format_ts(last_seen) or "",
                         "created_at": _format_ts(room.get("created_at")) or "",
                         "updated_at": _format_ts(room.get("updated_at")) or "",
                         "relays": devices,
@@ -2373,13 +2396,46 @@ class PostgresStore:
                 if not room:
                     return None
                 cur.execute("SELECT * FROM relay_devices WHERE room_id = %s ORDER BY relay_number ASC", (int(room_id),))
+                relays = cur.fetchall()
+                slug = str(room.get("api_slug") or "")
+                token = decrypt_secret(room["api_token_ciphertext"]) if room.get("api_token_ciphertext") else ""
+                last_seen = room.get("device_last_seen_at")
+                now_utc = datetime.now(timezone.utc)
+                connected = False
+                if last_seen:
+                    try:
+                        age = (now_utc - last_seen).total_seconds()
+                        connected = (age <= 15)
+                    except Exception:
+                        pass
                 return {
                     "id": room["id"],
                     "nama_tempat": room["nama_tempat"],
-                    "api_slug": room["api_slug"],
+                    "api_slug": slug,
+                    "api_client_id": room.get("api_client_id") or f"device-{slug}",
+                    "api_token": token,
+                    "api_token_masked": mask_secret(token) if token else "********",
+                    "api_token_header": "X-Device-Token",
+                    "api_base_path": f"/api/device/relay/{slug}",
+                    "api_commands_path": f"/api/device/relay/{slug}/commands",
+                    "api_status_path": f"/api/device/relay/{slug}/status",
+                    "api_commands_url": f"/api/device/relay/{slug}/commands",
+                    "api_status_url": f"/api/device/relay/{slug}/status",
+                    "jumlah_relay": len(relays),
+                    "device_connected": connected,
+                    "device_connection_label": "ESP32 Terhubung" if connected else ("ESP32 Terputus" if last_seen else "Belum Terhubung"),
+                    "device_last_seen_at": _format_ts(last_seen) or "",
                     "created_at": _format_ts(room.get("created_at")) or "",
                     "updated_at": _format_ts(room.get("updated_at")) or "",
-                    "relays": cur.fetchall(),
+                    "relays": relays,
+                    "api_status_payload_example": {
+                        "token": token or "TOKEN_PERANGKAT",
+                        "command_id": "cmd_12345",
+                        "relays": [
+                            {"relay": r["relay_number"], "status": r["status"]}
+                            for r in relays
+                        ],
+                    },
                 }
 
     def update_relay_room(self, owner_id: int, room_id: int, nama_tempat: str, relays: List[Dict]) -> None:
@@ -2398,7 +2454,8 @@ class PostgresStore:
                         ON CONFLICT(room_id, relay_number) DO UPDATE SET
                             nama_relay = EXCLUDED.nama_relay,
                             voice_command_on = EXCLUDED.voice_command_on,
-                            voice_command_off = EXCLUDED.voice_command_off
+                            voice_command_off = EXCLUDED.voice_command_off,
+                            status = EXCLUDED.status
                         """,
                         (
                             int(room_id),
@@ -2409,6 +2466,8 @@ class PostgresStore:
                             relay.get("status", "OFF").upper(),
                         ),
                     )
+                # Clean up deleted relay channels if room relay count was reduced
+                cur.execute("DELETE FROM relay_devices WHERE room_id = %s AND relay_number > %s", (int(room_id), len(relays)))
             conn.commit()
 
     def delete_relay_room(self, owner_id: int, room_id: int) -> bool:
@@ -2418,6 +2477,34 @@ class PostgresStore:
                 affected = cur.rowcount > 0
             conn.commit()
         return affected
+
+    def find_relay_room_by_slug(self, api_slug: str) -> Optional[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM relay_rooms WHERE api_slug = %s", (api_slug.strip(),))
+                room = cur.fetchone()
+                if not room:
+                    return None
+                token = decrypt_secret(room["api_token_ciphertext"]) if room.get("api_token_ciphertext") else ""
+                return {
+                    "user_id": room["owner_id"],
+                    "room_id": room["id"],
+                    "nama_tempat": room["nama_tempat"],
+                    "api_slug": room["api_slug"],
+                    "api_client_id": room.get("api_client_id", ""),
+                    "api_token": token,
+                    "api_token_hash": room.get("api_token_hash"),
+                }
+
+    def ack_relay_command(self, owner_id: int, room_id: int, command_id: str = None) -> None:
+        now = utc_now()
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE relay_rooms SET updated_at = %s, device_last_seen_at = %s WHERE id = %s AND owner_id = %s",
+                    (now, now, int(room_id), int(owner_id)),
+                )
+            conn.commit()
 
     def update_relay_status(self, owner_id: int, room_id: int, relay_number: int, status: str) -> None:
         status_clean = status.strip().upper()

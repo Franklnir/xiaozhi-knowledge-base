@@ -58,3 +58,4 @@ class RealRelayDeviceStatusCommand(BaseModel):
     command: Optional[Union[str, bool, int]] = None
     state: Optional[Union[str, bool, int]] = None
     command_id: str = ""
+    relays: Optional[List[dict]] = None

@@ -3532,6 +3532,32 @@ class HFJsonStore:
                     return {"room": room, "relay": relay, "command": "OFF"}
         return None
 
+    def find_relay_room_by_slug(self, api_slug: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            for room in data.get("relay_rooms", []):
+                if str(room.get("api_slug", "")).strip().lower() == api_slug.strip().lower():
+                    return {
+                        "user_id": room.get("owner_id"),
+                        "room_id": room.get("id"),
+                        "nama_tempat": room.get("nama_tempat", ""),
+                        "api_slug": room.get("api_slug", ""),
+                        "api_client_id": room.get("api_client_id", ""),
+                        "api_token": room.get("api_token", ""),
+                        "api_token_hash": "",
+                    }
+            return None
+
+    def ack_relay_command(self, owner_id: int, room_id: int, command_id: str = None) -> None:
+        with self._lock:
+            data = self._load()
+            for room in data.get("relay_rooms", []):
+                if int(room.get("id", 0)) == int(room_id) and int(room.get("owner_id", 0)) == int(owner_id):
+                    room["device_last_seen_at"] = utc_now()
+                    room["updated_at"] = utc_now()
+                    break
+            self._commit(data, "Ack relay command")
+
     def get_pending_relay_commands(self, owner_id: int, room_id: int) -> List[Dict[str, Any]]:
         return []
 
