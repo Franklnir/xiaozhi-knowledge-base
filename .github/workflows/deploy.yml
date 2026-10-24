@@ -57,7 +57,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1
@@ -65,6 +65,8 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: irsyad
           key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 25m
+          timeout: 60s
           script: |
             cd ${{ env.APP_DIR }}
 
