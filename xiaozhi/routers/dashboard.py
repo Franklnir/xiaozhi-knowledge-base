@@ -227,6 +227,9 @@ async def add_category(request: Request, name: str = Form(...), csrf_token: str 
         return redirect_with_message("/dashboard", f"Kategori '{name}' ditambahkan.")
     except ValueError as exc:
         return redirect_with_message("/dashboard", f"Gagal: {exc}")
+    except Exception as exc:
+        logger.exception("Error adding category: %s", exc)
+        return redirect_with_message("/dashboard", f"Gagal menambahkan kategori: {exc}")
 
 
 @router.post("/delete_category/{cat_id}")
@@ -241,6 +244,9 @@ async def delete_category(request: Request, cat_id: int, csrf_token: str = Form(
         return redirect_with_message("/dashboard", "Kategori dihapus." if deleted else "Kategori tidak ditemukan.")
     except ValueError as exc:
         return redirect_with_message("/dashboard", f"Gagal: {exc}")
+    except Exception as exc:
+        logger.exception("Error deleting category: %s", exc)
+        return redirect_with_message("/dashboard", f"Gagal menghapus kategori: {exc}")
 
 
 @router.post("/api/user/theme")

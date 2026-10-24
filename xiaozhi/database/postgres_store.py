@@ -790,6 +790,7 @@ class PostgresStore:
     def _seed_default_categories(self, user_id: int) -> None:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id)
                 now = utc_now()
                 for name in DEFAULT_CATEGORIES:
                     cur.execute(
@@ -805,6 +806,7 @@ class PostgresStore:
     def _ensure_live_api_category(self, user_id: int) -> None:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_id)
                 cur.execute(
                     """
                     INSERT INTO categories (owner_id, name, created_at)
@@ -818,15 +820,15 @@ class PostgresStore:
     def list_categories(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM categories WHERE owner_id = %s ORDER BY name ASC", (int(owner_id),))
                 return cur.fetchall()
 
     def add_category(self, owner_id: int, name: str) -> None:
-        name = clean_text(name)
-        if not name:
-            raise ValueError("Nama kategori tidak boleh kosong.")
+        name = clean_text(name, max_len=80, min_len=2, field="Nama kategori")
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 try:
                     cur.execute(
                         "INSERT INTO categories (owner_id, name, created_at) VALUES (%s, %s, %s)",
@@ -840,17 +842,31 @@ class PostgresStore:
     def delete_category(self, owner_id: int, category_id: int) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
+                cur.execute("SELECT name FROM categories WHERE id = %s AND owner_id = %s", (int(category_id), int(owner_id)))
+                row = cur.fetchone()
+                if not row:
+                    return False
+                if is_live_api_category(row.get("name", "")):
+                    raise ValueError("Kategori data dari api bersifat permanen.")
                 cur.execute("DELETE FROM categories WHERE id = %s AND owner_id = %s", (int(category_id), int(owner_id)))
                 affected = cur.rowcount > 0
             conn.commit()
         return affected
 
     def ensure_categories(self, owner_id: int, names: List[str]) -> List[str]:
-        cleaned = [clean_text(name) for name in names if clean_text(name)]
+        cleaned = []
+        for name in names:
+            if name and str(name).strip():
+                try:
+                    cleaned.append(clean_text(str(name), max_len=80, min_len=2, field="Nama kategori"))
+                except ValueError:
+                    pass
         if not cleaned:
             return []
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 now = utc_now()
                 for cat in cleaned:
                     cur.execute(
