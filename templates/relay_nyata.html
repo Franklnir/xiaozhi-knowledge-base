@@ -945,6 +945,143 @@
         width: 100%;
     }
 
+    /* ── ESP32-C3 Banner & Setup Tabs ───────────────────────────── */
+    .relay-esp32c3-banner {
+        background: #ecfdf5;
+        border: 1.5px solid #10b981;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .banner-badge {
+        background: #10b981;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 850;
+        letter-spacing: 0.5px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .banner-content strong {
+        font-size: 13px;
+        color: #065f46;
+        display: block;
+        margin-bottom: 2px;
+    }
+    .banner-content p {
+        font-size: 11.5px;
+        color: #047857;
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    .relay-cfg-tabs {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1.5px solid var(--app-border);
+        padding-bottom: 8px;
+        margin-bottom: 14px;
+    }
+    .relay-cfg-tab {
+        padding: 7px 14px;
+        border-radius: 7px;
+        font-size: 12px;
+        font-weight: 750;
+        border: 1px solid var(--app-border);
+        background: var(--app-surface);
+        color: var(--app-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .relay-cfg-tab:hover {
+        background: var(--app-surface-muted);
+        color: var(--app-text);
+    }
+    .relay-cfg-tab.active {
+        background: var(--app-text);
+        color: var(--app-surface);
+        border-color: var(--app-text);
+    }
+
+    .relay-wifi-customizer-box {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+    }
+
+    .relay-pinout-guide {
+        background: rgba(0, 0, 0, 0.03);
+        border: 1px solid var(--app-border);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 11px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .guide-title {
+        font-weight: 800;
+        color: var(--app-text);
+    }
+    .guide-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .guide-pill {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--app-text);
+    }
+    .guide-note {
+        font-size: 10.5px;
+        color: #d97706;
+        font-weight: 600;
+    }
+
+    :root[data-theme="neo"] .relay-esp32c3-banner {
+        background: #ecfdf5;
+        border: 2px solid #111111;
+        box-shadow: 2px 2px 0 #111111;
+    }
+    :root[data-theme="neo"] .banner-badge {
+        border: 1.5px solid #111111;
+    }
+    :root[data-theme="neo"] .relay-cfg-tab {
+        border: 1.5px solid #111111;
+        box-shadow: 1.5px 1.5px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-cfg-tab.active {
+        background: #111111;
+        color: #ffffff;
+        box-shadow: 2.5px 2.5px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-wifi-customizer-box {
+        background: #fffbe8;
+        border: 2px solid #111111;
+        box-shadow: 2px 2px 0 #111111;
+    }
+    :root[data-theme="neo"] .relay-pinout-guide {
+        background: #ffffff;
+        border: 1.5px solid #111111;
+    }
+    :root[data-theme="neo"] .guide-pill {
+        border: 1.5px solid #111111;
+    }
+
     /* ── Responsive Mobile Optimizations ────────────────────────── */
     @media (max-width: 768px) {
         .relay-mode-nav {
@@ -1262,62 +1399,125 @@
      ⚙️ MODAL: KONFIGURASI API ESP32 & CODE GENERATOR
      ==================================================================== -->
 <div class="relay-modal" id="configModal">
-    <div class="app-card relay-modal-panel" style="width: min(100%, 880px);">
+    <div class="app-card relay-modal-panel" style="width: min(100%, 900px);">
         <div class="app-card-header">
             <div>
-                <h2 class="app-section-title" id="configModalTitle">Konfigurasi API ESP32 / ESP8266</h2>
-                <p class="app-section-subtitle">Gunakan endpoint dan token ini di firmware Arduino / MicroPython mikrokontroler Anda.</p>
+                <h2 class="app-section-title" id="configModalTitle">Setup Firmware ESP32-C3 & API</h2>
+                <p class="app-section-subtitle">Generate kodingan Arduino C++ otomatis khusus mikrokontroler ESP32-C3 dan konfigurasi API.</p>
             </div>
             <button type="button" class="app-button app-button-ghost app-icon-button" data-close-config>&times;</button>
         </div>
 
-        <div class="app-alert app-alert-warning" style="margin-bottom:16px;">
-            🔒 <strong>Keamanan:</strong> Jangan bagikan token API ke publik. ESP32 memakai header <code>X-Device-Token</code> untuk mengambil antrean perintah dan mengirim status balik.
-        </div>
-
-        <!-- Direct Copy Fields -->
-        <div style="display:grid; gap:12px; margin-bottom:18px;">
-            <div>
-                <label class="app-label" style="font-size:12px; margin-bottom:4px;">Endpoint Polling Perintah (GET):</label>
-                <div class="relay-copy-input-group">
-                    <input type="text" class="relay-copy-input" id="cfgCommandsUrl" readonly>
-                    <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgCommandsUrl', this)">Salin</button>
-                </div>
-            </div>
-
-            <div>
-                <label class="app-label" style="font-size:12px; margin-bottom:4px;">Endpoint Kirim Status (POST):</label>
-                <div class="relay-copy-input-group">
-                    <input type="text" class="relay-copy-input" id="cfgStatusUrl" readonly>
-                    <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgStatusUrl', this)">Salin</button>
-                </div>
-            </div>
-
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-                <div>
-                    <label class="app-label" style="font-size:12px; margin-bottom:4px;">Client ID Perangkat:</label>
-                    <div class="relay-copy-input-group">
-                        <input type="text" class="relay-copy-input" id="cfgClientId" readonly>
-                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgClientId', this)">Salin</button>
-                    </div>
-                </div>
-                <div>
-                    <label class="app-label" style="font-size:12px; margin-bottom:4px;">Token Rahasia Perangkat:</label>
-                    <div class="relay-copy-input-group">
-                        <input type="text" class="relay-copy-input" id="cfgDeviceToken" readonly>
-                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgDeviceToken', this)">Salin</button>
-                    </div>
-                </div>
+        <!-- ⚡ Keterangan Khusus ESP32-C3 (Pemberitahuan Kompatibilitas & Keamanan) -->
+        <div class="relay-esp32c3-banner">
+            <div class="banner-badge">ESP32-C3 ONLY</div>
+            <div class="banner-content">
+                <strong>Khusus Didesain & Dioptimalkan untuk ESP32-C3 (RISC-V)</strong>
+                <p>Firmware ini dikonfigurasi khusus dengan pemetaan pin aman ESP32-C3 (GPIO 4, 5, 6, 7), proteksi chattering saat startup, dan sinkronisasi 2-arah real-time. Anda hanya perlu memasukkan nama & password Wi-Fi rumah.</p>
             </div>
         </div>
 
-        <!-- Collapsible Raw JSON / Code Example -->
-        <div style="border-top:1px solid var(--app-border); padding-top:14px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                <strong style="font-size:13px; color:var(--app-text);">Format Response JSON:</strong>
-                <button type="button" class="app-button app-button-small" onclick="copyConfigCode(this)">Salin JSON</button>
+        <!-- Tab Bar -->
+        <div class="relay-cfg-tabs">
+            <button type="button" class="relay-cfg-tab active" id="tabBtnArduino" onclick="switchConfigTab('arduino')">
+                <span>💻 Kode Arduino ESP32-C3 (.ino)</span>
+            </button>
+            <button type="button" class="relay-cfg-tab" id="tabBtnEndpoints" onclick="switchConfigTab('endpoints')">
+                <span>🔌 Endpoint & Parameter Teknis API</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: KODE ARDUINO GENERATOR -->
+        <div id="tabPanelArduino" class="relay-tab-panel active">
+            <!-- Wi-Fi Customizer Bar -->
+            <div class="relay-wifi-customizer-box">
+                <div style="font-size:12px; font-weight:800; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                    <span>📶 Konfigurasi Wi-Fi Rumah Anda (Otomatis Masuk ke Kode):</span>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Nama Wi-Fi (SSID):</label>
+                        <input type="text" id="cfgWifiSsid" class="app-input" style="padding:6px 10px; font-size:12px;" value="WIFI_RUMAH_ANDA" placeholder="Contoh: MyHome_WiFi" oninput="regenerateArduinoCode()">
+                    </div>
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Password Wi-Fi:</label>
+                        <input type="text" id="cfgWifiPass" class="app-input" style="padding:6px 10px; font-size:12px;" value="PASSWORD_WIFI" placeholder="Contoh: Rahasia123" oninput="regenerateArduinoCode()">
+                    </div>
+                    <div>
+                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Tipe Modul Relay:</label>
+                        <select id="cfgRelayLogic" class="app-select" style="padding:6px 10px; font-size:12px;" onchange="regenerateArduinoCode()">
+                            <option value="false" selected>ACTIVE HIGH (Relay ON saat 3.3V)</option>
+                            <option value="true">ACTIVE LOW (Relay Biru Songle pada umumnya)</option>
+                        </select>
+                    </div>
+                </div>
             </div>
-            <pre class="relay-code" id="configCode" style="max-height: 260px; font-size:11.5px; border-radius:10px; background:#020617; color:#a7f3d0; padding:12px; overflow:auto;">Memuat konfigurasi...</pre>
+
+            <!-- Pinout Diagram Mini Guide -->
+            <div class="relay-pinout-guide">
+                <span class="guide-title">📌 Pemetaan Pin Fisik ESP32-C3:</span>
+                <div id="cfgPinoutList" class="guide-pills"></div>
+                <span class="guide-note">⚠️ Hindari GPIO 2, 8, 9 pada ESP32-C3 karena merupakan strapping pin SPI bootloader.</span>
+            </div>
+
+            <!-- Code Container -->
+            <div style="position:relative; margin-top:12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                    <span style="font-size:11.5px; font-weight:750; color:var(--app-muted);">Salin kode di bawah ini langsung ke Arduino IDE:</span>
+                    <button type="button" class="app-button app-button-small app-button-primary" id="btnCopyArduino" onclick="copyArduinoCode(this)">
+                        📋 Salin Kode Arduino Lengkap
+                    </button>
+                </div>
+                <pre class="relay-code" id="arduinoCodeBox" style="max-height:360px; font-size:11.5px; border-radius:10px; background:#020617; color:#38bdf8; padding:14px; overflow:auto; line-height:1.45;"></pre>
+            </div>
+        </div>
+
+        <!-- TAB 2: ENDPOINT & PARAMETER API -->
+        <div id="tabPanelEndpoints" class="relay-tab-panel" style="display:none;">
+            <!-- Direct Copy Fields -->
+            <div style="display:grid; gap:12px; margin-top:14px; margin-bottom:18px;">
+                <div>
+                    <label class="app-label" style="font-size:12px; margin-bottom:4px;">Endpoint Polling Perintah (GET):</label>
+                    <div class="relay-copy-input-group">
+                        <input type="text" class="relay-copy-input" id="cfgCommandsUrl" readonly>
+                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgCommandsUrl', this)">Salin</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="app-label" style="font-size:12px; margin-bottom:4px;">Endpoint Kirim Status (POST):</label>
+                    <div class="relay-copy-input-group">
+                        <input type="text" class="relay-copy-input" id="cfgStatusUrl" readonly>
+                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgStatusUrl', this)">Salin</button>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+                    <div>
+                        <label class="app-label" style="font-size:12px; margin-bottom:4px;">Client ID Perangkat:</label>
+                        <div class="relay-copy-input-group">
+                            <input type="text" class="relay-copy-input" id="cfgClientId" readonly>
+                            <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgClientId', this)">Salin</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="app-label" style="font-size:12px; margin-bottom:4px;">Token Rahasia Perangkat:</label>
+                        <div class="relay-copy-input-group">
+                            <input type="text" class="relay-copy-input" id="cfgDeviceToken" readonly>
+                            <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgDeviceToken', this)">Salin</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Raw JSON -->
+            <div style="border-top:1px solid var(--app-border); padding-top:14px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <strong style="font-size:13px; color:var(--app-text);">Format Response JSON:</strong>
+                    <button type="button" class="app-button app-button-small" onclick="copyConfigCode(this)">Salin JSON</button>
+                </div>
+                <pre class="relay-code" id="configCode" style="max-height: 220px; font-size:11.5px; border-radius:10px; background:#020617; color:#a7f3d0; padding:12px; overflow:auto;">Memuat konfigurasi...</pre>
+            </div>
         </div>
     </div>
 </div>
@@ -1625,6 +1825,367 @@
         openRelayModal();
     }
 
+    let currentConfigRoom = null;
+
+    function switchConfigTab(tabName) {
+        const btnArduino = document.getElementById("tabBtnArduino");
+        const btnEndpoints = document.getElementById("tabBtnEndpoints");
+        const panelArduino = document.getElementById("tabPanelArduino");
+        const panelEndpoints = document.getElementById("tabPanelEndpoints");
+
+        if (tabName === "arduino") {
+            btnArduino?.classList.add("active");
+            btnEndpoints?.classList.remove("active");
+            if (panelArduino) panelArduino.style.display = "block";
+            if (panelEndpoints) panelEndpoints.style.display = "none";
+        } else {
+            btnArduino?.classList.remove("active");
+            btnEndpoints?.classList.add("active");
+            if (panelArduino) panelArduino.style.display = "none";
+            if (panelEndpoints) panelEndpoints.style.display = "block";
+        }
+    }
+
+    function buildArduinoCode(room, wifiSsid, wifiPass, activeLow) {
+        if (!room) return "// Memuat konfigurasi...";
+        const numRelays = Math.max(1, Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)));
+        const pins = [4, 5, 6, 7].slice(0, numRelays).join(", ");
+        const pinArray = `const int RELAY_PINS[NUM_RELAYS] = { ${pins} };`;
+        const ssid = wifiSsid || "WIFI_RUMAH_ANDA";
+        const pass = wifiPass || "PASSWORD_WIFI";
+        const logicStr = activeLow ? "true" : "false";
+
+        return `/*
+ * ============================================================
+ * ESP32-C3 FIRMWARE: RELAY NYATA XIAOZHI AI (2-WAY SYNC)
+ * ============================================================
+ * Mikrokontroler : ESP32-C3 (RISC-V) SuperMini / NodeMCU C3
+ * Ruangan        : ${room.nama_tempat}
+ * Client ID      : ${room.api_client_id}
+ * Jumlah Channel : ${numRelays} Channel Relay
+ *
+ * Pemetaan Pinout Fisik ESP32-C3:
+${(room.relays || []).map((r, i) => ` * - Channel ${r.relay_number} (${r.nama_relay}) -> GPIO ${4 + i}`).join("\n")}
+ *
+ * Keamanan Hardware:
+ * 1. Output diset level OFF sebelum pinMode OUTPUT (anti chattering).
+ * 2. Sinkronisasi server saat boot (tidak mematikan lampu jika listrik padam).
+ * 3. 2-Way Hardware Acknowledgment setelah GPIO fisik berubah.
+ * 4. Mendukung Simulator Wokwi & Wi-Fi Rumah Otomatis.
+ */
+
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+// ============================================================
+// 1. KONFIGURASI WIFI RUMAH
+// ============================================================
+const char* WIFI_SSID     = "${ssid}";
+const char* WIFI_PASSWORD = "${pass}";
+
+// ============================================================
+// 2. KONFIGURASI SERVER
+// ============================================================
+const char* CLIENT_ID     = "${room.api_client_id}";
+const char* DEVICE_TOKEN  = "${room.api_token}";
+const char* URL_POLL_COMMANDS = "${room.api_commands_url}";
+const char* URL_SEND_STATUS   = "${room.api_status_url}";
+
+const unsigned long POLL_INTERVAL_MS = 1000;
+const unsigned long WIFI_RETRY_MS    = 5000;
+const unsigned long HTTP_TIMEOUT_MS  = 8000;
+
+// ============================================================
+// 3. KONFIGURASI PIN RELAY ESP32-C3
+// ============================================================
+const int NUM_RELAYS = ${numRelays};
+${pinArray}
+
+// ${activeLow ? "ACTIVE LOW: Relay menyala saat pin LOW (GND)" : "ACTIVE HIGH: Relay menyala saat pin HIGH (3.3V)"}
+const bool RELAY_ACTIVE_LOW = ${logicStr};
+
+bool relayStates[NUM_RELAYS] = { ${Array(numRelays).fill("false").join(", ")} };
+
+// ============================================================
+// 4. CEGAH EKSEKUSI GANDA
+// ============================================================
+unsigned long lastPollTime = 0;
+unsigned long lastWiFiRetryTime = 0;
+
+const int PROCESSED_ID_SLOTS = 10;
+String processedCommandIds[PROCESSED_ID_SLOTS];
+int processedWriteIndex = 0;
+
+bool isCommandProcessed(const String& commandId) {
+    if (commandId.length() == 0) return false;
+    for (int i = 0; i < PROCESSED_ID_SLOTS; i++) {
+        if (processedCommandIds[i] == commandId) return true;
+    }
+    return false;
+}
+
+void rememberCommandId(const String& commandId) {
+    if (commandId.length() == 0) return;
+    processedCommandIds[processedWriteIndex] = commandId;
+    processedWriteIndex = (processedWriteIndex + 1) % PROCESSED_ID_SLOTS;
+}
+
+void applyRelayHardware(int index, bool turnOn) {
+    if (index < 0 || index >= NUM_RELAYS) return;
+    uint8_t pinLevel = RELAY_ACTIVE_LOW ? (turnOn ? LOW : HIGH) : (turnOn ? HIGH : LOW);
+    digitalWrite(RELAY_PINS[index], pinLevel);
+    relayStates[index] = turnOn;
+
+    Serial.printf("[RELAY] CH %d (GPIO %d) -> %s (Level %s)\\n",
+                  index + 1, RELAY_PINS[index], turnOn ? "ON" : "OFF", pinLevel == HIGH ? "HIGH" : "LOW");
+}
+
+// ============================================================
+// 5. MENGIRIM STATUS BALIK (2-WAY ACKNOWLEDGMENT)
+// ============================================================
+bool sendStatusUpdate(const String& commandId) {
+    if (WiFi.status() != WL_CONNECTED) return false;
+
+    WiFiClientSecure client;
+    client.setInsecure();
+
+    HTTPClient http;
+    if (!http.begin(client, URL_SEND_STATUS)) return false;
+
+    http.setTimeout(HTTP_TIMEOUT_MS);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Accept", "application/json");
+    http.addHeader("X-Device-Token", DEVICE_TOKEN);
+
+    StaticJsonDocument<512> doc;
+    doc["token"] = DEVICE_TOKEN;
+    doc["command_id"] = (commandId.length() > 0) ? commandId : "";
+
+    JsonArray relays = doc.createNestedArray("relays");
+    for (int i = 0; i < NUM_RELAYS; i++) {
+        JsonObject r = relays.createNestedObject();
+        r["relay"] = i + 1;
+        r["status"] = relayStates[i] ? "ON" : "OFF";
+    }
+
+    String body;
+    serializeJson(doc, body);
+
+    int httpCode = http.POST(body);
+    bool ok = (httpCode >= 200 && httpCode < 300);
+
+    if (ok) {
+        Serial.printf("[ACK] Berhasil kirim status ke server (HTTP %d)\\n", httpCode);
+    } else {
+        Serial.printf("[ACK] Gagal (HTTP %d)\\n", httpCode);
+    }
+
+    http.end();
+    return ok;
+}
+
+// ============================================================
+// 6. PROSES PERINTAH
+// ============================================================
+void processCommand(JsonObject cmd) {
+    String commandId = cmd["id"] | "";
+    int relayNum     = cmd["relay"] | 0;
+    String action    = cmd["command"] | "";
+    action.trim();
+    action.toUpperCase();
+
+    int index = relayNum - 1;
+    if (index < 0 || index >= NUM_RELAYS) return;
+
+    if (isCommandProcessed(commandId)) {
+        sendStatusUpdate(commandId);
+        return;
+    }
+
+    if (action == "ON") {
+        applyRelayHardware(index, true);
+    } else if (action == "OFF") {
+        applyRelayHardware(index, false);
+    } else if (action == "TOGGLE") {
+        applyRelayHardware(index, !relayStates[index]);
+    } else {
+        return;
+    }
+
+    rememberCommandId(commandId);
+    sendStatusUpdate(commandId);
+}
+
+// ============================================================
+// 7. POLLING SERVER
+// ============================================================
+void pollCommands() {
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    WiFiClientSecure client;
+    client.setInsecure();
+
+    HTTPClient http;
+    if (!http.begin(client, URL_POLL_COMMANDS)) return;
+
+    http.setTimeout(HTTP_TIMEOUT_MS);
+    http.addHeader("X-Device-Token", DEVICE_TOKEN);
+    http.addHeader("Accept", "application/json");
+
+    int httpCode = http.GET();
+    if (httpCode != HTTP_CODE_OK) {
+        http.end();
+        return;
+    }
+
+    String payload = http.getString();
+    http.end();
+
+    StaticJsonDocument<2048> doc;
+    if (deserializeJson(doc, payload)) return;
+    if (!doc["success"]) return;
+
+    JsonArray commands = doc["commands"].as<JsonArray>();
+    if (!commands.isNull() && commands.size() > 0) {
+        for (JsonObject cmd : commands) {
+            processCommand(cmd);
+        }
+        return;
+    }
+
+    JsonArray relays = doc["relays"].as<JsonArray>();
+    bool stateChanged = false;
+    if (!relays.isNull()) {
+        for (JsonObject relay : relays) {
+            int relayNum = relay["relay"] | 0;
+            int index = relayNum - 1;
+            if (index < 0 || index >= NUM_RELAYS) continue;
+
+            String desired = relay["desired_status"] | "";
+            desired.trim();
+            desired.toUpperCase();
+            if (desired != "ON" && desired != "OFF") continue;
+
+            bool desiredOn = (desired == "ON");
+            if (relayStates[index] != desiredOn) {
+                applyRelayHardware(index, desiredOn);
+                stateChanged = true;
+            }
+        }
+    }
+
+    if (stateChanged) {
+        sendStatusUpdate("");
+    }
+}
+
+// ============================================================
+// 8. KONEKSI WIFI & SETUP
+// ============================================================
+void connectWiFi() {
+    if (WiFi.status() == WL_CONNECTED) return;
+    WiFi.disconnect();
+    delay(100);
+    WiFi.mode(WIFI_STA);
+
+    int n = WiFi.scanNetworks();
+    bool isWokwi = false;
+    for (int i = 0; i < n; i++) {
+        if (WiFi.SSID(i) == "Wokwi-GUEST") isWokwi = true;
+    }
+    WiFi.scanDelete();
+
+    if (isWokwi) {
+        Serial.println("[WIFI] Menggunakan Simulator Wokwi...");
+        WiFi.begin("Wokwi-GUEST", "", 6);
+    } else {
+        Serial.printf("[WIFI] Menghubungkan ke %s...\\n", WIFI_SSID);
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    }
+
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("[WIFI] Terhubung! IP: %s\\n", WiFi.localIP().toString().c_str());
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(500);
+
+    // Proteksi: Set pin ke OFF sebelum mengaktifkan OUTPUT (anti cetak-cetek liar)
+    for (int i = 0; i < NUM_RELAYS; i++) {
+        digitalWrite(RELAY_PINS[i], RELAY_ACTIVE_LOW ? HIGH : LOW);
+        pinMode(RELAY_PINS[i], OUTPUT);
+        relayStates[i] = false;
+    }
+
+    Serial.println("\\n==========================================");
+    Serial.printf(" ESP32-C3: %s (READY)\\n", CLIENT_ID);
+    Serial.println("==========================================");
+
+    connectWiFi();
+
+    // SINKRONISASI SERVER SAAT BOOT
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("[INIT] Membaca status server...");
+        pollCommands();
+    }
+}
+
+void loop() {
+    unsigned long now = millis();
+
+    if (WiFi.status() != WL_CONNECTED) {
+        if (now - lastWiFiRetryTime >= WIFI_RETRY_MS) {
+            lastWiFiRetryTime = now;
+            connectWiFi();
+        }
+        delay(10);
+        return;
+    }
+
+    if (now - lastPollTime >= POLL_INTERVAL_MS) {
+        lastPollTime = now;
+        pollCommands();
+    }
+}
+`;
+    }
+
+    function regenerateArduinoCode() {
+        if (!currentConfigRoom) return;
+        const ssid = document.getElementById("cfgWifiSsid")?.value.trim() || "WIFI_RUMAH_ANDA";
+        const pass = document.getElementById("cfgWifiPass")?.value.trim() || "PASSWORD_WIFI";
+        const activeLow = document.getElementById("cfgRelayLogic")?.value === "true";
+        const box = document.getElementById("arduinoCodeBox");
+        if (box) {
+            box.textContent = buildArduinoCode(currentConfigRoom, ssid, pass, activeLow);
+        }
+    }
+
+    function copyArduinoCode(btn) {
+        const box = document.getElementById("arduinoCodeBox");
+        if (!box) return;
+        navigator.clipboard.writeText(box.textContent).then(() => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = "<span>✓ Kode Berhasil Disalin!</span>";
+            showToast("Kode Arduino ESP32-C3 berhasil disalin!", "success");
+            setTimeout(() => { btn.innerHTML = orig; }, 1600);
+        }).catch(() => {
+            showToast("Gagal menyalin kode ke clipboard.", "error");
+        });
+    }
+
     async function showConfig(roomId) {
         const modal = document.getElementById("configModal");
         const code = document.getElementById("configCode");
@@ -1641,15 +2202,26 @@
             return;
         }
         const room = payload.room;
-        document.getElementById("configModalTitle").textContent = `Konfigurasi API: ${room.nama_tempat}`;
+        currentConfigRoom = room;
+
+        document.getElementById("configModalTitle").textContent = `Setup ESP32-C3: ${room.nama_tempat}`;
         document.getElementById("cfgCommandsUrl").value = room.api_commands_url || "";
         document.getElementById("cfgStatusUrl").value = room.api_status_url || "";
         document.getElementById("cfgClientId").value = room.api_client_id || "";
         document.getElementById("cfgDeviceToken").value = room.api_token || "";
 
+        // Pinout Guide mapping
+        const numRelays = Math.max(1, Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)));
+        const pinPills = Array.from({ length: numRelays }, (_, i) => `<span class="guide-pill">CH ${i + 1}: GPIO ${4 + i}</span>`).join(" ");
+        const pinoutEl = document.getElementById("cfgPinoutList");
+        if (pinoutEl) pinoutEl.innerHTML = pinPills;
+
+        switchConfigTab("arduino");
+        regenerateArduinoCode();
+
         code.textContent = JSON.stringify({
             ruangan: room.nama_tempat,
-            hardware: "ESP32 / ESP8266 / Wemos D1",
+            hardware: "ESP32-C3 (RISC-V Architecture)",
             client_id: room.api_client_id,
             token: room.api_token,
             header_auth: `${room.api_token_header}: ${room.api_token}`,
