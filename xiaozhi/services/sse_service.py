@@ -289,6 +289,11 @@ class RelayEventHub:
             if not self._subscribers[uid]:
                 del self._subscribers[uid]
 
+    def subscriber_count(self, user_id: Optional[int] = None) -> int:
+        if user_id is not None:
+            return len(self._subscribers.get(int(user_id), set()))
+        return sum(len(qs) for qs in self._subscribers.values())
+
 
 relay_event_hub = RelayEventHub()
 
