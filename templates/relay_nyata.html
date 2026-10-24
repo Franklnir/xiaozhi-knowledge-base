@@ -1381,7 +1381,7 @@
         <div class="app-card-header">
             <div>
                 <h2 class="app-section-title" id="relayModalTitle">Tambah Relay Nyata</h2>
-                <p class="app-section-subtitle">Konfigurasikan hingga 4 channel relay dalam satu mikrokontroler ESP32.</p>
+                <p class="app-section-subtitle">Konfigurasikan 1 hingga {{ api_defaults.max_relays or 16 }} channel relay fisik dalam satu mikrokontroler ESP32.</p>
             </div>
             <button type="button" class="app-button app-button-ghost app-icon-button" data-close-modal>&times;</button>
         </div>
@@ -1397,9 +1397,9 @@
                     <input id="namaTempat" name="nama_tempat" class="app-input" required maxlength="80" placeholder="Contoh: Kamar Utama, Ruang Tamu">
                 </div>
                 <div>
-                    <label class="app-label" for="jumlahRelay">Jumlah channel relay</label>
+                    <label class="app-label" for="jumlahRelay">Jumlah channel relay (1 - {{ api_defaults.max_relays or 16 }})</label>
                     <select id="jumlahRelay" name="jumlah_relay" class="app-select" required>
-                        {% for count in [1, 2, 3, 4] %}
+                        {% for count in range(1, (api_defaults.max_relays or 16) + 1) %}
                         <option value="{{ count }}">{{ count }} Channel Relay</option>
                         {% endfor %}
                     </select>
@@ -1442,18 +1442,19 @@
         </div>
 
         <!-- ⚡ Keterangan Khusus ESP32-C3 (Pemberitahuan Kompatibilitas & Keamanan) -->
+        <!-- ⚡ Keterangan Kompatibilitas ESP32 & Keamanan 16-Channel Relay -->
         <div class="relay-esp32c3-banner">
-            <div class="banner-badge">ESP32-C3 ONLY</div>
+            <div class="banner-badge">ESP32 SAFE GPIO (1-16 CH)</div>
             <div class="banner-content">
-                <strong>Khusus Didesain & Dioptimalkan untuk ESP32-C3 (RISC-V)</strong>
-                <p>Firmware ini dikonfigurasi khusus dengan pemetaan pin aman ESP32-C3 (GPIO 4, 5, 6, 7), proteksi chattering saat startup, dan sinkronisasi 2-arah real-time. Anda hanya perlu memasukkan nama & password Wi-Fi rumah.</p>
+                <strong>Firmware Universal ESP32 (Mendukung 1 hingga 16 Channel Relay)</strong>
+                <p>Firmware ini dikonfigurasi dengan pemetaan 16 GPIO aman (bebas konflik dengan internal SPI flash), proteksi chattering saat startup, dan sinkronisasi 2-arah real-time. Anda hanya perlu memasukkan nama & password Wi-Fi rumah.</p>
             </div>
         </div>
 
         <!-- Tab Bar -->
         <div class="relay-cfg-tabs">
             <button type="button" class="relay-cfg-tab active" id="tabBtnArduino" onclick="switchConfigTab('arduino')">
-                <span>💻 Kode Arduino ESP32-C3 (.ino)</span>
+                <span>💻 Kode Arduino ESP32 (.ino)</span>
             </button>
             <button type="button" class="relay-cfg-tab" id="tabBtnEndpoints" onclick="switchConfigTab('endpoints')">
                 <span>🔌 Endpoint & Parameter Teknis API</span>
@@ -1494,9 +1495,9 @@
 
             <!-- Pinout Diagram Mini Guide -->
             <div class="relay-pinout-guide">
-                <span class="guide-title">📌 Pemetaan Pin Fisik ESP32-C3:</span>
+                <span class="guide-title">📌 Pemetaan Pin Fisik GPIO ESP32 Aman (1-16 Channel):</span>
                 <div id="cfgPinoutList" class="guide-pills"></div>
-                <span class="guide-note">⚠️ Hindari GPIO 2, 8, 9 pada ESP32-C3 karena merupakan strapping pin SPI bootloader.</span>
+                <span class="guide-note">⚠️ Pinout menggunakan GPIO [4, 5, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33] yang bebas bentrok internal flash SPI dan aman saat booting.</span>
             </div>
 
             <!-- Code Container -->
@@ -1710,6 +1711,12 @@
     }
 
     function validateRelayForm(event) {
+        if (VIRTUAL_ENABLED) {
+            event.preventDefault();
+            window.alert("⚠️ Mode Simulasi Virtual Sedang Aktif!\n\nUntuk menambahkan atau mengedit Relay Nyata, Anda wajib menonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar tidak terjadi tabrakan konfigurasi perintah suara.");
+            showToast("⚠️ Nonaktifkan Simulasi Virtual terlebih dahulu!", "error");
+            return false;
+        }
         const duplicate = findDuplicateRelayCommand();
         if (!duplicate) return;
         event.preventDefault();
@@ -1863,6 +1870,11 @@
     }
 
     function openAddForm() {
+        if (VIRTUAL_ENABLED) {
+            window.alert("⚠️ Mode Simulasi Virtual Masih Aktif!\n\nUntuk menambahkan Relay Nyata fisik, Anda harus menonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar tidak terjadi tabrakan konfigurasi perintah suara asisten XiaoZhi.\n\nSilakan klik tombol 'Nonaktifkan Simulasi Virtual' pada bilah peringatan di atas.");
+            showToast("⚠️ Nonaktifkan Simulasi Virtual terlebih dahulu!", "error");
+            return;
+        }
         document.getElementById("relayModalTitle").textContent = "Tambah Ruangan Relay Nyata";
         relayForm.action = "/relay-nyata/add";
         relayForm.reset();
@@ -1876,6 +1888,11 @@
     }
 
     function openEditForm(roomId) {
+        if (VIRTUAL_ENABLED) {
+            window.alert("⚠️ Mode Simulasi Virtual Masih Aktif!\n\nUntuk mengubah konfigurasi Relay Nyata fisik, Anda harus menonaktifkan Simulasi Smart Home Virtual terlebih dahulu.");
+            showToast("⚠️ Nonaktifkan Simulasi Virtual terlebih dahulu!", "error");
+            return;
+        }
         const room = ROOMS.find((item) => Number(item.id) === Number(roomId));
         if (!room) return;
         document.getElementById("relayModalTitle").textContent = `Edit Ruangan: ${room.nama_tempat}`;
@@ -1917,10 +1934,12 @@
         }
     }
 
+    const SAFE_PINS = [4, 5, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
+
     function buildArduinoCode(room, wifiSsid, wifiPass, activeLow, protocol) {
         if (!room) return "// Memuat konfigurasi...";
-        const numRelays = Math.max(1, Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)));
-        const pins = [4, 5, 6, 7].slice(0, numRelays).join(", ");
+        const numRelays = Math.max(1, Math.min(Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)), SAFE_PINS.length));
+        const pins = SAFE_PINS.slice(0, numRelays).join(", ");
         const pinArray = `const int RELAY_PINS[NUM_RELAYS] = { ${pins} };`;
         const ssid = wifiSsid || "WIFI_RUMAH_ANDA";
         const pass = wifiPass || "PASSWORD_WIFI";
@@ -1928,19 +1947,24 @@
         const slug = room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
         const isMqtt = (protocol === 'mqtt' || !protocol);
 
+        const pinComments = Array.from({ length: numRelays }, (_, i) => {
+            const r = (room.relays && room.relays[i]) ? room.relays[i] : { relay_number: i + 1, nama_relay: `Relay ${i + 1}` };
+            return ` * - Channel ${r.relay_number} (${r.nama_relay || 'Relay ' + (i + 1)}) -> GPIO ${SAFE_PINS[i]}`;
+        }).join("\n");
+
         if (isMqtt) {
             return `/*
  * ============================================================
- * ESP32-C3 FIRMWARE: RELAY NYATA XIAOZHI AI (HYBRID GO + MQTT)
+ * ESP32 FIRMWARE: RELAY NYATA XIAOZHI AI (HYBRID GO + MQTT)
  * ============================================================
  * Arsitektur    : Ultra-Lightweight Event-Driven MQTT (Eclipse Mosquitto)
- * Mikrokontroler: ESP32-C3 (RISC-V) SuperMini / NodeMCU C3
+ * Mikrokontroler: ESP32 / ESP32-C3 / ESP32 WROOM (RISC-V / Xtensa)
  * Ruangan       : ${room.nama_tempat}
  * Client ID     : ${room.api_client_id}
- * Jumlah Channel: ${numRelays} Channel Relay
+ * Jumlah Channel: ${numRelays} Channel Relay (Maks. 16 CH)
  *
- * Pemetaan Pinout Fisik Aman ESP32-C3:
-${(room.relays || []).map((r, i) => ` * - Channel ${r.relay_number} (${r.nama_relay}) -> GPIO ${4 + i}`).join("\n")}
+ * Pemetaan Pinout Fisik Aman (Bebas Konflik SPI Flash):
+${pinComments}
  *
  * Fitur Keamanan Hardware:
  * 1. Output diset level OFF sebelum pinMode OUTPUT (anti chattering).
@@ -2202,15 +2226,15 @@ void loop() {
         // Fallback: HTTP Polling Sketch
         return `/*
  * ============================================================
- * ESP32-C3 FIRMWARE: RELAY NYATA XIAOZHI AI (HTTP FALLBACK)
+ * ESP32 FIRMWARE: RELAY NYATA XIAOZHI AI (HTTP FALLBACK)
  * ============================================================
- * Mikrokontroler : ESP32-C3 (RISC-V) SuperMini / NodeMCU C3
+ * Mikrokontroler : ESP32 / ESP32-C3 / ESP32 WROOM (RISC-V / Xtensa)
  * Ruangan        : ${room.nama_tempat}
  * Client ID      : ${room.api_client_id}
- * Jumlah Channel : ${numRelays} Channel Relay
+ * Jumlah Channel : ${numRelays} Channel Relay (Maks. 16 CH)
  *
- * Pemetaan Pinout Fisik ESP32-C3:
-${(room.relays || []).map((r, i) => ` * - Channel ${r.relay_number} (${r.nama_relay}) -> GPIO ${4 + i}`).join("\n")}
+ * Pemetaan Pinout Fisik Aman (Bebas Konflik SPI Flash):
+${pinComments}
  *
  * Keamanan Hardware:
  * 1. Output diset level OFF sebelum pinMode OUTPUT (anti chattering).
@@ -2576,9 +2600,9 @@ void loop() {
         const mqttLwtEl = document.getElementById("cfgMqttLwtTopic");
         if (mqttLwtEl) mqttLwtEl.value = `xiaozhi/relay/${slug}/availability`;
 
-        // Pinout Guide mapping
-        const numRelays = Math.max(1, Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)));
-        const pinPills = Array.from({ length: numRelays }, (_, i) => `<span class="guide-pill">CH ${i + 1}: GPIO ${4 + i}</span>`).join(" ");
+        // Pinout Guide mapping (Up to 16 Relays)
+        const numRelays = Math.max(1, Math.min(Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)), SAFE_PINS.length));
+        const pinPills = Array.from({ length: numRelays }, (_, i) => `<span class="guide-pill">CH ${i + 1}: GPIO ${SAFE_PINS[i]}</span>`).join(" ");
         const pinoutEl = document.getElementById("cfgPinoutList");
         if (pinoutEl) pinoutEl.innerHTML = pinPills;
 
@@ -2587,7 +2611,7 @@ void loop() {
 
         code.textContent = JSON.stringify({
             ruangan: room.nama_tempat,
-            hardware: "ESP32-C3 (RISC-V Architecture)",
+            hardware: "ESP32 (RISC-V / Xtensa Architecture)",
             protokol: "MQTT Mosquitto (Zero-Lag Event-Driven)",
             client_id: room.api_client_id,
             token: room.api_token,

@@ -168,13 +168,13 @@ func (h *RelayHandler) HandlePostStatus(w http.ResponseWriter, r *http.Request) 
 	if st == "" {
 		st = payload.State
 	}
-	if relayNum > 0 && st != "" {
+	if relayNum > 0 && relayNum <= 16 && st != "" {
 		_ = h.relayStore.UpdateRelayStatus(r.Context(), room.ID, relayNum, st)
 	}
 
 	// 6. Update Batch Relays (if sent)
 	for _, item := range payload.Relays {
-		if item.Relay > 0 && item.Status != "" {
+		if item.Relay > 0 && item.Relay <= 16 && item.Status != "" {
 			_ = h.relayStore.UpdateRelayStatus(r.Context(), room.ID, item.Relay, item.Status)
 		}
 	}
@@ -251,9 +251,35 @@ func (h *RelayHandler) HandlePostControl(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if payload.Relay <= 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Nomor relay diperlukan."})
+	// 1. Keamanan batas channel sistem (1 s/d 16 relay)
+	if payload.Relay <= 0 || payload.Relay > 16 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Nomor relay tidak valid (harus antara 1 dan 16)."})
 		return
+	}
+
+	// 2. Keamanan otorisasi: Pastikan ruangan ada
+	room, err := h.relayStore.GetRoomBySlug(r.Context(), slug)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"detail": "API slug ruangan tidak ditemukan."})
+		return
+	}
+
+	// 3. Keamanan batas ruangan: Pastikan relay benar-benar terdaftar pada ruangan tersebut
+	relays, err := h.relayStore.GetRoomRelays(r.Context(), room.ID)
+	if err == nil && len(relays) > 0 {
+		isAuthorized := false
+		for _, rItem := range relays {
+			if rItem.Relay == payload.Relay {
+				isAuthorized = true
+				break
+			}
+		}
+		if !isAuthorized {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"detail": fmt.Sprintf("Akses ditolak: Relay %d melebihi batas relay terdaftar pada ruangan '%s' (Maksimal: %d channel).", payload.Relay, room.NamaTempat, len(relays)),
+			})
+			return
+		}
 	}
 
 	cmdClean := store.NormalizeRelayState(payload.Command)

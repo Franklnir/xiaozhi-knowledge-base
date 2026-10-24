@@ -123,6 +123,8 @@ def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, sou
     target_status = normalize_relay_state(command)
     current_status = str(relay.get("status", "OFF")).upper()
     relay_num = int(relay.get("relay_number", 1))
+    if relay_num < 1 or relay_num > REAL_RELAY_MAX_RELAYS:
+        raise ValueError(f"Nomor channel relay {relay_num} di luar batas yang diizinkan (1 - {REAL_RELAY_MAX_RELAYS}).")
     slug = room.get("slug") or room.get("api_slug") or ""
     
     import time
@@ -425,6 +427,23 @@ async def add_relay_room(
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
     store = get_store()
     validate_csrf(request, csrf_token, user)
+
+    # 1. Pastikan simulasi smarthome virtual dinonaktifkan terlebih dahulu!
+    feature_settings = store.get_feature_settings(user["id"])
+    if bool(feature_settings.get("virtual_smarthome_enabled", True)):
+        return redirect_with_message(
+            "/relay-nyata",
+            "Gagal: Simulasi Smart Home Virtual sedang aktif! Anda wajib menonaktifkan simulasi virtual terlebih dahulu di menu Profil / Smart Home sebelum menambahkan Relay Nyata fisik."
+        )
+
+    # 2. Cek kuota relay rooms user
+    quota = store.user_quota(user["id"])
+    if quota.get("relay_rooms", {}).get("reached"):
+        return redirect_with_message(
+            "/relay-nyata",
+            f"Gagal: Batas perangkat Relay Nyata akun Anda ({quota.get('relay_rooms', {}).get('limit', 7)} ruangan) telah tercapai."
+        )
+
     try:
         form = await request.form()
         jumlah_relay = parse_int_range(form.get("jumlah_relay"), field="Jumlah relay", minimum=1, maximum=REAL_RELAY_MAX_RELAYS)
@@ -466,6 +485,20 @@ async def update_relay_room(
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
     store = get_store()
     validate_csrf(request, csrf_token, user)
+
+    # 1. Pastikan simulasi virtual tidak aktif saat edit
+    feature_settings = store.get_feature_settings(user["id"])
+    if bool(feature_settings.get("virtual_smarthome_enabled", True)):
+        return redirect_with_message(
+            "/relay-nyata",
+            "Gagal: Simulasi Smart Home Virtual sedang aktif! Nonaktifkan simulasi virtual terlebih dahulu sebelum mengubah konfigurasi Relay Nyata."
+        )
+
+    # 2. Pastikan ruangan milik user yang login
+    existing_room = store.get_relay_room(user["id"], room_id)
+    if not existing_room:
+        return redirect_with_message("/relay-nyata", "Gagal: Ruangan tidak ditemukan atau Anda tidak memiliki akses.")
+
     try:
         form = await request.form()
         nama_tempat = str(form.get("nama_tempat", "")).strip()
@@ -528,12 +561,36 @@ async def relay_room_config(request: Request, room_id: int):
 async def relay_nyata_control(request: Request, cmd: RealRelayControlCommand):
     user = require_user(request)
     store = get_store()
+
+    # 1. Keamanan Mode: Tolak jika simulasi virtual sedang aktif
+    feature_settings = store.get_feature_settings(user["id"])
+    if bool(feature_settings.get("virtual_smarthome_enabled", True)):
+        return JSONResponse({
+            "success": False,
+            "message": "Simulasi Smart Home Virtual sedang aktif. Nonaktifkan simulasi virtual terlebih dahulu untuk mengontrol relay fisik.",
+        }, status_code=400)
+
+    # 2. Keamanan Batas Sistem Relay
+    if cmd.relay_number < 1 or cmd.relay_number > REAL_RELAY_MAX_RELAYS:
+        return JSONResponse({
+            "success": False,
+            "message": f"Akses ditolak: Channel relay {cmd.relay_number} di luar batas yang diizinkan (1 s/d {REAL_RELAY_MAX_RELAYS}).",
+        }, status_code=400)
+
+    # 3. Keamanan Otorisasi Ruangan
     room = store.get_relay_room(user["id"], cmd.room_id)
     if not room:
-        raise HTTPException(status_code=404, detail="Ruangan tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Ruangan tidak ditemukan atau bukan milik akun Anda.")
+
+    # 4. Keamanan Batas Ruangan: Pastikan relay terdaftar pada ruangan tersebut
     relay = next((r for r in room.get("relays", []) if r["relay_number"] == cmd.relay_number), None)
     if not relay:
-        raise HTTPException(status_code=404, detail="Relay tidak ditemukan.")
+        registered_numbers = [r["relay_number"] for r in room.get("relays", [])]
+        return JSONResponse({
+            "success": False,
+            "message": f"Akses ditolak: Channel relay {cmd.relay_number} tidak terdaftar pada ruangan '{room.get('nama_tempat')}'. Ruangan ini hanya memiliki {len(registered_numbers)} relay terdaftar.",
+        }, status_code=403)
+
     try:
         response = control_real_relay(user["id"], room, relay, cmd.command, source="web_ui")
         response["updated_room"] = store.get_relay_room(user["id"], cmd.room_id)
@@ -546,15 +603,26 @@ async def relay_nyata_control(request: Request, cmd: RealRelayControlCommand):
 async def relay_nyata_room_control(request: Request):
     """Batch control all relays in a specific room (All ON / All OFF)."""
     user = require_user(request)
+    store = get_store()
+
+    # 1. Keamanan Mode: Tolak jika simulasi virtual sedang aktif
+    feature_settings = store.get_feature_settings(user["id"])
+    if bool(feature_settings.get("virtual_smarthome_enabled", True)):
+        return JSONResponse({
+            "success": False,
+            "message": "Simulasi Smart Home Virtual sedang aktif. Nonaktifkan simulasi virtual terlebih dahulu untuk mengontrol relay fisik.",
+        }, status_code=400)
+
     body = await request.json()
     room_id = body.get("room_id")
     command = str(body.get("command", "OFF")).upper()
     if not room_id:
         raise HTTPException(status_code=400, detail="room_id diperlukan.")
-    store = get_store()
+
     room = store.get_relay_room(user["id"], int(room_id))
     if not room:
-        raise HTTPException(status_code=404, detail="Ruangan tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Ruangan tidak ditemukan atau bukan milik akun Anda.")
+
     for relay in room.get("relays", []):
         control_real_relay(user["id"], room, relay, command, source="web_ui")
     updated_room = store.get_relay_room(user["id"], int(room_id))

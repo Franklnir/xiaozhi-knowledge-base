@@ -224,3 +224,122 @@ def test_relay_device_endpoint_security_and_null_command_id(tmp_path):
     assert room["relays"][0]["status"] == "ON"
 
 
+def test_relay_virtual_smarthome_guard_and_16_channel_security(tmp_path):
+    import os
+    db_file = str(tmp_path / "test_relay_virtual_guard.db")
+    os.environ["DB_BACKEND"] = "sqlite"
+    os.environ["SQLITE_DB_PATH"] = db_file
+
+    from fastapi.testclient import TestClient
+    from xiaozhi.main import app
+    from xiaozhi.dependencies import get_store, session_serializer, SESSION_COOKIE, generate_csrf
+
+    store = get_store()
+    user = store.create_user("guard_tester", "pwd123456")
+    user_id = user["id"]
+
+    token = session_serializer.dumps({
+        "id": user_id,
+        "username": "guard_tester",
+        "session_version": 1,
+    })
+    csrf = generate_csrf(user)
+    client = TestClient(app, follow_redirects=False)
+    cookies = {SESSION_COOKIE: token}
+
+    # 1. Pastikan default: virtual_smarthome_enabled adalah True
+    store.set_feature_setting(user_id, "virtual_smarthome_enabled", True)
+
+    # A. Coba tambah relay saat virtual aktif -> Wajib ditolak!
+    add_data = {
+        "csrf_token": csrf,
+        "nama_tempat": "Ruang Tamu Virtual",
+        "jumlah_relay": "2",
+        "relay_1_nama": "Lampu 1",
+        "relay_2_nama": "Lampu 2",
+    }
+    resp = client.post("/relay-nyata/add", data=add_data, cookies=cookies)
+    assert resp.status_code == 303
+    assert "Simulasi+Smart+Home+Virtual+sedang+aktif" in resp.headers["location"] or "Simulasi Smart Home Virtual sedang aktif" in resp.headers["location"]
+    assert len(store.list_relay_rooms(user_id)) == 0
+
+    # B. Nonaktifkan Simulasi Virtual -> Sekarang tambah relay fisik diizinkan
+    store.set_feature_setting(user_id, "virtual_smarthome_enabled", False)
+
+    # C. Coba tambah relay dengan 17 channel (> 16 limit) -> Wajib ditolak oleh sistem!
+    add_invalid_17 = {
+        "csrf_token": csrf,
+        "nama_tempat": "Ruang Over Limit",
+        "jumlah_relay": "17",
+    }
+    resp = client.post("/relay-nyata/add", data=add_invalid_17, cookies=cookies)
+    assert resp.status_code == 303
+    assert "harus+antara+1+dan+16" in resp.headers["location"] or "harus antara 1 dan 16" in resp.headers["location"]
+    assert len(store.list_relay_rooms(user_id)) == 0
+
+    # D. Tambah relay fisik hingga 16 relay -> Wajib berhasil!
+    add_valid_16 = {
+        "csrf_token": csrf,
+        "nama_tempat": "Ruang Server 16 Relay",
+        "jumlah_relay": "16",
+    }
+    for i in range(1, 17):
+        add_valid_16[f"relay_{i}_nama"] = f"Server Rack {i}"
+        add_valid_16[f"relay_{i}_status"] = "OFF"
+
+    resp = client.post("/relay-nyata/add", data=add_valid_16, cookies=cookies)
+    assert resp.status_code == 303
+    rooms = store.list_relay_rooms(user_id)
+    assert len(rooms) == 1
+    assert rooms[0]["nama_tempat"] == "Ruang Server 16 Relay"
+    assert len(rooms[0]["relays"]) == 16
+    assert rooms[0]["relays"][15]["relay_number"] == 16
+    room_id = rooms[0]["id"]
+
+    # E. Buat ruangan kedua dengan hanya 2 channel relay untuk tes otorisasi channel
+    config_2ch = generate_real_relay_api_config("Kamar Anak 2CH")
+    relays_2ch = [
+        {"relay_number": 1, "nama_relay": "Lampu Meja", "voice_command_on": "nyalakan meja", "voice_command_off": "matikan meja", "status": "OFF"},
+        {"relay_number": 2, "nama_relay": "Lampu Tidur", "voice_command_on": "nyalakan tidur", "voice_command_off": "matikan tidur", "status": "OFF"},
+    ]
+    room_2ch_id = store.add_relay_room(user_id, "Kamar Anak 2CH", config_2ch["api_slug"], config_2ch["api_token"], config_2ch["api_client_id"], relays_2ch)
+
+    # F. Keamanan Kontrol: Coba aktifkan relay 5 pada ruangan yang hanya punya 2 relay -> Wajib 403 Forbidden!
+    resp = client.post("/api/relay-nyata/control", json={
+        "room_id": room_2ch_id,
+        "relay_number": 5,
+        "command": "ON"
+    }, cookies=cookies)
+    assert resp.status_code == 403
+    assert "tidak terdaftar" in resp.json()["message"]
+
+    # G. Keamanan Kontrol: Coba aktifkan relay 20 (> 16 batas sistem) -> Wajib 400 Bad Request!
+    resp = client.post("/api/relay-nyata/control", json={
+        "room_id": room_id,
+        "relay_number": 20,
+        "command": "ON"
+    }, cookies=cookies)
+    assert resp.status_code == 400
+    assert "di luar batas" in resp.json()["message"]
+
+    # H. Keamanan Kontrol: Aktifkan relay 16 pada ruangan yang punya 16 relay -> Berhasil!
+    resp = client.post("/api/relay-nyata/control", json={
+        "room_id": room_id,
+        "relay_number": 16,
+        "command": "ON"
+    }, cookies=cookies)
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+    # I. Keamanan Mode: Nyalakan kembali Simulasi Virtual -> Kontrol relay nyata harus diblokir!
+    store.set_feature_setting(user_id, "virtual_smarthome_enabled", True)
+    resp = client.post("/api/relay-nyata/control", json={
+        "room_id": room_id,
+        "relay_number": 1,
+        "command": "ON"
+    }, cookies=cookies)
+    assert resp.status_code == 400
+    assert "Simulasi Smart Home Virtual sedang aktif" in resp.json()["message"]
+
+
+
