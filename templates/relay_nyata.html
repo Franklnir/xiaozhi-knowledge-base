@@ -2100,18 +2100,23 @@ void connectWiFi() {
     delay(100);
     WiFi.mode(WIFI_STA);
 
-    int n = WiFi.scanNetworks();
-    bool isWokwi = false;
-    for (int i = 0; i < n; i++) {
-        if (WiFi.SSID(i) == "Wokwi-GUEST") isWokwi = true;
-    }
-    WiFi.scanDelete();
+    bool isDefaultPlaceholder = (String(WIFI_SSID) == "WIFI_RUMAH_ANDA" || strlen(WIFI_SSID) == 0);
+    bool useWokwi = false;
 
-    if (isWokwi) {
-        Serial.println("[WIFI] Menggunakan Simulator Wokwi...");
+    if (isDefaultPlaceholder) {
+        // Cek simulator Wokwi jika user belum mengubah SSID default
+        int n = WiFi.scanNetworks();
+        for (int i = 0; i < n; i++) {
+            if (WiFi.SSID(i) == "Wokwi-GUEST") { useWokwi = true; break; }
+        }
+        WiFi.scanDelete();
+    }
+
+    if (useWokwi) {
+        Serial.println("[WIFI] Menggunakan Simulator Wokwi (Wokwi-GUEST)...");
         WiFi.begin("Wokwi-GUEST", "", 6);
     } else {
-        Serial.printf("[WIFI] Menghubungkan ke %s...\\n", WIFI_SSID);
+        Serial.printf("[WIFI] Menghubungkan ke Wi-Fi Rumah: %s...\\n", WIFI_SSID);
         WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     }
 
@@ -2124,7 +2129,9 @@ void connectWiFi() {
     Serial.println();
 
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.printf("[WIFI] Terhubung! IP: %s\\n", WiFi.localIP().toString().c_str());
+        Serial.printf("[WIFI] TERHUBUNG! IP: %s\\n", WiFi.localIP().toString().c_str());
+    } else {
+        Serial.printf("[WIFI] Gagal terhubung ke %s. Pastikan SSID dan Password benar!\\n", useWokwi ? "Wokwi-GUEST" : WIFI_SSID);
     }
 }
 
