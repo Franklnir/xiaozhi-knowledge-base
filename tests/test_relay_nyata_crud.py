@@ -113,3 +113,16 @@ def test_relay_voice_matching(tmp_path):
     room = store.get_relay_room(owner_id, room_id)
     assert room["relays"][0]["status"] == "ON"
 
+
+def test_real_relay_device_status_command_model():
+    from xiaozhi.database.models import RealRelayDeviceStatusCommand
+    cmd = RealRelayDeviceStatusCommand.model_validate({
+        "token": "tok_123",
+        "command_id": None,
+        "relays": [{"relay": 1, "status": "ON"}]
+    })
+    assert cmd.command_id is None
+    assert cmd.token == "tok_123"
+    assert cmd.relays[0]["status"] == "ON"
+
+

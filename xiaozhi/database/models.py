@@ -51,11 +51,11 @@ class RealRelayControlCommand(BaseModel):
 
 
 class RealRelayDeviceStatusCommand(BaseModel):
-    token: str = ""
+    token: Optional[str] = ""
     relay: Optional[int] = None
     relay_number: Optional[int] = None
     status: Optional[Union[str, bool, int]] = None
     command: Optional[Union[str, bool, int]] = None
     state: Optional[Union[str, bool, int]] = None
-    command_id: str = ""
+    command_id: Optional[str] = None
     relays: Optional[List[dict]] = None
