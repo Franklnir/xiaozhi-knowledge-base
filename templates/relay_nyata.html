@@ -2,180 +2,578 @@
 
 {% block content %}
 <style>
-    .relay-toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
+    /* ================================================================
+       🎛️ SMART HOME RELAY NYATA - MODERN PREMIUM STYLES
+       ================================================================ */
+
+    /* ── Dual-Mode Navigation Bar ───────────────────────────────── */
+    .relay-mode-nav-container {
+        margin-bottom: 20px;
     }
-    .relay-add-button {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .relay-plus {
-        display: inline-grid;
-        width: 22px;
-        height: 22px;
-        place-items: center;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, .16);
-        font-size: 18px;
-        line-height: 1;
-    }
-    .relay-grid {
+    .relay-mode-nav {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        align-items: stretch;
-        gap: 16px;
-    }
-    .relay-card {
-        display: grid;
-        grid-template-rows: auto minmax(0, 1fr) auto;
-        width: 100%;
-        height: 420px;
-        gap: 14px;
-    }
-    .relay-card-title {
-        display: grid;
         gap: 12px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        padding: 6px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
     }
-    .relay-api-path {
-        overflow-wrap: anywhere;
-        color: var(--app-sky);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12px;
-        font-weight: 750;
+    .relay-mode-btn {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 18px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: var(--app-text);
+        background: transparent;
+        border: 1px solid transparent;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
     }
-    .relay-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        align-content: start;
-        gap: 10px;
-        min-height: 0;
-        overflow-y: auto;
-        padding-right: 4px;
+    .relay-mode-btn:hover {
+        background: var(--app-soft);
+        transform: translateY(-1px);
     }
-    .relay-item {
+    .relay-mode-btn.is-active {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.05));
+        border-color: rgba(16, 185, 129, 0.35);
+        box-shadow: 0 2px 10px rgba(16, 185, 129, 0.08);
+    }
+    .relay-mode-icon-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        background: var(--app-soft);
+        color: var(--app-muted);
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+    }
+    .relay-mode-btn.is-active .relay-mode-icon-box {
+        background: #10b981;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    }
+    .relay-mode-text-group {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        min-height: 190px;
-        border: 1px solid var(--app-border);
-        border-radius: 8px;
-        background: var(--app-surface-muted);
-        padding: 12px;
+        gap: 2px;
+        flex: 1;
+        min-width: 0;
     }
-    .relay-item.is-on {
-        border-color: #86efac;
-        background: #ecfdf5;
+    .relay-mode-title {
+        font-size: 14px;
+        font-weight: 750;
+        color: var(--app-text);
     }
-    .relay-item.is-off {
-        border-color: #fecaca;
-        background: #fef2f2;
+    .relay-mode-subtitle {
+        font-size: 11.5px;
+        color: var(--app-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .relay-item-head {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 8px;
+    .relay-mode-badge {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--app-soft);
+        color: var(--app-muted);
+        flex-shrink: 0;
     }
-    .relay-status-group {
+    .relay-mode-badge.is-active-badge {
+        background: #10b981;
+        color: #ffffff;
+    }
+
+    /* ── Live Status Strip & Quick Toolbar ──────────────────────── */
+    .relay-quick-stats {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 6px;
+        justify-content: space-between;
+        gap: 14px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        padding: 14px 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
     }
-    .relay-device-badges {
+    .relay-stats-left {
         display: flex;
         flex-wrap: wrap;
-        justify-content: flex-start;
+        align-items: center;
+        gap: 12px;
+    }
+    .relay-live-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        transition: all 0.3s ease;
+    }
+    .relay-pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #10b981;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: relayPulse 2s infinite cubic-bezier(0.45, 0, 0.55, 1);
+    }
+    @keyframes relayPulse {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* ── Relay Cards Grid ───────────────────────────────────────── */
+    .relay-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        align-items: start;
+        gap: 20px;
+    }
+
+    /* ── Room Card Container ────────────────────────────────────── */
+    .relay-room-card {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 14px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .relay-room-card:hover {
+        border-color: var(--app-border-strong);
+        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.06);
+    }
+
+    /* ── Room Card Header ───────────────────────────────────────── */
+    .relay-room-header {
+        padding: 16px 18px 14px;
+        border-bottom: 1px solid var(--app-border);
+        background: linear-gradient(180deg, var(--app-surface), var(--app-surface-muted));
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .relay-room-header-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .relay-room-identity {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+    .relay-room-icon-badge {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #0284c7, #0369a1);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 3px 10px rgba(3, 105, 161, 0.25);
+    }
+    .relay-room-meta {
+        min-width: 0;
+    }
+    .relay-room-name {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--app-text);
+        line-height: 1.25;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .relay-room-details {
+        font-size: 12px;
+        color: var(--app-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 3px;
+    }
+    .relay-room-actions-menu {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    /* ── Room Master Switch Bar ─────────────────────────────────── */
+    .relay-room-master-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        background: var(--app-soft);
+        border-radius: 9px;
+        padding: 8px 12px;
+    }
+    .relay-room-connection-status {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11.5px;
+        font-weight: 650;
+        color: var(--app-muted);
+    }
+    .relay-master-btn-group {
+        display: flex;
+        align-items: center;
         gap: 6px;
     }
-    .relay-connection-pill {
-        padding: 4px 8px;
-        font-size: 12px;
+    .relay-master-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 750;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 0.15s ease;
     }
-    .relay-chip-off {
+    .relay-master-btn-on {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+        color: #047857;
+    }
+    .relay-master-btn-on:hover {
+        background: #d1fae5;
+        border-color: #6ee7b7;
+        transform: translateY(-1px);
+    }
+    .relay-master-btn-off {
+        background: #fef2f2;
         border-color: #fecaca;
-        background: #fee2e2;
         color: #b91c1c;
     }
-    .relay-command,
-    .relay-sync {
-        margin-top: 7px;
-        color: var(--app-muted);
-        font-size: 12px;
-        line-height: 1.55;
+    .relay-master-btn-off:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
+        transform: translateY(-1px);
     }
-    .relay-actions {
+
+    /* ── Relay Channels List ────────────────────────────────────── */
+    .relay-channels-list {
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* ── Modern Tactile Relay Tile ──────────────────────────────── */
+    .relay-tile {
+        background: var(--app-surface-muted);
+        border: 1.5px solid var(--app-border);
+        border-radius: 12px;
+        padding: 14px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        position: relative;
+    }
+    .relay-tile.is-on {
+        background: linear-gradient(145deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.02));
+        border-color: rgba(16, 185, 129, 0.45);
+        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.08);
+    }
+    .relay-tile.is-off {
+        background: var(--app-surface-muted);
+        border-color: var(--app-border);
+    }
+
+    /* ── Relay Tile Header: Icon, Name & Toggle ──────────────────── */
+    .relay-tile-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .relay-tile-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+    .relay-bulb-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--app-soft);
+        color: var(--app-muted);
+        flex-shrink: 0;
+        transition: all 0.25s ease;
+    }
+    .relay-tile.is-on .relay-bulb-icon {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: #ffffff;
+        box-shadow: 0 0 16px rgba(245, 158, 11, 0.45), 0 2px 8px rgba(217, 119, 6, 0.3);
+        transform: scale(1.04);
+    }
+    .relay-tile-title-group {
+        min-width: 0;
+    }
+    .relay-channel-tag {
+        font-size: 10.5px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--app-muted);
+        display: inline-block;
+    }
+    .relay-name-text {
+        font-size: 14px;
+        font-weight: 750;
+        color: var(--app-text);
+        line-height: 1.3;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* ── iOS-Style Tactile Toggle Switch ────────────────────────── */
+    .relay-toggle-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    .relay-status-pill-badge {
+        font-size: 11px;
+        font-weight: 800;
+        padding: 3px 8px;
+        border-radius: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        transition: all 0.2s ease;
+    }
+    .relay-tile.is-on .relay-status-pill-badge {
+        background: #10b981;
+        color: #ffffff;
+    }
+    .relay-tile.is-off .relay-status-pill-badge {
+        background: var(--app-soft);
+        color: var(--app-muted);
+    }
+
+    .relay-switch {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 26px;
+        cursor: pointer;
+        user-select: none;
+    }
+    .relay-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+    }
+    .relay-switch-slider {
+        position: absolute;
+        inset: 0;
+        background-color: var(--app-border-strong);
+        border-radius: 34px;
+        transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .relay-switch-slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        border-radius: 50%;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .relay-switch input:checked + .relay-switch-slider {
+        background-color: #10b981;
+    }
+    .relay-switch input:checked + .relay-switch-slider:before {
+        transform: translateX(22px);
+    }
+    .relay-switch input:disabled + .relay-switch-slider {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* ── Sync & Pending Indicator ───────────────────────────────── */
+    .relay-sync-indicator {
+        font-size: 11.5px;
+        line-height: 1.4;
+        color: var(--app-muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .relay-sync-indicator.is-pending {
+        color: #d97706;
+        font-weight: 600;
+    }
+    .relay-sync-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+    }
+    .relay-sync-indicator.is-pending .relay-sync-dot {
+        background: #f59e0b;
+        animation: relayPulse 1.2s infinite;
+    }
+
+    /* ── Voice Command Speech Bubbles ───────────────────────────── */
+    .relay-voice-box {
         display: flex;
         flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 2px;
+    }
+    .relay-voice-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 8px;
+        font-size: 11.5px;
+        font-weight: 600;
+        background: var(--app-surface);
+        border: 1px dashed var(--app-border-strong);
+        color: var(--app-text);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        position: relative;
+    }
+    .relay-voice-chip:hover {
+        background: var(--app-soft);
+        border-style: solid;
+        border-color: #0284c7;
+        color: #0284c7;
+        transform: translateY(-1px);
+    }
+    .relay-voice-chip .copy-icon {
+        opacity: 0.45;
+        transition: opacity 0.15s ease;
+    }
+    .relay-voice-chip:hover .copy-icon {
+        opacity: 1;
+    }
+
+    /* ── Room Card Footer Toolbar ───────────────────────────────── */
+    .relay-room-footer {
+        padding: 12px 18px;
+        border-top: 1px solid var(--app-border);
+        background: var(--app-surface);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: 8px;
     }
-    .relay-item .relay-actions {
-        margin-top: auto;
+    .relay-api-pill {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11.5px;
+        color: var(--app-sky);
+        font-weight: 700;
+        background: var(--app-soft);
+        padding: 4px 8px;
+        border-radius: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 170px;
     }
-    .relay-hidden {
-        display: none;
-    }
+
+    /* ── Enhanced Modals ────────────────────────────────────────── */
     .relay-modal {
         position: fixed;
         inset: 0;
-        z-index: 60;
+        z-index: 100;
         display: none;
         align-items: center;
         justify-content: center;
-        background: rgba(15, 23, 42, .54);
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
         padding: 16px;
     }
     .relay-modal.is-open {
         display: flex;
+        animation: relayModalFadeIn 0.2s ease-out;
+    }
+    @keyframes relayModalFadeIn {
+        from { opacity: 0; transform: scale(0.97); }
+        to { opacity: 1; transform: scale(1); }
     }
     .relay-modal-panel {
-        width: min(100%, 860px);
-        max-height: 92vh;
-        overflow: auto;
+        width: min(100%, 820px);
+        max-height: 90vh;
+        overflow-y: auto;
+        border-radius: 16px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
     }
-    .relay-form-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-    }
-    .relay-config-preview {
-        display: grid;
-        gap: 6px;
-        border: 1px solid var(--app-border);
+    .relay-copy-input-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--app-soft);
+        border: 1px solid var(--app-border-strong);
         border-radius: 8px;
-        background: #f8fafc;
-        padding: 12px;
+        padding: 4px 8px;
+    }
+    .relay-copy-input {
+        background: transparent;
+        border: none;
+        outline: none;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-size: 12px;
-        overflow-wrap: anywhere;
+        color: var(--app-text);
+        width: 100%;
     }
-    .relay-code {
-        max-height: 420px;
-        overflow: auto;
-        border: 1px solid var(--app-border);
-        border-radius: 8px;
-        background: #020617;
-        padding: 14px;
-        color: #d1fae5;
-        font-size: 12px;
-        line-height: 1.65;
-        white-space: pre-wrap;
-    }
-    @media (max-width: 760px) {
+
+    /* ── Responsive Mobile Optimizations ────────────────────────── */
+    @media (max-width: 768px) {
+        .relay-mode-nav {
+            grid-template-columns: 1fr;
+        }
         .relay-grid {
             grid-template-columns: 1fr;
         }
-        .relay-card {
-            height: 430px;
+        .relay-room-header-top {
+            flex-direction: column;
+            align-items: flex-start;
         }
-        .relay-form-grid {
-            grid-template-columns: 1fr;
+        .relay-room-actions-menu {
+            width: 100%;
+            justify-content: flex-end;
         }
     }
 </style>
@@ -192,7 +590,7 @@
                 </span>
                 <div class="relay-mode-text-group">
                     <span class="relay-mode-title">⚡ Mode Relay Nyata (Fisik)</span>
-                    <span class="relay-mode-subtitle">Kontrol Perangkat Keras ESP32 / ESP8266 via API</span>
+                    <span class="relay-mode-subtitle">Kontrol Perangkat Keras ESP32 / ESP8266 via HTTP API</span>
                 </div>
                 <span class="relay-mode-badge is-active-badge">Aktif</span>
             </a>
@@ -205,23 +603,28 @@
                 </span>
                 <div class="relay-mode-text-group">
                     <span class="relay-mode-title">🏠 Mode Simulasi Virtual</span>
-                    <span class="relay-mode-subtitle">8 Channel Virtual Smart Home (Web Interaktif)</span>
+                    <span class="relay-mode-subtitle">8 Channel Virtual Smart Home (Simulasi Interaktif Web)</span>
                 </div>
                 <span class="relay-mode-badge">Buka Simulasi ➔</span>
             </a>
         </div>
     </div>
+
+    <!-- ⚡ Header & Quick Live Status Strip -->
     <header class="app-page-header">
         <div>
-            <p class="app-eyebrow">API ESP32/8266 dll</p>
+            <p class="app-eyebrow">Smart Home IoT • ESP32 / ESP8266</p>
             <h1 class="app-title">Relay Nyata</h1>
-            <p class="app-subtitle">Kontrol relay fisik ESP32/8266 dll lewat API polling berdasarkan perintah suara Xiaozhi AI / MCP.</p>
+            <p class="app-subtitle">Kontrol perangkat fisik secara real-time via Web Dashboard dan perintah suara asisten XiaoZhi AI (MCP Tools 2-Arah).</p>
         </div>
         <div class="app-toolbar">
-            <span class="app-status-pill {% if not virtual_smarthome_enabled %}is-online{% else %}is-offline{% endif %}">
-                <span class="app-status-dot"></span>
-                {% if virtual_smarthome_enabled %}Menunggu simulasi dinonaktifkan{% else %}Relay nyata aktif{% endif %}
-            </span>
+            <button type="button" class="app-button app-button-primary relay-add-button" id="openAddRelay" {% if quota.relay_rooms.reached %}disabled{% endif %}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                {% if quota.relay_rooms.reached %}Batas Relay Tercapai{% else %}Tambah Ruangan Relay{% endif %}
+            </button>
         </div>
     </header>
 
@@ -236,134 +639,223 @@
     {% endif %}
 
     {% if virtual_smarthome_enabled %}
-    <div class="app-alert app-alert-warning">
-        Relay Nyata belum bisa berfungsi karena Simulasi Smart Home Virtual masih aktif. Nonaktifkan simulasi dulu agar perintah MCP tidak konflik.
+    <div class="app-alert app-alert-warning" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div>
+            <strong>⚠️ Simulasi Smart Home Virtual Sedang Aktif</strong>
+            <p style="margin:4px 0 0; font-size:13px;">Nonaktifkan simulasi virtual agar perintah suara XiaoZhi mengontrol Relay Fisik secara langsung.</p>
+        </div>
+        <form action="/relay-nyata/toggle-simulasi" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="enabled" value="false">
+            <button type="submit" class="app-button app-button-danger app-button-small">Nonaktifkan Simulasi Virtual</button>
+        </form>
     </div>
-    <form action="/relay-nyata/toggle-simulasi" method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="enabled" value="false">
-        <button type="submit" class="app-button app-button-danger">Nonaktifkan Simulasi Smart Home Virtual</button>
-    </form>
-    {% else %}
-    <div class="app-alert app-alert-success">
-        Simulasi Smart Home Virtual sedang nonaktif. ESP32/8266 dll dapat mengambil perintah lewat API dan mengirim status balik ke database.
-    </div>
-    <form action="/relay-nyata/toggle-simulasi" method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="enabled" value="true">
-        <button type="submit" class="app-button">Aktifkan Kembali Simulasi Virtual</button>
-    </form>
     {% endif %}
 
-    <section class="app-card">
-        <div class="app-card-header is-compact">
-            <div>
-                <h2 class="app-section-title">Batas Akun</h2>
-                <p class="app-section-subtitle">Kuota perangkat relay yang ditetapkan admin.</p>
+    <!-- 📊 Quick Overview & Status Strip -->
+    <section class="relay-quick-stats">
+        <div class="relay-stats-left">
+            <div id="sseLiveBadge" class="relay-live-chip" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                <span class="relay-pulse-dot"></span>
+                <span id="sseLiveText">Live Sinkron (SSE 2-Arah)</span>
             </div>
-        </div>
-        <div class="app-meta-row">
+            <span class="app-chip app-chip-small app-chip-neutral">
+                Ruangan: {{ rooms|length }} Ruangan
+            </span>
             <span class="app-chip app-chip-small {% if quota.relay_rooms.reached %}app-chip-info{% else %}app-chip-neutral{% endif %}">
-                Perangkat Relay: {{ quota.relay_rooms.label }}
+                Kuota Akun: {{ quota.relay_rooms.label }}
             </span>
             <span class="app-chip app-chip-small app-chip-neutral">
-                Total Materi: {{ quota.materials.label }}
+                Interval Polling: {{ api_defaults.poll_interval_ms }} ms
             </span>
-            <span class="app-chip app-chip-small app-chip-neutral">
-                API Realtime: {{ quota.live_apis.label }}
+        </div>
+        <div class="relay-stats-right">
+            {% if not virtual_smarthome_enabled %}
+            <span class="app-status-pill is-online">
+                <span class="app-status-dot"></span>
+                Relay Nyata Siap
             </span>
+            {% else %}
+            <span class="app-status-pill is-offline">
+                <span class="app-status-dot"></span>
+                Mode Simulasi Berjalan
+            </span>
+            {% endif %}
         </div>
     </section>
 
-    <section class="relay-toolbar">
-        <div>
-            <div style="display:flex; align-items:center; gap:8px;">
-                <h2 class="app-section-title">Perangkat Relay</h2>
-                <span id="sseLiveBadge" class="app-chip app-chip-small" style="font-size:11px; font-weight:600; background:rgba(16, 185, 129, 0.12); color:#10b981; border:1px solid rgba(16, 185, 129, 0.3);">⚡ Live Sinkron (SSE)</span>
-            </div>
-            <p class="app-section-subtitle">{{ rooms|length }} ruangan terdaftar. Sinkronisasi instan 2-arah aktif.</p>
-        </div>
-        <button type="button" class="app-button app-button-primary relay-add-button" id="openAddRelay" {% if quota.relay_rooms.reached %}disabled{% endif %}>
-            <span class="relay-plus">+</span>
-            {% if quota.relay_rooms.reached %}Batas Relay Tercapai{% else %}Tambah Relay{% endif %}
-        </button>
-    </section>
-
+    <!-- 🏠 Ruangan Relay Cards Grid -->
     {% if rooms %}
     <section class="relay-grid" id="relayGrid">
         {% for room in rooms %}
-        <article class="app-card relay-card" data-room='{{ room|tojson }}'>
-            <div class="relay-card-title">
-                <div>
-                    <h2 class="app-section-title">{{ room.nama_tempat }}</h2>
-                    <p class="app-section-subtitle">Jumlah Relay: {{ room.jumlah_relay }}</p>
-                    <p class="relay-api-path">Endpoint: {{ room.api_commands_path }}</p>
-                    <p class="app-section-subtitle">Sinkron terakhir: <span id="roomSeen{{ room.id }}">{{ room.device_last_seen_at or "belum ada" }}</span></p>
+        <article class="relay-room-card" id="roomCard{{ room.id }}" data-room='{{ room|tojson }}'>
+            <!-- Room Card Header -->
+            <div class="relay-room-header">
+                <div class="relay-room-header-top">
+                    <div class="relay-room-identity">
+                        <div class="relay-room-icon-badge">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                            </svg>
+                        </div>
+                        <div class="relay-room-meta">
+                            <h2 class="relay-room-name">{{ room.nama_tempat }}</h2>
+                            <div class="relay-room-details">
+                                <span>{{ room.jumlah_relay }} Relay</span>
+                                <span>•</span>
+                                <span class="app-chip app-chip-small" style="font-size:10.5px; padding:2px 6px;">{{ room.api_client_id }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="relay-room-actions-menu">
+                        <button type="button" class="app-button app-button-small app-button-sky" data-config-room="{{ room.id }}" title="Lihat Konfigurasi API ESP32">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                            API
+                        </button>
+                        <button type="button" class="app-button app-button-small" data-edit-room="{{ room.id }}" title="Edit Ruangan & Relay">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                            Edit
+                        </button>
+                        <form action="/relay-nyata/delete/{{ room.id }}" method="POST" onsubmit="return confirm('Hapus seluruh ruangan {{ room.nama_tempat }} dan semua relainya?');" style="margin:0;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="app-button app-button-small app-button-text-danger" title="Hapus Ruangan">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
                 </div>
-                <div class="relay-device-badges">
-                    <span class="app-chip app-chip-small app-chip-info">{{ room.api_client_id }}</span>
-                    <span class="app-status-pill relay-connection-pill {% if room.device_connected %}is-online{% else %}is-offline{% endif %}" data-device-connection-room="{{ room.id }}">
-                        <span class="app-status-dot"></span>
-                        <span data-device-connection-label>{{ room.device_connection_label }}</span>
-                    </span>
+
+                <!-- Master Room Quick Controls & Device Connection -->
+                <div class="relay-room-master-bar">
+                    <div class="relay-room-connection-status">
+                        <span class="app-status-pill relay-connection-pill {% if room.device_connected %}is-online{% else %}is-offline{% endif %}" data-device-connection-room="{{ room.id }}" style="padding: 3px 8px; font-size: 11.5px;">
+                            <span class="app-status-dot"></span>
+                            <span data-device-connection-label>{{ room.device_connection_label }}</span>
+                        </span>
+                        <span style="font-size:11px; opacity:0.8;">Seen: <span id="roomSeen{{ room.id }}">{{ room.device_last_seen_at or "belum ada" }}</span></span>
+                    </div>
+
+                    <!-- ⚡ Master Room Control: Nyalakan Semua & Matikan Semua -->
+                    <div class="relay-master-btn-group">
+                        <button type="button" class="relay-master-btn relay-master-btn-on" onclick="controlRoomAll({{ room.id }}, 'ON')" title="Nyalakan semua relay di ruangan ini">
+                            ⚡ Semua ON
+                        </button>
+                        <button type="button" class="relay-master-btn relay-master-btn-off" onclick="controlRoomAll({{ room.id }}, 'OFF')" title="Matikan semua relay di ruangan ini">
+                            💤 Semua OFF
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div class="relay-list">
+            <!-- List of Relay Channels -->
+            <div class="relay-channels-list">
                 {% for relay in room.relays %}
-                <div class="relay-item {% if relay.status == 'ON' %}is-on{% else %}is-off{% endif %}" id="relayItem{{ room.id }}-{{ relay.relay_number }}">
-                    <div class="relay-item-head">
-                        <strong>Relay {{ relay.relay_number }} - {{ relay.nama_relay }}</strong>
-                        <div class="relay-status-group">
-                            <span class="app-chip app-chip-small {% if relay.status == 'ON' %}app-chip-success{% else %}relay-chip-off{% endif %}" id="relayStatus{{ room.id }}-{{ relay.relay_number }}">{{ relay.status }}</span>
-                            <span class="app-status-pill relay-connection-pill {% if room.device_connected %}is-online{% else %}is-offline{% endif %}" data-device-connection-room="{{ room.id }}">
-                                <span class="app-status-dot"></span>
-                                <span data-device-connection-label>{{ room.device_connection_label }}</span>
-                            </span>
-                            <span class="app-chip app-chip-small app-chip-info {% if not relay.pending_command %}relay-hidden{% endif %}" id="relayPending{{ room.id }}-{{ relay.relay_number }}">
-                                {% if relay.pending_command %}Menunggu {{ relay.pending_command }}{% endif %}
-                            </span>
+                <div class="relay-tile {% if relay.status == 'ON' %}is-on{% else %}is-off{% endif %}" id="relayItem{{ room.id }}-{{ relay.relay_number }}">
+                    <!-- Header: Bulb Icon, Title, and Toggle Switch -->
+                    <div class="relay-tile-head">
+                        <div class="relay-tile-info">
+                            <div class="relay-bulb-icon" id="relayBulb{{ room.id }}-{{ relay.relay_number }}">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9 18h6"></path>
+                                    <path d="M10 22h4"></path>
+                                    <path d="M12 2a7 7 0 0 0-7 7c0 3.03 1.8 5.64 4.36 6.81A1 1 0 0 1 10 16.7V17a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-.3a1 1 0 0 1 .64-.89C17.2 14.64 19 12.03 19 9a7 7 0 0 0-7-7z"></path>
+                                </svg>
+                            </div>
+                            <div class="relay-tile-title-group">
+                                <span class="relay-channel-tag">CH {{ relay.relay_number }}</span>
+                                <h3 class="relay-name-text">{{ relay.nama_relay }}</h3>
+                            </div>
+                        </div>
+
+                        <!-- 🎚️ Tactile Toggle Switch (1-Click Control) -->
+                        <div class="relay-toggle-control">
+                            <span class="relay-status-pill-badge" id="relayStatus{{ room.id }}-{{ relay.relay_number }}">{{ relay.status }}</span>
+                            <label class="relay-switch" title="Klik untuk beralih ON/OFF">
+                                <input type="checkbox" id="relaySwitchInput{{ room.id }}-{{ relay.relay_number }}" {% if relay.status == 'ON' %}checked{% endif %} onchange="handleSwitchToggle({{ room.id }}, {{ relay.relay_number }}, this)" {% if virtual_smarthome_enabled %}disabled{% endif %}>
+                                <span class="relay-switch-slider"></span>
+                            </label>
                         </div>
                     </div>
-                    <div class="relay-sync" id="relaySync{{ room.id }}-{{ relay.relay_number }}">
-                        {% if relay.pending_command %}Target: {{ relay.desired_status }}. Menunggu ESP32/8266 dll mengirim status balik.{% else %}Status database dan target sudah sinkron.{% endif %}
+
+                    <!-- Sync & Hardware Acknowledgment Indicator -->
+                    <div class="relay-sync-indicator {% if relay.pending_command %}is-pending{% endif %}" id="relaySync{{ room.id }}-{{ relay.relay_number }}">
+                        <span class="relay-sync-dot"></span>
+                        <span id="relaySyncText{{ room.id }}-{{ relay.relay_number }}">
+                            {% if relay.pending_command %}
+                            Menunggu ESP32 konfirmasi {{ relay.desired_status }}...
+                            {% else %}
+                            Sinkron dengan status perangkat fisik.
+                            {% endif %}
+                        </span>
                     </div>
-                    <div class="relay-command">
-                        <div>Perintah ON: {{ relay.voice_command_on }}</div>
-                        <div>Perintah OFF: {{ relay.voice_command_off }}</div>
-                    </div>
-                    <div class="relay-actions mt-3">
-                        <button type="button" class="app-button app-button-small app-button-success" data-control-room="{{ room.id }}" data-control-relay="{{ relay.relay_number }}" data-control-command="ON" {% if virtual_smarthome_enabled %}disabled{% endif %}>ON</button>
-                        <button type="button" class="app-button app-button-small app-button-danger" data-control-room="{{ room.id }}" data-control-relay="{{ relay.relay_number }}" data-control-command="OFF" {% if virtual_smarthome_enabled %}disabled{% endif %}>OFF</button>
+
+                    <!-- Voice Command Chips (Copyable on Click) -->
+                    <div class="relay-voice-box">
+                        <div class="relay-voice-chip" onclick="copyVoiceCommand('{{ relay.voice_command_on|escape }}', this)" title="Klik untuk menyalin perintah ON">
+                            <span>🎙️ "{{ relay.voice_command_on }}"</span>
+                            <svg class="copy-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </div>
+                        <div class="relay-voice-chip" onclick="copyVoiceCommand('{{ relay.voice_command_off|escape }}', this)" title="Klik untuk menyalin perintah OFF">
+                            <span>🎙️ "{{ relay.voice_command_off }}"</span>
+                            <svg class="copy-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
 
-            <div class="relay-actions">
-                <button type="button" class="app-button app-button-small" data-edit-room="{{ room.id }}">Edit</button>
-                <button type="button" class="app-button app-button-small app-button-sky" data-config-room="{{ room.id }}">Konfigurasi API</button>
-                <form action="/relay-nyata/delete/{{ room.id }}" method="POST" onsubmit="return confirm('Hapus Relay Nyata ini?');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="submit" class="app-button app-button-small app-button-text-danger">Hapus</button>
-                </form>
+            <!-- Room Card Footer -->
+            <div class="relay-room-footer">
+                <span class="relay-api-pill" title="{{ room.api_commands_path }}">{{ room.api_commands_path }}</span>
+                <button type="button" class="app-button app-button-small" data-config-room="{{ room.id }}" style="font-size:11.5px; padding:4px 10px;">
+                    Setup ESP32 ➔
+                </button>
             </div>
         </article>
         {% endfor %}
     </section>
     {% else %}
-    <div class="app-card text-center">
-        <p class="text-sm font-semibold text-slate-600">Belum ada perangkat Relay Nyata.</p>
+    <!-- Empty State -->
+    <div class="app-card text-center" style="padding: 48px 20px;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--app-soft); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: var(--app-muted);">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+        </div>
+        <h3 class="app-section-title" style="margin-bottom: 6px;">Belum ada perangkat Relay Nyata</h3>
+        <p class="app-section-subtitle" style="max-width: 460px; margin: 0 auto 20px;">Tambahkan ruangan dan konfigurasi relay untuk menghubungkan mikrokontroler ESP32/ESP8266 ke asisten suara XiaoZhi AI.</p>
+        <button type="button" class="app-button app-button-primary" onclick="openAddForm()">
+            + Tambah Ruangan Relay Pertama
+        </button>
     </div>
     {% endif %}
 </div>
 
+<!-- ====================================================================
+     📋 MODAL: TAMBAH / EDIT RUANGAN RELAY
+     ==================================================================== -->
 <div class="relay-modal" id="relayModal">
     <div class="app-card relay-modal-panel">
         <div class="app-card-header">
             <div>
                 <h2 class="app-section-title" id="relayModalTitle">Tambah Relay Nyata</h2>
-                <p class="app-section-subtitle">Maksimal 4 relay dalam satu ruangan.</p>
+                <p class="app-section-subtitle">Konfigurasikan hingga 4 channel relay dalam satu mikrokontroler ESP32.</p>
             </div>
             <button type="button" class="app-button app-button-ghost app-icon-button" data-close-modal>&times;</button>
         </div>
@@ -373,52 +865,110 @@
             <input type="hidden" name="api_token" id="apiToken">
             <input type="hidden" name="api_client_id" id="apiClientId">
 
-            <div class="relay-form-grid">
+            <div class="relay-form-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
                 <div>
                     <label class="app-label" for="namaTempat">Nama tempat / ruangan</label>
-                    <input id="namaTempat" name="nama_tempat" class="app-input" required maxlength="80" placeholder="Kamar Tidur">
+                    <input id="namaTempat" name="nama_tempat" class="app-input" required maxlength="80" placeholder="Contoh: Kamar Utama, Ruang Tamu">
                 </div>
                 <div>
-                    <label class="app-label" for="jumlahRelay">Jumlah relay</label>
+                    <label class="app-label" for="jumlahRelay">Jumlah channel relay</label>
                     <select id="jumlahRelay" name="jumlah_relay" class="app-select" required>
                         {% for count in [1, 2, 3, 4] %}
-                        <option value="{{ count }}">{{ count }} relay</option>
+                        <option value="{{ count }}">{{ count }} Channel Relay</option>
                         {% endfor %}
                     </select>
                 </div>
             </div>
 
-            <div id="relayFields" class="app-form-section"></div>
+            <!-- Dynamic Relay Fields -->
+            <div id="relayFields" class="app-form-section" style="display:grid; gap:12px;"></div>
 
-            <div class="relay-actions">
-                <button type="button" class="app-button app-button-sky" id="generateApiButton">Generate API</button>
-                <span class="app-field-hint" id="generateHint">Endpoint API dan token perangkat dibuat otomatis dari nama ruangan.</span>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-top:6px;">
+                <button type="button" class="app-button app-button-sky" id="generateApiButton">
+                    ⚡ Generate API & Token
+                </button>
+                <span class="app-field-hint" id="generateHint" style="margin:0;">Endpoint API dan token perangkat dibuat otomatis dari nama ruangan.</span>
             </div>
-            <div class="relay-config-preview" id="apiPreview">
+
+            <div class="relay-config-preview" id="apiPreview" style="background:var(--app-soft); border:1px solid var(--app-border-strong); border-radius:10px; padding:12px; font-size:12px; font-family:ui-monospace, monospace; line-height:1.6; display:grid; gap:4px;">
                 <span>API belum digenerate. Jika langsung disimpan, sistem tetap membuat token otomatis.</span>
             </div>
-            <div class="flex justify-end gap-2">
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
                 <button type="button" class="app-button" data-close-modal>Batal</button>
-                <button type="submit" class="app-button app-button-primary">Simpan</button>
+                <button type="submit" class="app-button app-button-primary">Simpan Ruangan</button>
             </div>
         </form>
     </div>
 </div>
 
+<!-- ====================================================================
+     ⚙️ MODAL: KONFIGURASI API ESP32 & CODE GENERATOR
+     ==================================================================== -->
 <div class="relay-modal" id="configModal">
-    <div class="app-card relay-modal-panel">
+    <div class="app-card relay-modal-panel" style="width: min(100%, 880px);">
         <div class="app-card-header">
             <div>
-                <h2 class="app-section-title">Konfigurasi API ESP32/8266 dll</h2>
-                <p class="app-section-subtitle">Token ini hanya ditampilkan untuk akun pemilik perangkat.</p>
+                <h2 class="app-section-title" id="configModalTitle">Konfigurasi API ESP32 / ESP8266</h2>
+                <p class="app-section-subtitle">Gunakan endpoint dan token ini di firmware Arduino / MicroPython mikrokontroler Anda.</p>
             </div>
             <button type="button" class="app-button app-button-ghost app-icon-button" data-close-config>&times;</button>
         </div>
-        <div class="app-alert app-alert-warning">Jangan bagikan token API. ESP32/8266 dll memakai token ini untuk membaca perintah dan mengirim status.</div>
-        <pre class="relay-code mt-4" id="configCode">Memuat konfigurasi...</pre>
+
+        <div class="app-alert app-alert-warning" style="margin-bottom:16px;">
+            🔒 <strong>Keamanan:</strong> Jangan bagikan token API ke publik. ESP32 memakai header <code>X-Device-Token</code> untuk mengambil antrean perintah dan mengirim status balik.
+        </div>
+
+        <!-- Direct Copy Fields -->
+        <div style="display:grid; gap:12px; margin-bottom:18px;">
+            <div>
+                <label class="app-label" style="font-size:12px; margin-bottom:4px;">Endpoint Polling Perintah (GET):</label>
+                <div class="relay-copy-input-group">
+                    <input type="text" class="relay-copy-input" id="cfgCommandsUrl" readonly>
+                    <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgCommandsUrl', this)">Salin</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="app-label" style="font-size:12px; margin-bottom:4px;">Endpoint Kirim Status (POST):</label>
+                <div class="relay-copy-input-group">
+                    <input type="text" class="relay-copy-input" id="cfgStatusUrl" readonly>
+                    <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgStatusUrl', this)">Salin</button>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+                <div>
+                    <label class="app-label" style="font-size:12px; margin-bottom:4px;">Client ID Perangkat:</label>
+                    <div class="relay-copy-input-group">
+                        <input type="text" class="relay-copy-input" id="cfgClientId" readonly>
+                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgClientId', this)">Salin</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="app-label" style="font-size:12px; margin-bottom:4px;">Token Rahasia Perangkat:</label>
+                    <div class="relay-copy-input-group">
+                        <input type="text" class="relay-copy-input" id="cfgDeviceToken" readonly>
+                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgDeviceToken', this)">Salin</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collapsible Raw JSON / Code Example -->
+        <div style="border-top:1px solid var(--app-border); padding-top:14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <strong style="font-size:13px; color:var(--app-text);">Format Response JSON:</strong>
+                <button type="button" class="app-button app-button-small" onclick="copyConfigCode(this)">Salin JSON</button>
+            </div>
+            <pre class="relay-code" id="configCode" style="max-height: 260px; font-size:11.5px; border-radius:10px; background:#020617; color:#a7f3d0; padding:12px; overflow:auto;">Memuat konfigurasi...</pre>
+        </div>
     </div>
 </div>
 
+<!-- ====================================================================
+     💡 JAVASCRIPT: LOGIKA KONTROL 2-ARAH, SSE, & INTERAKSI TACTILE
+     ==================================================================== -->
 <script>
     const CSRF_TOKEN = {{ csrf_token|tojson }};
     const ROOMS = {{ rooms|tojson }};
@@ -451,6 +1001,51 @@
             .trim();
     }
 
+    function showToast(message, type = "info") {
+        if (window.App && App.toast) {
+            if (type === "success") App.toast.success(message);
+            else if (type === "error") App.toast.error(message);
+            else App.toast.info(message);
+        } else {
+            console.log(`[Toast ${type}]: ${message}`);
+        }
+    }
+
+    function copyVoiceCommand(text, el) {
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(`🎙️ Tersalin: "${text}"`, "info");
+            const origText = el.innerHTML;
+            el.innerHTML = `<span>✓ Tersalin!</span>`;
+            setTimeout(() => { el.innerHTML = origText; }, 1200);
+        }).catch(() => {
+            showToast("Gagal menyalin teks ke clipboard.", "error");
+        });
+    }
+
+    function copyInputField(id, btn) {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.select();
+        navigator.clipboard.writeText(input.value).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = "Disalin!";
+            setTimeout(() => { btn.textContent = orig; }, 1400);
+            showToast("Berhasil disalin ke clipboard!", "success");
+        });
+    }
+
+    function copyConfigCode(btn) {
+        const code = document.getElementById("configCode");
+        if (!code) return;
+        navigator.clipboard.writeText(code.textContent).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = "Disalin!";
+            setTimeout(() => { btn.textContent = orig; }, 1400);
+            showToast("Format JSON disalin!", "success");
+        });
+    }
+
     function currentEditingRoomId() {
         const match = relayForm.action.match(/\/relay-nyata\/update\/(\d+)/);
         return match ? Number(match[1]) : null;
@@ -463,10 +1058,7 @@
         ROOMS.forEach((room) => {
             if (currentRoomId && Number(room.id) === currentRoomId) return;
             (room.relays || []).forEach((relay) => {
-                [
-                    relay.voice_command_on,
-                    relay.voice_command_off,
-                ].forEach((value) => {
+                [relay.voice_command_on, relay.voice_command_off].forEach((value) => {
                     const command = normalizeCommand(value);
                     if (!command) return;
                     usedCommands.set(command, `${room.nama_tempat || "ruangan"} / ${relay.nama_relay || "relay"}`);
@@ -487,7 +1079,6 @@
                 usedCommands.set(command, `ruangan ini / ${relayName}`);
             }
         }
-
         return null;
     }
 
@@ -512,28 +1103,33 @@
         relayFields.innerHTML = Array.from({ length: total }, (_, index) => {
             const number = index + 1;
             const relay = relays[index] || {};
+            const defaultOn = relay.voice_command_on || `nyalakan relay ${number}`;
+            const defaultOff = relay.voice_command_off || `matikan relay ${number}`;
             return `
-                <div class="app-muted-panel">
-                    <h3 class="text-sm font-bold text-slate-950">Relay ${number}</h3>
-                    <div class="relay-form-grid mt-3">
+                <div class="app-muted-panel" style="background:var(--app-soft); border:1px solid var(--app-border); border-radius:10px; padding:14px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <strong style="font-size:13px; color:var(--app-text);">Channel Relay ${number}</strong>
+                        <span class="app-chip app-chip-small" style="font-size:10.5px;">CH ${number}</span>
+                    </div>
+                    <div class="relay-form-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
                         <div>
-                            <label class="app-label" for="relay${number}Nama">Nama relay</label>
-                            <input id="relay${number}Nama" name="relay_${number}_nama" class="app-input" required maxlength="80" value="${escapeHtml(relay.nama_relay || "")}" placeholder="Lampu Kamar">
+                            <label class="app-label" for="relay${number}Nama">Nama Beban / Perangkat</label>
+                            <input id="relay${number}Nama" name="relay_${number}_nama" class="app-input" required maxlength="80" value="${escapeHtml(relay.nama_relay || `Lampu ${number}`)}" placeholder="Lampu Utama">
                         </div>
                         <div>
-                            <label class="app-label" for="relay${number}Status">Status awal</label>
+                            <label class="app-label" for="relay${number}Status">Status Awal</label>
                             <select id="relay${number}Status" name="relay_${number}_status" class="app-select">
-                                <option value="OFF" ${relay.status === "ON" ? "" : "selected"}>OFF</option>
-                                <option value="ON" ${relay.status === "ON" ? "selected" : ""}>ON</option>
+                                <option value="OFF" ${relay.status === "ON" ? "" : "selected"}>OFF (Mati)</option>
+                                <option value="ON" ${relay.status === "ON" ? "selected" : ""}>ON (Nyala)</option>
                             </select>
                         </div>
                         <div>
-                            <label class="app-label" for="relay${number}On">Perintah suara ON</label>
-                            <input id="relay${number}On" name="relay_${number}_on" class="app-input" required maxlength="120" value="${escapeHtml(relay.voice_command_on || "")}" placeholder="nyalakan lampu kamar">
+                            <label class="app-label" for="relay${number}On">Perintah Suara ON</label>
+                            <input id="relay${number}On" name="relay_${number}_on" class="app-input" required maxlength="120" value="${escapeHtml(defaultOn)}" placeholder="nyalakan lampu">
                         </div>
                         <div>
-                            <label class="app-label" for="relay${number}Off">Perintah suara OFF</label>
-                            <input id="relay${number}Off" name="relay_${number}_off" class="app-input" required maxlength="120" value="${escapeHtml(relay.voice_command_off || "")}" placeholder="matikan lampu kamar">
+                            <label class="app-label" for="relay${number}Off">Perintah Suara OFF</label>
+                            <input id="relay${number}Off" name="relay_${number}_off" class="app-input" required maxlength="120" value="${escapeHtml(defaultOff)}" placeholder="matikan lampu">
                         </div>
                     </div>
                 </div>
@@ -550,12 +1146,11 @@
         document.getElementById("apiClientId").value = config.api_client_id || "";
         const tokenLabel = config.api_token ? "tersimpan" : (config.api_token_masked || "tetap memakai token lama");
         document.getElementById("apiPreview").innerHTML = `
-            <span>Client ID: ${escapeHtml(config.api_client_id || "-")}</span>
-            <span>Token: ${escapeHtml(tokenLabel)}</span>
-            <span>GET perintah: ${escapeHtml(window.location.origin + commandsPath)}</span>
-            <span>POST status: ${escapeHtml(window.location.origin + statusPath)}</span>
-            <span>Header: X-Device-Token: TOKEN_PERANGKAT</span>
-            <span>Polling: ${escapeHtml(config.poll_interval_ms || POLL_INTERVAL_MS)} ms</span>
+            <span><strong>Client ID:</strong> ${escapeHtml(config.api_client_id || "-")}</span>
+            <span><strong>Token:</strong> ${escapeHtml(tokenLabel)}</span>
+            <span><strong>GET Perintah:</strong> ${escapeHtml(window.location.origin + commandsPath)}</span>
+            <span><strong>POST Status:</strong> ${escapeHtml(window.location.origin + statusPath)}</span>
+            <span><strong>Header:</strong> X-Device-Token: TOKEN_PERANGKAT</span>
         `;
     }
 
@@ -584,7 +1179,7 @@
     }
 
     function openAddForm() {
-        document.getElementById("relayModalTitle").textContent = "Tambah Relay Nyata";
+        document.getElementById("relayModalTitle").textContent = "Tambah Ruangan Relay Nyata";
         relayForm.action = "/relay-nyata/add";
         relayForm.reset();
         jumlahRelay.value = "1";
@@ -599,7 +1194,7 @@
     function openEditForm(roomId) {
         const room = ROOMS.find((item) => Number(item.id) === Number(roomId));
         if (!room) return;
-        document.getElementById("relayModalTitle").textContent = `Edit ${room.nama_tempat}`;
+        document.getElementById("relayModalTitle").textContent = `Edit Ruangan: ${room.nama_tempat}`;
         relayForm.action = `/relay-nyata/update/${encodeURIComponent(room.id)}`;
         namaTempat.value = room.nama_tempat || "";
         jumlahRelay.value = String(room.jumlah_relay || 1);
@@ -621,6 +1216,7 @@
         const code = document.getElementById("configCode");
         code.textContent = "Memuat konfigurasi...";
         modal.classList.add("is-open");
+
         const response = await fetch(`/api/relay-nyata/${encodeURIComponent(roomId)}/config`, {
             headers: { "Accept": "application/json" },
             credentials: "same-origin",
@@ -631,57 +1227,64 @@
             return;
         }
         const room = payload.room;
+        document.getElementById("configModalTitle").textContent = `Konfigurasi API: ${room.nama_tempat}`;
+        document.getElementById("cfgCommandsUrl").value = room.api_commands_url || "";
+        document.getElementById("cfgStatusUrl").value = room.api_status_url || "";
+        document.getElementById("cfgClientId").value = room.api_client_id || "";
+        document.getElementById("cfgDeviceToken").value = room.api_token || "";
+
         code.textContent = JSON.stringify({
-            nama_tempat: room.nama_tempat,
-            jenis_perangkat: "ESP32/8266 dll",
+            ruangan: room.nama_tempat,
+            hardware: "ESP32 / ESP8266 / Wemos D1",
             client_id: room.api_client_id,
-            token_api_perangkat: room.api_token,
-            header_token: `${room.api_token_header}: ${room.api_token}`,
-            endpoint_poll_perintah: room.api_commands_url,
-            endpoint_kirim_status: room.api_status_url,
+            token: room.api_token,
+            header_auth: `${room.api_token_header}: ${room.api_token}`,
+            url_poll_perintah: room.api_commands_url,
+            url_kirim_status: room.api_status_url,
             interval_polling_ms: POLL_INTERVAL_MS,
             contoh_response_perintah: {
                 success: true,
-                commands: [{ id: "command_id", relay: 1, command: "ON" }],
-                relays: [{ relay: 1, name: "Lampu Kamar", status: "OFF", desired_status: "ON" }],
+                commands: [{ id: "cmd_12345", relay: 1, command: "ON" }],
+                relays: [{ relay: 1, name: "Lampu Kamar", status: "OFF", desired_status: "ON" }]
             },
-            contoh_payload_status: room.api_status_payload_example,
-            catatan: "ESP32/8266 dll lakukan GET endpoint_poll_perintah berkala dan POST status terbaru dengan header X-Device-Token. Query ?token=... masih didukung untuk perangkat lama, tapi header lebih aman.",
+            contoh_payload_kirim_status: room.api_status_payload_example,
         }, null, 2);
     }
 
+    // ── Paint Single Relay State ─────────────────────────────────
     function paintRelay(roomId, relay) {
         const relayNumber = relay.relay_number;
         const status = String(relay.status || "OFF").toUpperCase();
         const pending = String(relay.pending_command || "").toUpperCase();
         const desired = String(relay.desired_status || status).toUpperCase();
+
         const itemEl = document.getElementById(`relayItem${roomId}-${relayNumber}`);
         if (itemEl) {
             itemEl.classList.toggle("is-on", status === "ON");
             itemEl.classList.toggle("is-off", status !== "ON");
         }
+
+        const switchEl = document.getElementById(`relaySwitchInput${roomId}-${relayNumber}`);
+        if (switchEl) {
+            switchEl.checked = (status === "ON");
+        }
+
         const statusEl = document.getElementById(`relayStatus${roomId}-${relayNumber}`);
         if (statusEl) {
             statusEl.textContent = status;
-            statusEl.className = `app-chip app-chip-small ${status === "ON" ? "app-chip-success" : "relay-chip-off"}`;
         }
-        const pendingEl = document.getElementById(`relayPending${roomId}-${relayNumber}`);
-        if (pendingEl) {
-            pendingEl.textContent = pending ? `Menunggu ${pending}` : "";
-            pendingEl.classList.toggle("relay-hidden", !pending);
-        }
-        const syncEl = document.getElementById(`relaySync${roomId}-${relayNumber}`);
-        if (syncEl) {
-            syncEl.textContent = pending
-                ? `Target: ${desired}. Menunggu ESP32/8266 dll mengirim status balik.`
-                : "Status database dan target sudah sinkron.";
-        }
-    }
 
-    function deviceConnectionLabel(room, connected) {
-        if (room.device_connection_label) return room.device_connection_label;
-        if (connected) return "ESP32/8266 terhubung";
-        return room.device_last_seen_at ? "ESP32/8266 tidak terhubung" : "ESP32/8266 belum terhubung";
+        const syncEl = document.getElementById(`relaySync${roomId}-${relayNumber}`);
+        const syncTextEl = document.getElementById(`relaySyncText${roomId}-${relayNumber}`);
+        if (syncEl && syncTextEl) {
+            if (pending) {
+                syncEl.classList.add("is-pending");
+                syncTextEl.textContent = `Menunggu ESP32 konfirmasi ${desired}...`;
+            } else {
+                syncEl.classList.remove("is-pending");
+                syncTextEl.textContent = "Sinkron dengan status perangkat fisik.";
+            }
+        }
     }
 
     function deviceConnected(room) {
@@ -693,7 +1296,7 @@
 
     function paintDeviceConnection(room) {
         const connected = deviceConnected(room);
-        const label = deviceConnectionLabel(room, connected);
+        const label = connected ? "ESP32 Terhubung" : (room.device_last_seen_at ? "ESP32 Terputus" : "Belum Terhubung");
         document.querySelectorAll(`[data-device-connection-room="${room.id}"]`).forEach((el) => {
             el.className = `app-status-pill relay-connection-pill ${connected ? "is-online" : "is-offline"}`;
             const labelEl = el.querySelector("[data-device-connection-label]");
@@ -709,27 +1312,102 @@
         (room.relays || []).forEach((relay) => paintRelay(room.id, relay));
     }
 
-    async function controlRelay(roomId, relayNumber, command) {
+    // ── 1-Click Toggle Switch Handler (Optimistic UI) ────────────
+    async function handleSwitchToggle(roomId, relayNumber, inputEl) {
+        if (VIRTUAL_ENABLED) {
+            inputEl.checked = !inputEl.checked;
+            window.alert("Nonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar Relay Nyata bisa digunakan.");
+            return;
+        }
+        const command = inputEl.checked ? "ON" : "OFF";
+        
+        // Optimistic visual transition
+        paintRelay(roomId, {
+            relay_number: relayNumber,
+            status: command,
+            pending_command: command,
+            desired_status: command,
+        });
+
+        try {
+            const response = await fetch("/api/relay-nyata/control", {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": CSRF_TOKEN,
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({ room_id: Number(roomId), relay_number: Number(relayNumber), command }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) {
+                // Rollback on error
+                inputEl.checked = !inputEl.checked;
+                paintRelay(roomId, {
+                    relay_number: relayNumber,
+                    status: inputEl.checked ? "ON" : "OFF",
+                    pending_command: "",
+                });
+                showToast(payload.detail || "Gagal mengubah status relay.", "error");
+                return;
+            }
+            showToast(`Relay CH ${relayNumber} diubah ke ${command}`, "success");
+            paintRoom(payload.updated_room);
+        } catch (err) {
+            inputEl.checked = !inputEl.checked;
+            showToast("Koneksi gagal. Coba lagi.", "error");
+        }
+    }
+
+    // ── Master Room Control (Semua ON / Semua OFF) ────────────────
+    async function controlRoomAll(roomId, command) {
         if (VIRTUAL_ENABLED) {
             window.alert("Nonaktifkan Simulasi Smart Home Virtual terlebih dahulu agar Relay Nyata bisa digunakan.");
             return;
         }
-        const response = await fetch("/api/relay-nyata/control", {
-            method: "POST",
-            headers: {
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "X-CSRF-Token": CSRF_TOKEN,
-            },
-            credentials: "same-origin",
-            body: JSON.stringify({ room_id: Number(roomId), relay_number: Number(relayNumber), command }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !payload.success) {
-            window.alert(payload.detail || "Gagal membuat antrean perintah API.");
-            return;
+        try {
+            const response = await fetch("/api/relay-nyata/room-control", {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": CSRF_TOKEN,
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({ room_id: Number(roomId), command }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) {
+                showToast(payload.detail || "Gagal mengubah semua relay.", "error");
+                return;
+            }
+            showToast(`Semua relay ruangan diubah ke ${command}`, "success");
+            paintRoom(payload.updated_room);
+        } catch (err) {
+            showToast("Gagal menghubungi server.", "error");
         }
-        paintRoom(payload.updated_room);
+    }
+
+    // ── Real-Time 2-Way SSE Event Stream ──────────────────────────
+    let relaySSE = null;
+    let sseFallbackTimer = null;
+
+    function updateSSEBadge(connected, text) {
+        const badge = document.getElementById("sseLiveBadge");
+        const badgeText = document.getElementById("sseLiveText");
+        if (!badge || !badgeText) return;
+        if (connected) {
+            badgeText.textContent = text || "Live Sinkron (SSE 2-Arah)";
+            badge.style.background = "rgba(16, 185, 129, 0.12)";
+            badge.style.color = "#10b981";
+            badge.style.borderColor = "rgba(16, 185, 129, 0.3)";
+        } else {
+            badgeText.textContent = text || "Reconnecting (Polling Fallback)";
+            badge.style.background = "rgba(245, 158, 11, 0.12)";
+            badge.style.color = "#f59e0b";
+            badge.style.borderColor = "rgba(245, 158, 11, 0.3)";
+        }
     }
 
     async function refreshRelayStatuses() {
@@ -741,35 +1419,13 @@
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || !payload.success) return;
             (payload.rooms || []).forEach((room) => paintRoom(room));
-        } catch (error) {
-            // Polling fallback jika offline
-        }
-    }
-
-    // ── Real-Time 2-Way SSE Event Stream ──────────────────────────
-    let relaySSE = null;
-    let sseFallbackTimer = null;
-
-    function updateSSEBadge(connected, text) {
-        const badge = document.getElementById("sseLiveBadge");
-        if (!badge) return;
-        if (connected) {
-            badge.textContent = text || "⚡ Live Sinkron (SSE)";
-            badge.style.background = "rgba(16, 185, 129, 0.12)";
-            badge.style.color = "#10b981";
-            badge.style.borderColor = "rgba(16, 185, 129, 0.3)";
-        } else {
-            badge.textContent = text || "⚠️ Reconnecting (Fallback Polling)";
-            badge.style.background = "rgba(245, 158, 11, 0.12)";
-            badge.style.color = "#f59e0b";
-            badge.style.borderColor = "rgba(245, 158, 11, 0.3)";
-        }
+        } catch (error) {}
     }
 
     function initRelaySSE() {
         if (!window.EventSource) {
             startFallbackPolling(10000);
-            updateSSEBadge(false, "● Mode Polling (No SSE)");
+            updateSSEBadge(false, "Mode Polling Aktif");
             return;
         }
 
@@ -783,7 +1439,7 @@
 
             relaySSE.addEventListener("connected", () => {
                 stopFallbackPolling();
-                updateSSEBadge(true, "⚡ Live Sinkron (SSE)");
+                updateSSEBadge(true, "Live Sinkron (SSE 2-Arah)");
             });
 
             relaySSE.addEventListener("relay_update", (e) => {
@@ -796,13 +1452,11 @@
                         desired_status: data.desired || data.status
                     });
 
-                    // Notifikasi jika dipicu oleh suara XiaoZhi
-                    if (data.source === "mcp_voice" && window.App && App.toast) {
-                        App.toast.info("🎙️ XiaoZhi: " + (data.relay_name || "Relay") + " di " + (data.room_name || "Ruangan") + " diubah ke " + data.status);
+                    // Notifikasi jika dipicu oleh suara XiaoZhi AI
+                    if (data.source === "mcp_voice") {
+                        showToast(`🎙️ XiaoZhi AI: ${(data.relay_name || "Relay")} di ${(data.room_name || "Ruangan")} diubah ke ${data.status}`, "info");
                     }
-                } catch (err) {
-                    console.error("Relay SSE parse error:", err);
-                }
+                } catch (err) {}
             });
 
             relaySSE.addEventListener("device_status", (e) => {
@@ -818,7 +1472,7 @@
             });
 
             relaySSE.onerror = () => {
-                updateSSEBadge(false, "⚠️ Terputus (Fallback Polling)");
+                updateSSEBadge(false, "Reconnecting (Polling)");
                 startFallbackPolling(15000);
             };
         } catch (err) {
@@ -839,7 +1493,7 @@
         }
     }
 
-    // Auto-refresh saat tab kembali aktif
+    // Auto-refresh saat window kembali terlihat
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
             refreshRelayStatuses();
@@ -849,24 +1503,26 @@
         }
     });
 
-    document.getElementById("openAddRelay").addEventListener("click", openAddForm);
-    document.getElementById("generateApiButton").addEventListener("click", () => generateApiConfig());
-    relayForm.addEventListener("submit", validateRelayForm);
-    jumlahRelay.addEventListener("change", () => renderRelayInputs(jumlahRelay.value));
-    document.querySelectorAll("[data-close-modal]").forEach((button) => button.addEventListener("click", closeRelayModal));
-    document.querySelectorAll("[data-close-config]").forEach((button) => {
-        button.addEventListener("click", () => document.getElementById("configModal").classList.remove("is-open"));
-    });
-    document.querySelectorAll("[data-edit-room]").forEach((button) => {
-        button.addEventListener("click", () => openEditForm(button.dataset.editRoom));
-    });
-    document.querySelectorAll("[data-config-room]").forEach((button) => {
-        button.addEventListener("click", () => showConfig(button.dataset.configRoom));
-    });
-    document.querySelectorAll("[data-control-room]").forEach((button) => {
-        button.addEventListener("click", () => controlRelay(button.dataset.controlRoom, button.dataset.controlRelay, button.dataset.controlCommand));
+    // ── Event Listeners ──────────────────────────────────────────
+    document.getElementById("openAddRelay")?.addEventListener("click", openAddForm);
+    document.getElementById("generateApiButton")?.addEventListener("click", () => generateApiConfig());
+    relayForm?.addEventListener("submit", validateRelayForm);
+    jumlahRelay?.addEventListener("change", () => renderRelayInputs(jumlahRelay.value));
+
+    document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeRelayModal));
+    document.querySelectorAll("[data-close-config]").forEach((btn) => {
+        btn.addEventListener("click", () => document.getElementById("configModal").classList.remove("is-open"));
     });
 
+    document.querySelectorAll("[data-edit-room]").forEach((btn) => {
+        btn.addEventListener("click", () => openEditForm(btn.dataset.editRoom));
+    });
+
+    document.querySelectorAll("[data-config-room]").forEach((btn) => {
+        btn.addEventListener("click", () => showConfig(btn.dataset.configRoom));
+    });
+
+    // Inisialisasi awal
     renderRelayInputs(1);
     initRelaySSE();
 </script>

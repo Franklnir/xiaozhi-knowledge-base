@@ -335,6 +335,25 @@ async def relay_nyata_control(request: Request, cmd: RealRelayControlCommand):
         return JSONResponse({"success": False, "message": str(exc)}, status_code=400)
 
 
+@router.post("/api/relay-nyata/room-control")
+async def relay_nyata_room_control(request: Request):
+    """Batch control all relays in a specific room (All ON / All OFF)."""
+    user = require_user(request)
+    body = await request.json()
+    room_id = body.get("room_id")
+    command = str(body.get("command", "OFF")).upper()
+    if not room_id:
+        raise HTTPException(status_code=400, detail="room_id diperlukan.")
+    store = get_store()
+    room = store.get_relay_room(user["id"], int(room_id))
+    if not room:
+        raise HTTPException(status_code=404, detail="Ruangan tidak ditemukan.")
+    for relay in room.get("relays", []):
+        control_real_relay(user["id"], room, relay, command, source="web_ui")
+    updated_room = store.get_relay_room(user["id"], int(room_id))
+    return {"success": True, "command": command, "updated_room": updated_room}
+
+
 @router.get("/api/relay-nyata/stream")
 async def relay_nyata_stream(request: Request):
     """
