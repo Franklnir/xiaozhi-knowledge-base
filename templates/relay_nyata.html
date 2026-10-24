@@ -1451,10 +1451,9 @@
                     </div>
                     <div>
                         <label class="app-label" style="font-size:11px; margin-bottom:3px;">Protokol Komunikasi:</label>
-                        <select id="cfgProtocol" class="app-select" style="padding:6px 10px; font-size:12px; font-weight:700; color:#0284c7;" onchange="regenerateArduinoCode()">
-                            <option value="mqtt" selected>⚡ MQTT Mosquitto (Zero-Lag 0.1ms, Realtime 2-Arah)</option>
-                            <option value="http">🌐 HTTP Polling (Fallback)</option>
-                        </select>
+                        <div style="padding:6px 10px; font-size:11.5px; font-weight:750; color:#0284c7; background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:6px; display:flex; align-items:center; gap:6px; height:32px; box-sizing:border-box;">
+                            <span>⚡ MQTT Mosquitto (Realtime 2-Arah)</span>
+                        </div>
                     </div>
                     <div>
                         <label class="app-label" style="font-size:11px; margin-bottom:3px;">Tipe Modul Relay:</label>
@@ -1533,41 +1532,20 @@
                 </div>
             </div>
 
-            <!-- Direct HTTP Polling Fields -->
-            <div style="display:grid; gap:10px; margin-bottom:14px;">
-                <div style="font-size:12px; font-weight:800; color:var(--app-text); margin-bottom:2px;">
-                    <span>🌐 Parameter HTTP Polling (Fallback Tradisional):</span>
+            <!-- Device Credentials -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-bottom:14px;">
+                <div>
+                    <label class="app-label" style="font-size:11px; margin-bottom:3px;">Client ID Perangkat (ESP32):</label>
+                    <div class="relay-copy-input-group">
+                        <input type="text" class="relay-copy-input" id="cfgClientId" readonly>
+                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgClientId', this)">Salin</button>
+                    </div>
                 </div>
                 <div>
-                    <label class="app-label" style="font-size:11px; margin-bottom:3px;">Endpoint Polling Perintah (GET):</label>
+                    <label class="app-label" style="font-size:11px; margin-bottom:3px;">Token Keamanan Perangkat:</label>
                     <div class="relay-copy-input-group">
-                        <input type="text" class="relay-copy-input" id="cfgCommandsUrl" readonly>
-                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgCommandsUrl', this)">Salin</button>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="app-label" style="font-size:11px; margin-bottom:3px;">Endpoint Kirim Status (POST):</label>
-                    <div class="relay-copy-input-group">
-                        <input type="text" class="relay-copy-input" id="cfgStatusUrl" readonly>
-                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgStatusUrl', this)">Salin</button>
-                    </div>
-                </div>
-
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
-                    <div>
-                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Client ID Perangkat:</label>
-                        <div class="relay-copy-input-group">
-                            <input type="text" class="relay-copy-input" id="cfgClientId" readonly>
-                            <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgClientId', this)">Salin</button>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Token Rahasia Perangkat:</label>
-                        <div class="relay-copy-input-group">
-                            <input type="text" class="relay-copy-input" id="cfgDeviceToken" readonly>
-                            <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgDeviceToken', this)">Salin</button>
-                        </div>
+                        <input type="text" class="relay-copy-input" id="cfgDeviceToken" readonly>
+                        <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgDeviceToken', this)">Salin</button>
                     </div>
                 </div>
             </div>
@@ -2549,10 +2527,14 @@ void loop() {
         const slug = room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
         document.getElementById("configModalTitle").textContent = `Setup ESP32-C3: ${room.nama_tempat}`;
-        document.getElementById("cfgCommandsUrl").value = room.api_commands_url || "";
-        document.getElementById("cfgStatusUrl").value = room.api_status_url || "";
-        document.getElementById("cfgClientId").value = room.api_client_id || "";
-        document.getElementById("cfgDeviceToken").value = room.api_token || "";
+        const cmdUrlEl = document.getElementById("cfgCommandsUrl");
+        if (cmdUrlEl) cmdUrlEl.value = room.api_commands_url || "";
+        const statusUrlEl = document.getElementById("cfgStatusUrl");
+        if (statusUrlEl) statusUrlEl.value = room.api_status_url || "";
+        const clientIdEl = document.getElementById("cfgClientId");
+        if (clientIdEl) clientIdEl.value = room.api_client_id || "";
+        const tokenEl = document.getElementById("cfgDeviceToken");
+        if (tokenEl) tokenEl.value = room.api_token || "";
 
         // Set MQTT Fields
         const mqttCmdEl = document.getElementById("cfgMqttCmdTopic");
@@ -2574,6 +2556,7 @@ void loop() {
         code.textContent = JSON.stringify({
             ruangan: room.nama_tempat,
             hardware: "ESP32-C3 (RISC-V Architecture)",
+            protokol: "MQTT Mosquitto (Zero-Lag Event-Driven)",
             client_id: room.api_client_id,
             token: room.api_token,
             mqtt_broker: "163.61.58.235:1883",
@@ -2582,12 +2565,6 @@ void loop() {
                 hardware_state_ack: `xiaozhi/relay/${slug}/state`,
                 lwt_availability: `xiaozhi/relay/${slug}/availability`,
                 hardware_diagnostics: `xiaozhi/relay/${slug}/err`
-            },
-            http_endpoints: {
-                header_auth: `${room.api_token_header}: ${room.api_token}`,
-                url_poll_perintah: room.api_commands_url,
-                url_kirim_status: room.api_status_url,
-                interval_polling_ms: POLL_INTERVAL_MS
             },
             contoh_payload_mqtt_command: {
                 cmd_id: "cmd_12345",
