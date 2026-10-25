@@ -430,6 +430,211 @@ void setup() {
             self.assertEqual(mat["category"], "Jurnal Ilmiah")
             self.assertEqual(mat["doi"], "10.1234/robotics.2026.01")
 
+    def test_wikipedia_smart_formatter(self):
+        wiki_html = """
+        <!DOCTYPE html>
+        <html>
+        <head><title>ESP32 - Wikipedia bahasa Indonesia</title></head>
+        <body>
+            <article id="content">
+                <table class="infobox">
+                    <tr><th colspan="2">ESP32 Microcontroller</th></tr>
+                    <tr><td>Produsen</td><td>Espressif Systems</td></tr>
+                    <tr><td>Arsitektur</td><td>Xtensa dual-core 32-bit LX6</td></tr>
+                    <tr><td>Frekuensi</td><td>240 MHz</td></tr>
+                </table>
+                <h1>ESP32</h1>
+                <p>ESP32 adalah mikrokontroler berbiaya rendah dan hemat daya dengan Wi-Fi terintegrasi[1][2]. Perangkat ini dikembangkan oleh Espressif Systems[sunting].</p>
+                <p>Fitur utamanya meliputi Bluetooth v4.2 BR/EDR dan BLE[citation needed] yang mendukung transmisi audio secara nirkabel.</p>
+                <h2>Referensi</h2>
+                <p>1. Espressif Systems Overview.</p>
+                <h2>Pranala luar</h2>
+                <p>Situs resmi Espressif.</p>
+            </article>
+        </body>
+        </html>
+        """
+        mock_resp = MagicMock()
+        mock_resp.content = wiki_html.encode("utf-8")
+        mock_resp.headers = {"content-type": "text/html; charset=utf-8"}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("xiaozhi.services.scraper_service.requests.get", return_value=mock_resp):
+            data = scrape_url("https://id.wikipedia.org/wiki/ESP32")
+            self.assertTrue(data["success"])
+            # Infobox extracted into specifications
+            self.assertIn("Ringkasan Fakta & Spesifikasi (Infobox Wikipedia)", data["content"])
+            self.assertIn("Espressif Systems", data["content"])
+            self.assertIn("Xtensa dual-core", data["content"])
+            # Citations [1][2] and [sunting] and [citation needed] stripped
+            self.assertNotIn("[1]", data["content"])
+            self.assertNotIn("[2]", data["content"])
+            self.assertNotIn("[sunting]", data["content"])
+            self.assertNotIn("[citation needed]", data["content"])
+            # Truncated before Referensi and Pranala luar
+            self.assertNotIn("Situs resmi Espressif", data["content"])
+
+    def test_auto_quiz_generator_flashcards(self):
+        from xiaozhi.services.scraper_service import generate_quiz_from_content, format_quiz_as_markdown
+        text = (
+            "Sensor MAX6675 adalah konverter digital termokopel tipe-K dengan kompensasi cold-junction terintegrasi. "
+            "Sensor ini menggunakan antarmuka SPI hanya-baca dengan resolusi pembacaan 12-bit dan akurasi 0.25 derajat Celsius. "
+            "Tegangan operasional sensor berkisar antara 3.0V hingga 5.5V sehingga sangat cocok dipasangkan langsung ke ESP32 atau Arduino."
+        )
+        quiz = generate_quiz_from_content(text, title="MAX6675 ESP32", num_questions=3)
+        self.assertGreaterEqual(len(quiz), 1)
+        self.assertIn("question", quiz[0])
+        self.assertIn("answer", quiz[0])
+
+        quiz_md = format_quiz_as_markdown(quiz)
+        self.assertIn("### 🧠 Kuis Pemahaman & Flashcards", quiz_md)
+        self.assertIn("❓ **Pertanyaan**:", quiz_md)
+        self.assertIn("💡 **Kunci Jawaban**:", quiz_md)
+
+    def test_academic_papers_unified_search(self):
+        from xiaozhi.services.scraper_service import search_academic_papers_unified
+        mock_arxiv_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+            <entry>
+                <id>http://arxiv.org/abs/2401.00001v1</id>
+                <title>TinyTransformer: Edge Speech Recognition on Microcontrollers</title>
+                <summary>We introduce a tiny transformer model achieving 96% accuracy on embedded microcontrollers.</summary>
+                <published>2024-01-10T12:00:00Z</published>
+                <author><name>Dr. John Doe</name></author>
+                <link title="pdf" href="http://arxiv.org/pdf/2401.00001v1.pdf" type="application/pdf"/>
+            </entry>
+        </feed>
+        """
+        mock_arxiv_resp = MagicMock()
+        mock_arxiv_resp.read.return_value = mock_arxiv_xml
+        mock_arxiv_resp.__enter__.return_value = mock_arxiv_resp
+
+        with patch("urllib.request.urlopen", return_value=mock_arxiv_resp), \
+             patch("xiaozhi.services.scraper_service.search_semantic_scholar_papers", return_value=[]), \
+             patch("xiaozhi.services.scraper_service.search_crossref_papers", return_value=[]):
+            res = search_academic_papers_unified("edge speech recognition", max_results=3)
+            self.assertTrue(res["success"])
+            self.assertEqual(res["total_found"], 1)
+            paper = res["papers"][0]
+            self.assertEqual(paper["title"], "TinyTransformer: Edge Speech Recognition on Microcontrollers")
+            self.assertEqual(paper["year"], "2024")
+            self.assertIn("Dr. John Doe", paper["authors"])
+            self.assertIn("http://arxiv.org/pdf/2401.00001v1.pdf", paper["pdf_url"])
+            self.assertIn("Hasil Pencarian Jurnal & Paper Ilmiah", res["summary_markdown"])
+
+    def test_autonomous_deep_research_confirmation_rule(self):
+        from xiaozhi.services.scraper_service import conduct_autonomous_research
+        mock_paper = {
+            "success": True,
+            "query": "MAX6675 ESP32",
+            "total_found": 1,
+            "papers": [{
+                "title": "Interfacing High Temperature MAX6675 with ESP32",
+                "authors": ["Eng. Smith"],
+                "year": "2025",
+                "source": "CrossRef",
+                "citations": "15 Sitasi",
+                "citation_count": 15,
+                "abstract": "Design and calibration of MAX6675 thermocouple for industrial temperature monitoring with ESP32.",
+                "pdf_url": "https://example.com/paper.pdf",
+                "url": "https://example.com/paper",
+            }],
+            "summary_markdown": "summary",
+        }
+
+        with patch("xiaozhi.services.scraper_service.search_academic_papers_unified", return_value=mock_paper):
+            res = conduct_autonomous_research("paper MAX6675 ESP32", mode="academic")
+            self.assertTrue(res["success"])
+            # Must NOT be saved directly to DB
+            self.assertFalse(res["saved_to_db"])
+            self.assertTrue(res["needs_user_confirmation"])
+            # Must contain the exact confirmation prompt
+            self.assertIn("Apakah Anda ingin saya menyimpan materi ini ke Knowledge Base Anda?", res["confirmation_prompt"])
+            self.assertIn("Dan ada hal lain yang ingin Anda tanyakan atau pelajari?", res["confirmation_prompt"])
+            # Must prepare payload ready for user approval
+            self.assertIn("materi_siap_simpan", res)
+            self.assertEqual(res["materi_siap_simpan"]["category"], "Jurnal Ilmiah")
+
+    def test_mcp_tools_registration_and_quiz_flow(self):
+        from xiaozhi.mcp.tools import register_tools
+        from xiaozhi.mcp.context import mcp_active_owner_ctx
+
+        registered = {}
+        mock_mcp = MagicMock()
+        def mock_tool():
+            def decorator(fn):
+                registered[fn.__name__] = fn
+                return fn
+            return decorator
+        mock_mcp.tool = mock_tool
+
+        mock_store = MagicMock()
+        mock_store.list_materials.return_value = [{
+            "id": 42,
+            "title": "ESP32 Termokopel MAX6675",
+            "category": "Jurnal Ilmiah",
+            "content": (
+                "# ESP32 Termokopel MAX6675\n\n"
+                "Panduan interfacing sensor MAX6675 dengan mikrokontroler ESP32.\n\n"
+                "### 🧠 Kuis Pemahaman & Flashcards\n\n"
+                "1. ❓ **Pertanyaan**: Berapa resolusi ADC internal MAX6675?\n"
+                "   - 💡 **Kunci Jawaban**: Resolusi 12-bit dengan presisi 0.25 derajat Celsius.\n\n"
+                "2. ❓ **Pertanyaan**: Apa protokol komunikasi yang digunakan?\n"
+                "   - 💡 **Kunci Jawaban**: Protokol SPI read-only."
+            ),
+            "keywords": "esp32, max6675, spi",
+        }]
+        mock_store.add_material.return_value = 43
+
+        history_calls = []
+        def mock_record_history(owner_id, tool_name, summary, params, result):
+            history_calls.append((owner_id, tool_name, summary, result))
+
+        register_tools(mock_mcp, mock_store, mock_record_history)
+
+        # Ensure all 4 new tools are registered
+        self.assertIn("search_academic_papers", registered)
+        self.assertIn("autonomous_deep_research", registered)
+        self.assertIn("confirm_and_save_research_material", registered)
+        self.assertIn("test_user_knowledge_quiz", registered)
+
+        # Test context owner
+        token = mcp_active_owner_ctx.set(101)
+        try:
+            # 1. Test quiz presentation (Question 1)
+            quiz_fn = registered["test_user_knowledge_quiz"]
+            q1_res = quiz_fn(topic_or_material_title="MAX6675", question_number=1, user_answer="")
+            self.assertTrue(q1_res["success"])
+            self.assertEqual(q1_res["mode"], "tanya_soal")
+            self.assertEqual(q1_res["soal_ke"], 1)
+            self.assertIn("Berapa resolusi ADC internal MAX6675?", q1_res["pertanyaan"])
+
+            # 2. Test user answering Question 1
+            eval_res = quiz_fn(topic_or_material_title="MAX6675", question_number=1, user_answer="Resolusinya 12 bit")
+            self.assertTrue(eval_res["success"])
+            self.assertEqual(eval_res["mode"], "evaluasi_jawaban")
+            self.assertIn("12-bit", eval_res["kunci_jawaban"])
+            self.assertTrue(eval_res["ada_soal_berikutnya"])
+            self.assertEqual(eval_res["nomor_soal_berikutnya"], 2)
+
+            # 3. Test confirmation save tool
+            confirm_fn = registered["confirm_and_save_research_material"]
+            save_res = confirm_fn(
+                title="Riset MAX6675 ESP32",
+                content="Langkah wiring SPI ESP32",
+                url="https://example.com/max6675",
+                category="Riset Mandiri",
+                save_confirmed=True
+            )
+            self.assertTrue(save_res["success"])
+            self.assertEqual(save_res["material_id"], 43)
+            self.assertIn("Dan ada hal lain yang ingin Anda tanyakan atau pelajari?", save_res["tanya_pengguna_lanjutan"])
+            mock_store.add_material.assert_called_once()
+        finally:
+            mcp_active_owner_ctx.reset(token)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+

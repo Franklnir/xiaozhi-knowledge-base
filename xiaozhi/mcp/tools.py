@@ -10,7 +10,13 @@ from bs4 import BeautifulSoup
 
 from xiaozhi.core.utils import clean_text, is_generic_playlist_query
 from xiaozhi.mcp.context import mcp_active_owner_ctx, mcp_active_slot_ctx
-from xiaozhi.services.scraper_service import extract_structured_text_bs4, validate_scrape_url
+from xiaozhi.services.scraper_service import (
+    conduct_autonomous_research,
+    extract_structured_text_bs4,
+    generate_quiz_from_content,
+    search_academic_papers_unified,
+    validate_scrape_url,
+)
 from xiaozhi.services.smarthome_service import (
     parse_smart_home_action,
     resolve_smart_home_target,
@@ -3224,5 +3230,221 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         except Exception as e:
             logger.exception("Error deleting material via MCP")
             return {"success": False, "message": f"Terjadi kesalahan saat menghapus materi: {str(e)[:80]}"}
+
+    @mcp_server.tool()
+    def search_academic_papers(query: str, max_results: int = 3) -> dict:
+        """
+        Pencarian jurnal ilmiah & paper akademis berbobot tinggi secara instan tanpa batasan paywall.
+        Mengintegrasikan database arXiv, Semantic Scholar, dan CrossRef secara real-time.
+        Menyajikan: Judul & Tahun terbit, Nama peneliti, Jumlah sitasi (citation count),
+        Intisari abstrak riset, dan opsi mengunduh/membaca teks lengkap PDF open-access.
+
+        Args:
+            query: Kata kunci riset (contoh: "edge AI speech recognition on microcontroller", "thermocouple MAX6675 ESP32").
+            max_results: Batas jumlah paper yang ditampilkan (default: 3).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        res = search_academic_papers_unified(query, max_results=max_results)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "search_academic_papers", query, {"query": query, "max_results": max_results}, res)
+        return res
+
+    @mcp_server.tool()
+    def autonomous_deep_research(topic_or_question: str, mode: str = "auto") -> dict:
+        """
+        Autonomous Deep Research: XiaoZhi secara mandiri mencari sumber artikel, paper ilmiah, atau
+        dokumentasi teknis terbaik tanpa mengharuskan pengguna menyalin tautan URL manual.
+        
+        PENTING (ADAPTIF & AMAN - ATURAN KONFIRMASI PENGGUNA):
+        Tool ini TIDAK LANGSUNG menyimpan materi ke database Knowledge Base.
+        XiaoZhi wajib mempresentasikan intisari temuan kepada pengguna terlebih dahulu, lalu menanyakan konfirmasi:
+        'Apakah Anda ingin saya menyimpan materi ini ke Knowledge Base Anda? Dan ada hal lain yang ingin Anda tanyakan atau pelajari?'
+        Jika pengguna menyetujui, panggil tool 'confirm_and_save_research_material'.
+
+        Args:
+            topic_or_question: Topik penelitian mandiri (contoh: "cara menghubungkan sensor thermocouple MAX6675 ke ESP32", "paper Transformer di mikrokontroler").
+            mode: 'auto' (otomatis deteksi akademis vs tutorial web), 'academic' (jurnal/paper), atau 'web' (tutorial/Wikipedia/dokumentasi).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        res = conduct_autonomous_research(topic_or_question, mode=mode)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "autonomous_deep_research", topic_or_question, {"topic": topic_or_question, "mode": mode}, res)
+        return res
+
+    @mcp_server.tool()
+    def confirm_and_save_research_material(title: str, content: str, url: str = "", category: str = "Riset Mandiri", save_confirmed: bool = True) -> dict:
+        """
+        Simpan materi hasil riset otonom atau pencarian ke Knowledge Base pengguna SETELAH pengguna
+        memberikan konfirmasi persetujuan (contoh: "ya tolong simpan", "masukkan ke materiku", "simpan materi tadi").
+
+        Args:
+            title: Judul materi yang ingin disimpan.
+            content: Isi ringkasan riset atau dokumen lengkap.
+            url: Sumber URL atau link paper/artikel.
+            category: Kategori materi (default: "Riset Mandiri" atau "Jurnal Ilmiah").
+            save_confirmed: Harus bernilai True sebagai bukti persetujuan eksplisit pengguna.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi akun Xiaozhi aktif."}
+
+        if not save_confirmed:
+            return {
+                "success": False,
+                "message": "Penyimpanan dibatalkan karena pengguna belum memberikan konfirmasi persetujuan."
+            }
+
+        try:
+            clean_title = (title or "Materi Riset Mandiri").strip()[:160]
+            clean_cat = (category or "Riset Mandiri").strip()[:80]
+            clean_content = content.strip()
+            if url and ("🌐 **Sumber**" not in clean_content and "🌐 **URL**" not in clean_content):
+                clean_content = f"🌐 **Sumber**: {url}\n\n" + clean_content
+
+            keywords = f"riset, autonomous, {clean_cat.lower()}, {clean_title[:40].lower()}"
+            mat_id = store.add_material(
+                owner_id,
+                clean_title,
+                clean_cat,
+                clean_content,
+                keywords,
+                url or "autonomous_research"
+            )
+            from xiaozhi.services.mcp_service import signal_mcp_reload
+            signal_mcp_reload()
+
+            ret = {
+                "success": True,
+                "message": f"Materi '{clean_title}' berhasil disimpan ke Knowledge Base Anda (ID: {mat_id}).",
+                "material_id": mat_id,
+                "title": clean_title,
+                "category": clean_cat,
+                "tanya_pengguna_lanjutan": "Materi sudah tersimpan dengan aman ke Knowledge Base Anda. Dan ada hal lain yang ingin Anda tanyakan atau pelajari?",
+            }
+            record_mcp_tool_history(owner_id, "confirm_and_save_research_material", clean_title, {"title": clean_title, "category": clean_cat}, ret)
+            return ret
+        except Exception as e:
+            logger.exception("Error saving confirmed research material")
+            return {"success": False, "message": f"Gagal menyimpan ke Knowledge Base: {str(e)[:80]}"}
+
+    @mcp_server.tool()
+    def test_user_knowledge_quiz(topic_or_material_title: str = "", question_number: int = 1, user_answer: str = "") -> dict:
+        """
+        Uji pemahaman pengguna dengan kuis/flashcard interaktif dari materi yang baru saja dipelajari/di-scrape
+        atau materi yang ada di Knowledge Base pengguna.
+        Gunakan tool ini saat pengguna berkata:
+        - "XiaoZhi, uji saya tentang materi IoT yang tadi kamu pelajari"
+        - "Uji pemahaman saya tentang materi tadi"
+        - "Beri saya kuis dari materi [topik]"
+        - Atau saat pengguna menjawab pertanyaan kuis sebelumnya.
+
+        Args:
+            topic_or_material_title: Topik atau judul materi yang ingin diujikan (jika kosong, mengambil materi terbaru).
+            question_number: Nomor soal kuis yang sedang aktif (1, 2, atau 3).
+            user_answer: Jawaban yang diberikan oleh pengguna (jika kosong, XiaoZhi akan menyajikan soal).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi akun Xiaozhi aktif."}
+
+        try:
+            target_mat = None
+            all_mats = store.list_materials(owner_id)
+
+            if topic_or_material_title.strip():
+                clean_topic = topic_or_material_title.strip().lower()
+                for m in all_mats:
+                    if clean_topic in str(m.get("title", "")).lower() or clean_topic in str(m.get("keywords", "")).lower():
+                        target_mat = m
+                        break
+                if not target_mat:
+                    searched = store.search_materials(owner_id, clean_topic, limit=2)
+                    if searched:
+                        target_mat = searched[0]
+
+            if not target_mat and all_mats:
+                target_mat = all_mats[0]
+
+            if not target_mat:
+                return {
+                    "success": False,
+                    "message": "Belum ada materi pembelajaran di Knowledge Base Anda untuk dibuatkan kuis. Anda dapat meminta saya mencari materi terlebih dahulu."
+                }
+
+            mat_title = target_mat.get("title", "Materi")
+            mat_content = target_mat.get("content", "")
+
+            # Ekstrak kuis dari konten jika sudah ada
+            quiz_blocks = []
+            if "### 🧠 Kuis Pemahaman" in mat_content:
+                quiz_section = mat_content.split("### 🧠 Kuis Pemahaman")[-1]
+                q_matches = re.findall(r"\*\*Pertanyaan.*?\*\*:\s*(.*?)(?=\n\s*[-•]?\s*💡|\n\n\d|\Z)", quiz_section, re.DOTALL)
+                a_matches = re.findall(r"\*\*(?:Kunci )?Jawaban\*\*:\s*(.*?)(?=\n\n|\n\d|\Z)", quiz_section, re.DOTALL)
+                for i in range(min(len(q_matches), len(a_matches))):
+                    q_text = q_matches[i].strip().lstrip("> ")
+                    a_text = a_matches[i].strip().lstrip("> ")
+                    if q_text and a_text:
+                        quiz_blocks.append({"question": q_text, "answer": a_text})
+
+            if not quiz_blocks:
+                quiz_blocks = generate_quiz_from_content(mat_content, title=mat_title, num_questions=3)
+
+            if not quiz_blocks:
+                return {
+                    "success": False,
+                    "message": f"Materi '{mat_title}' belum memiliki butir kuis yang cukup."
+                }
+
+            total_q = len(quiz_blocks)
+            idx = max(1, min(question_number, total_q)) - 1
+            current_q = quiz_blocks[idx]
+
+            # Jika user menjawab pertanyaan:
+            if user_answer.strip():
+                kunci_jawaban = current_q["answer"]
+                next_q_num = idx + 2
+                has_next = next_q_num <= total_q
+
+                ret = {
+                    "success": True,
+                    "mode": "evaluasi_jawaban",
+                    "materi": mat_title,
+                    "soal_ke": idx + 1,
+                    "jawaban_user": user_answer,
+                    "kunci_jawaban": kunci_jawaban,
+                    "ada_soal_berikutnya": has_next,
+                    "nomor_soal_berikutnya": next_q_num if has_next else None,
+                    "instruksi_ai": (
+                        f"PANDUAN MENJAWAB PENGGUNA:\n"
+                        f"1. Berikan apresiasi dan nilai jawaban pengguna berdasarkan kunci jawaban di atas secara ramah dan suportif.\n"
+                        f"2. Jelaskan perbandingannya dalam 1-2 kalimat.\n"
+                        + (f"3. Lalu langsung tanyakan soal nomor {next_q_num}: '{quiz_blocks[idx+1]['question']}'" if has_next else "3. Berikan ucapan selamat karena telah menyelesaikan semua soal kuis pada materi ini!")
+                    )
+                }
+                record_mcp_tool_history(owner_id, "test_user_knowledge_quiz", f"eval {mat_title} Q{idx+1}", {"answer": user_answer}, ret)
+                return ret
+
+            # Jika menyajikan soal baru:
+            ret = {
+                "success": True,
+                "mode": "tanya_soal",
+                "materi": mat_title,
+                "soal_ke": idx + 1,
+                "total_soal": total_q,
+                "pertanyaan": current_q["question"],
+                "kunci_jawaban_rahasia": current_q["answer"],
+                "instruksi_ai": (
+                    f"PANDUAN MENJAWAB PENGGUNA:\n"
+                    f"1. Sapa pengguna dan ajukan pertanyaan nomor {idx+1} dari total {total_q} soal materi '{mat_title}':\n"
+                    f"   '{current_q['question']}'\n"
+                    f"2. JANGAN MEMBACAKAN KUNCI JAWABAN sekarang. Tunggu hingga pengguna menjawab."
+                )
+            }
+            record_mcp_tool_history(owner_id, "test_user_knowledge_quiz", f"ask {mat_title} Q{idx+1}", {"q_num": idx+1}, ret)
+            return ret
+        except Exception as e:
+            logger.exception("Error running knowledge quiz")
+            return {"success": False, "message": f"Terjadi kesalahan saat memuat kuis: {str(e)[:80]}"}
+
 
 

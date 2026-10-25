@@ -14,7 +14,8 @@ import re
 import socket
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, Optional
+import xml.etree.ElementTree as ET
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("xiaozhi.scraper")
 
@@ -181,6 +182,123 @@ def clean_indonesian_news_noise(text: str) -> str:
 def clean_inline_spaces(s: str) -> str:
     """Bersihkan spasi berlebih dalam baris teks."""
     return re.sub(r"[ \t]+", " ", s).strip()
+
+
+def clean_wikipedia_dom(soup: Any, base_url: str = "") -> List[str]:
+    """
+    Format dan bersihkan elemen DOM Wikipedia untuk pembacaan suara dan teks yang bersih:
+    - Menghapus penanda kutipan referensi angka [1], [2], [rujukan?], [citation needed]
+    - Menghapus navigasi Wikipedia, tombol sunting bab, daftar isi (TOC), dan footer referensi
+    - Mengekstrak Infobox menjadi ringkasan spesifikasi fakta terstruktur
+    """
+    if soup is None:
+        return []
+
+    # 1. Hapus referensi [1], [2], [citation needed] dan tombol sunting
+    for sup in soup.find_all("sup", class_=re.compile(r"(reference|noprint)", re.I)):
+        sup.decompose()
+    for span in soup.find_all("span", class_=re.compile(r"(mw-editsection|citation)", re.I)):
+        span.decompose()
+    for el in soup.find_all(["div", "table"], class_=re.compile(r"(hatnote|navbox|vertical-navbox|metadata|side-box|reflist|printfooter)", re.I)):
+        el.decompose()
+    for el in soup.find_all(id=re.compile(r"(toc|mw-navigation|catlinks)", re.I)):
+        el.decompose()
+
+    # 2. Ekstrak data Infobox menjadi daftar fakta bersih
+    infobox_summary: List[str] = []
+    infobox = soup.find("table", class_=re.compile(r"\binfobox\b", re.I))
+    if infobox:
+        for tr in infobox.find_all("tr"):
+            th = tr.find("th")
+            td = tr.find("td")
+            if th and td:
+                label = th.get_text(separator=" ", strip=True).replace("\n", " ")
+                val = td.get_text(separator=" ", strip=True).replace("\n", " ")
+            elif len(tr.find_all("td")) >= 2:
+                all_td = tr.find_all("td")
+                label = all_td[0].get_text(separator=" ", strip=True).replace("\n", " ")
+                val = all_td[1].get_text(separator=" ", strip=True).replace("\n", " ")
+            else:
+                continue
+            label = re.sub(r"\[(?:\d+|catatan \d+|rujukan\?|butuh rujukan|citation needed)\]", "", label).strip()
+            val = re.sub(r"\[(?:\d+|catatan \d+|rujukan\?|butuh rujukan|citation needed)\]", "", val).strip()
+            if label and val and len(label) < 60 and len(val) < 250:
+                infobox_summary.append(f"• **{label}**: {val}")
+        infobox.decompose()
+
+    return infobox_summary
+
+
+def generate_quiz_from_content(content: str, title: str = "", num_questions: int = 3) -> List[Dict[str, str]]:
+    """
+    Ekstrak 3-5 pertanyaan kuis pemahaman faktual dan kunci jawaban ringkas (flashcards)
+    secara otomatis dari teks materi yang di-scrape.
+    """
+    if not content or len(content.strip()) < 80:
+        return []
+
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    paragraphs = [
+        l for l in lines
+        if len(l) > 35
+        and not l.startswith(("#", ">", "•", "|", "```", "---", "1.", "2.", "3.", "4.", "5."))
+        and not any(noise in l.lower() for noise in ["referensi", "doi:", "sumber url", "penulis:"])
+    ]
+    headings = [
+        re.sub(r"^#+\s*", "", l).strip()
+        for l in lines
+        if l.startswith(("#", "###", "##")) and not any(k in l.lower() for k in ["informasi dokumen", "referensi", "tautan", "tipe konten", "kuis pemahaman"])
+    ]
+
+    doc_title = title or (headings[0] if headings else "Topik Ini")
+    doc_title = re.sub(r"^(?:jurnal ilmiah|artikel web|dokumen pdf|transkrip):\s*", "", doc_title, flags=re.I).strip()
+
+    quiz: List[Dict[str, str]] = []
+
+    # Q1: Definisi / Konsep Inti
+    if paragraphs:
+        first_p = paragraphs[0]
+        sents = [s.strip() for s in re.split(r"[.!?]\s+", first_p) if len(s.strip()) > 20]
+        ans1 = (sents[0] if sents else first_p[:200]).rstrip(".") + "."
+        quiz.append({
+            "question": f"Apa konsep atau fungsi utama yang dibahas mengenai {doc_title}?",
+            "answer": ans1[:280]
+        })
+
+    # Q2: Karakteristik / Cara Kerja / Metodologi
+    mid_idx = len(paragraphs) // 2
+    if len(paragraphs) > 1 and mid_idx < len(paragraphs):
+        mid_p = paragraphs[mid_idx]
+        sents = [s.strip() for s in re.split(r"[.!?]\s+", mid_p) if len(s.strip()) > 20]
+        ans2 = (sents[0] if sents else mid_p[:200]).rstrip(".") + "."
+        focus_topic = headings[1] if len(headings) > 1 else doc_title
+        quiz.append({
+            "question": f"Bagaimana prinsip kerja, metode, atau karakteristik penting terkait {focus_topic}?",
+            "answer": ans2[:280]
+        })
+
+    # Q3: Keunggulan / Manfaat / Temuan Kunci
+    if len(paragraphs) > 2:
+        last_p = paragraphs[-1]
+        sents = [s.strip() for s in re.split(r"[.!?]\s+", last_p) if len(s.strip()) > 20]
+        ans3 = (sents[0] if sents else last_p[:200]).rstrip(".") + "."
+        quiz.append({
+            "question": f"Apa temuan penting, hasil pengujian, atau keunggulan dari pembahasan {doc_title}?",
+            "answer": ans3[:280]
+        })
+
+    return quiz[:num_questions]
+
+
+def format_quiz_as_markdown(quiz_items: List[Dict[str, str]]) -> str:
+    """Format daftar kuis menjadi blok Markdown Flashcards terstruktur."""
+    if not quiz_items:
+        return ""
+    lines = ["\n---\n", "### 🧠 Kuis Pemahaman & Flashcards\n"]
+    for idx, item in enumerate(quiz_items, 1):
+        lines.append(f"{idx}. ❓ **Pertanyaan**: {item['question']}")
+        lines.append(f"   - 💡 **Kunci Jawaban**: {item['answer']}\n")
+    return "\n".join(lines)
 
 
 def format_inline_markdown(element: Any, base_url: str = "", collected_links: Optional[list] = None) -> str:
@@ -510,16 +628,29 @@ def extract_structured_text_bs4(
         or soup
     )
 
+    is_wikipedia = "wikipedia.org" in (base_url or "").lower()
     blocks = []
     seen_tables = set()
     seen_lists = set()
     seen_pres = set()
     seen_callouts = set()
 
+    # Pre-extract Wikipedia Infobox facts if present
+    if is_wikipedia:
+        infobox_specs = clean_wikipedia_dom(soup, base_url)
+        if infobox_specs:
+            blocks.append("### ℹ️ Ringkasan Fakta & Spesifikasi (Infobox Wikipedia)\n" + "\n".join(infobox_specs[:12]))
+
     for el in main_el.find_all(["h1", "h2", "h3", "h4", "p", "ul", "ol", "table", "pre", "blockquote", "div"]):
         tag = el.name.lower()
         if tag in ("h1", "h2", "h3", "h4"):
             text = format_inline_markdown(el, base_url, collected_links).strip()
+            if is_wikipedia:
+                text = re.sub(r"\[(?:\d+|catatan \d+|rujukan\?|butuh rujukan|citation needed)\]", "", text).strip()
+                text = re.sub(r"\[(?:sunting|edit)\]", "", text).strip()
+                # Stop parsing at Wikipedia footer sections
+                if text.lower() in ("referensi", "pranala luar", "lihat pula", "catatan kaki", "daftar pustaka", "references", "external links", "see also"):
+                    break
             if not text or len(text) < 2:
                 continue
             # Skip if heading duplicates page title or is an abstract header
@@ -544,6 +675,9 @@ def extract_structured_text_bs4(
             items = []
             for idx, li in enumerate(el.find_all("li", recursive=False), 1):
                 lit = format_inline_markdown(li, base_url, collected_links).strip()
+                if is_wikipedia:
+                    lit = re.sub(r"\[(?:\d+|catatan \d+|rujukan\?|butuh rujukan|citation needed)\]", "", lit)
+                    lit = re.sub(r"\[(?:sunting|edit)\]", "", lit).strip()
                 if lit:
                     if tag == "ol":
                         items.append(f"{idx}. {lit}")
@@ -599,6 +733,9 @@ def extract_structured_text_bs4(
             if any(c in p_classes for c in ("byline", "author", "author-name")):
                 continue
             pt = format_inline_markdown(el, base_url, collected_links).strip()
+            if is_wikipedia:
+                pt = re.sub(r"\[(?:\d+|catatan \d+|rujukan\?|butuh rujukan|citation needed)\]", "", pt)
+                pt = re.sub(r"\[(?:sunting|edit)\]", "", pt).strip()
             if pt and len(pt) > 10:
                 blocks.append(pt)
 
@@ -623,6 +760,8 @@ def _extract_page_data_bs4(html: str, max_length: int, url: str = "") -> Dict[st
     Ekstrak data halaman web komprehensif menggunakan BeautifulSoup:
     - Metadata akademik (Google Scholar, Dublin Core, JSON-LD, arXiv, DOI, Abstrak).
     - Konten terstruktur (Markdown Headings, Tables, Lists, Code Blocks, Callouts).
+    - Format Wikipedia bersih bebas rujukan [1][2] dengan Infobox fakta.
+    - Kuis pemahaman & flashcards 3 pertanyaan otomatis.
     - Tautan inline presisi [teks](url) dan daftar referensi terkait di bagian akhir.
     """
     soup = BeautifulSoup(html, "html.parser")
@@ -678,6 +817,7 @@ def _extract_page_data_bs4(html: str, max_length: int, url: str = "") -> Dict[st
             "doi": meta.get("doi", ""),
             "abstract": meta.get("abstract", ""),
             "collected_links": [],
+            "quiz": [],
         }
 
     # 4. Construct Executive Document Structure
@@ -719,6 +859,12 @@ def _extract_page_data_bs4(html: str, max_length: int, url: str = "") -> Dict[st
         ref_lines = [f"• [{link['text']}]({link['url']})" for link in collected_links[:15]]
         doc_parts.append("\n".join(ref_lines))
 
+    # 5. Generate Comprehension Quiz / Flashcards
+    quiz_items = generate_quiz_from_content(body_text, title=title, num_questions=3)
+    if quiz_items:
+        quiz_md = format_quiz_as_markdown(quiz_items)
+        doc_parts.append(quiz_md)
+
     full_document = "\n\n".join(doc_parts).strip()
     full_document = re.sub(r"\n{3,}", "\n\n", full_document)
 
@@ -742,6 +888,7 @@ def _extract_page_data_bs4(html: str, max_length: int, url: str = "") -> Dict[st
         "doi": meta.get("doi", ""),
         "abstract": meta.get("abstract", ""),
         "collected_links": collected_links,
+        "quiz": quiz_items,
     }
 
 
@@ -1226,6 +1373,7 @@ def scrape_url(url: str, max_length: int = 25000) -> Dict[str, Any]:
             "doi": extracted.get("doi", ""),
             "abstract": extracted.get("abstract", ""),
             "collected_links": extracted.get("collected_links", []),
+            "quiz": extracted.get("quiz", []),
         }
 
     except requests.exceptions.Timeout:
@@ -1335,6 +1483,7 @@ async def scrape_url_async(url: str, max_length: int = 25000) -> Dict[str, Any]:
                 "doi": extracted.get("doi", ""),
                 "abstract": extracted.get("abstract", ""),
                 "collected_links": extracted.get("collected_links", []),
+                "quiz": extracted.get("quiz", []),
             }
     except httpx.TimeoutException:
         jina_res = await scrape_via_jina_reader_async(safe_url, max_length)
@@ -1422,4 +1571,531 @@ def create_material_from_url(url: str, title: str = "", category: str = "Web Scr
         "pub_date": result.get("pub_date", ""),
         "doi": result.get("doi", ""),
         "abstract": result.get("abstract", ""),
+        "quiz": result.get("quiz", []),
     }
+
+
+# ── 9. Direct Academic Paper APIs & Autonomous Deep Research ─────────────────
+
+def search_arxiv_papers(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    """
+    Cari jurnal ilmiah gratis di arXiv API berdasarkan kata kunci.
+    Mengembalikan daftar paper dengan judul, penulis, tahun, abstrak, dan link PDF open-access.
+    """
+    clean_q = re.sub(r"[^\w\s-]", " ", query).strip()
+    if not clean_q:
+        return []
+
+    url = f"http://export.arxiv.org/api/query?search_query=all:{urllib.parse.quote_plus(clean_q)}&start=0&max_results={max_results}"
+    results: List[Dict[str, Any]] = []
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "XiaoZhi-Academic/1.0 (academic-research@xiaozhiscig.biz.id)"}
+        )
+        with urllib.request.urlopen(req, timeout=7) as resp:
+            xml_data = resp.read()
+
+        root = ET.fromstring(xml_data)
+        atom_ns = "{http://www.w3.org/2005/Atom}"
+        arxiv_ns = "{http://arxiv.org/schemas/atom}"
+
+        for entry in root.findall(f"{atom_ns}entry"):
+            title_el = entry.find(f"{atom_ns}title")
+            title = re.sub(r"\s+", " ", title_el.text or "").strip() if title_el is not None else ""
+            if not title:
+                continue
+
+            summary_el = entry.find(f"{atom_ns}summary")
+            abstract = re.sub(r"\s+", " ", summary_el.text or "").strip() if summary_el is not None else ""
+
+            pub_el = entry.find(f"{atom_ns}published")
+            year = pub_el.text[:4] if pub_el is not None and pub_el.text else ""
+
+            id_el = entry.find(f"{atom_ns}id")
+            entry_id = (id_el.text or "").strip() if id_el is not None else ""
+
+            authors = []
+            for a in entry.findall(f"{atom_ns}author"):
+                name_el = a.find(f"{atom_ns}name")
+                if name_el is not None and name_el.text:
+                    authors.append(name_el.text.strip())
+
+            pdf_url = ""
+            for link in entry.findall(f"{atom_ns}link"):
+                if link.get("title") == "pdf" or link.get("type") == "application/pdf":
+                    pdf_url = link.get("href", "")
+                    break
+            if not pdf_url and entry_id:
+                pdf_url = entry_id.replace("/abs/", "/pdf/") + ".pdf"
+
+            doi_el = entry.find(f"{arxiv_ns}doi")
+            doi = (doi_el.text or "").strip() if doi_el is not None else ""
+
+            results.append({
+                "title": title,
+                "authors": authors,
+                "year": year,
+                "citations": "Tersedia di arXiv (Open Access)",
+                "citation_count": 0,
+                "abstract": abstract,
+                "doi": doi,
+                "pdf_url": pdf_url,
+                "url": entry_id or pdf_url,
+                "source": "arXiv",
+            })
+    except Exception as e:
+        logger.warning("Error searching arXiv for '%s': %s", query, e)
+
+    return results
+
+
+def search_semantic_scholar_papers(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    """
+    Cari paper ilmiah di Semantic Scholar Graph API.
+    Menyajikan citation count, abstrak komprehensif, dan link PDF open-access jika ada.
+    """
+    clean_q = re.sub(r"[^\w\s-]", " ", query).strip()
+    if not clean_q:
+        return []
+
+    url = (
+        f"https://api.semanticscholar.org/graph/v1/paper/search?"
+        f"query={urllib.parse.quote_plus(clean_q)}&limit={max_results}"
+        f"&fields=title,authors,year,citationCount,abstract,openAccessPdf,url,externalIds"
+    )
+    results: List[Dict[str, Any]] = []
+
+    try:
+        headers = {
+            "User-Agent": "XiaoZhi-Scholar/1.0 (academic-research@xiaozhiscig.biz.id)",
+            "Accept": "application/json",
+        }
+        if HAS_REQUESTS:
+            resp = requests.get(url, headers=headers, timeout=6)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+            else:
+                data = []
+        else:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=6) as response:
+                data = json.loads(response.read().decode("utf-8")).get("data", [])
+
+        for item in data:
+            title = (item.get("title") or "").strip()
+            if not title:
+                continue
+
+            authors = [a.get("name", "").strip() for a in item.get("authors", []) if a.get("name")]
+            year = str(item.get("year") or "")
+            citations = item.get("citationCount") or 0
+            abstract = (item.get("abstract") or "").strip()
+            oa_pdf = item.get("openAccessPdf") or {}
+            pdf_url = oa_pdf.get("url") or ""
+            paper_url = item.get("url") or ""
+            ext_ids = item.get("externalIds") or {}
+            doi = ext_ids.get("DOI") or ""
+
+            results.append({
+                "title": title,
+                "authors": authors,
+                "year": year,
+                "citations": f"{citations} Sitasi",
+                "citation_count": citations,
+                "abstract": abstract,
+                "doi": doi,
+                "pdf_url": pdf_url,
+                "url": paper_url or (f"https://doi.org/{doi}" if doi else ""),
+                "source": "Semantic Scholar",
+            })
+    except Exception as e:
+        logger.warning("Semantic Scholar search notice for '%s': %s", query, e)
+
+    return results
+
+
+def search_crossref_papers(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    """
+    Cari jurnal ilmiah terindeks di CrossRef REST API (metadata resmi jutaan penerbit dunia).
+    Gratis tanpa API key, tahan banting dengan citation count resmi.
+    """
+    clean_q = re.sub(r"[^\w\s-]", " ", query).strip()
+    if not clean_q:
+        return []
+
+    url = f"https://api.crossref.org/works?query={urllib.parse.quote_plus(clean_q)}&rows={max_results}"
+    results: List[Dict[str, Any]] = []
+
+    try:
+        headers = {
+            "User-Agent": "XiaoZhiScraper/1.0 (mailto:admin@xiaozhiscig.biz.id)",
+            "Accept": "application/json",
+        }
+        if HAS_REQUESTS:
+            resp = requests.get(url, headers=headers, timeout=6)
+            if resp.status_code == 200:
+                items = resp.json().get("message", {}).get("items", [])
+            else:
+                items = []
+        else:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=6) as response:
+                items = json.loads(response.read().decode("utf-8")).get("message", {}).get("items", [])
+
+        for it in items:
+            titles = it.get("title", [])
+            title = titles[0].strip() if titles else ""
+            if not title:
+                continue
+
+            authors = []
+            for a in it.get("author", []):
+                name = f"{a.get('given', '')} {a.get('family', '')}".strip()
+                if name:
+                    authors.append(name)
+
+            issued = it.get("issued", {}).get("date-parts", [[]])
+            year = str(issued[0][0]) if issued and issued[0] else ""
+
+            citations = it.get("is-referenced-by-count", 0)
+            doi = it.get("DOI", "")
+            doi_url = it.get("URL", f"https://doi.org/{doi}" if doi else "")
+
+            # Open Access link extraction
+            pdf_url = ""
+            for l in it.get("link", []):
+                if "application/pdf" in l.get("content-type", "").lower():
+                    pdf_url = l.get("URL", "")
+                    break
+
+            abstract = it.get("abstract", "")
+            if abstract:
+                abstract = re.sub(r"<[^>]+>", " ", abstract).strip()
+                abstract = re.sub(r"\s+", " ", abstract)
+
+            results.append({
+                "title": title,
+                "authors": authors,
+                "year": year,
+                "citations": f"{citations} Sitasi",
+                "citation_count": citations,
+                "abstract": abstract,
+                "doi": doi,
+                "pdf_url": pdf_url,
+                "url": doi_url,
+                "source": "CrossRef / Jurnal Resmi",
+            })
+    except Exception as e:
+        logger.warning("CrossRef search notice for '%s': %s", query, e)
+
+    return results
+
+
+def search_academic_papers_unified(query: str, max_results: int = 5) -> Dict[str, Any]:
+    """
+    Integrasi gabungan arXiv, Semantic Scholar, dan CrossRef:
+    - Melakukan pencarian paralel/bertingkat ke 3 database jurnal bereputasi tinggi.
+    - Menghapus duplikasi judul.
+    - Mengurutkan berdasarkan relevansi dan jumlah sitasi.
+    - Menyusun format Markdown presentasi yang siap dibaca user atau XiaoZhi.
+    """
+    papers: List[Dict[str, Any]] = []
+    seen_titles = set()
+
+    # 1. Search arXiv
+    arxiv_list = search_arxiv_papers(query, max_results=max_results)
+    for p in arxiv_list:
+        norm = re.sub(r"[^a-z0-9]", "", p["title"].lower())
+        if norm and norm not in seen_titles:
+            seen_titles.add(norm)
+            papers.append(p)
+
+    # 2. Search Semantic Scholar
+    ss_list = search_semantic_scholar_papers(query, max_results=max_results)
+    for p in ss_list:
+        norm = re.sub(r"[^a-z0-9]", "", p["title"].lower())
+        if norm and norm not in seen_titles:
+            seen_titles.add(norm)
+            papers.append(p)
+
+    # 3. Search CrossRef (tahan banting dan kaya sitasi)
+    if len(papers) < max_results:
+        cr_list = search_crossref_papers(query, max_results=max_results)
+        for p in cr_list:
+            norm = re.sub(r"[^a-z0-9]", "", p["title"].lower())
+            if norm and norm not in seen_titles:
+                seen_titles.add(norm)
+                papers.append(p)
+
+    # Urutkan berdasarkan ada tidaknya PDF open-access & sitasi
+    papers.sort(key=lambda x: (bool(x.get("pdf_url")), x.get("citation_count", 0)), reverse=True)
+    selected_papers = papers[:max_results]
+
+    if not selected_papers:
+        return {
+            "success": False,
+            "query": query,
+            "total_found": 0,
+            "papers": [],
+            "message": f"Tidak ditemukan paper atau jurnal akademis untuk kata kunci '{query}'.",
+        }
+
+    # Format Markdown rapi untuk konsumsi user & AI
+    md_lines = [f"## 📚 Hasil Pencarian Jurnal & Paper Ilmiah: '{query}'\n"]
+    for idx, p in enumerate(selected_papers, 1):
+        md_lines.append(f"### {idx}. {p['title']}")
+        if p.get("authors"):
+            md_lines.append(f"- 👤 **Penulis**: {', '.join(p['authors'][:4])}")
+        md_lines.append(f"- 🗓️ **Tahun**: {p.get('year') or 'N/A'} | 🏛️ **Database**: {p.get('source')} | 📊 **Sitasi**: {p.get('citations')}")
+        if p.get("pdf_url"):
+            md_lines.append(f"- 📥 **Akses PDF**: [Unduh / Buka PDF Full-Text]({p['pdf_url']})")
+        if p.get("url"):
+            md_lines.append(f"- 🔗 **Tautan Paper**: [{p.get('doi') or p['url']}]({p['url']})")
+        if p.get("abstract"):
+            clean_abs = p["abstract"][:400] + ("..." if len(p["abstract"]) > 400 else "")
+            md_lines.append(f"- 📑 **Intisari Abstrak**:\n  > {clean_abs}")
+        md_lines.append("")
+
+    return {
+        "success": True,
+        "query": query,
+        "total_found": len(selected_papers),
+        "papers": selected_papers,
+        "summary_markdown": "\n".join(md_lines).strip(),
+    }
+
+
+def search_web_sources(query: str, max_results: int = 3) -> List[Dict[str, str]]:
+    """
+    Cari sumber referensi ensiklopedia (Wikipedia OpenSearch) dan berita/tutorial terpercaya.
+    """
+    clean_q = re.sub(r"[^\w\s-]", " ", query).strip()
+    sources: List[Dict[str, str]] = []
+    seen_urls = set()
+
+    # 1. Wikipedia OpenSearch API (Bahasa Indonesia & Inggris)
+    for lang in ("id", "en"):
+        try:
+            wiki_api = f"https://{lang}.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote_plus(clean_q)}&limit={max_results}&namespace=0&format=json"
+            headers = {"User-Agent": "XiaoZhi-Wiki/1.0 (admin@xiaozhiscig.biz.id)"}
+            if HAS_REQUESTS:
+                resp = requests.get(wiki_api, headers=headers, timeout=5)
+                data = resp.json() if resp.status_code == 200 else []
+            else:
+                req = urllib.request.Request(wiki_api, headers=headers)
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+
+            if len(data) >= 4:
+                titles = data[1]
+                snippets = data[2]
+                urls = data[3]
+                for t, s, u in zip(titles, snippets, urls):
+                    if u not in seen_urls:
+                        seen_urls.add(u)
+                        sources.append({
+                            "title": t,
+                            "url": u,
+                            "snippet": s or f"Artikel ensiklopedia Wikipedia {lang.upper()}",
+                            "source": f"Wikipedia ({lang.upper()})",
+                        })
+        except Exception as e:
+            logger.debug("Wikipedia OpenSearch notice (%s): %s", lang, e)
+
+    # 2. Google News RSS untuk topik terkini jika belum cukup
+    if len(sources) < max_results:
+        try:
+            rss_url = f"https://news.google.com/rss/search?q={urllib.parse.quote_plus(clean_q)}&hl=id&gl=ID&ceid=ID:id"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            if HAS_REQUESTS:
+                resp = requests.get(rss_url, headers=headers, timeout=5)
+                xml_content = resp.text if resp.status_code == 200 else ""
+            else:
+                req = urllib.request.Request(rss_url, headers=headers)
+                with urllib.request.urlopen(req, timeout=5) as r:
+                    xml_content = r.read().decode("utf-8", errors="ignore")
+
+            if xml_content:
+                items = re.findall(r"<item>(.*?)</item>", xml_content, re.DOTALL)
+                for item in items[:max_results]:
+                    t = re.search(r"<title>(.*?)</title>", item)
+                    l = re.search(r"<link>(.*?)</link>", item)
+                    d = re.search(r"<description>(.*?)</description>", item)
+                    if t and l:
+                        u = l.group(1).strip()
+                        if u not in seen_urls:
+                            seen_urls.add(u)
+                            desc = re.sub(r"<[^>]+>", " ", d.group(1) if d else "").strip()
+                            sources.append({
+                                "title": t.group(1).strip(),
+                                "url": u,
+                                "snippet": desc[:250],
+                                "source": "Google News Terverifikasi",
+                            })
+        except Exception as e:
+            logger.debug("News RSS notice: %s", e)
+
+    return sources[:max_results]
+
+
+def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any]:
+    """
+    Autonomous Deep Research Engine:
+    Secara mandiri mencari, mengekstraksi, dan menyusun briefing materi komprehensif
+    lengkap dengan kuis pemahaman tanpa mengharuskan pengguna menyalin tautan link manual.
+
+    PENTING (ADAPTIF & AMAN):
+    Sesuai instruksi pengguna, hasil TIDAK LANGSUNG disimpan ke database.
+    XiaoZhi akan terlebih dahulu mempresentasikan intisari temuan, lalu menanyakan
+    konfirmasi persis kepada pengguna:
+    "Apakah Anda ingin saya menyimpan materi ini ke Knowledge Base Anda? Dan ada hal lain yang ingin Anda tanyakan atau pelajari?"
+
+    Args:
+        topic: Topik atau pertanyaan yang ingin diteliti secara mandiri.
+        mode: 'academic' (arXiv/SemanticScholar/CrossRef), 'web' (Tutorial/Wikipedia), atau 'auto' (cerdas adaptif).
+    """
+    clean_topic = topic.strip()
+    if not clean_topic:
+        return {"success": False, "error": "Topik penelitian tidak boleh kosong."}
+
+    # Klasifikasi otomatis apakah pengguna menargetkan paper/jurnal ilmiah atau tutorial praktis
+    is_academic = False
+    academic_keywords = [
+        "paper", "jurnal", "riset", "penelitian", "scholar", "arxiv",
+        "algoritma", "deep learning", "transformer", "neural", "arsitektur",
+        "akurasi", "dataset", "scientific", "study", "metodologi",
+    ]
+    if mode == "academic" or (mode == "auto" and any(k in clean_topic.lower() for k in academic_keywords)):
+        is_academic = True
+
+    # 1. Jalur Penelitian Akademis (arXiv / Semantic Scholar / CrossRef)
+    if is_academic:
+        res = search_academic_papers_unified(clean_topic, max_results=3)
+        if res.get("success") and res.get("papers"):
+            top_paper = res["papers"][0]
+            title = top_paper["title"]
+            authors_str = ", ".join(top_paper.get("authors", [])) or "Tim Peneliti"
+            year = top_paper.get("year", "N/A")
+            source_platform = top_paper.get("source", "Repositori Ilmiah")
+            citations = top_paper.get("citations", "N/A")
+            abstract = top_paper.get("abstract") or "Abstrak lengkap dapat diakses pada dokumen publikasi resmi."
+            pdf_link = top_paper.get("pdf_url") or ""
+            paper_url = top_paper.get("url") or pdf_link
+
+            # Sintesis Executive Briefing
+            brief_parts = [
+                f"# 📑 Kajian Paper Ilmiah: {title}\n",
+                f"> 🏛️ **Sumber / Platform**: {source_platform} | 🗓️ **Tahun**: {year}",
+                f"> 👤 **Peneliti**: {authors_str}",
+                f"> 📊 **Dampak & Sitasi**: {citations}",
+            ]
+            if pdf_link:
+                brief_parts.append(f"> 📥 **Akses Full-Text PDF**: [{pdf_link}]({pdf_link})")
+            if paper_url:
+                brief_parts.append(f"> 🌐 **URL Dokumen**: {paper_url}")
+            brief_parts.append("\n---\n")
+            brief_parts.append("### 🔬 Intisari & Abstrak Riset\n")
+            brief_parts.append(f"> {abstract}\n")
+
+            # Hasilkan Kuis Pemahaman Otomatis (3 Soal)
+            quiz_items = generate_quiz_from_content(abstract, title=title, num_questions=3)
+            if quiz_items:
+                brief_parts.append(format_quiz_as_markdown(quiz_items))
+
+            full_briefing = "\n".join(brief_parts)
+
+            materi_payload = {
+                "title": f"Paper: {title[:120]}",
+                "category": "Jurnal Ilmiah",
+                "content": full_briefing,
+                "url": paper_url,
+                "keywords": f"paper, riset, {source_platform.lower()}, {clean_topic[:60]}",
+            }
+
+            return {
+                "success": True,
+                "mode": "academic",
+                "topic": clean_topic,
+                "primary_source": {
+                    "title": title,
+                    "authors": authors_str,
+                    "year": year,
+                    "source": source_platform,
+                    "pdf_url": pdf_link,
+                    "url": paper_url,
+                },
+                "summary": full_briefing,
+                "quiz": quiz_items,
+                "saved_to_db": False,
+                "needs_user_confirmation": True,
+                "confirmation_prompt": (
+                    "Apakah Anda ingin saya menyimpan materi ini ke Knowledge Base Anda? "
+                    "Dan ada hal lain yang ingin Anda tanyakan atau pelajari?"
+                ),
+                "materi_siap_simpan": materi_payload,
+                "instruksi_ai": (
+                    "PANDUAN MENJAWAB PENGGUNA:\n"
+                    "1. Jelaskan intisari paper di atas dengan ramah, padat, dan terstruktur (judul, temuan utama, dan link PDF jika ada).\n"
+                    "2. JANGAN LANGSUNG MENYIMPAN KE DATABASE! Wajib tanyakan konfirmasi ini di akhir jawaban:\n"
+                    "   'Apakah Anda ingin saya menyimpan materi ini ke Knowledge Base Anda? Dan ada hal lain yang ingin Anda tanyakan atau pelajari?'\n"
+                    "3. Jika pengguna menyetujui, panggil tool 'confirm_and_save_research_material'."
+                ),
+            }
+
+    # 2. Jalur Riset Web & Ensiklopedia / Dokumentasi Teknis
+    web_sources = search_web_sources(clean_topic, max_results=3)
+    if web_sources:
+        best_source = web_sources[0]
+        scrape_res = scrape_url(best_source["url"], max_length=15000)
+        if scrape_res.get("success"):
+            full_content = scrape_res["content"]
+            title = scrape_res.get("title") or best_source["title"]
+            quiz_items = scrape_res.get("quiz") or generate_quiz_from_content(full_content, title=title, num_questions=3)
+
+            materi_payload = {
+                "title": title[:140],
+                "category": "Dokumentasi & Riset Mandiri",
+                "content": full_content,
+                "url": best_source["url"],
+                "keywords": f"riset, autonomous, {best_source.get('source', '').lower()}, {clean_topic[:60]}",
+            }
+
+            return {
+                "success": True,
+                "mode": "web",
+                "topic": clean_topic,
+                "primary_source": {
+                    "title": title,
+                    "url": best_source["url"],
+                    "source": best_source.get("source", "Web"),
+                },
+                "summary": full_content[:3000] + ("\n\n[...Konten selengkapnya siap disimpan...]" if len(full_content) > 3000 else ""),
+                "quiz": quiz_items,
+                "saved_to_db": False,
+                "needs_user_confirmation": True,
+                "confirmation_prompt": (
+                    "Apakah Anda ingin saya menyimpan materi ini ke Knowledge Base Anda? "
+                    "Dan ada hal lain yang ingin Anda tanyakan atau pelajari?"
+                ),
+                "materi_siap_simpan": materi_payload,
+                "instruksi_ai": (
+                    "PANDUAN MENJAWAB PENGGUNA:\n"
+                    "1. Jelaskan langkah-langkah / konsep inti dari materi yang kamu pelajari di atas secara ringkas dan praktis.\n"
+                    "2. JANGAN LANGSUNG MENYIMPAN KE DATABASE! Wajib tanyakan konfirmasi ini di akhir jawaban:\n"
+                    "   'Apakah Anda ingin saya menyimpan materi ini ke Knowledge Base Anda? Dan ada hal lain yang ingin Anda tanyakan atau pelajari?'\n"
+                    "3. Jika pengguna menyetujui, panggil tool 'confirm_and_save_research_material'."
+                ),
+            }
+
+    # 3. Fallback jika tidak menemukan sumber spesifik: coba CrossRef umum
+    fallback_academic = search_academic_papers_unified(clean_topic, max_results=2)
+    if fallback_academic.get("success") and fallback_academic.get("papers"):
+        return conduct_autonomous_research(clean_topic, mode="academic")
+
+    return {
+        "success": False,
+        "error": f"Tidak dapat menemukan materi terverifikasi secara otomatis untuk topik '{clean_topic}'. Pengguna dapat memberikan link URL spesifik jika ada.",
+    }
+
