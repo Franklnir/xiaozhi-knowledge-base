@@ -1554,12 +1554,18 @@
                         </select>
                     </div>
                     <div>
-                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Nama Wi-Fi (SSID):</label>
-                        <input type="text" id="cfgWifiSsid" class="app-input" style="padding:6px 10px; font-size:12px;" value="WIFI_RUMAH_ANDA" placeholder="Contoh: MyHome_WiFi" oninput="regenerateArduinoCode()">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                            <label class="app-label" style="font-size:11px; margin-bottom:0;">Nama Wi-Fi (SSID):</label>
+                            <span id="wifiSavedStatusBadge" style="display:none; font-size:10px; font-weight:800; color:#059669; background:rgba(5,150,105,0.1); border:1px solid rgba(5,150,105,0.3); border-radius:4px; padding:1px 5px;">💾 Tersimpan di Browser</span>
+                        </div>
+                        <input type="text" id="cfgWifiSsid" class="app-input" style="padding:6px 10px; font-size:12px;" value="WIFI_RUMAH_ANDA" placeholder="Contoh: MyHome_WiFi" oninput="saveWifiCredentials(); regenerateArduinoCode();">
                     </div>
                     <div>
-                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Password Wi-Fi:</label>
-                        <input type="text" id="cfgWifiPass" class="app-input" style="padding:6px 10px; font-size:12px;" value="PASSWORD_WIFI" placeholder="Contoh: Rahasia123" oninput="regenerateArduinoCode()">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                            <label class="app-label" style="font-size:11px; margin-bottom:0;">Password Wi-Fi:</label>
+                            <button type="button" onclick="toggleWifiPassVisibility()" style="background:none; border:none; color:var(--app-muted); font-size:10px; cursor:pointer; font-weight:750;" id="btnToggleWifiPass">👁️ Intip Password</button>
+                        </div>
+                        <input type="text" id="cfgWifiPass" class="app-input" style="padding:6px 10px; font-size:12px;" value="PASSWORD_WIFI" placeholder="Contoh: Rahasia123" oninput="saveWifiCredentials(); regenerateArduinoCode();">
                     </div>
                     <div>
                         <label class="app-label" style="font-size:11px; margin-bottom:3px;">Tipe Modul Relay:</label>
@@ -2938,6 +2944,61 @@ void loop() {
 `;
     }
 
+    function loadSavedWifiCredentials() {
+        try {
+            const savedSsid = localStorage.getItem('xiaozhi_relay_wifi_ssid');
+            const savedPass = localStorage.getItem('xiaozhi_relay_wifi_pass');
+            const ssidEl = document.getElementById('cfgWifiSsid');
+            const passEl = document.getElementById('cfgWifiPass');
+            const statusBadge = document.getElementById('wifiSavedStatusBadge');
+
+            if (savedSsid && ssidEl) {
+                ssidEl.value = savedSsid;
+            }
+            if (savedPass !== null && passEl) {
+                passEl.value = savedPass;
+            }
+            if (savedSsid && statusBadge) {
+                statusBadge.style.display = 'inline-flex';
+                statusBadge.textContent = '💾 Tersimpan di Browser';
+            }
+        } catch (e) {}
+    }
+
+    function saveWifiCredentials() {
+        try {
+            const ssidEl = document.getElementById('cfgWifiSsid');
+            const passEl = document.getElementById('cfgWifiPass');
+            const statusBadge = document.getElementById('wifiSavedStatusBadge');
+            const ssid = ssidEl ? ssidEl.value.trim() : '';
+            const pass = passEl ? passEl.value : '';
+
+            if (ssid && ssid !== 'WIFI_RUMAH_ANDA') {
+                localStorage.setItem('xiaozhi_relay_wifi_ssid', ssid);
+                localStorage.setItem('xiaozhi_relay_wifi_pass', pass);
+                if (statusBadge) {
+                    statusBadge.style.display = 'inline-flex';
+                    statusBadge.textContent = '💾 Tersimpan di Browser';
+                }
+            } else if (!ssid || ssid === 'WIFI_RUMAH_ANDA') {
+                if (statusBadge) statusBadge.style.display = 'none';
+            }
+        } catch (e) {}
+    }
+
+    function toggleWifiPassVisibility() {
+        const passEl = document.getElementById('cfgWifiPass');
+        const btn = document.getElementById('btnToggleWifiPass');
+        if (!passEl) return;
+        if (passEl.type === 'password') {
+            passEl.type = 'text';
+            if (btn) btn.textContent = '🙈 Tutup Password';
+        } else {
+            passEl.type = 'password';
+            if (btn) btn.textContent = '👁️ Intip Password';
+        }
+    }
+
     function regenerateArduinoCode() {
         if (!currentConfigRoom) return;
         const ssid = document.getElementById("cfgWifiSsid")?.value.trim() || "WIFI_RUMAH_ANDA";
@@ -3000,6 +3061,8 @@ void loop() {
         }
         const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3";
         const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3;
+
+        saveWifiCredentials();
 
         const origHtml = btn.innerHTML;
         btn.innerHTML = "<span>⏳ Menyiapkan Paket ZIP...</span>";
@@ -3087,6 +3150,7 @@ void loop() {
         const mqttLwtEl = document.getElementById("cfgMqttLwtTopic");
         if (mqttLwtEl) mqttLwtEl.value = `xiaozhi/relay/${slug}/availability`;
 
+        loadSavedWifiCredentials();
         switchConfigTab("arduino");
         regenerateArduinoCode();
 

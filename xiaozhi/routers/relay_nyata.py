@@ -851,31 +851,61 @@ async def internal_relay_broadcast(request: Request):
     return {"success": True}
 
 
-@router.post("/api/relay-nyata/{room_id}/download-project-zip")
+@router.api_route("/api/relay-nyata/{room_id}/download-project-zip", methods=["GET", "POST"])
 async def download_arduino_project_zip(room_id: int, request: Request):
     """
     Generate fully self-contained Plug-and-Play Arduino project .ZIP
     including the custom .ino sketch and pre-bundled libraries (ArduinoJson & PubSubClient).
+    Supports both POST (with custom edited code from web UI) and GET.
     """
     user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Silakan login terlebih dahulu.")
 
     store = get_store()
-    room = store.get_real_relay_room(user["id"], room_id)
+    room = store.get_relay_room(user["id"], room_id)
     if not room:
         raise HTTPException(status_code=404, detail="Ruangan tidak ditemukan.")
 
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    body = {}
+    if request.method == "POST":
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
 
     code = body.get("code", "")
     board_name = body.get("board", "ESP32-S3")
     room_name = room.get("nama_tempat", "Smart_Home")
     clean_slug = re.sub(r'[^a-zA-Z0-9_]+', '_', room_name).strip('_') or f"Room_{room_id}"
     folder_name = f"{clean_slug}_ESP32_Relay"
+
+    if not code:
+        code = f"""// ====================================================================
+// XIAOZHI ESP32 SMART RELAY CONTROLLER (MQTT)
+// Ruangan: {room_name} | Board: {board_name}
+// Broker : 163.61.58.235:1883 | Client ID: {room.get('api_client_id', '')}
+// ====================================================================
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+
+const char* WIFI_SSID = "WIFI_RUMAH_ANDA";
+const char* WIFI_PASS = "PASSWORD_WIFI";
+const char* MQTT_SERVER = "163.61.58.235";
+const int   MQTT_PORT   = 1883;
+const char* CLIENT_ID   = "{room.get('api_client_id', 'esp32_relay')}";
+const char* DEVICE_TOKEN = "{room.get('api_token', '')}";
+
+void setup() {{
+    Serial.begin(115200);
+    Serial.println("Xiaozhi Relay Ready");
+}}
+
+void loop() {{
+    delay(10);
+}}
+"""
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
