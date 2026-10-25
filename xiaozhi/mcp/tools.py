@@ -17,6 +17,12 @@ from xiaozhi.services.scraper_service import (
     search_academic_papers_unified,
     validate_scrape_url,
 )
+from xiaozhi.services.language_tutor_service import (
+    explain_grammar_and_nuance as service_explain_grammar,
+    quiz_language_vocabulary as service_quiz_vocabulary,
+    save_vocabulary_flashcard as service_save_vocabulary,
+    start_conversation_roleplay as service_start_roleplay,
+)
 from xiaozhi.services.smarthome_service import (
     parse_smart_home_action,
     resolve_smart_home_target,
@@ -3445,6 +3451,147 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         except Exception as e:
             logger.exception("Error running knowledge quiz")
             return {"success": False, "message": f"Terjadi kesalahan saat memuat kuis: {str(e)[:80]}"}
+
+    @mcp_server.tool()
+    def save_vocabulary_flashcard(
+        word: str,
+        language: str = "Inggris",
+        translation: str = "",
+        pronunciation: str = "",
+        part_of_speech: str = "",
+        level: str = "A1",
+        example: str = "",
+        example_translation: str = "",
+        notes: str = "",
+    ) -> dict:
+        """
+        Simpan kata, frasa, atau idiom baru ke Buku Kosakata Knowledge Base milik pengguna.
+        Gunakan tool ini saat pengguna belajar kosakata baru, atau saat pengguna meminta:
+        "XiaoZhi, tolong catat/simpan kata ini ke buku kosakataku".
+
+        Args:
+            word: Kata atau frasa dalam bahasa target (contoh: "Accomplish", "Otsukaresama", "Xīn kǔ le").
+            language: Bahasa target (contoh: "Inggris", "Jepang", "Mandarin", "Korea", "Arab", "Jerman").
+            translation: Terjemahan arti dalam bahasa Indonesia.
+            pronunciation: Panduan cara baca / fonetik (contoh: "uh-KAHM-plish", "Romaji", "Pinyin").
+            part_of_speech: Kelas kata (contoh: "Verb", "Noun", "Adjective", "Ungkapan").
+            level: Tingkat kemahiran (contoh: "A1", "A2", "B1", "B2", "N5", "HSK 2").
+            example: Contoh kalimat percakapan praktis dalam bahasa target.
+            example_translation: Terjemahan bahasa Indonesia dari contoh kalimat.
+            notes: Nuansa penggunaan, tips kesopanan, atau konteks situasi.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi akun Xiaozhi aktif."}
+
+        res = service_save_vocabulary(
+            store=store,
+            owner_id=owner_id,
+            word=word,
+            language=language,
+            translation=translation,
+            pronunciation=pronunciation,
+            part_of_speech=part_of_speech,
+            level=level,
+            example=example,
+            example_translation=example_translation,
+            notes=notes,
+        )
+        record_mcp_tool_history(owner_id, "save_vocabulary_flashcard", word, {"word": word, "lang": language}, res)
+        return res
+
+    @mcp_server.tool()
+    def quiz_language_vocabulary(
+        language: str = "Inggris",
+        question_number: int = 1,
+        user_answer: str = "",
+    ) -> dict:
+        """
+        Latihan kuis drill kosakata bahasa asing secara interaktif melalui suara.
+        Gunakan tool ini saat pengguna berkata:
+        - "XiaoZhi, uji kosakata bahasa Inggriskup"
+        - "Kuis kosakata bahasa Jepang"
+        - "Latihan hafalan kata"
+        - Atau saat pengguna menjawab pertanyaan kuis sebelumnya.
+
+        Args:
+            language: Bahasa yang ingin diujikan (contoh: "Inggris", "Jepang", "Mandarin", "Korea").
+            question_number: Nomor butir kuis yang sedang aktif (1, 2, 3...).
+            user_answer: Jawaban yang diucapkan oleh pengguna (jika kosong, XiaoZhi akan mengajukan soal baru).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi akun Xiaozhi aktif."}
+
+        res = service_quiz_vocabulary(
+            store=store,
+            owner_id=owner_id,
+            language=language,
+            question_number=question_number,
+            user_answer=user_answer,
+        )
+        record_mcp_tool_history(owner_id, "quiz_language_vocabulary", f"{language} Q{question_number}", {"q_num": question_number, "ans": user_answer}, res)
+        return res
+
+    @mcp_server.tool()
+    def start_conversation_roleplay(
+        scenario: str = "kafe",
+        target_language: str = "Inggris",
+        level: str = "Pemula",
+        turn_number: int = 1,
+        user_speech: str = "",
+    ) -> dict:
+        """
+        Simulasi percakapan nyata (Roleplay) dengan pembetulan tata bahasa aktif (Feedback-First Pedagogy).
+        Gunakan tool ini saat pengguna berkata:
+        - "XiaoZhi, ayo simulasi ngobrol di kafe bahasa Inggris"
+        - "Latihan percakapan di bandara / hotel / wawancara kerja"
+        - "Ayo roleplay bahasa Jepang / Mandarin"
+        - Atau saat melanjutkan percakapan roleplay yang sedang berlangsung.
+
+        Args:
+            scenario: Topik simulasi ('kafe', 'bandara', 'hotel', 'wawancara', 'tanya_arah').
+            target_language: Bahasa target percakapan (contoh: "Inggris", "Jepang", "Mandarin").
+            level: Tingkat kemampuan pengguna ('Pemula', 'Menengah', 'Mahir').
+            turn_number: Nomor giliran percakapan (1 untuk pembukaan, 2, 3, dst.).
+            user_speech: Kalimat yang baru saja diucapkan oleh pengguna.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        res = service_start_roleplay(
+            scenario=scenario,
+            target_language=target_language,
+            level=level,
+            turn_number=turn_number,
+            user_speech=user_speech,
+        )
+        if owner_id:
+            record_mcp_tool_history(owner_id, "start_conversation_roleplay", f"{scenario} {target_language} T{turn_number}", {"speech": user_speech}, res)
+        return res
+
+    @mcp_server.tool()
+    def explain_grammar_and_nuance(
+        topic: str,
+        target_language: str = "Inggris",
+    ) -> dict:
+        """
+        Dokter Tata Bahasa & Nuansa Budaya (Grammar Doctor): Menjelaskan rumus tata bahasa, tenses,
+        perbedaan partikel, kesalahan umum penutur Indonesia, dan nuansa kesopanan formal vs santai.
+        Gunakan tool ini saat pengguna bertanya:
+        - "Apa bedanya Present Perfect dan Past Simple?"
+        - "Jelaskan partikel wa dan ga di bahasa Jepang"
+        - "Bagaimana aturan nada di bahasa Mandarin?"
+        - "Kenapa kalimat ini salah?"
+
+        Args:
+            topic: Topik atau aturan tata bahasa yang ingin dibahas (contoh: "present perfect vs past simple", "partikel wa ga", "four tones mandarin").
+            target_language: Bahasa target (contoh: "Inggris", "Jepang", "Mandarin").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        res = service_explain_grammar(topic=topic, target_language=target_language)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "explain_grammar_and_nuance", topic, {"topic": topic, "lang": target_language}, res)
+        return res
+
 
 
 
