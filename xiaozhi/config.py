@@ -514,6 +514,98 @@ ALL_MCP_TOOLS_CATALOG = [
         "icon": "🕌",
         "description": "Bimbingan doa harian dan tata cara ibadah lengkap untuk semua agama.",
     },
+
+    # 10. Web Scraper & Riset Ilmiah Mandiri
+    {
+        "name": "scrape_webpage",
+        "title": "Web Scraper & Ekstraksi Dokumen",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "🌐",
+        "description": "Ekstraksi artikel web, dokumen PDF online, dan transkrip YouTube dengan struktur terformat rapi.",
+    },
+    {
+        "name": "scrape_and_save_to_knowledge",
+        "title": "Scrape & Simpan ke Knowledge Base",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "💾",
+        "description": "Scrape artikel atau dokumen online dan otomatis menyimpannya ke Knowledge Base RAG pengguna.",
+    },
+    {
+        "name": "delete_course_material",
+        "title": "Hapus Materi Knowledge Base",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "🗑️",
+        "description": "Menghapus materi pembelajaran dari database Knowledge Base pengguna.",
+    },
+    {
+        "name": "search_academic_papers",
+        "title": "Pencarian Jurnal Ilmiah (arXiv & Scholar)",
+        "category": "education",
+        "category_label": "Edukasi & Riset",
+        "icon": "📚",
+        "description": "Pencarian paper dan jurnal ilmiah tanpa paywall dari repositori resmi arXiv, Semantic Scholar, dan CrossRef.",
+    },
+    {
+        "name": "autonomous_deep_research",
+        "title": "Riset Otonom Mandiri (Deep Research)",
+        "category": "education",
+        "category_label": "Edukasi & Riset",
+        "icon": "🤖",
+        "description": "Pencarian sumber terpercaya dan sintesis dokumen mandiri tanpa perlu copy link manual (dengan konfirmasi simpan).",
+    },
+    {
+        "name": "confirm_and_save_research_material",
+        "title": "Simpan Riset ke Knowledge Base",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "📥",
+        "description": "Menyimpan materi riset mandiri ke database Knowledge Base setelah memperoleh konfirmasi persetujuan pengguna.",
+    },
+    {
+        "name": "test_user_knowledge_quiz",
+        "title": "Kuis Pemahaman & Flashcard Materi",
+        "category": "education",
+        "category_label": "Edukasi & Riset",
+        "icon": "🧠",
+        "description": "Kuis interaktif berbasis suara untuk menguji pemahaman pengguna dari materi yang baru dipelajari atau tersimpan.",
+    },
+
+    # 11. Akademi Guru Bahasa Pintar (Smart Language Academy)
+    {
+        "name": "save_vocabulary_flashcard",
+        "title": "Buku Kosakata & Flashcard Bahasa",
+        "category": "education",
+        "category_label": "Guru Bahasa & Edukasi",
+        "icon": "📇",
+        "description": "Menyimpan kosakata baru lengkap dengan arti, fonetik, tingkat kemahiran, dan contoh kalimat percakapan.",
+    },
+    {
+        "name": "quiz_language_vocabulary",
+        "title": "Kuis Drill Kosakata Bahasa",
+        "category": "education",
+        "category_label": "Guru Bahasa & Edukasi",
+        "icon": "🗣️",
+        "description": "Latihan kuis hafalan kosakata bahasa asing secara interaktif melalui mikrofon dan speaker.",
+    },
+    {
+        "name": "start_conversation_roleplay",
+        "title": "Simulasi Percakapan Bahasa (Roleplay)",
+        "category": "education",
+        "category_label": "Guru Bahasa & Edukasi",
+        "icon": "🎭",
+        "description": "Simulasi percakapan nyata (Kafe, Bandara, Hotel, Wawancara Kerja) dengan koreksi grammar aktif.",
+    },
+    {
+        "name": "explain_grammar_and_nuance",
+        "title": "Dokter Tata Bahasa & Nuansa Budaya",
+        "category": "education",
+        "category_label": "Guru Bahasa & Edukasi",
+        "icon": "🔬",
+        "description": "Menjelaskan rumus grammar, perbedaan tenses, kesalahan umum penutur Indonesia, dan nuansa kesopanan formal/santai.",
+    },
 ]
 
 ALL_MCP_TOOL_NAMES = [t["name"] for t in ALL_MCP_TOOLS_CATALOG]

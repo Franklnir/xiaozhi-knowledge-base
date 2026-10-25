@@ -554,7 +554,7 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
             f"- **Token MCP Tersimpan**: {token_str}\n"
             f"- **Hash Token Keamanan**: `{token_hash[:16]}...` (Terverifikasi)\n\n"
             "**Fungsi FastMCP:**\n"
-            "FastMCP memungkinkan board ESP32 Anda memanggil **47 Tools Ilmiah** (Kalkulator, Analisis Soal, Deteksi Bias Kognitif, Cuaca BMKG, Kontrol Relay, dsb) secara otomatis saat Anda berbicara."
+            "FastMCP memungkinkan board ESP32 Anda memanggil **63 Tools Ilmiah** (Kalkulator, Analisis Soal, Deteksi Bias Kognitif, Cuaca BMKG, Kontrol Relay, dsb) secara otomatis saat Anda berbicara."
         )
 
     # ── User Smart Home & Relay Inquiries ────────────────────────────────────
@@ -596,7 +596,7 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                 "Anda dapat menyetel pengingat langsung dengan berbicara ke board ESP32 XiaoZhi Anda."
             )
 
-    # ── Specific Tool Inquiry (Lookup in 47 Tools Catalog) ───────────────────
+    # ── Specific Tool Inquiry (Lookup in 63 Tools Catalog) ───────────────────
     elif any(k in q_lower for k in ["tool", "fungsi tool", "apa itu tool", "kegunaan tool"]) and not any(k in q_lower for k in ["daftar tool", "apa saja tool", "katalog tool", "sebutkan tool"]):
         from xiaozhi.config import ALL_MCP_TOOLS_CATALOG
         tool_matched = None
@@ -678,7 +678,7 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
         full_text = (
             "🔌 **Panduan Lengkap Setup & Troubleshooting FastMCP**\n\n"
             "**Apa itu MCP?**\n"
-            "MCP (Model Context Protocol) adalah protokol penghubung antara asisten suara XiaoZhi dengan server Knowledge Base dan 47 tools kami.\n\n"
+            "MCP (Model Context Protocol) adalah protokol penghubung antara asisten suara XiaoZhi dengan server Knowledge Base dan 63 tools kami.\n\n"
             "**Langkah-Langkah Setup:**\n"
             "1. **Buka Konsol XiaoZhi**: Kunjungi [https://xiaozhi.me](https://xiaozhi.me) dan login ke akun Anda.\n"
             "2. **Ambil Endpoint MCP**: Cari menu *Koneksi MCP* / *MCP Endpoint*, salin URL lengkap berawalan `wss://`.\n"
@@ -742,7 +742,7 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
         full_text = (
             "📖 **Buku Panduan & Arsitektur Resmi XiaoZhi Indonesia**\n\n"
             "XiaoZhi Indonesia mengintegrasikan 6 pilar teknologi cerdas:\n\n"
-            "1. 🔌 **FastMCP Integration**: Menghubungkan board ESP32 dengan 47 tools komputasi ilmiah dan memori jangka panjang.\n"
+            "1. 🔌 **FastMCP Integration**: Menghubungkan board ESP32 dengan 63 tools komputasi ilmiah dan memori jangka panjang.\n"
             "2. 🎵 **YouTube Music Streamer**: Transcoding Opus 24kHz real-time dengan konsumsi bandwidth ultra-rendah untuk speaker board.\n"
             "3. 🏠 **Smart Home & Relay Nyata**: Kontrol saklar fisik dan otomasi rumah berbasis IoT dan perintah suara.\n"
             "4. 📚 **Knowledge Base & Semantic RAG**: Penyimpanan materi perkuliahan dengan pencarian semantik cerdas.\n"
@@ -791,7 +791,7 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                     f"ATURAN KEAMANAN MUTLAK: Anda HANYA diizinkan merujuk dan melayani data milik pengguna {username}. "
                     f"JANGAN PERNAH membocorkan, menyebutkan, atau mengarang data pengguna lain. "
                     f"Anda memiliki pengetahuan lengkap tentang dokumentasi XiaoZhi: setup FastMCP WSS, YouTube Music streaming Opus di ESP32, "
-                    f"smart home relay nyata via GPIO, knowledge base RAG, dan 47 tools FastMCP. "
+                    f"smart home relay nyata via GPIO, knowledge base RAG, dan 63 tools FastMCP. "
                     f"Jawablah dalam Bahasa Indonesia yang jelas, ramah, dan terstruktur."
                 )
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?alt=sse&key={gemini_api_key}"
