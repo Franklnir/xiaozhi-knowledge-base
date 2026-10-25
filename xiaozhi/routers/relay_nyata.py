@@ -940,4 +940,54 @@ dengan website https://xiaozhiscig.biz.id/relay-nyata
     )
 
 
+@router.get("/api/relay-nyata/firmware-stream/{chip_family}")
+async def stream_relay_firmware(chip_family: str, request: Request):
+    """
+    Serve pre-compiled factory firmware binary directly for 1-click web flashing without drag & drop.
+    """
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Silakan login terlebih dahulu.")
+
+    chip = (chip_family or "").lower().strip()
+    preset_id = "esp32s3_cam"
+    if "c3" in chip:
+        preset_id = "esp32c3ytmusikchronchi"
+    elif "s3" in chip:
+        preset_id = "esp32s3_cam"
+    else:
+        preset_id = "esp32s3_cam"
+
+    try:
+        from xiaozhi.services.preset_approval_service import get_preset_version_binary, get_preset
+        preset_info = None
+        raw_bytes = None
+        ver_meta = {}
+        try:
+            preset_info = get_preset(preset_id)
+            raw_bytes, ver_meta = get_preset_version_binary(preset_id)
+        except Exception:
+            preset_id = "esp32s3_cam"
+            preset_info = get_preset(preset_id)
+            raw_bytes, ver_meta = get_preset_version_binary(preset_id)
+
+        fn = ver_meta.get("filename") or f"{preset_id}.bin"
+        offset = (preset_info.get("offset") if preset_info else None) or "0x0"
+
+        return Response(
+            content=raw_bytes,
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'inline; filename="{fn}"',
+                "Content-Length": str(len(raw_bytes)),
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0, private",
+                "X-Firmware-Offset": offset,
+                "X-Firmware-Name": fn,
+            }
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal memuat firmware preset: {str(exc)}")
+
+
+
 

@@ -1735,17 +1735,51 @@
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:14px;">
                 <!-- Flashing Card -->
                 <div style="background:var(--app-surface); border:2px solid #111; box-shadow:3px 3px 0 #111; border-radius:10px; padding:14px;">
-                    <div style="font-size:12.5px; font-weight:900; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                        <span>⚡ Flash Firmware Binary (.bin)</span>
+                    <!-- Mode Header & Toggle -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+                        <div style="font-size:12.5px; font-weight:900; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                            <span>⚡ Flash Firmware ESP32</span>
+                        </div>
+                        <div style="display:inline-flex; border:2px solid #111; border-radius:6px; overflow:hidden; box-shadow:1.5px 1.5px 0 #111;">
+                            <button type="button" id="btnModeAutoFirmware" onclick="setFlasherFirmwareMode('auto')" style="background:#10b981; color:#fff; font-size:10.5px; font-weight:900; padding:4px 9px; border:none; cursor:pointer;">
+                                ⚡ 1-Klik Otomatis
+                            </button>
+                            <button type="button" id="btnModeCustomFirmware" onclick="setFlasherFirmwareMode('custom')" style="background:var(--app-surface); color:var(--app-text); font-size:10.5px; font-weight:750; padding:4px 9px; border:none; border-left:1.5px solid #111; cursor:pointer;">
+                                📂 Upload .bin Kustom
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Dropzone -->
-                    <div class="flasher-dropzone-relay" id="flasherDropzone" onclick="document.getElementById('flasherFileInput').click()">
+                    <!-- 1-KLIK OTOMATIS PRESET CARD (Tanpa Drag & Drop) -->
+                    <div id="flasherAutoPresetCard" style="background:rgba(16, 185, 129, 0.08); border:2px solid #10b981; border-radius:8px; padding:12px; margin-bottom:10px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:4px;">
+                            <span style="font-size:10px; font-weight:900; text-transform:uppercase; background:#10b981; color:#fff; padding:2px 7px; border-radius:4px; letter-spacing:0.5px;">
+                                ⚡ 1-KLIK PLUG &amp; PLAY (TANPA FILE)
+                            </span>
+                            <span id="flasherAutoFirmwareBadge" style="font-size:10.5px; font-weight:800; color:#047857; display:flex; align-items:center; gap:4px;">
+                                <span class="conn-dot" style="background:#10b981; width:7px; height:7px; display:inline-block; border-radius:50%;"></span>
+                                <span>Menyiapkan binary...</span>
+                            </span>
+                        </div>
+                        <div style="font-size:12.5px; font-weight:900; color:var(--app-text); margin-bottom:3px;" id="flasherAutoFirmwareTitle">
+                            Firmware Resmi Xiaozhi ESP32 (Ready-to-Flash)
+                        </div>
+                        <div style="font-size:11px; color:var(--app-muted); line-height:1.4;" id="flasherAutoFirmwareDesc">
+                            Binary pabrik lengkap dengan driver Wi-Fi &amp; MQTT Realtime. Anda tidak perlu mencari atau drag-and-drop file .bin lagi, cukup klik tombol Sambungkan lalu Flash!
+                        </div>
+                        <div style="margin-top:8px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; font-size:10.5px; font-weight:750; color:#047857; border-top:1px dashed rgba(16,185,129,0.3); padding-top:6px;">
+                            <span>Alamat Target: <code style="background:#fff; border:1px solid #10b981; padding:1px 5px; border-radius:3px; color:#065f46;">0x0 (Full Factory Image)</code></span>
+                            <span id="flasherAutoFirmwareSize">Ukuran: Sedang diunduh...</span>
+                        </div>
+                    </div>
+
+                    <!-- Dropzone (Mode Manual Kustom) -->
+                    <div class="flasher-dropzone-relay" id="flasherDropzone" style="display:none;" onclick="document.getElementById('flasherFileInput').click()">
                         <input type="file" id="flasherFileInput" accept=".bin" style="display:none;">
                         <div style="font-size:24px; margin-bottom:4px;">📥</div>
                         <div style="font-size:12px; font-weight:800; color:var(--app-text);" id="flasherFileLabel">Klik atau Tarik File .bin ke Sini</div>
                         <div style="font-size:10.5px; color:var(--app-muted); margin-top:2px;">
-                            File hasil ekspor Arduino IDE (Sketch &rarr; Export Compiled Binary)
+                            Pilihan manual jika Anda memiliki file .bin sendiri hasil kompilasi Arduino IDE.
                         </div>
                     </div>
 
@@ -1762,8 +1796,8 @@
                         <div>
                             <label class="app-label" style="font-size:11px; margin-bottom:2px;">Alamat Offset Flash:</label>
                             <select id="flasherOffset" class="app-select" style="padding:6px 10px; font-size:12px;">
-                                <option value="0x10000" selected>0x10000 (Standar Arduino Application)</option>
-                                <option value="0x0">0x0 (Full Factory Merged Binary)</option>
+                                <option value="0x0" selected>0x0 (Full Factory Merged Binary)</option>
+                                <option value="0x10000">0x10000 (Standar Arduino Application)</option>
                                 <option value="0x20000">0x20000 (Aplikasi Saja / Update OTA)</option>
                             </select>
                         </div>
@@ -2222,6 +2256,9 @@
         } else if (tabName === "flasher") {
             btnFlasher?.classList.add("active");
             if (panelFlasher) panelFlasher.style.display = "block";
+            if (typeof loadAutoFirmwarePreset === 'function' && flasherFirmwareMode === 'auto' && !flasherSelectedBuffer) {
+                loadAutoFirmwarePreset();
+            }
         } else {
             btnEndpoints?.classList.add("active");
             if (panelEndpoints) panelEndpoints.style.display = "block";
@@ -2924,6 +2961,10 @@ void loop() {
         if (box) {
             box.textContent = buildArduinoCode(currentConfigRoom, ssid, pass, activeLow, proto, boardKey);
         }
+
+        if (typeof loadAutoFirmwarePreset === 'function' && typeof flasherFirmwareMode !== 'undefined' && flasherFirmwareMode === 'auto') {
+            loadAutoFirmwarePreset(boardKey);
+        }
     }
 
     function copyArduinoCode(btn) {
@@ -3601,6 +3642,109 @@ void loop() {
     let flasherIsFlashing = false;
     let flasherIsMonitoring = false;
     let flasherMonitorReader = null;
+    let flasherFirmwareMode = 'auto'; // 'auto' (1-klik tanpa file) atau 'custom' (.bin upload)
+    let autoFirmwareLoaded = false;
+    let autoFirmwareLoading = false;
+    let autoFirmwareChipFamily = 'esp32_s3';
+
+    function setFlasherFirmwareMode(mode) {
+        flasherFirmwareMode = mode;
+        const btnAuto = document.getElementById('btnModeAutoFirmware');
+        const btnCustom = document.getElementById('btnModeCustomFirmware');
+        const cardAuto = document.getElementById('flasherAutoPresetCard');
+        const dropzone = document.getElementById('flasherDropzone');
+        const customInfo = document.getElementById('flasherSelectedFileInfo');
+        const offsetSelect = document.getElementById('flasherOffset');
+
+        if (mode === 'auto') {
+            if (btnAuto) { btnAuto.style.background = '#10b981'; btnAuto.style.color = '#fff'; }
+            if (btnCustom) { btnCustom.style.background = 'var(--app-surface)'; btnCustom.style.color = 'var(--app-text)'; }
+            if (cardAuto) cardAuto.style.display = 'block';
+            if (dropzone) dropzone.style.display = 'none';
+            if (customInfo) customInfo.style.display = 'none';
+            if (offsetSelect) offsetSelect.value = '0x0';
+
+            if (!flasherSelectedBuffer || !autoFirmwareLoaded) {
+                loadAutoFirmwarePreset();
+            } else {
+                updateFlasherButtonState();
+            }
+        } else {
+            if (btnAuto) { btnAuto.style.background = 'var(--app-surface)'; btnAuto.style.color = 'var(--app-text)'; }
+            if (btnCustom) { btnCustom.style.background = '#0284c7'; btnCustom.style.color = '#fff'; }
+            if (cardAuto) cardAuto.style.display = 'none';
+            if (dropzone) dropzone.style.display = (flasherSelectedBuffer && !autoFirmwareLoaded) ? 'none' : 'block';
+            if (customInfo) customInfo.style.display = (flasherSelectedBuffer && !autoFirmwareLoaded) ? 'flex' : 'none';
+            if (offsetSelect) offsetSelect.value = '0x10000';
+            if (autoFirmwareLoaded) {
+                flasherSelectedBuffer = null;
+            }
+            updateFlasherButtonState();
+        }
+    }
+
+    async function loadAutoFirmwarePreset(chipHint = null) {
+        if (flasherFirmwareMode !== 'auto') return;
+        if (autoFirmwareLoading) return;
+        autoFirmwareLoading = true;
+
+        const badge = document.getElementById('flasherAutoFirmwareBadge');
+        const sizeEl = document.getElementById('flasherAutoFirmwareSize');
+        const titleEl = document.getElementById('flasherAutoFirmwareTitle');
+
+        if (badge) {
+            badge.innerHTML = `<span class="conn-dot" style="background:#f59e0b; width:7px; height:7px; display:inline-block; border-radius:50%;"></span><span>Mengunduh firmware dari server...</span>`;
+            badge.style.color = '#b45309';
+        }
+
+        try {
+            let chip = chipHint;
+            if (!chip) {
+                const boardSelect = document.getElementById('cfgBoardType');
+                chip = boardSelect ? boardSelect.value : 'esp32_s3';
+            }
+            autoFirmwareChipFamily = chip;
+
+            logToRelayConsole(`[AUTO-FIRMWARE] Memuat firmware resmi server untuk (${chip})...`);
+            const res = await fetch(`/api/relay-nyata/firmware-stream/${encodeURIComponent(chip)}`);
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => ({}));
+                throw new Error(errJson.detail || `Server error (${res.status})`);
+            }
+
+            const buffer = await res.arrayBuffer();
+            flasherSelectedBuffer = buffer;
+            autoFirmwareLoaded = true;
+
+            const offsetHeader = res.headers.get('X-Firmware-Offset') || '0x0';
+            const fnHeader = res.headers.get('X-Firmware-Name') || `xiaozhi_${chip}_factory.bin`;
+
+            const offsetSelect = document.getElementById('flasherOffset');
+            if (offsetSelect) {
+                offsetSelect.value = offsetHeader;
+            }
+
+            const mb = (buffer.byteLength / (1024 * 1024)).toFixed(2);
+            if (badge) {
+                badge.innerHTML = `<span class="conn-dot" style="background:#10b981; width:7px; height:7px; display:inline-block; border-radius:50%;"></span><span>🟢 Siap Flash Langsung</span>`;
+                badge.style.color = '#047857';
+            }
+            if (sizeEl) sizeEl.textContent = `Ukuran: ${mb} MB (${buffer.byteLength.toLocaleString()} bytes)`;
+            if (titleEl) titleEl.textContent = `Firmware Resmi: ${fnHeader}`;
+
+            logToRelayConsole(`[AUTO-FIRMWARE] ✅ Firmware resmi ${fnHeader} (${mb} MB, offset ${offsetHeader}) siap di memory! Klik 'Mulai Flash' untuk menulis.`);
+        } catch (err) {
+            console.error('Gagal mengambil firmware preset:', err);
+            if (badge) {
+                badge.innerHTML = `<span class="conn-dot" style="background:#ef4444; width:7px; height:7px; display:inline-block; border-radius:50%;"></span><span>⚠️ Gagal Muat Preset</span>`;
+                badge.style.color = '#ef4444';
+            }
+            logToRelayConsole(`[AUTO-FIRMWARE] ⚠️ Gagal memuat firmware otomatis: ${err.message}. Anda bisa beralih ke 'Upload .bin Kustom'.`);
+        } finally {
+            autoFirmwareLoading = false;
+            updateFlasherButtonState();
+        }
+    }
 
     function identifyUsbDevice(p) {
         if (!p || !p.getInfo) return 'Port Serial Standar';
@@ -3738,8 +3882,12 @@ void loop() {
                 logToRelayConsole(`🎯 [AUTO-SYNC] Generator kodingan Arduino otomatis disesuaikan ke: ${targetBoard.toUpperCase()}`);
             }
 
+            if (flasherFirmwareMode === 'auto') {
+                loadAutoFirmwarePreset(targetBoard);
+            }
+
             updateFlasherButtonState();
-            showToast(`Chip ESP32 Terhubung: ${chip}! Kodingan Arduino disinkronkan.`, "success");
+            showToast(`Chip ESP32 Terhubung: ${chip}! Siap flash 1-klik tanpa drag-and-drop file.`, "success");
 
         } catch (err) {
             logToRelayConsole(`[ERROR] Gagal koneksi serial: ${err.message}`);
@@ -3781,6 +3929,7 @@ void loop() {
         const reader = new FileReader();
         reader.onload = function(e) {
             flasherSelectedBuffer = e.target.result;
+            autoFirmwareLoaded = false;
             document.getElementById('flasherSelectedFileName').textContent = file.name;
             const kb = (file.size / 1024).toFixed(1);
             document.getElementById('flasherSelectedFileSize').textContent = `${kb} KB (${file.size.toLocaleString()} bytes)`;
@@ -3794,10 +3943,15 @@ void loop() {
 
     function clearFlasherFile() {
         flasherSelectedBuffer = null;
-        document.getElementById('flasherDropzone').style.display = 'block';
-        document.getElementById('flasherSelectedFileInfo').style.display = 'none';
-        document.getElementById('flasherFileInput').value = '';
-        updateFlasherButtonState();
+        autoFirmwareLoaded = false;
+        if (flasherFirmwareMode === 'auto') {
+            loadAutoFirmwarePreset();
+        } else {
+            document.getElementById('flasherDropzone').style.display = 'block';
+            document.getElementById('flasherSelectedFileInfo').style.display = 'none';
+            document.getElementById('flasherFileInput').value = '';
+            updateFlasherButtonState();
+        }
     }
 
     function updateFlasherButtonState() {
@@ -3805,6 +3959,22 @@ void loop() {
         if (!btn) return;
         const canFlash = (flasherEsploader !== null) && (flasherSelectedBuffer !== null) && !flasherIsFlashing;
         btn.disabled = !canFlash;
+        if (canFlash) {
+            btn.style.background = '#059669';
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+            btn.textContent = '⚡ Mulai Flash ke ESP32';
+        } else {
+            btn.style.opacity = '0.65';
+            btn.style.cursor = 'not-allowed';
+            if (!flasherEsploader) {
+                btn.textContent = '🔌 Sambungkan Port ESP32 Dahulu';
+            } else if (!flasherSelectedBuffer) {
+                btn.textContent = '⏳ Menyiapkan Binary...';
+            } else if (flasherIsFlashing) {
+                btn.textContent = '⚡ Sedang Menulis Flash...';
+            }
+        }
     }
 
     async function executeRelayFlashing() {
@@ -4112,5 +4282,8 @@ void loop() {
             if (e.dataTransfer.files.length > 0) handleFlasherFile(e.dataTransfer.files[0]);
         });
     }
+
+    // Initialize flasher button state
+    updateFlasherButtonState();
 </script>
 {% endblock %}
