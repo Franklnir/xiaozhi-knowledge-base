@@ -890,20 +890,61 @@ async def download_arduino_project_zip(room_id: int, request: Request):
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-const char* WIFI_SSID = "WIFI_RUMAH_ANDA";
-const char* WIFI_PASS = "PASSWORD_WIFI";
-const char* MQTT_SERVER = "163.61.58.235";
-const int   MQTT_PORT   = 1883;
-const char* CLIENT_ID   = "{room.get('api_client_id', 'esp32_relay')}";
-const char* DEVICE_TOKEN = "{room.get('api_token', '')}";
+const char* WIFI_SSID     = "WIFI_RUMAH_ANDA";
+const char* WIFI_PASS     = "PASSWORD_WIFI";
+const char* MQTT_SERVER   = "163.61.58.235";
+const int   MQTT_PORT     = 1883;
+const char* CLIENT_ID     = "{room.get('api_client_id', 'esp32_relay')}";
+const char* DEVICE_TOKEN  = "{room.get('api_token', '')}";
+const char* TOPIC_COMMAND = "xiaozhi/relay/{clean_slug.lower()}/set";
+const char* TOPIC_STATE   = "xiaozhi/relay/{clean_slug.lower()}/state";
+
+const int RELAY_PIN = 4;
+bool relayState = false;
+
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+unsigned long lastStatusPrint = 0;
+
+void printStatus() {{
+    Serial.println("\\n============================================================");
+    Serial.println("  📊 STATUS MONITOR REAL-TIME: XIAOZHI ESP32 RELAY");
+    Serial.println("============================================================");
+    Serial.printf("⏱️  Uptime   : %lu detik\\n", millis() / 1000);
+    Serial.printf("📶 WiFi     : %s (IP: %s)\\n", (WiFi.status() == WL_CONNECTED) ? "TERHUBUNG (Online)" : "OFFLINE", WiFi.localIP().toString().c_str());
+    Serial.printf("🔌 MQTT     : %s\\n", mqttClient.connected() ? "TERHUBUNG (Online)" : "TERPUTUS");
+    Serial.printf("🏠 Ruangan  : {room_name}\\n");
+    Serial.printf("⚡ Relay 1  : %s (GPIO %d)\\n", relayState ? "🟢 ON (Menyala)" : "⚪ OFF (Padam)", RELAY_PIN);
+    Serial.println("============================================================\\n");
+}}
 
 void setup() {{
     Serial.begin(115200);
-    Serial.println("Xiaozhi Relay Ready");
+    delay(500);
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN, HIGH); // Active LOW default OFF
+    Serial.println("\\n[BOOT] Xiaozhi ESP32 Smart Relay Siap.");
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    while (WiFi.status() != WL_CONNECTED) {{ delay(500); Serial.print("."); }}
+    Serial.println("\\n[WIFI] Terhubung!");
+    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    printStatus();
 }}
 
 void loop() {{
-    delay(10);
+    if (!mqttClient.connected()) {{
+        if (mqttClient.connect(CLIENT_ID)) {{
+            mqttClient.subscribe(TOPIC_COMMAND);
+            Serial.println("[MQTT] Terhubung ke broker!");
+        }} else {{
+            delay(5000);
+        }}
+    }}
+    mqttClient.loop();
+    if (millis() - lastStatusPrint >= 30000) {{
+        lastStatusPrint = millis();
+        printStatus();
+    }}
 }}
 """
 

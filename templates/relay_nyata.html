@@ -2150,6 +2150,7 @@ PubSubClient mqttClient(espClient);
 
 unsigned long lastMqttRetry = 0;
 unsigned long lastHeartbeat = 0;
+unsigned long lastStatusPrint = 0;
 
 bool isDuplicate(const String& id) {
     if (id.length() == 0) return false;
@@ -2170,7 +2171,33 @@ void applyRelay(int index, bool turnOn) {
     uint8_t level = RELAY_ACTIVE_LOW ? (turnOn ? LOW : HIGH) : (turnOn ? HIGH : LOW);
     digitalWrite(RELAY_PINS[index], level);
     relayStates[index] = turnOn;
-    Serial.printf("[RELAY] CH %d (GPIO %d) -> %s\\n", index + 1, RELAY_PINS[index], turnOn ? "ON" : "OFF");
+    Serial.printf("[STATUS RELAY] ⚡ CH %d (GPIO %d) -> %s (Pin Level: %s)\\n",
+                  index + 1, RELAY_PINS[index], turnOn ? "🟢 ON (Menyala)" : "⚪ OFF (Padam)", level == HIGH ? "HIGH" : "LOW");
+}
+
+void printSystemStatus() {
+    Serial.println("\\n============================================================");
+    Serial.println("  📊 STATUS REAL-TIME: XIAOZHI ESP32 SMART RELAY");
+    Serial.println("============================================================");
+    Serial.printf("⏱️  Uptime        : %lu detik (%lu menit)\\n", millis() / 1000, millis() / 60000);
+    Serial.printf("📶 WiFi Status   : %s\\n", (WiFi.status() == WL_CONNECTED) ? "TERHUBUNG (Online)" : "TERPUTUS (Offline)");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("🌐 IP Address    : %s\\n", WiFi.localIP().toString().c_str());
+        Serial.printf("📡 Sinyal (RSSI) : %d dBm\\n", WiFi.RSSI());
+    }
+    Serial.printf("🔌 MQTT Broker   : %s (%s:%d)\\n", mqttClient.connected() ? "TERHUBUNG (Online)" : "TERPUTUS (Offline)", MQTT_BROKER, MQTT_PORT);
+    Serial.printf("🏠 Ruangan       : %s\\n", "${room.nama_tempat}");
+    Serial.printf("🆔 Client ID     : %s\\n", CLIENT_ID);
+    Serial.println("------------------------------------------------------------");
+    Serial.println("⚡ STATUS CHANNEL RELAY SAAT INI:");
+    for (int i = 0; i < NUM_RELAYS; i++) {
+        Serial.printf("   • Channel %d (GPIO %2d) : %s\\n", 
+                      i + 1, RELAY_PINS[i], relayStates[i] ? "🟢 [ON  / MENYALA]" : "⚪ [OFF / PADAM]");
+    }
+    Serial.println("============================================================");
+    Serial.println("💡 Bantuan: Ketik 'status' di Serial Monitor untuk cek status kapan saja.");
+    Serial.println("💡 Kontrol: Ketik '1 on', '1 off', 'all on', atau 'all off' untuk uji coba.");
+    Serial.println("============================================================\\n");
 }
 
 void publishState(int relayIndex, const String& cmdId) {
@@ -2186,7 +2213,7 @@ void publishState(int relayIndex, const String& cmdId) {
     char buffer[256];
     size_t len = serializeJson(doc, buffer);
     mqttClient.publish(TOPIC_STATE, (uint8_t*)buffer, len, false);
-    Serial.printf("[MQTT ACK] Kirim state CH %d -> %s\\n", relayIndex + 1, relayStates[relayIndex] ? "ON" : "OFF");
+    Serial.printf("[STATUS MQTT] 📤 State terkirim ke Broker: CH %d = %s (Cmd: %s)\\n", relayIndex + 1, relayStates[relayIndex] ? "ON" : "OFF", cmdId.c_str());
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -2292,8 +2319,71 @@ void reconnectMQTT() {
         for (int i = 0; i < NUM_RELAYS; i++) {
             publishState(i, "init_boot");
         }
+        Serial.println("[MQTT] ✅ Status awal seluruh channel relay berhasil dipublish ke Broker.");
     } else {
         Serial.printf(" GAGAL (rc=%d). Akan coba lagi dalam 5 detik.\\n", mqttClient.state());
+    }
+}
+
+void handleSerialInput() {
+    if (!Serial.available()) return;
+    String cmd = Serial.readStringUntil('\\n');
+    cmd.trim();
+    if (cmd.length() == 0) return;
+
+    if (cmd.equalsIgnoreCase("status") || cmd.equalsIgnoreCase("s")) {
+        printSystemStatus();
+    } else if (cmd.equalsIgnoreCase("help") || cmd.equalsIgnoreCase("?")) {
+        Serial.println("\\n--- DAFTAR PERINTAH SERIAL MONITOR ---");
+        Serial.println("status      : Tampilkan ringkasan status sistem & relay lengkap");
+        Serial.println("all on      : Nyalakan semua channel relay");
+        Serial.println("all off     : Matikan semua channel relay");
+        Serial.println("<no> on     : Contoh '1 on' untuk menyalakan Channel 1");
+        Serial.println("<no> off    : Contoh '1 off' untuk mematikan Channel 1");
+        Serial.println("<no>        : Contoh '1' untuk toggle Channel 1");
+        Serial.println("---------------------------------------\\n");
+    } else if (cmd.equalsIgnoreCase("all on")) {
+        Serial.println("[SERIAL] ⚡ Menyalakan SEMUA channel relay...");
+        for (int i = 0; i < NUM_RELAYS; i++) { 
+            applyRelay(i, true); 
+            publishState(i, "serial_all_on"); 
+        }
+        printSystemStatus();
+    } else if (cmd.equalsIgnoreCase("all off")) {
+        Serial.println("[SERIAL] ⚡ Mematikan SEMUA channel relay...");
+        for (int i = 0; i < NUM_RELAYS; i++) { 
+            applyRelay(i, false); 
+            publishState(i, "serial_all_off"); 
+        }
+        printSystemStatus();
+    } else {
+        int spaceIdx = cmd.indexOf(' ');
+        int ch = 0;
+        String act = "";
+        if (spaceIdx > 0) {
+            ch = cmd.substring(0, spaceIdx).toInt();
+            act = cmd.substring(spaceIdx + 1);
+            act.trim();
+            act.toUpperCase();
+        } else {
+            ch = cmd.toInt();
+        }
+
+        int idx = ch - 1;
+        if (idx >= 0 && idx < NUM_RELAYS) {
+            if (act == "ON") {
+                applyRelay(idx, true);
+                publishState(idx, "serial_cmd");
+            } else if (act == "OFF") {
+                applyRelay(idx, false);
+                publishState(idx, "serial_cmd");
+            } else {
+                applyRelay(idx, !relayStates[idx]);
+                publishState(idx, "serial_toggle");
+            }
+        } else {
+            Serial.printf("[SERIAL] Perintah '%s' tidak dikenal. Ketik 'status' atau 'help'.\\n", cmd.c_str());
+        }
     }
 }
 
@@ -2323,10 +2413,16 @@ ${cdcBootCode}
     mqttClient.setKeepAlive(60);
 
     reconnectMQTT();
+
+    // Tampilkan ringkasan status perdana di Serial Monitor
+    printSystemStatus();
 }
 
 void loop() {
     unsigned long now = millis();
+
+    // Terima perintah langsung dari Serial Monitor
+    handleSerialInput();
 
     if (WiFi.status() != WL_CONNECTED) {
         connectWiFi();
@@ -2347,6 +2443,17 @@ void loop() {
             lastHeartbeat = now;
             mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
         }
+    }
+
+    // Tampilkan status ringkas di Serial Monitor secara berkala (tiap 30 detik)
+    if (now - lastStatusPrint >= 30000) {
+        lastStatusPrint = now;
+        Serial.printf("[STATUS LIVE] ⏱️ %lus | WiFi: %d dBm | MQTT: %s | Kondisi Relay: [", 
+                      now / 1000, WiFi.RSSI(), mqttClient.connected() ? "ONLINE" : "OFFLINE");
+        for (int i = 0; i < NUM_RELAYS; i++) {
+            Serial.printf("CH%d:%s%s", i + 1, relayStates[i] ? "ON" : "OFF", (i < NUM_RELAYS - 1) ? " " : "");
+        }
+        Serial.println("]");
     }
 }
 `;
@@ -2411,6 +2518,7 @@ bool relayStates[NUM_RELAYS] = { ${Array(numRelays).fill("false").join(", ")} };
 // ============================================================
 unsigned long lastPollTime = 0;
 unsigned long lastWiFiRetryTime = 0;
+unsigned long lastStatusPrint = 0;
 
 const int PROCESSED_ID_SLOTS = 10;
 String processedCommandIds[PROCESSED_ID_SLOTS];
@@ -2436,8 +2544,32 @@ void applyRelayHardware(int index, bool turnOn) {
     digitalWrite(RELAY_PINS[index], pinLevel);
     relayStates[index] = turnOn;
 
-    Serial.printf("[RELAY] CH %d (GPIO %d) -> %s (Level %s)\\n",
-                  index + 1, RELAY_PINS[index], turnOn ? "ON" : "OFF", pinLevel == HIGH ? "HIGH" : "LOW");
+    Serial.printf("[STATUS RELAY] ⚡ CH %d (GPIO %d) -> %s (Pin Level: %s)\\n",
+                  index + 1, RELAY_PINS[index], turnOn ? "🟢 ON (Menyala)" : "⚪ OFF (Padam)", pinLevel == HIGH ? "HIGH" : "LOW");
+}
+
+void printSystemStatus() {
+    Serial.println("\\n============================================================");
+    Serial.println("  📊 STATUS REAL-TIME: XIAOZHI ESP32 RELAY (HTTP)");
+    Serial.println("============================================================");
+    Serial.printf("⏱️  Uptime        : %lu detik (%lu menit)\\n", millis() / 1000, millis() / 60000);
+    Serial.printf("📶 WiFi Status   : %s\\n", (WiFi.status() == WL_CONNECTED) ? "TERHUBUNG (Online)" : "TERPUTUS (Offline)");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("🌐 IP Address    : %s\\n", WiFi.localIP().toString().c_str());
+        Serial.printf("📡 Sinyal (RSSI) : %d dBm\\n", WiFi.RSSI());
+    }
+    Serial.printf("🏠 Ruangan       : %s\\n", "${room.nama_tempat}");
+    Serial.printf("🆔 Client ID     : %s\\n", CLIENT_ID);
+    Serial.println("------------------------------------------------------------");
+    Serial.println("⚡ STATUS CHANNEL RELAY SAAT INI:");
+    for (int i = 0; i < NUM_RELAYS; i++) {
+        Serial.printf("   • Channel %d (GPIO %2d) : %s\\n", 
+                      i + 1, RELAY_PINS[i], relayStates[i] ? "🟢 [ON  / MENYALA]" : "⚪ [OFF / PADAM]");
+    }
+    Serial.println("============================================================");
+    Serial.println("💡 Bantuan: Ketik 'status' di Serial Monitor untuk cek status kapan saja.");
+    Serial.println("💡 Kontrol: Ketik '1 on', '1 off', 'all on', atau 'all off' untuk uji coba.");
+    Serial.println("============================================================\\n");
 }
 
 // ============================================================
@@ -2579,6 +2711,62 @@ void pollCommands() {
     }
 }
 
+void handleSerialInput() {
+    if (!Serial.available()) return;
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd.length() == 0) return;
+
+    if (cmd.equalsIgnoreCase("status") || cmd.equalsIgnoreCase("s")) {
+        printSystemStatus();
+    } else if (cmd.equalsIgnoreCase("help") || cmd.equalsIgnoreCase("?")) {
+        Serial.println("\n--- DAFTAR PERINTAH SERIAL MONITOR ---");
+        Serial.println("status      : Tampilkan ringkasan status sistem & relay lengkap");
+        Serial.println("all on      : Nyalakan semua channel relay");
+        Serial.println("all off     : Matikan semua channel relay");
+        Serial.println("<no> on     : Contoh '1 on' untuk menyalakan Channel 1");
+        Serial.println("<no> off    : Contoh '1 off' untuk mematikan Channel 1");
+        Serial.println("<no>        : Contoh '1' untuk toggle Channel 1");
+        Serial.println("---------------------------------------\n");
+    } else if (cmd.equalsIgnoreCase("all on")) {
+        Serial.println("[SERIAL] ⚡ Menyalakan SEMUA channel relay...");
+        for (int i = 0; i < NUM_RELAYS; i++) { applyRelayHardware(i, true); }
+        sendStatusUpdate("serial_all_on");
+        printSystemStatus();
+    } else if (cmd.equalsIgnoreCase("all off")) {
+        Serial.println("[SERIAL] ⚡ Mematikan SEMUA channel relay...");
+        for (int i = 0; i < NUM_RELAYS; i++) { applyRelayHardware(i, false); }
+        sendStatusUpdate("serial_all_off");
+        printSystemStatus();
+    } else {
+        int spaceIdx = cmd.indexOf(' ');
+        int ch = 0;
+        String act = "";
+        if (spaceIdx > 0) {
+            ch = cmd.substring(0, spaceIdx).toInt();
+            act = cmd.substring(spaceIdx + 1);
+            act.trim();
+            act.toUpperCase();
+        } else {
+            ch = cmd.toInt();
+        }
+
+        int idx = ch - 1;
+        if (idx >= 0 && idx < NUM_RELAYS) {
+            if (act == "ON") {
+                applyRelayHardware(idx, true);
+            } else if (act == "OFF") {
+                applyRelayHardware(idx, false);
+            } else {
+                applyRelayHardware(idx, !relayStates[idx]);
+            }
+            sendStatusUpdate("serial_cmd");
+        } else {
+            Serial.printf("[SERIAL] Perintah '%s' tidak dikenal. Ketik 'status' atau 'help'.\n", cmd.c_str());
+        }
+    }
+}
+
 // ============================================================
 // 8. KONEKSI WIFI & SETUP
 // ============================================================
@@ -2645,10 +2833,16 @@ ${cdcBootCode}
         Serial.println("[INIT] Membaca status server...");
         pollCommands();
     }
+
+    // Tampilkan ringkasan status perdana di Serial Monitor
+    printSystemStatus();
 }
 
 void loop() {
     unsigned long now = millis();
+
+    // Terima perintah langsung dari Serial Monitor
+    handleSerialInput();
 
     if (WiFi.status() != WL_CONNECTED) {
         if (now - lastWiFiRetryTime >= WIFI_RETRY_MS) {
@@ -2662,6 +2856,17 @@ void loop() {
     if (now - lastPollTime >= POLL_INTERVAL_MS) {
         lastPollTime = now;
         pollCommands();
+    }
+
+    // Tampilkan live status ringkas di Serial Monitor tiap 30 detik
+    if (now - lastStatusPrint >= 30000) {
+        lastStatusPrint = now;
+        Serial.printf("[STATUS LIVE] ⏱️ %lus | WiFi: %d dBm | HTTP Poll OK | Kondisi Relay: [", 
+                      now / 1000, WiFi.RSSI());
+        for (int i = 0; i < NUM_RELAYS; i++) {
+            Serial.printf("CH%d:%s%s", i + 1, relayStates[i] ? "ON" : "OFF", (i < NUM_RELAYS - 1) ? " " : "");
+        }
+        Serial.println("]");
     }
 }
 `;
