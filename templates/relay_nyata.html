@@ -1114,6 +1114,18 @@
         margin-bottom: 12px;
     }
 
+    .relay-config-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 16px;
+    }
+    @media (max-width: 680px) {
+        .relay-config-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+    }
+
     .relay-pinout-guide {
         background: rgba(0, 0, 0, 0.03);
         border: 1px solid var(--app-border);
@@ -1538,14 +1550,19 @@
         <!-- TAB 1: KODE ARDUINO GENERATOR -->
         <div id="tabPanelArduino" class="relay-tab-panel active">
             <!-- Wi-Fi & Board Customizer Bar -->
-            <div class="relay-wifi-customizer-box">
-                <div style="font-size:12px; font-weight:800; color:var(--app-text); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                    <span>📶 Konfigurasi Hardware & Wi-Fi (Otomatis Menyesuaikan Kodingan):</span>
+            <div class="relay-wifi-customizer-box" style="margin-top:10px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:12px; border-bottom:1.5px solid rgba(0,0,0,0.08); padding-bottom:8px;">
+                    <div style="font-size:12px; font-weight:900; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                        <span>📶 Konfigurasi Hardware &amp; Wi-Fi (Otomatis Menyesuaikan Kodingan):</span>
+                    </div>
+                    <span id="wifiSavedStatusBadge" style="display:none; font-size:10.5px; font-weight:850; color:#065f46; background:#d1fae5; border:1.5px solid #10b981; border-radius:6px; padding:2px 8px; align-items:center; gap:5px; box-shadow:1.5px 1.5px 0 #111;">
+                        <span>💾</span> <span>Wi-Fi Tersimpan di Browser</span>
+                    </span>
                 </div>
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
+                <div class="relay-config-grid">
                     <div>
-                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Pilihan Chipset / Board:</label>
-                        <select id="cfgBoardType" class="app-select" style="padding:6px 10px; font-size:12px; font-weight:700; color:#0284c7; background:rgba(2,132,199,0.06); border:1px solid rgba(2,132,199,0.3);" onchange="regenerateArduinoCode()">
+                        <label class="app-label" style="font-size:11px; font-weight:800; margin-bottom:4px; display:block;">PILIHAN CHIPSET / BOARD:</label>
+                        <select id="cfgBoardType" class="app-select" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; color:#0284c7; background:rgba(2,132,199,0.06); border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" onchange="regenerateArduinoCode()">
                             <option value="esp32_s3" selected>🚀 ESP32-S3 (Xtensa Dual-Core AI)</option>
                             <option value="esp32_s2">⚡ ESP32-S2 (Xtensa Single-Core USB)</option>
                             <option value="esp32_classic">📦 ESP32 Klasik (WROOM-32 / WROVER)</option>
@@ -1554,25 +1571,24 @@
                         </select>
                     </div>
                     <div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
-                            <label class="app-label" style="font-size:11px; margin-bottom:0;">Nama Wi-Fi (SSID):</label>
-                            <span id="wifiSavedStatusBadge" style="display:none; font-size:10px; font-weight:800; color:#059669; background:rgba(5,150,105,0.1); border:1px solid rgba(5,150,105,0.3); border-radius:4px; padding:1px 5px;">💾 Tersimpan di Browser</span>
-                        </div>
-                        <input type="text" id="cfgWifiSsid" class="app-input" style="padding:6px 10px; font-size:12px;" value="WIFI_RUMAH_ANDA" placeholder="Contoh: MyHome_WiFi" oninput="saveWifiCredentials(); regenerateArduinoCode();">
-                    </div>
-                    <div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
-                            <label class="app-label" style="font-size:11px; margin-bottom:0;">Password Wi-Fi:</label>
-                            <button type="button" onclick="toggleWifiPassVisibility()" style="background:none; border:none; color:var(--app-muted); font-size:10px; cursor:pointer; font-weight:750;" id="btnToggleWifiPass">👁️ Intip Password</button>
-                        </div>
-                        <input type="text" id="cfgWifiPass" class="app-input" style="padding:6px 10px; font-size:12px;" value="PASSWORD_WIFI" placeholder="Contoh: Rahasia123" oninput="saveWifiCredentials(); regenerateArduinoCode();">
-                    </div>
-                    <div>
-                        <label class="app-label" style="font-size:11px; margin-bottom:3px;">Tipe Modul Relay:</label>
-                        <select id="cfgRelayLogic" class="app-select" style="padding:6px 10px; font-size:12px;" onchange="regenerateArduinoCode()">
-                            <option value="false">ACTIVE HIGH (Relay ON saat 3.3V)</option>
-                            <option value="true" selected>ACTIVE LOW (Relay Biru Songle pada umumnya)</option>
+                        <label class="app-label" style="font-size:11px; font-weight:800; margin-bottom:4px; display:block;">TIPE MODUL RELAY:</label>
+                        <select id="cfgRelayLogic" class="app-select" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" onchange="regenerateArduinoCode()">
+                            <option value="true" selected>🔵 ACTIVE LOW (Relay Biru Songle pada umumnya)</option>
+                            <option value="false">🔴 ACTIVE HIGH (Relay ON saat sinyal 3.3V)</option>
                         </select>
+                    </div>
+                    <div>
+                        <label class="app-label" style="font-size:11px; font-weight:800; margin-bottom:4px; display:block;">NAMA WI-FI (SSID):</label>
+                        <input type="text" id="cfgWifiSsid" class="app-input" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" value="WIFI_RUMAH_ANDA" placeholder="Contoh: MyHome_WiFi" oninput="saveWifiCredentials(); regenerateArduinoCode();">
+                    </div>
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <label class="app-label" style="font-size:11px; font-weight:800; margin-bottom:0;">PASSWORD WI-FI:</label>
+                            <button type="button" onclick="toggleWifiPassVisibility()" style="background:#fff; border:1.5px solid #111; box-shadow:1.5px 1.5px 0 #111; border-radius:4px; padding:2px 8px; font-size:10px; font-weight:800; color:var(--app-text); cursor:pointer; display:inline-flex; align-items:center; gap:4px;" id="btnToggleWifiPass">
+                                <span>👁️</span> <span>Intip Password</span>
+                            </button>
+                        </div>
+                        <input type="password" id="cfgWifiPass" class="app-input" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" value="PASSWORD_WIFI" placeholder="Contoh: Rahasia123" oninput="saveWifiCredentials(); regenerateArduinoCode();">
                     </div>
                 </div>
             </div>
@@ -2992,10 +3008,10 @@ void loop() {
         if (!passEl) return;
         if (passEl.type === 'password') {
             passEl.type = 'text';
-            if (btn) btn.textContent = '🙈 Tutup Password';
+            if (btn) btn.innerHTML = '<span>🙈</span> <span>Tutup Password</span>';
         } else {
             passEl.type = 'password';
-            if (btn) btn.textContent = '👁️ Intip Password';
+            if (btn) btn.innerHTML = '<span>👁️</span> <span>Intip Password</span>';
         }
     }
 
