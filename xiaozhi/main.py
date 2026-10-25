@@ -286,19 +286,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse,
 @app.get("/download/app", include_in_schema=False)
 @app.get("/download/espbridge.apk", include_in_schema=False)
 async def download_mobile_app():
-    """Serve official latest ESPBridge Android APK directly with octet-stream to prevent browser hang."""
-    local_apk = STATIC_DIR / "download" / "espbridge.apk"
-    if local_apk.exists():
-        return FileResponse(
-            path=str(local_apk),
-            filename="espbridge-xiaozhi-v1.4.8.apk",
-            media_type="application/octet-stream",
-            headers={
-                "Content-Disposition": 'attachment; filename="espbridge-xiaozhi-v1.4.8.apk"',
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "X-Content-Type-Options": "nosniff",
-            }
-        )
+    """Serve official latest ESPBridge Android APK directly from GitHub Releases."""
     return RedirectResponse(
         url="https://github.com/Franklnir/Chronchi/releases/download/v1.4.8/espbridge-xiaozhi-latest.apk",
         status_code=302
@@ -308,18 +296,7 @@ async def download_mobile_app():
 @app.get("/download/app.zip", include_in_schema=False)
 @app.get("/download/espbridge.zip", include_in_schema=False)
 async def download_mobile_app_zip():
-    """Serve lightweight ZIP archive (33MB) to guarantee 100% completion without browser APK hangs."""
-    local_zip = STATIC_DIR / "download" / "espbridge.zip"
-    if local_zip.exists():
-        return FileResponse(
-            path=str(local_zip),
-            filename="espbridge-xiaozhi-v1.4.8.zip",
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": 'attachment; filename="espbridge-xiaozhi-v1.4.8.zip"',
-                "Cache-Control": "no-cache",
-            }
-        )
+    """Serve official ESPBridge Android release from GitHub."""
     return RedirectResponse(
         url="https://github.com/Franklnir/Chronchi/releases/download/v1.4.8/espbridge-xiaozhi-latest.apk",
         status_code=302
