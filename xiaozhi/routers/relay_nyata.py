@@ -1,11 +1,14 @@
 import hashlib
+import io
+from pathlib import Path
 import re
 import secrets
 import time
+import zipfile
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
 from xiaozhi.config import (
     REAL_RELAY_MAX_RELAYS,
@@ -846,5 +849,95 @@ async def internal_relay_broadcast(request: Request):
         return JSONResponse({"success": False, "detail": str(exc)}, status_code=500)
 
     return {"success": True}
+
+
+@router.post("/api/relay-nyata/{room_id}/download-project-zip")
+async def download_arduino_project_zip(room_id: int, request: Request):
+    """
+    Generate fully self-contained Plug-and-Play Arduino project .ZIP
+    including the custom .ino sketch and pre-bundled libraries (ArduinoJson & PubSubClient).
+    """
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Silakan login terlebih dahulu.")
+
+    store = get_store()
+    room = store.get_real_relay_room(user["id"], room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Ruangan tidak ditemukan.")
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    code = body.get("code", "")
+    board_name = body.get("board", "ESP32-S3")
+    room_name = room.get("nama_tempat", "Smart_Home")
+    clean_slug = re.sub(r'[^a-zA-Z0-9_]+', '_', room_name).strip('_') or f"Room_{room_id}"
+    folder_name = f"{clean_slug}_ESP32_Relay"
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        # 1. Custom Sketch .ino
+        ino_filename = f"{folder_name}/{folder_name}.ino"
+        zf.writestr(ino_filename, code.encode("utf-8"))
+
+        # 2. README Plug & Play
+        readme_content = f"""====================================================================
+  PANDUAN LENGKAP PLUG & PLAY: ESP32 SMART RELAY XIAOZHI
+  Ruangan : {room_name} ({board_name})
+  Broker  : 163.61.58.235:1883 (Mosquitto)
+====================================================================
+
+Langkah 1: Pasang Library ke Arduino IDE (Hanya 1x Saja)
+-------------------------------------------------------
+Di dalam folder 'libraries/' sudah tersedia 2 file library:
+1. 'ArduinoJson.zip'
+2. 'PubSubClient.zip'
+
+Cara Pasang:
+a. Buka aplikasi Arduino IDE di komputer / laptop Anda.
+b. Klik Menu: Sketch -> Include Library -> Add .ZIP Library...
+c. Pilih file 'ArduinoJson.zip' dari folder libraries ini.
+d. Ulangi untuk file 'PubSubClient.zip'.
+
+Langkah 2: Buka dan Upload Kodingan
+-------------------------------------------------------
+a. Buka file '{folder_name}.ino' di Arduino IDE.
+b. Pada menu 'Tools' -> 'Board', pilih board ESP32 Anda ({board_name}).
+c. Hubungkan kabel USB ESP32 ke laptop, lalu pilih Port COM yang muncul.
+d. Klik tombol panah kanan (Upload).
+
+SELESAI!
+ESP32 Anda otomatis menyambung ke Wi-Fi dan langsung sinkron
+dengan website https://xiaozhiscig.biz.id/relay-nyata
+====================================================================
+"""
+        zf.writestr(f"{folder_name}/README_PANDUAN_PLUG_PLAY.txt", readme_content.encode("utf-8"))
+
+        # 3. Include official library zips
+        static_libs_dir = Path(__file__).resolve().parent.parent / "static" / "download" / "arduino_libs"
+        lib_arduinojson = static_libs_dir / "ArduinoJson.zip"
+        lib_pubsub = static_libs_dir / "PubSubClient.zip"
+
+        if lib_arduinojson.exists():
+            zf.write(lib_arduinojson, f"{folder_name}/libraries/ArduinoJson.zip")
+        if lib_pubsub.exists():
+            zf.write(lib_pubsub, f"{folder_name}/libraries/PubSubClient.zip")
+
+    zip_buffer.seek(0)
+    zip_bytes = zip_buffer.getvalue()
+
+    filename = f"{clean_slug}_esp32_relay_complete.zip"
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache",
+        }
+    )
+
 
 

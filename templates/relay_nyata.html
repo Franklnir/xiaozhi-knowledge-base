@@ -1586,6 +1586,9 @@
                         <button type="button" class="app-button app-button-small app-button-primary" id="btnCopyArduino" onclick="copyArduinoCode(this)">
                             📋 Salin Kode Arduino Lengkap
                         </button>
+                        <button type="button" class="app-button app-button-small" id="btnDownloadZip" style="background:#0284c7; color:#fff; font-weight:850; border:2px solid #111; box-shadow:2.5px 2.5px 0 #111; display:inline-flex; align-items:center; gap:6px; cursor:pointer;" onclick="downloadArduinoProjectZip(this)">
+                            📦 Unduh Proyek .ZIP (Kode + Library Lengkap)
+                        </button>
                         <button type="button" class="app-button app-button-small" id="btnDirectFlashTab" style="background:#059669; color:#fff; font-weight:850; border:2px solid #111; box-shadow:2.5px 2.5px 0 #111; display:inline-flex; align-items:center; gap:6px; cursor:pointer;" onclick="switchConfigTab('flasher')">
                             ⚡ Flash Langsung &amp; Serial Monitor
                         </button>
@@ -2936,6 +2939,67 @@ void loop() {
         }).catch(() => {
             showToast("Gagal menyalin kode ke clipboard.", "error");
         });
+    }
+
+    async function downloadArduinoProjectZip(btn) {
+        if (!currentConfigRoom || !currentConfigRoom.id) {
+            alert("Konfigurasi ruangan belum dimuat.");
+            return;
+        }
+        const box = document.getElementById("arduinoCodeBox");
+        if (!box || !box.textContent.trim()) {
+            alert("Kodingan Arduino belum digenerate.");
+            return;
+        }
+        const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3";
+        const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3;
+
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = "<span>⏳ Menyiapkan Paket ZIP...</span>";
+        btn.disabled = true;
+
+        try {
+            const resp = await fetch(`/api/relay-nyata/${currentConfigRoom.id}/download-project-zip`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/zip",
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({
+                    code: box.textContent,
+                    board: profile.name || boardKey,
+                }),
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || "Gagal mengunduh paket proyek.");
+            }
+
+            const blob = await resp.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            const slug = (currentConfigRoom.nama_tempat || "esp32_relay").toLowerCase().replace(/[^a-z0-9_]+/g, "_");
+            a.download = `${slug}_esp32_relay_complete.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            btn.innerHTML = "<span>✓ ZIP Berhasil Diunduh!</span>";
+            showToast("Paket Proyek Arduino + Library lengkap berhasil diunduh!", "success");
+            setTimeout(() => {
+                btn.innerHTML = origHtml;
+                btn.disabled = false;
+            }, 2000);
+        } catch(err) {
+            alert("Gagal mengunduh paket ZIP: " + err.message);
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+        }
     }
 
     async function showConfig(roomId) {
