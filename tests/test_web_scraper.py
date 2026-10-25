@@ -265,6 +265,171 @@ Sangat cocok untuk IoT dan voice assistant modern.
                 self.assertIn("[00:35] pertama kita siapkan kabel data", res["content"])
                 self.assertEqual(res["source_type"], "youtube_transcript")
 
+    def test_academic_journal_scraping_and_metadata(self):
+        journal_html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="citation_title" content="Deep Learning for Real-Time IoT Speech Recognition">
+            <meta name="citation_author" content="Dr. Budi Santoso">
+            <meta name="citation_author" content="Prof. Siti Aminah">
+            <meta name="citation_publication_date" content="2025/11/15">
+            <meta name="citation_journal_title" content="IEEE Transactions on Neural Networks">
+            <meta name="citation_doi" content="10.1109/TNNLS.2025.1234567">
+            <meta name="citation_abstract" content="In this research, we propose an ultra-compact Transformer model optimized for edge devices like ESP32-S3, achieving 98% accuracy.">
+        </head>
+        <body>
+            <article>
+                <h1>Deep Learning for Real-Time IoT Speech Recognition</h1>
+                <div class="abstract">
+                    In this research, we propose an ultra-compact Transformer model optimized for edge devices like ESP32-S3, achieving 98% accuracy.
+                </div>
+                <h2>Introduction</h2>
+                <p>Speech processing at the edge enables low-latency offline voice assistants without constant cloud dependencies.</p>
+                <p>We evaluate memory footprints against baseline Recurrent Neural Networks.</p>
+            </article>
+        </body>
+        </html>
+        """
+        mock_resp = MagicMock()
+        mock_resp.content = journal_html.encode("utf-8")
+        mock_resp.headers = {"content-type": "text/html; charset=utf-8"}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("xiaozhi.services.scraper_service.requests.get", return_value=mock_resp):
+            data = scrape_url("https://ieeexplore.ieee.org/document/1234567")
+            self.assertTrue(data["success"])
+            self.assertEqual(data["title"], "Deep Learning for Real-Time IoT Speech Recognition")
+            self.assertIn("Jurnal Ilmiah", data["content_type"])
+            self.assertIn("Dr. Budi Santoso", data["authors"])
+            self.assertIn("Prof. Siti Aminah", data["authors"])
+            self.assertEqual(data["journal"], "IEEE Transactions on Neural Networks")
+            self.assertEqual(data["doi"], "10.1109/TNNLS.2025.1234567")
+            self.assertIn("10.1109/TNNLS.2025.1234567", data["content"])
+            self.assertIn("### 📑 Abstrak / Ringkasan Eksekutif", data["content"])
+            self.assertIn("Transformer model optimized for edge devices", data["content"])
+
+    def test_arxiv_paper_scraping(self):
+        arxiv_html = """
+        <html>
+        <head>
+            <meta name="citation_title" content="Attention Is All You Need">
+            <meta name="citation_author" content="Ashish Vaswani">
+            <meta name="citation_author" content="Noam Shazeer">
+            <meta name="citation_date" content="2017/06/12">
+            <meta name="citation_doi" content="10.48550/arXiv.1706.03762">
+        </head>
+        <body>
+            <div id="abs">
+                <h1 class="title mathjax"><span class="descriptor">Title:</span>Attention Is All You Need</h1>
+                <div class="authors"><span class="descriptor">Authors:</span><a href="/search?searchtype=author">Ashish Vaswani</a>, <a href="/search?searchtype=author">Noam Shazeer</a></div>
+                <blockquote class="abstract mathjax">
+                    <span class="descriptor">Abstract:</span> The dominant sequence transduction models are based on complex recurrent or convolutional neural networks. We propose the Transformer, a novel network architecture based solely on attention mechanisms.
+                </blockquote>
+            </div>
+        </body>
+        </html>
+        """
+        mock_resp = MagicMock()
+        mock_resp.content = arxiv_html.encode("utf-8")
+        mock_resp.headers = {"content-type": "text/html; charset=utf-8"}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("xiaozhi.services.scraper_service.requests.get", return_value=mock_resp):
+            data = scrape_url("https://arxiv.org/abs/1706.03762")
+            self.assertTrue(data["success"])
+            self.assertEqual(data["title"], "Attention Is All You Need")
+            self.assertIn("arXiv", data["content_type"])
+            self.assertIn("Ashish Vaswani", data["authors"])
+            self.assertIn("Noam Shazeer", data["authors"])
+            self.assertIn("10.48550/arXiv.1706.03762", data["doi"])
+            self.assertIn("We propose the Transformer", data["content"])
+
+    def test_inline_links_and_reference_section(self):
+        links_html = """
+        <html><body><article>
+            <h1>Panduan Hardware ESP32</h1>
+            <p>Untuk memulai proyek, kunjungi <a href="/docs/getting-started">Dokumentasi Resmi</a>.</p>
+            <p>Gunakan sensor mikrofon I2S yang tersedia di <a href="https://vendor.com/inmp441">Modul INMP441</a>.</p>
+            <p>Bagikan artikel ini: <a href="https://facebook.com/sharer?u=abc">Share ke FB</a></p>
+            <p>Untuk pertanyaan hubungi kami: <a href="mailto:support@example.com">Email CS</a></p>
+        </article></body></html>
+        """
+        mock_resp = MagicMock()
+        mock_resp.content = links_html.encode("utf-8")
+        mock_resp.headers = {"content-type": "text/html; charset=utf-8"}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("xiaozhi.services.scraper_service.requests.get", return_value=mock_resp):
+            data = scrape_url("https://example.com/tutorial")
+            self.assertTrue(data["success"])
+            # Relative link resolved to absolute
+            self.assertIn("[Dokumentasi Resmi](https://example.com/docs/getting-started)", data["content"])
+            self.assertIn("[Modul INMP441](https://vendor.com/inmp441)", data["content"])
+            # Social share and mailto filtered out from markdown link syntax
+            self.assertNotIn("[Share ke FB](https://facebook.com", data["content"])
+            self.assertNotIn("mailto:", data["content"])
+            # Key references section appended
+            self.assertIn("### 🔗 Referensi & Tautan Penting Terkait", data["content"])
+            self.assertIn("• [Dokumentasi Resmi](https://example.com/docs/getting-started)", data["content"])
+
+    def test_code_blocks_and_callout_extraction(self):
+        code_html = """
+        <html><body><article>
+            <h1>Konfigurasi WiFi ESP32</h1>
+            <div class="alert warning">
+                Pastikan frekuensi WiFi adalah 2.4 GHz karena ESP32 tidak mendukung 5 GHz.
+            </div>
+            <p>Gunakan baris kode berikut pada Arduino IDE:</p>
+            <pre><code class="language-cpp">
+#include &lt;WiFi.h&gt;
+void setup() {
+    WiFi.begin("SSID", "PASS");
+}
+            </code></pre>
+            <p>Periksa serial monitor dengan kecepatan <code>115200 baud</code>.</p>
+        </article></body></html>
+        """
+        mock_resp = MagicMock()
+        mock_resp.content = code_html.encode("utf-8")
+        mock_resp.headers = {"content-type": "text/html; charset=utf-8"}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("xiaozhi.services.scraper_service.requests.get", return_value=mock_resp):
+            data = scrape_url("https://example.com/wifi-esp32")
+            self.assertTrue(data["success"])
+            # Code block with cpp language tag
+            self.assertIn("```cpp", data["content"])
+            self.assertIn("WiFi.begin(\"SSID\", \"PASS\");", data["content"])
+            # Inline code formatted
+            self.assertIn("`115200 baud`", data["content"])
+            # Warning callout formatted
+            self.assertIn("> ⚠️ **Perhatian**: Pastikan frekuensi WiFi adalah 2.4 GHz", data["content"])
+            # Content type auto-classified as technical documentation
+            self.assertIn("Dokumentasi Teknis", data["content_type"])
+
+    def test_auto_category_classification_in_create_material(self):
+        journal_html = """
+        <html><head>
+            <meta name="citation_title" content="Advanced Neural Robotics">
+            <meta name="citation_doi" content="10.1234/robotics.2026.01">
+        </head><body><article>
+            <h1>Advanced Neural Robotics</h1>
+            <p>Neural networks applied to bipedal robotic motion control in outdoor terrain.</p>
+            <p>Extensive simulation demonstrates stability under perturbations.</p>
+        </article></body></html>
+        """
+        mock_resp = MagicMock()
+        mock_resp.content = journal_html.encode("utf-8")
+        mock_resp.headers = {"content-type": "text/html; charset=utf-8"}
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("xiaozhi.services.scraper_service.requests.get", return_value=mock_resp):
+            mat = create_material_from_url("https://example.com/robotics-paper")
+            self.assertTrue(mat["success"])
+            self.assertEqual(mat["category"], "Jurnal Ilmiah")
+            self.assertEqual(mat["doi"], "10.1234/robotics.2026.01")
+
 
 if __name__ == "__main__":
     unittest.main()
