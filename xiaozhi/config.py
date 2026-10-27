@@ -254,6 +254,14 @@ ALL_MCP_TOOLS_CATALOG = [
         "icon": "🔴",
         "description": "Mematikan seluruh pin relay fisik ESP32 secara serentak.",
     },
+    {
+        "name": "set_smarthome_simulation_mode",
+        "title": "Mode Simulasi Smart Home",
+        "category": "iot",
+        "category_label": "Smart Home & IoT",
+        "icon": "🔄",
+        "description": "Mengaktifkan atau menonaktifkan mode Simulasi Smart Home Virtual (beralih antara simulator virtual dan relay fisik).",
+    },
 
     # 4. Multimedia & Web
     {
@@ -860,21 +868,27 @@ SMART_HOME_RELAYS = {
         "location": "living_room",
         "color": "yellow",
         "device": "Lampu utama",
-        "aliases": ("ruang tamu", "tamu", "living room"),
+        "aliases": (
+            "ruang tamu", "tamu", "living room", "lampu utama",
+            "lampu ruang tamu", "lampu tamu", "lampu tengah", "ruang keluarga",
+        ),
     },
     "2": {
         "name": "Dapur",
         "location": "kitchen",
         "color": "white",
         "device": "Lampu dapur",
-        "aliases": ("dapur", "kitchen"),
+        "aliases": ("dapur", "kitchen", "lampu dapur", "ruang dapur", "ruang makan"),
     },
     "3": {
         "name": "Kamar Mandi",
         "location": "bathroom",
         "color": "white",
         "device": "Lampu kamar mandi",
-        "aliases": ("kamar mandi", "mandi", "wc", "toilet", "bathroom", "km"),
+        "aliases": (
+            "kamar mandi", "mandi", "wc", "toilet", "bathroom", "km",
+            "lampu kamar mandi", "lampu mandi", "lampu toilet", "lampu wc",
+        ),
     },
     "4": {
         "name": "Kamar Tidur Utama",
@@ -884,6 +898,8 @@ SMART_HOME_RELAYS = {
         "aliases": (
             "kamar tidur utama", "kamar utama", "master bedroom",
             "tidur utama", "kamar 1", "kamar satu", "bedroom utama", "bedroom 1",
+            "lampu kamar utama", "lampu master bedroom", "lampu kamar 1", "lampu kamar satu",
+            "lampu tidur utama", "lampu kamar tidur utama",
         ),
     },
     "5": {
@@ -891,14 +907,21 @@ SMART_HOME_RELAYS = {
         "location": "terrace",
         "color": "white",
         "device": "Lampu teras",
-        "aliases": ("teras", "depan", "teras depan", "terrace"),
+        "aliases": (
+            "teras", "depan", "teras depan", "terrace",
+            "lampu teras", "lampu depan", "lampu teras depan", "lampu luar",
+        ),
     },
     "6": {
         "name": "Basement",
         "location": "basement",
         "color": "red",
         "device": "Alarm",
-        "aliases": ("basement", "alarm", "sirine", "siren", "bahaya"),
+        "aliases": (
+            "basement", "alarm", "sirine", "siren", "bahaya",
+            "alarm rumah", "alarm bahaya", "keamanan", "security",
+            "sirine alarm", "alarm basement", "sirine bahaya",
+        ),
     },
     "7": {
         "name": "Kamar Tidur 2",
@@ -907,7 +930,9 @@ SMART_HOME_RELAYS = {
         "device": "Lampu kamar kedua",
         "aliases": (
             "kamar tidur 2", "kamar tidur dua", "kamar 2", "kamar dua",
-            "kamar kedua", "bedroom 2", "second bedroom",
+            "kamar kedua", "bedroom 2", "second bedroom", "kamar tidur kedua",
+            "lampu kamar tidur 2", "lampu kamar tidur dua", "lampu kamar 2",
+            "lampu kamar dua", "lampu kamar kedua", "lampu anak",
         ),
     },
     "8": {
@@ -915,7 +940,11 @@ SMART_HOME_RELAYS = {
         "location": "ac_room",
         "color": "blue",
         "device": "AC",
-        "aliases": ("ruang ac", "ac", "air conditioner", "kipas", "pendingin"),
+        "aliases": (
+            "ruang ac", "ac", "air conditioner", "kipas", "pendingin",
+            "pendingin ruangan", "ac rumah", "ac kamar", "pendingin udara",
+            "ac ruang tamu", "ventilasi",
+        ),
     },
 }
 SMART_HOME_CHANNELS = tuple(SMART_HOME_RELAYS.keys())
@@ -928,10 +957,14 @@ SMART_HOME_AMBIGUOUS_TARGETS = {
 SMART_HOME_ON_ACTIONS = {
     "on", "turn on", "nyala", "nyalakan", "hidup", "hidupkan",
     "1", "true", "aktif", "aktifkan",
+    "fungsikan", "operasikan", "jalankan", "bunyikan", "dinginkan", "buka", "start",
+    "fungsikanlah", "fungsikan dong", "hidupkanlah", "nyalakanlah", "bunyikanlah",
 }
 SMART_HOME_OFF_ACTIONS = {
     "off", "turn off", "mati", "matikan", "padam", "padamkan",
     "0", "false", "nonaktif", "nonaktifkan",
+    "hentikan", "senyapkan", "diamkan", "stop", "close", "tutup",
+    "matikanlah", "padamkanlah", "hentikanlah", "senyapkanlah",
 }
 
 # Build channel alias lookup

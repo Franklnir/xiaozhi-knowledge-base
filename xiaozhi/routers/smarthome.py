@@ -105,8 +105,15 @@ async def smarthome_relay(request: Request, cmd: SmartHomeRelayCommand):
     if not bool(feature_settings.get("virtual_smarthome_enabled", True)):
         return JSONResponse({"success": False, "message": "Simulasi Smart Home Virtual sedang nonaktif."}, status_code=400)
     try:
-        state = set_smart_home_relay(user["id"], cmd.channel, cmd.state)
-        return {"success": True, "state": state}
+        set_smart_home_relay(user["id"], cmd.channel, cmd.state)
+        token_info = store.get_xiaozhi_token_info(user["id"])
+        payload = smart_home_payload(
+            user["id"],
+            token_saved=bool(token_info),
+            mcp_connected=is_mcp_connected(user["id"]),
+            virtual_enabled=True,
+        )
+        return payload
     except ValueError as exc:
         return JSONResponse({"success": False, "message": str(exc)}, status_code=400)
 
@@ -118,5 +125,12 @@ async def smarthome_all(request: Request, cmd: SmartHomeAllCommand):
     feature_settings = store.get_feature_settings(user["id"])
     if not bool(feature_settings.get("virtual_smarthome_enabled", True)):
         return JSONResponse({"success": False, "message": "Simulasi Smart Home Virtual sedang nonaktif."}, status_code=400)
-    state = set_all_smart_home_relays(user["id"], cmd.state)
-    return {"success": True, "state": state}
+    set_all_smart_home_relays(user["id"], cmd.state)
+    token_info = store.get_xiaozhi_token_info(user["id"])
+    payload = smart_home_payload(
+        user["id"],
+        token_saved=bool(token_info),
+        mcp_connected=is_mcp_connected(user["id"]),
+        virtual_enabled=True,
+    )
+    return payload

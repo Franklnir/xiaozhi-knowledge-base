@@ -37,7 +37,23 @@ def parse_smart_home_action(action: Any) -> bool:
         return True
     if command in SMART_HOME_OFF_ACTIONS:
         return False
-    raise ValueError("Action harus on/off, nyala/mati, atau hidup/matikan.")
+
+    cmd_padded = f" {command} "
+    for on_act in SMART_HOME_ON_ACTIONS:
+        if f" {on_act} " in cmd_padded:
+            return True
+    for off_act in SMART_HOME_OFF_ACTIONS:
+        if f" {off_act} " in cmd_padded:
+            return False
+
+    for on_act in SMART_HOME_ON_ACTIONS:
+        if len(on_act) >= 3 and on_act in command:
+            return True
+    for off_act in SMART_HOME_OFF_ACTIONS:
+        if len(off_act) >= 3 and off_act in command:
+            return False
+
+    raise ValueError("Action harus on/off, nyala/mati, hidup/matikan, atau fungsikan/hentikan.")
 
 
 def resolve_smart_home_target(target: Any) -> Tuple[Optional[int], Optional[str]]:

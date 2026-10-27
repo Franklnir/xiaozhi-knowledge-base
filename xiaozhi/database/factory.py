@@ -31,8 +31,13 @@ def create_store():
     # Explicit backend selection
     if backend == "postgres":
         logger.info("Using PostgreSQL backend (explicit)")
-        from xiaozhi.database.postgres_store import PostgresStore
-        return PostgresStore()
+        try:
+            from xiaozhi.database.postgres_store import PostgresStore
+            return PostgresStore()
+        except Exception as exc:
+            logger.warning("PostgreSQL server tidak dapat diakses (%s). Beralih otomatis ke database lokal SQLite untuk mode development.", exc)
+            from xiaozhi.database.sqlite_store import SQLiteStore
+            return SQLiteStore()
     elif backend == "sqlite":
         logger.info("Using SQLite backend (explicit)")
         from xiaozhi.database.sqlite_store import SQLiteStore

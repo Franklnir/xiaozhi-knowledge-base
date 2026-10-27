@@ -24,6 +24,7 @@ from xiaozhi.services.language_tutor_service import (
     start_conversation_roleplay as service_start_roleplay,
 )
 from xiaozhi.services.smarthome_service import (
+    normalize_smart_home_text,
     parse_smart_home_action,
     resolve_smart_home_target,
     set_all_smart_home_relays,
@@ -1513,11 +1514,11 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     def control_relay(channel: int, action: str) -> dict:
         """
         Kontrol relay pada simulasi smarthome virtual.
-        Tool ini hanya tersedia saat Simulasi Smart Home Virtual aktif.
+        Tool ini digunakan saat Simulasi Smart Home Virtual aktif untuk menyalakan, mematikan, atau memfungsikan relay nomor 1 sampai 8.
 
         Args:
-            channel: Nomor relay 1-8. 1=Ruang Tamu, 2=Dapur, 3=Kamar Mandi, 4=Kamar Tidur Utama, 5=Teras, 6=Basement/Alarm, 7=Kamar Tidur 2, 8=Ruang AC.
-            action: Gunakan "on" atau "off". Bahasa Indonesia seperti nyala, hidupkan, mati, atau matikan juga diterima.
+            channel: Nomor relay 1-8. 1=Ruang Tamu (Lampu utama), 2=Dapur, 3=Kamar Mandi, 4=Kamar Tidur Utama, 5=Teras, 6=Basement (Alarm), 7=Kamar Tidur 2, 8=Ruang AC (Pendingin).
+            action: Gunakan "on", "off", "nyalakan", "matikan", "fungsikan", "hidupkan", "aktifkan", "bunyikan", atau "padamkan".
         """
         owner_id = mcp_active_owner_ctx.get()
         if owner_id is None:
@@ -1546,12 +1547,12 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def control_smart_home_room(target: str, action: str) -> dict:
         """
-        Kontrol perangkat simulasi smarthome berdasarkan nama ruangan.
-        Tool ini hanya tersedia saat Simulasi Smart Home Virtual aktif.
+        Kontrol perangkat simulasi smarthome berdasarkan nama ruangan atau nama perangkat.
+        Tool ini digunakan saat Simulasi Smart Home Virtual aktif untuk menyalakan, mematikan, atau memfungsikan perangkat.
 
         Args:
-            target: Nama ruangan atau channel. Contoh: ruang tamu, dapur, kamar mandi, kamar tidur utama, teras, basement, kamar tidur 2, ruang AC.
-            action: Gunakan "on" atau "off". Bahasa Indonesia seperti nyalakan, hidupkan, mati, atau matikan juga diterima.
+            target: Nama ruangan atau perangkat atau channel 1-8. Contoh: ruang tamu, lampu utama, dapur, lampu dapur, kamar mandi, kamar tidur utama, teras, alarm, sirine, basement, kamar tidur 2, ruang AC, AC, pendingin ruangan, atau 'semua' untuk seluruh ruangan.
+            action: Gunakan "on", "off", "nyalakan", "matikan", "fungsikan", "hidupkan", "aktifkan", "bunyikan", atau "padamkan".
         """
         owner_id = mcp_active_owner_ctx.get()
         if owner_id is None:
@@ -1560,6 +1561,35 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             response = {"success": False, "message": "Tool simulasi Smart Home Virtual sedang nonaktif. Gunakan tool Relay Nyata."}
             record_mcp_tool_history(owner_id, "control_smart_home_room", f"{target} {action}", {"target": target, "action": action}, response)
             return response
+
+        normalized = normalize_smart_home_text(target)
+        if normalized in {"semua", "all", "semua ruangan", "semua lampu", "semua relay", "seluruh ruangan", "seluruh lampu", "semuanya"}:
+            try:
+                enabled = parse_smart_home_action(action)
+                set_all_smart_home_relays(owner_id, enabled)
+                status = "dinyalakan" if enabled else "dimatikan"
+                response = {"success": True, "message": f"Semua perangkat smarthome virtual berhasil {status}."}
+                record_mcp_tool_history(owner_id, "control_smart_home_room", f"{target} {action}", {"target": target, "action": action}, response)
+                return response
+            except ValueError as exc:
+                response = {"success": False, "message": str(exc)}
+                record_mcp_tool_history(owner_id, "control_smart_home_room", f"{target} {action}", {"target": target, "action": action}, response)
+                return response
+
+        if normalized in {"simulasi", "simulasi smarthome", "mode simulasi", "virtual smarthome", "smarthome virtual", "rumah pintar virtual"}:
+            try:
+                enabled = parse_smart_home_action(action)
+                store.set_feature_setting(owner_id, "virtual_smarthome_enabled", enabled)
+                status = "diaktifkan" if enabled else "dinonaktifkan"
+                extra = " Perangkat simulasi virtual siap dikontrol." if enabled else " Mode beralih ke Relay Nyata fisik."
+                response = {"success": True, "message": f"Simulasi Smart Home Virtual berhasil {status}.{extra}", "virtual_smarthome_enabled": enabled}
+                record_mcp_tool_history(owner_id, "control_smart_home_room", f"{target} {action}", {"target": target, "action": action}, response)
+                return response
+            except ValueError as exc:
+                response = {"success": False, "message": str(exc)}
+                record_mcp_tool_history(owner_id, "control_smart_home_room", f"{target} {action}", {"target": target, "action": action}, response)
+                return response
+
         channel, error = resolve_smart_home_target(target)
         if error or channel is None:
             response = {"success": False, "message": error or "Target tidak valid."}
@@ -1634,6 +1664,38 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         response = {"success": True, "message": "Semua perangkat smarthome virtual berhasil dimatikan."}
         record_mcp_tool_history(owner_id, "all_relays_off", "matikan semua relay", {}, response)
         return response
+
+    @mcp_server.tool()
+    def set_smarthome_simulation_mode(action: str) -> dict:
+        """
+        Mengaktifkan atau menonaktifkan mode Simulasi Smart Home Virtual.
+        Gunakan tool ini jika pengguna meminta untuk mengaktifkan, menyalakan, mematikan, menonaktifkan simulasi smarthome/virtual, atau beralih antara simulasi dan relay fisik nyata.
+
+        Args:
+            action: Gunakan "aktifkan", "nyalakan", "fungsikan", "on" untuk mengaktifkan simulasi virtual, atau "nonaktifkan", "matikan", "off" untuk mematikan simulasi (beralih ke Relay Nyata fisik).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if owner_id is None:
+            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif."}
+        try:
+            enabled = parse_smart_home_action(action)
+            store.set_feature_setting(owner_id, "virtual_smarthome_enabled", enabled)
+            mode_text = "diaktifkan" if enabled else "dinonaktifkan"
+            extra = " Sekarang Xiaozhi dapat mengontrol perangkat di denah simulasi virtual." if enabled else " Mode beralih ke Relay Nyata fisik ESP32."
+            response = {
+                "success": True,
+                "message": f"Simulasi Smart Home Virtual berhasil {mode_text}.{extra}",
+                "virtual_smarthome_enabled": enabled,
+            }
+            record_mcp_tool_history(owner_id, "set_smarthome_simulation_mode", f"mode simulasi {action}", {"action": action}, response)
+            return response
+        except ValueError as exc:
+            response = {"success": False, "message": str(exc)}
+            record_mcp_tool_history(owner_id, "set_smarthome_simulation_mode", f"mode simulasi {action}", {"action": action}, response)
+            return response
+        except Exception:
+            logger.exception("Error MCP set_smarthome_simulation_mode")
+            return {"success": False, "message": "Gagal mengubah status mode simulasi smart home."}
 
     @mcp_server.tool()
     def control_real_relay_by_voice(user_message: str) -> dict:
