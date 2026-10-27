@@ -1006,6 +1006,8 @@ class PostgresStore:
         api_url: str = "",
         **kwargs,
     ) -> int:
+        if not is_live_api_category(category):
+            api_url = ""
         self._enforce_material_limits(owner_id, content=content, api_url=api_url, is_new=True)
         now = utc_now()
         api_ciphertext = encrypt_secret(api_url.strip()) if api_url.strip() else None
@@ -1045,16 +1047,19 @@ class PostgresStore:
     def update_material(
         self, owner_id: int, material_id: int, title: str, category: str, content: str, keywords: str, api_url: str = ""
     ) -> bool:
+        if not is_live_api_category(category):
+            api_url = ""
         self._enforce_material_limits(owner_id, content=content, api_url=api_url, is_new=False, material_id=material_id)
         now = utc_now()
         api_ciphertext = encrypt_secret(api_url.strip()) if api_url.strip() else None
+        source_type = LIVE_API_SOURCE_TYPE if api_url.strip() else None
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     UPDATE materials SET
                         title = %s, category = %s, content = %s, keywords = %s,
-                        api_url_ciphertext = %s, updated_at = %s
+                        source_type = %s, api_url_ciphertext = %s, updated_at = %s
                     WHERE id = %s AND owner_id = %s
                     """,
                     (
@@ -1062,6 +1067,7 @@ class PostgresStore:
                         category.strip(),
                         content.strip(),
                         keywords.strip(),
+                        source_type,
                         api_ciphertext,
                         now,
                         int(material_id),

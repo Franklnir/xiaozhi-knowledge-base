@@ -165,10 +165,12 @@
         justify-content: center;
         background: rgba(2, 6, 23, 0.65);
         backdrop-filter: blur(5px);
-        padding: 16px;
+        padding: 24px 16px;
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
 
     .dash-modal-backdrop.is-open {
@@ -183,12 +185,22 @@
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
         max-width: 680px;
         width: 100%;
-        max-height: calc(100vh - 36px);
+        max-height: min(860px, calc(100vh - 40px));
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        margin: auto;
         transform: scale(0.96) translateY(8px);
         transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Pastikan form di dalam modal box berperilaku flex-column dan mengisi tinggi yang tersedia */
+    .dash-modal-box > form {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
     }
 
     .dash-modal-backdrop.is-open .dash-modal-box {
@@ -211,6 +223,7 @@
         position: sticky;
         top: 0;
         z-index: 10;
+        flex-shrink: 0;
     }
 
     .dash-modal-body {
@@ -218,6 +231,29 @@
         overflow-y: auto;
         display: grid;
         gap: 16px;
+        flex: 1 1 auto;
+        min-height: 0;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+    }
+
+    /* Custom smooth scrollbars for modal body and backdrop */
+    .dash-modal-body::-webkit-scrollbar,
+    .dash-modal-backdrop::-webkit-scrollbar {
+        width: 6px;
+    }
+    .dash-modal-body::-webkit-scrollbar-track,
+    .dash-modal-backdrop::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .dash-modal-body::-webkit-scrollbar-thumb,
+    .dash-modal-backdrop::-webkit-scrollbar-thumb {
+        background: rgba(100, 116, 139, 0.4);
+        border-radius: 999px;
+    }
+    .dash-modal-body::-webkit-scrollbar-thumb:hover,
+    .dash-modal-backdrop::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 116, 139, 0.7);
     }
 
     .dash-modal-footer {
@@ -231,6 +267,7 @@
         position: sticky;
         bottom: 0;
         z-index: 10;
+        flex-shrink: 0;
     }
 
     /* Category Badges Styling */
@@ -577,9 +614,14 @@
                 <div class="flex items-center gap-2 w-full sm:w-auto">
                     <select id="filterCategory" onchange="filterTable()" class="app-select w-full sm:w-48" style="font-size:13px;">
                         <option value="all">Semua Kategori</option>
-                        {% for cat in categories %}
-                        <option value="{{ cat.name }}">{{ cat.name }}</option>
-                        {% endfor %}
+                        <optgroup label="📂 Kategori Reguler">
+                            {% for cat in categories if cat.name|trim|lower != 'data dari api' %}
+                            <option value="{{ cat.name }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="⚡ Khusus Realtime API">
+                            <option value="data dari api">⚡ data dari api</option>
+                        </optgroup>
                     </select>
                 </div>
             </div>
@@ -874,10 +916,15 @@
                             <label for="category" class="app-label !mb-0">Kategori <span class="text-rose-600">*</span></label>
                             <button type="button" onclick="openCategoryModal()" class="text-xs text-emerald-700 dark:text-emerald-400 font-bold hover:underline">+ Kategori Baru</button>
                         </div>
-                        <select id="category" name="category" required class="app-select">
-                            {% for cat in categories %}
-                            <option value="{{ cat.name }}">{{ cat.name }}</option>
-                            {% endfor %}
+                        <select id="category" name="category" required class="app-select" onchange="syncLiveApiFields('add')">
+                            <optgroup label="📂 Kategori Reguler (Teks & Dokumen)">
+                                {% for cat in categories if cat.name|trim|lower != 'data dari api' %}
+                                <option value="{{ cat.name }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="⚡ Khusus Realtime Live API (Endpoint Eksternal)">
+                                <option value="data dari api">⚡ data dari api (Live Endpoint API JSON)</option>
+                            </optgroup>
                         </select>
                     </div>
                     <div>
@@ -887,7 +934,7 @@
                 </div>
 
                 <!-- Live API Fields Toggle -->
-                <div id="liveApiFields" class="p-3 rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-800 hidden space-y-2">
+                <div id="liveApiFields" class="p-3 rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-800 hidden space-y-2" style="display: none;">
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-bold text-sky-900 dark:text-sky-300 flex items-center gap-1.5">
                             <svg class="dash-icon text-sky-600" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
@@ -950,10 +997,15 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label for="edit_category" class="app-label">Kategori <span class="text-rose-600">*</span></label>
-                        <select id="edit_category" name="category" required class="app-select">
-                            {% for cat in categories %}
-                            <option value="{{ cat.name }}">{{ cat.name }}</option>
-                            {% endfor %}
+                        <select id="edit_category" name="category" required class="app-select" onchange="syncLiveApiFields('edit')">
+                            <optgroup label="📂 Kategori Reguler (Teks & Dokumen)">
+                                {% for cat in categories if cat.name|trim|lower != 'data dari api' %}
+                                <option value="{{ cat.name }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="⚡ Khusus Realtime Live API (Endpoint Eksternal)">
+                                <option value="data dari api">⚡ data dari api (Live Endpoint API JSON)</option>
+                            </optgroup>
                         </select>
                     </div>
                     <div>
@@ -963,7 +1015,7 @@
                 </div>
 
                 <!-- Edit Live API Fields -->
-                <div id="editLiveApiFields" class="p-3 rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-800 hidden space-y-2">
+                <div id="editLiveApiFields" class="p-3 rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-800 hidden space-y-2" style="display: none;">
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-bold text-sky-900 dark:text-sky-300 flex items-center gap-1.5">
                             <svg class="dash-icon text-sky-600" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
@@ -1184,6 +1236,7 @@
     function openAddModal() {
         const modal = document.getElementById('addMaterialModal');
         if (modal) {
+            syncLiveApiFields('add');
             modal.classList.add('is-open');
             document.body.style.overflow = 'hidden';
             setTimeout(() => {
@@ -1404,7 +1457,12 @@
         const category = form.querySelector('[name="category"]').value.trim();
         const content = form.querySelector('[name="content"]').value.trim();
         const keywords = form.querySelector('[name="keywords"]').value.trim();
-        const apiUrl = form.querySelector('[name="api_url"]') ? form.querySelector('[name="api_url"]').value.trim() : '';
+        let apiUrl = form.querySelector('[name="api_url"]') ? form.querySelector('[name="api_url"]').value.trim() : '';
+
+        // Pastikan endpoint API hanya dikirim jika kategori memang khusus live API
+        if (!isLiveApiCategory(category)) {
+            apiUrl = '';
+        }
 
         if (!title || !content) {
             form.submit();
@@ -1628,11 +1686,13 @@
     };
 
     function isLiveApiCategory(value) {
-        return String(value || "").trim().toLowerCase() === liveApiCategoryName;
+        const val = String(value || "").trim().toLowerCase();
+        return val === liveApiCategoryName || val === "data dari api" || val.includes("data dari api");
     }
 
     function clearLiveApiTimer(mode) {
         const ctx = liveApiContexts[mode];
+        if (!ctx) return;
         if (ctx.timer) window.clearInterval(ctx.timer);
         ctx.timer = null;
         if (ctx.debounce) window.clearTimeout(ctx.debounce);
@@ -1641,6 +1701,7 @@
 
     function setLiveApiStatus(mode, message, isError = false) {
         const ctx = liveApiContexts[mode];
+        if (!ctx || !ctx.status) return;
         ctx.status.textContent = message;
         ctx.status.className = isError
             ? "text-[11px] font-semibold text-red-700"
@@ -1649,9 +1710,10 @@
 
     async function refreshLiveApiPreview(mode, showChecking = false) {
         const ctx = liveApiContexts[mode];
+        if (!ctx || !ctx.apiUrl || !ctx.category) return;
         const apiUrl = ctx.apiUrl.value.trim();
         if (!apiUrl || !isLiveApiCategory(ctx.category.value)) return;
-        ctx.refresh.disabled = true;
+        if (ctx.refresh) ctx.refresh.disabled = true;
         if (!ctx.lastHash || showChecking) {
             setLiveApiStatus(mode, "Mengecek perubahan API...");
         }
@@ -1672,54 +1734,85 @@
                     flashElement(ctx.content);
                 }
             }
-            ctx.content.value = payload.content || "";
+            if (ctx.content) ctx.content.value = payload.content || "";
             setLiveApiStatus(mode, liveApiMetaText(payload));
         } catch (error) {
             setLiveApiStatus(mode, error.message || "Gagal membaca API.", true);
         } finally {
-            ctx.refresh.disabled = false;
+            if (ctx.refresh) ctx.refresh.disabled = false;
         }
     }
 
     function scheduleLiveApiPreview(mode) {
         const ctx = liveApiContexts[mode];
+        if (!ctx) return;
         if (ctx.debounce) window.clearTimeout(ctx.debounce);
         ctx.debounce = window.setTimeout(() => refreshLiveApiPreview(mode), 450);
     }
 
     function syncLiveApiFields(mode) {
         const ctx = liveApiContexts[mode];
+        if (!ctx || !ctx.category) return;
         const live = isLiveApiCategory(ctx.category.value);
-        ctx.fields.classList.toggle("hidden", !live);
-        ctx.apiUrl.required = live;
-        ctx.content.required = !live;
-        ctx.content.readOnly = live;
-        ctx.content.placeholder = live
-            ? "Data dari API akan tampil otomatis dan diperbarui realtime."
-            : "Tulis isi materi secara lengkap dan terstruktur...";
+
+        if (ctx.fields) {
+            ctx.fields.classList.toggle("hidden", !live);
+            ctx.fields.style.display = live ? "block" : "none";
+        }
+        if (ctx.apiUrl) {
+            ctx.apiUrl.required = live;
+            if (!live) {
+                ctx.apiUrl.value = "";
+            }
+        }
+        if (ctx.content) {
+            ctx.content.required = !live;
+            ctx.content.readOnly = live;
+            ctx.content.placeholder = live
+                ? "Data dari API akan tampil otomatis dan diperbarui realtime."
+                : "Tuliskan materi secara lengkap, runtut, dan jelas agar mudah dipahami oleh asisten suara saat pengguna bertanya...";
+            if (live) {
+                if (!ctx.content.value.trim() || ctx.content.value.trim() === "Data realtime dari API akan muncul setelah endpoint terbaca.") {
+                    ctx.content.value = "Data realtime dari API akan muncul setelah endpoint terbaca.";
+                }
+            } else {
+                if (ctx.content.value.trim() === "Data realtime dari API akan muncul setelah endpoint terbaca." ||
+                    ctx.content.value.startsWith("Data realtime dari API:")) {
+                    ctx.content.value = "";
+                }
+            }
+            const wordDisplayId = mode === "add" ? "addWordCountDisplay" : "editWordCountDisplay";
+            updateWordCounter(ctx.content, wordDisplayId);
+        }
+
         if (!live) {
             clearLiveApiTimer(mode);
             ctx.lastHash = "";
             ctx.lastContent = "";
             return;
         }
-        if (!ctx.content.value) {
-            ctx.content.value = "Data realtime dari API akan muncul setelah endpoint terbaca.";
-        }
+
         if (!ctx.timer) {
-            ctx.timer = window.setInterval(() => refreshLiveApiPreview(mode), 1000);
+            ctx.timer = window.setInterval(() => refreshLiveApiPreview(mode), 3000);
         }
-        if (ctx.apiUrl.value.trim()) scheduleLiveApiPreview(mode);
+        if (ctx.apiUrl && ctx.apiUrl.value.trim()) scheduleLiveApiPreview(mode);
     }
 
     Object.entries(liveApiContexts).forEach(([mode, ctx]) => {
-        ctx.category.addEventListener("change", () => syncLiveApiFields(mode));
-        ctx.apiUrl.addEventListener("input", () => {
-            ctx.lastHash = "";
-            ctx.lastContent = "";
-            scheduleLiveApiPreview(mode);
-        });
-        ctx.refresh.addEventListener("click", () => refreshLiveApiPreview(mode, true));
+        if (ctx.category) {
+            ctx.category.addEventListener("change", () => syncLiveApiFields(mode));
+            ctx.category.addEventListener("input", () => syncLiveApiFields(mode));
+        }
+        if (ctx.apiUrl) {
+            ctx.apiUrl.addEventListener("input", () => {
+                ctx.lastHash = "";
+                ctx.lastContent = "";
+                scheduleLiveApiPreview(mode);
+            });
+        }
+        if (ctx.refresh) {
+            ctx.refresh.addEventListener("click", () => refreshLiveApiPreview(mode, true));
+        }
     });
 
     syncLiveApiFields("add");
@@ -2172,6 +2265,14 @@ async function executeWebScraper() {
             const kwField = document.getElementById('keywords');
 
             if (titleField && d.title) titleField.value = d.title;
+            const catField = document.getElementById('category');
+            if (catField && isLiveApiCategory(catField.value)) {
+                const firstRegular = catField.querySelector('optgroup[label*="Reguler"] option') || catField.querySelector('option:not([value="data dari api"])');
+                if (firstRegular) {
+                    catField.value = firstRegular.value;
+                    syncLiveApiFields('add');
+                }
+            }
             if (contentField && d.content) {
                 contentField.value = `Sumber: ${d.url}\n\n${d.content}`;
                 updateWordCounter(contentField, 'addWordCountDisplay');

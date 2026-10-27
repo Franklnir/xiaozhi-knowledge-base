@@ -884,7 +884,8 @@ def summarize_api_materials(materials: List[Dict[str, str]]) -> List[Dict[str, A
 
 
 def is_live_api_category(category: str) -> bool:
-    return (category or "").strip().lower() == LIVE_API_CATEGORY
+    cat = (category or "").strip().lower()
+    return cat == LIVE_API_CATEGORY or "data dari api" in cat
 
 
 def dump_api_json(value: Any) -> str:

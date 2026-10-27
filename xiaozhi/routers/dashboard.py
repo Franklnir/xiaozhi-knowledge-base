@@ -86,6 +86,9 @@ async def add_material(
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
     store = get_store()
     validate_csrf(request, csrf_token, user)
+    # Khususkan endpoint API: hanya aktif jika kategori memang 'data dari api'
+    if not is_live_api_category(category):
+        api_url = ""
     try:
         store.add_material(user["id"], title, category, content, keywords, api_url)
         signal_mcp_reload()
@@ -156,14 +159,17 @@ async def api_materials_stream_index(request: Request):
         keywords = form.get("keywords", "")
         api_url = form.get("api_url", "")
 
+    cat_str = str(category or "").strip()
+    api_url_str = str(api_url or "").strip() if is_live_api_category(cat_str) else ""
+
     return StreamingResponse(
         stream_material_indexing(
             user_id=user["id"],
             title=str(title or ""),
-            category=str(category or ""),
+            category=cat_str,
             content=str(content or ""),
             keywords=str(keywords or ""),
-            api_url=str(api_url or ""),
+            api_url=api_url_str,
             store=store,
             request=request,
         ),
@@ -206,6 +212,9 @@ async def update_material(
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
     store = get_store()
     validate_csrf(request, csrf_token, user)
+    # Khususkan endpoint API: jangan simpan api_url jika kategori bukan 'data dari api'
+    if not is_live_api_category(category):
+        api_url = ""
     try:
         updated = store.update_material(user["id"], material_id, title, category, content, keywords, api_url)
         if updated:

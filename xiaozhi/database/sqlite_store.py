@@ -861,6 +861,8 @@ class SQLiteStore:
                     raise ValueError(f"Batas endpoint API realtime akun Anda telah tercapai ({max_live_apis} endpoint). Hapus API lama atau hubungi admin.")
 
     def add_material(self, owner_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> None:
+        if not is_live_api_category(category):
+            api_url = ""
         self._enforce_material_limits(owner_id, content=content, api_url=api_url, is_new=True)
         conn = self._get_conn()
         api_url_ciphertext = encrypt_secret(api_url) if api_url else None
@@ -873,6 +875,8 @@ class SQLiteStore:
         conn.commit()
 
     def update_material(self, owner_id: int, material_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> bool:
+        if not is_live_api_category(category):
+            api_url = ""
         self._enforce_material_limits(owner_id, content=content, api_url=api_url, is_new=False, material_id=material_id)
         conn = self._get_conn()
         api_url_ciphertext = encrypt_secret(api_url) if api_url else None
