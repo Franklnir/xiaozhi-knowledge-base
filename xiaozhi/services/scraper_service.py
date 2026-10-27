@@ -44,24 +44,24 @@ except ImportError:
 # PDF Document Parsers (PyMuPDF / fitz, pypdf)
 HAS_PYMUPDF = False
 try:
-    import pymupdf as fitz  # PyMuPDF v1.23+
+    import pymupdf as fitz  # type: ignore # PyMuPDF v1.23+
     HAS_PYMUPDF = True
 except ImportError:
     try:
-        import fitz  # Legacy import
+        import fitz  # type: ignore # Legacy import
         HAS_PYMUPDF = True
     except ImportError:
         HAS_PYMUPDF = False
 
 try:
-    import pypdf
+    import pypdf  # type: ignore
     HAS_PYPDF = True
 except ImportError:
     HAS_PYPDF = False
 
 # YouTube Transcript Extractor
 try:
-    from youtube_transcript_api import YouTubeTranscriptApi
+    from youtube_transcript_api import YouTubeTranscriptApi  # type: ignore
     HAS_YOUTUBE_TRANSCRIPT = True
 except ImportError:
     HAS_YOUTUBE_TRANSCRIPT = False

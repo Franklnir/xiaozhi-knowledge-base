@@ -182,6 +182,41 @@ async def api_materials_stream_index(request: Request):
     )
 
 
+@router.post("/api/materials/live-api/preview")
+async def api_materials_live_api_preview(request: Request):
+    """Server-side live API preview with encryption and hash comparison."""
+    user = require_user(request)
+    body = await request.json()
+    api_url = str(body.get("api_url", "")).strip()
+    previous_hash = str(body.get("previous_hash", "")).strip()
+    if not api_url:
+        return JSONResponse({"detail": "URL API tidak boleh kosong."}, status_code=400)
+    try:
+        data = preview_live_api_content(api_url, previous_hash=previous_hash)
+        return JSONResponse(data)
+    except Exception as exc:
+        logger.warning("Failed live API preview: %s", exc)
+        return JSONResponse({"detail": f"Gagal membaca API: {exc}"}, status_code=400)
+
+
+@router.get("/api/materials/live-api/{material_id}")
+async def api_materials_live_api_item(request: Request, material_id: int, last_hash: str = ""):
+    """Server-side live API status updater for dashboard table."""
+    user = require_user(request)
+    store = get_store()
+    item = store.get_material(user["id"], material_id)
+    if not item:
+        return JSONResponse({"detail": "Materi tidak ditemukan."}, status_code=404)
+    api_url = item.get("api_url", "").strip()
+    if not api_url:
+        return JSONResponse({"detail": "Bukan materi live API."}, status_code=400)
+    try:
+        data = preview_live_api_content(api_url, previous_hash=last_hash)
+        return JSONResponse(data)
+    except Exception as exc:
+        logger.warning("Failed live API fetch for material %s: %s", material_id, exc)
+        return JSONResponse({"detail": f"Gagal membaca API: {exc}"}, status_code=400)
+
 
 @router.post("/delete_material/{material_id}")
 async def delete_material(request: Request, material_id: int, csrf_token: str = Form(...)):

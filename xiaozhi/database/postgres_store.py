@@ -307,6 +307,30 @@ class PostgresStore:
                         ) WITH CHECK (
                             user_id = app_current_user_id() OR app_is_admin_or_system()
                         );
+
+                        -- Row-Level Security untuk Materials (Isolasi ketat antar-tenant)
+                        ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
+                        ALTER TABLE materials FORCE ROW LEVEL SECURITY;
+
+                        DROP POLICY IF EXISTS p_materials_owner_isolation ON materials;
+                        CREATE POLICY p_materials_owner_isolation ON materials
+                        FOR ALL USING (
+                            owner_id = app_current_user_id() OR app_is_admin_or_system()
+                        ) WITH CHECK (
+                            owner_id = app_current_user_id() OR app_is_admin_or_system()
+                        );
+
+                        -- Row-Level Security untuk Categories (Isolasi ketat kategori kustom pengguna)
+                        ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+                        ALTER TABLE categories FORCE ROW LEVEL SECURITY;
+
+                        DROP POLICY IF EXISTS p_categories_owner_isolation ON categories;
+                        CREATE POLICY p_categories_owner_isolation ON categories
+                        FOR ALL USING (
+                            owner_id = app_current_user_id() OR app_is_admin_or_system()
+                        ) WITH CHECK (
+                            owner_id = app_current_user_id() OR app_is_admin_or_system()
+                        );
                     """)
 
                     # 6. Chat History Table
@@ -887,6 +911,7 @@ class PostgresStore:
     def list_materials(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM materials WHERE owner_id = %s ORDER BY id DESC", (int(owner_id),))
                 rows = cur.fetchall()
                 return [self._public_material(row) for row in rows]
@@ -894,6 +919,7 @@ class PostgresStore:
     def get_material(self, owner_id: int, material_id: int) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                 row = cur.fetchone()
                 return self._public_material(row) if row else None
@@ -902,6 +928,7 @@ class PostgresStore:
         keyword = keyword.strip()
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 if not keyword:
                     cur.execute(
                         "SELECT * FROM materials WHERE owner_id = %s ORDER BY id DESC LIMIT %s",
@@ -929,6 +956,7 @@ class PostgresStore:
     ) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 if material_id:
                     cur.execute("SELECT * FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                     row = cur.fetchone()
@@ -973,6 +1001,7 @@ class PostgresStore:
         limits = self._get_user_limits_dict(owner_id)
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 if is_new:
                     cur.execute("SELECT COUNT(*) as cnt FROM materials WHERE owner_id = %s", (int(owner_id),))
                     cnt = cur.fetchone()["cnt"]
@@ -1017,6 +1046,7 @@ class PostgresStore:
 
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     INSERT INTO materials (
@@ -1055,6 +1085,7 @@ class PostgresStore:
         source_type = LIVE_API_SOURCE_TYPE if api_url.strip() else None
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     UPDATE materials SET
@@ -1081,6 +1112,7 @@ class PostgresStore:
     def delete_material(self, owner_id: int, material_id: int) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute("DELETE FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                 affected = cur.rowcount > 0
             conn.commit()
@@ -1089,6 +1121,7 @@ class PostgresStore:
     def list_live_api_materials(self, owner_id: int, keyword: str = "", limit: int = 5) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     SELECT * FROM materials 
@@ -1105,6 +1138,7 @@ class PostgresStore:
     ) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
                 sql = "SELECT * FROM materials WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
                 if category:
@@ -1122,7 +1156,10 @@ class PostgresStore:
         """Format material row for public view, decrypting api_url if needed."""
         d = dict(row)
         api_cipher = d.pop("api_url_ciphertext", None)
-        d["api_url"] = decrypt_secret(api_cipher) if api_cipher else ""
+        raw_api = decrypt_secret(api_cipher) if api_cipher else ""
+        d["api_url"] = raw_api
+        d["masked_api_url"] = mask_secret(raw_api) if raw_api else ""
+        d["api_label"] = mask_secret(raw_api) if raw_api else ""
         if "created_at" in d:
             d["created_at"] = _format_ts(d["created_at"])
         if "updated_at" in d:
@@ -3377,6 +3414,7 @@ class PostgresStore:
         is_admin = self._is_admin(owner_id)
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id, user_role="admin" if is_admin else "user")
                 cur.execute("SELECT COUNT(*) as cnt FROM materials WHERE owner_id = %s", (int(owner_id),))
                 mat_cnt = cur.fetchone()["cnt"]
                 cur.execute(
@@ -3482,6 +3520,7 @@ class PostgresStore:
         result = []
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                self.set_rls_context(cur, user_role="admin")
                 for row in rows:
                     user_id = row["id"]
                     cur.execute("SELECT COUNT(*) as cnt FROM materials WHERE owner_id = %s", (user_id,))

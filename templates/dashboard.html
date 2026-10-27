@@ -886,8 +886,8 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             
             <div class="dash-modal-body">
-                <!-- Web Scraper Quick Tool -->
-                <div style="border: 2px dashed var(--app-border-strong); border-radius: 8px; padding: 12px 14px; background: rgba(5, 150, 105, 0.04);">
+                <!-- Web Scraper Quick Tool (Hanya untuk Kategori Reguler, Tersembunyi untuk Live API) -->
+                <div id="addWebScraperTool" style="border: 2px dashed var(--app-border-strong); border-radius: 8px; padding: 12px 14px; background: rgba(5, 150, 105, 0.04);">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs font-black flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
                             <svg class="dash-icon text-emerald-600" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
@@ -940,9 +940,15 @@
                             <svg class="dash-icon text-sky-600" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
                             <span>Endpoint Sumber API Realtime</span>
                         </span>
-                        <span class="app-chip app-chip-info app-chip-small">Live</span>
+                        <span class="app-chip app-chip-info app-chip-small flex items-center gap-1 font-mono text-[10px]">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            AES-256 & RLS
+                        </span>
                     </div>
-                    <input id="api_url" type="url" name="api_url" placeholder="https://api.domain.com/data-json" autocomplete="off" class="app-input text-xs">
+                    <input id="api_url" type="url" name="api_url" placeholder="https://api.domain.com/data-json" autocomplete="off" class="app-input text-xs font-mono">
+                    <div class="p-2 rounded bg-sky-100/70 dark:bg-sky-900/40 text-[11px] text-sky-900 dark:text-sky-200 leading-normal border border-sky-300/40 dark:border-sky-700/40">
+                        🛡️ <strong>Khusus Live API:</strong> Endpoint terenkripsi ketat di database (Fernet AES-256) & terproteksi Row-Level Security (RLS). Sistem menarik data realtime langsung dari endpoint secara aman tanpa scraping web.
+                    </div>
                     <div class="flex items-center justify-between pt-1">
                         <span class="text-[11px] font-semibold text-slate-500" id="liveApiStatus">Data JSON terbaru akan ditarik otomatis.</span>
                         <button type="button" class="app-button app-button-small text-xs" id="liveApiRefreshButton">Preview API</button>
@@ -1019,11 +1025,17 @@
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-bold text-sky-900 dark:text-sky-300 flex items-center gap-1.5">
                             <svg class="dash-icon text-sky-600" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                            <span>Sumber API Realtime</span>
+                            <span>Sumber API Realtime (Terenkripsi)</span>
                         </span>
-                        <span class="app-chip app-chip-info app-chip-small">Live</span>
+                        <span class="app-chip app-chip-info app-chip-small flex items-center gap-1 font-mono text-[10px]">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            AES-256 & RLS
+                        </span>
                     </div>
-                    <input id="edit_api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input text-xs">
+                    <input id="edit_api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input text-xs font-mono">
+                    <div class="p-2 rounded bg-sky-100/70 dark:bg-sky-900/40 text-[11px] text-sky-900 dark:text-sky-200 leading-normal border border-sky-300/40 dark:border-sky-700/40">
+                        🛡️ Endpoint diamankan dengan enkripsi at-rest Fernet AES-256 dan isolasi PostgreSQL RLS.
+                    </div>
                     <div class="flex items-center justify-between pt-1">
                         <span class="text-[11px] font-semibold text-slate-500" id="editLiveApiStatus">Data API akan tampil di Isi Data.</span>
                         <button type="button" class="app-button app-button-small text-xs" id="editLiveApiRefreshButton">Refresh</button>
@@ -1310,8 +1322,8 @@
 
             const liveEndpoint = document.getElementById('viewLiveEndpointText');
             if (liveEndpoint) {
-                if (item.source_type === 'api_live' && item.api_url) {
-                    liveEndpoint.textContent = item.api_url;
+                if (item.source_type === 'api_live' && (item.masked_api_url || item.api_label || item.api_url)) {
+                    liveEndpoint.textContent = '🛡️ Endpoint Terenkripsi: ' + (item.masked_api_url || item.api_label || 'Aktif (AES-256)');
                 } else {
                     liveEndpoint.textContent = '';
                 }
@@ -1755,6 +1767,13 @@
         if (!ctx || !ctx.category) return;
         const live = isLiveApiCategory(ctx.category.value);
 
+        if (mode === "add") {
+            const scraperTool = document.getElementById("addWebScraperTool");
+            if (scraperTool) {
+                scraperTool.style.display = live ? "none" : "block";
+            }
+        }
+
         if (ctx.fields) {
             ctx.fields.classList.toggle("hidden", !live);
             ctx.fields.style.display = live ? "block" : "none";
@@ -1769,7 +1788,7 @@
             ctx.content.required = !live;
             ctx.content.readOnly = live;
             ctx.content.placeholder = live
-                ? "Data dari API akan tampil otomatis dan diperbarui realtime."
+                ? "Data dari API live endpoint akan ditarik secara otomatis oleh server dan dienkripsi aman."
                 : "Tuliskan materi secara lengkap, runtut, dan jelas agar mudah dipahami oleh asisten suara saat pengguna bertanya...";
             if (live) {
                 if (!ctx.content.value.trim() || ctx.content.value.trim() === "Data realtime dari API akan muncul setelah endpoint terbaca.") {

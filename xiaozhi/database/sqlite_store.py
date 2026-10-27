@@ -921,6 +921,7 @@ class SQLiteStore:
         api_url = ""
         if row.get("api_url_ciphertext"):
             api_url = decrypt_secret(row["api_url_ciphertext"]) or ""
+        masked_api = mask_secret(api_url) if api_url else ""
         return {
             "id": row["id"],
             "title": row.get("title", ""),
@@ -930,7 +931,8 @@ class SQLiteStore:
             "owner_id": row.get("owner_id", 0),
             "source_type": row.get("source_type", ""),
             "api_url": api_url,
-            "api_label": api_url[:50] + "..." if len(api_url) > 50 else api_url,
+            "masked_api_url": masked_api,
+            "api_label": masked_api,
         }
 
     # ── XiaoZhi Tokens (MCP, Maksimal 3 Slot per Akun) ─────────────────────
