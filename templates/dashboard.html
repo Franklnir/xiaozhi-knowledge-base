@@ -1945,13 +1945,154 @@
             es.addEventListener("material_created", (evt) => {
                 try {
                     const data = JSON.parse(evt.data);
+                    const mat = data.material;
+                    if (!mat || !mat.id) return;
+
+                    // 1. Hindari duplikasi jika baris sudah ada
+                    if (document.querySelector(`[data-material-id="${mat.id}"]`)) {
+                        return;
+                    }
+
+                    // 2. Hapus baris kosong default jika ada
+                    const emptyRow = document.getElementById("emptyTableRow");
+                    if (emptyRow) emptyRow.remove();
+
+                    // 3. Bangun elemen <tr> baru secara dinamis
+                    const tableBody = document.getElementById("dataTableBody");
+                    if (!tableBody) return;
+
+                    const cat = mat.category || "Umum";
+                    const catLower = cat.toLowerCase();
+                    const title = mat.title || "Materi Tanpa Judul";
+                    const content = mat.content || "";
+                    const keywords = mat.keywords || "";
+                    const apiUrl = mat.api_url || "";
+                    const isLiveApi = mat.source_type === "api_live" || Boolean(apiUrl);
+
+                    let catChipClass = "cat-chip-default";
+                    let catIconSvg = "";
+                    if (catLower.includes("video") || catLower.includes("youtube")) {
+                        catChipClass = "cat-chip-youtube";
+                        catIconSvg = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> ';
+                    } else if (catLower.includes("tugas")) {
+                        catChipClass = "cat-chip-tugas";
+                    } else if (catLower.includes("pengumuman")) {
+                        catChipClass = "cat-chip-pengumuman";
+                    } else if (catLower.includes("materi")) {
+                        catChipClass = "cat-chip-materi";
+                    } else if (isLiveApi || catLower.includes("api")) {
+                        catChipClass = "cat-chip-api";
+                    }
+
+                    const liveBadgeHtml = isLiveApi ? `
+                        <span class="cat-chip cat-chip-api text-[10px] gap-1">
+                            <svg class="dash-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            Realtime
+                        </span>` : "";
+
+                    const keywordsHtml = keywords ? `
+                        <span class="flex items-center gap-1">
+                            <svg class="dash-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                            ${escapeHtml(keywords.length > 45 ? keywords.slice(0, 45) + '...' : keywords)}
+                        </span>` : "";
+
+                    const liveApiHeaderHtml = isLiveApi ? `
+                        <div class="mb-1 flex items-center gap-1.5 text-xs font-bold text-sky-700 dark:text-sky-400">
+                            <svg class="dash-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                            <span>Endpoint: ${escapeHtml(apiUrl)}</span>
+                        </div>` : "";
+
+                    const liveApiStatusHtml = isLiveApi ? `
+                        <span class="font-semibold text-emerald-700 dark:text-emerald-400" id="liveApiRowStatus${mat.id}">Mengecek update... | Size: 0.00 MB</span>` : "";
+
+                    const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+                    const jsonPayload = JSON.stringify(mat).replaceAll("'", "&#039;");
+                    const safeTitleEscaped = title.replace(/'/g, "\\'");
+
+                    const tr = document.createElement("tr");
+                    tr.className = "data-row hover:bg-slate-50 dark:hover:bg-slate-800/40";
+                    tr.setAttribute("data-category", cat);
+                    tr.setAttribute("data-material-id", String(mat.id));
+                    tr.setAttribute("data-live-api", isLiveApi ? "true" : "false");
+                    tr.setAttribute("data-search", `${title} ${cat} ${content} ${keywords} ${apiUrl}`.toLowerCase());
+
+                    tr.innerHTML = `
+                        <td>
+                            <div class="flex flex-col gap-1 items-start">
+                                <span class="cat-chip ${catChipClass}">
+                                    ${catIconSvg}${escapeHtml(cat)}
+                                </span>
+                                ${liveBadgeHtml}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="material-title-main">${escapeHtml(title)}</span>
+                            <div class="material-meta-sub">
+                                <span class="font-mono text-slate-500 font-bold">#${mat.id}</span>
+                                ${keywordsHtml}
+                            </div>
+                        </td>
+                        <td>
+                            ${liveApiHeaderHtml}
+                            <div class="material-preview-box" id="materialContent${mat.id}">
+                                ${escapeHtml(previewText(content, 160))}
+                            </div>
+                            <div class="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">
+                                <span class="flex items-center gap-1">
+                                    <svg class="dash-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                    ${wordCount} kata
+                                </span>
+                                ${liveApiStatusHtml}
+                            </div>
+                        </td>
+                        <td class="text-right">
+                            <div class="app-inline-actions justify-end">
+                                <button type="button" onclick="viewMaterial(this)" data-item='${jsonPayload}' class="app-button app-button-ghost app-button-small btn-icon" style="color:var(--app-accent);" title="Lihat materi lengkap">
+                                    <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    <span>Lihat</span>
+                                </button>
+                                <button type="button" onclick="editData(this)" data-item='${jsonPayload}' class="app-button app-button-ghost app-button-small app-button-link btn-icon" title="Edit materi">
+                                    <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                                    <span>Edit</span>
+                                </button>
+                                <button type="button" onclick="confirmDeleteMaterial(${mat.id}, '${safeTitleEscaped}')" class="app-button app-button-ghost app-button-small app-button-text-danger" title="Hapus materi">
+                                    <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+
+                    tableBody.prepend(tr);
+                    flashElement(tr);
+
+                    // 4. Update badge jumlah row
                     const badge = document.getElementById("badgeRowCount");
-                    if (badge && data.material) {
+                    if (badge) {
                         const current = parseInt(badge.textContent) || 0;
                         badge.textContent = (current + 1) + " item";
                         flashElement(badge);
                     }
-                } catch(e) {}
+
+                    // 5. Update stat card Total Materi
+                    const totalCardNum = document.querySelector(".stat-card-modern .stat-card-num");
+                    if (totalCardNum) {
+                        const totalVal = parseInt(totalCardNum.textContent) || 0;
+                        totalCardNum.textContent = totalVal + 1;
+                        flashElement(totalCardNum);
+                    }
+
+                    // 6. Jalankan live polling jika live API
+                    if (isLiveApi && typeof refreshSavedLiveMaterial === "function") {
+                        refreshSavedLiveMaterial(tr);
+                    }
+
+                    // 7. Sinkronkan filter pencarian & kategori
+                    if (typeof filterTable === "function") {
+                        filterTable();
+                    }
+                } catch(e) {
+                    console.error("Error inserting real-time material row:", e);
+                }
             });
 
             es.addEventListener("material_updated", (evt) => {

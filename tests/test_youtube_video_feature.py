@@ -83,6 +83,16 @@ def test_genre_classification():
     )
     assert genre2 == "Hiburan & Komedi"
 
+    # Test Rust vs Golang by Programmer Zaman Now (even if category is Education)
+    genre3, topic3 = classify_video_genre(
+        ["Education"],
+        "Rust vs Golang | PZN Reaction",
+        "JOIN PREMIUM : https://www.youtube.com/ProgrammerZamanNow/join DISCORD PREMIUM",
+        ["rust", "golang", "pzn", "reaction"]
+    )
+    assert genre3 == "Sains & Teknologi"
+    assert "rust vs golang" in topic3.lower()
+
 
 def test_request_id_caching():
     """Test that video metadata is stored and retrievable by request_id."""
@@ -123,6 +133,9 @@ def test_inspect_youtube_video_with_auto_save(test_setup):
         "description": "Pengantar fisika kuantum untuk pemula.",
         "thumbnail": "https://example.com/thumb.jpg",
         "youtube_url": "https://www.youtube.com/watch?v=testvid1011",
+        "has_transcript": True,
+        "transcript": "[00:00] Halo selamat datang di fisika kuantum [00:30] Kita bahas foton",
+        "transcript_chars": 62,
     }
 
     with patch("xiaozhi.services.scraper_service.scrape_youtube_video_details", return_value=mock_details):
@@ -139,6 +152,8 @@ def test_inspect_youtube_video_with_auto_save(test_setup):
         assert len(materials) == 1
         assert materials[0]["category"] == "Video YouTube"
         assert "Fisika Kuantum" in materials[0]["title"]
+        assert "Transkrip & Pembicaraan Subtitle Video" in materials[0]["content"]
+        assert "Kita bahas foton" in materials[0]["content"]
 
 
 def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
@@ -160,6 +175,9 @@ def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
         "description": "Langkah menggunakan modul camera OV2640.",
         "thumbnail": "https://example.com/thumb2.jpg",
         "youtube_url": "https://www.youtube.com/watch?v=testvid2022",
+        "has_transcript": True,
+        "transcript": "[00:00] Halo maker hari ini kita pasang modul camera [00:30] Konfigurasi pin D0 sampai D7",
+        "transcript_chars": 90,
     }
 
     with patch("xiaozhi.services.scraper_service.scrape_youtube_video_details", return_value=mock_details):
@@ -168,11 +186,13 @@ def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
         assert inspect_res["success"] is True
         assert inspect_res["already_saved"] is False
         assert "Apakah Anda ingin memutar video ini sekarang?" in inspect_res["message"]
+        assert "Tersedia" in inspect_res["message"]
         req_id = inspect_res["request_id"]
 
         # Cache is populated
         cached = get_cached_youtube_video_request(req_id)
         assert cached is not None
+        assert cached["has_transcript"] is True
 
         # Step 2: User confirms both playing and saving
         confirm_res = confirm_fn(request_id=req_id, play_now=True, save_to_materials=True)
@@ -187,3 +207,4 @@ def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
         assert len(mats) == 1
         assert mats[0]["category"] == "Video YouTube"
         assert "ESP32 S3 Cam" in mats[0]["title"]
+        assert "Konfigurasi pin D0 sampai D7" in mats[0]["content"]

@@ -2037,24 +2037,36 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         v_topic = video_data["topic"]
         vid = video_data["video_id"]
         v_url = video_data["youtube_url"]
+        transcript_content = video_data.get("transcript") or ""
+        has_transcript = video_data.get("has_transcript", False)
+        sub_status = f"Tersedia ({video_data.get('transcript_chars', len(transcript_content)):,} karakter transkrip)" if has_transcript else "Tidak tersedia / CC non-aktif"
+        subtitle_section = (
+            f"\n\n### 📝 Transkrip & Pembicaraan Subtitle Video:\n{transcript_content}"
+            if transcript_content
+            else "\n\n### 📝 Transkrip & Pembicaraan Subtitle Video:\n(Subtitle publik tidak tersedia dari video ini atau dinonaktifkan oleh pembuat video)"
+        )
 
         already_saved = False
         saved_material_id = None
 
+        # Format content text with metadata and full subtitle transcript
+        content_text = (
+            f"🎬 **Video YouTube**: {v_title}\n"
+            f"📺 **Channel**: {v_channel}\n"
+            f"⏱️ **Durasi**: {v_dur}\n"
+            f"👁️ **Jumlah Penonton**: {v_views}\n"
+            f"📂 **Genre**: {v_genre}\n"
+            f"📌 **Topik**: {v_topic}\n"
+            f"📝 **Subtitle/Transkrip**: {sub_status}\n"
+            f"🔗 **URL**: {v_url}\n\n"
+            f"### Ringkasan Deskripsi Video:\n"
+            f"{video_data.get('description', '')}"
+            f"{subtitle_section}"
+        )
+
         # Jika user minta simpan sejak awal: langsung simpan ke Database Materi Belajar tanpa konfirmasi simpan
         if has_save_intent and owner_id:
             try:
-                content_text = (
-                    f"🎬 **Video YouTube**: {v_title}\n"
-                    f"📺 **Channel**: {v_channel}\n"
-                    f"⏱️ **Durasi**: {v_dur}\n"
-                    f"👁️ **Jumlah Penonton**: {v_views}\n"
-                    f"📂 **Genre**: {v_genre}\n"
-                    f"📌 **Topik**: {v_topic}\n"
-                    f"🔗 **URL**: {v_url}\n\n"
-                    f"### Ringkasan Deskripsi Video:\n"
-                    f"{video_data.get('description', '')}"
-                )
                 saved_item = store.add_material(
                     owner_id,
                     title=f"Video: {v_title}"[:160],
@@ -2066,10 +2078,18 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 from xiaozhi.services.mcp_service import signal_mcp_reload
                 signal_mcp_reload()
                 already_saved = True
-                saved_material_id = getattr(saved_item, "id", None) or (saved_item.get("id") if isinstance(saved_item, dict) else None)
+                saved_material_id = getattr(saved_item, "id", None) or (saved_item.get("id") if isinstance(saved_item, dict) else saved_item)
                 broadcast_material_event(owner_id, "material_created", {
                     "action": "create",
-                    "material": {"title": v_title, "category": "Video YouTube", "id": saved_material_id},
+                    "material": {
+                        "id": saved_material_id,
+                        "title": f"Video: {v_title}"[:160],
+                        "category": "Video YouTube",
+                        "content": content_text,
+                        "keywords": f"youtube, video, {v_channel}, {v_genre}",
+                        "api_url": v_url,
+                        "source_type": None,
+                    },
                     "message": f"Materi video '{v_title}' otomatis disimpan ke Database Materi Belajar.",
                 })
             except Exception as save_err:
@@ -2081,13 +2101,14 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 f"- Durasi: {v_dur}\n"
                 f"- Penonton: {v_views}\n"
                 f"- Genre: {v_genre}\n"
-                f"- Topik: {v_topic}\n\n"
+                f"- Topik: {v_topic}\n"
+                f"- Subtitle: {sub_status}\n\n"
                 f"Video ini SUDAH otomatis saya simpan ke Database Materi Belajar Anda (Kategori: Video YouTube).\n"
                 f"Apakah Anda ingin memutar videonya sekarang?"
             )
             instructions = (
-                f"Sampaikan info metadata video ke pengguna: Judul, Channel ('{v_channel}'), Durasi ('{v_dur}'), Penonton ('{v_views}'), Genre ('{v_genre}'), dan Topik ('{v_topic}'). "
-                f"Beri tahu bahwa video sudah tersimpan di Database Materi Belajar. "
+                f"Sampaikan info metadata video ke pengguna: Judul, Channel ('{v_channel}'), Durasi ('{v_dur}'), Penonton ('{v_views}'), Genre ('{v_genre}'), Topik ('{v_topic}'), dan Subtitle ('{sub_status}'). "
+                f"Beri tahu bahwa video dan subtitle sudah tersimpan di Database Materi Belajar. "
                 f"Lalu tanyakan HANYA 1 konfirmasi: Apakah ingin memutar videonya sekarang? "
                 f"Gunakan request_id='{req_id}' saat user menjawab ya/tidak."
             )
@@ -2097,11 +2118,12 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 f"- Durasi: {v_dur}\n"
                 f"- Penonton: {v_views}\n"
                 f"- Genre: {v_genre}\n"
-                f"- Topik: {v_topic}\n\n"
+                f"- Topik: {v_topic}\n"
+                f"- Subtitle: {sub_status}\n\n"
                 f"Apakah Anda ingin memutar video ini sekarang? Dan apakah Anda ingin menyimpannya ke Database Materi Belajar?"
             )
             instructions = (
-                f"Sampaikan info metadata video ke pengguna secara ramah: Judul ('{v_title}'), Channel ('{v_channel}'), Durasi ('{v_dur}'), Penonton ('{v_views}'), Genre ('{v_genre}'), dan Topik ('{v_topic}'). "
+                f"Sampaikan info metadata video ke pengguna secara ramah: Judul ('{v_title}'), Channel ('{v_channel}'), Durasi ('{v_dur}'), Penonton ('{v_views}'), Genre ('{v_genre}'), Topik ('{v_topic}'), dan Subtitle ('{sub_status}'). "
                 f"Lalu tanyakan 2 hal untuk konfirmasi: "
                 f"1. Apakah ingin memutar video ini sekarang? "
                 f"2. Apakah ingin menyimpannya ke Database Materi Belajar? "
@@ -2171,6 +2193,15 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         v_topic = cached_data.get("topic", "")
         v_url = cached_data.get("youtube_url", f"https://www.youtube.com/watch?v={vid}")
 
+        transcript_content = cached_data.get("transcript") or ""
+        has_transcript = cached_data.get("has_transcript", False)
+        sub_status = f"Tersedia ({cached_data.get('transcript_chars', len(transcript_content)):,} karakter transkrip)" if has_transcript else "Tidak tersedia / CC non-aktif"
+        subtitle_section = (
+            f"\n\n### 📝 Transkrip & Pembicaraan Subtitle Video:\n{transcript_content}"
+            if transcript_content
+            else "\n\n### 📝 Transkrip & Pembicaraan Subtitle Video:\n(Subtitle publik tidak tersedia dari video ini atau dinonaktifkan oleh pembuat video)"
+        )
+
         saved_id = None
         saved_status = False
 
@@ -2184,9 +2215,11 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     f"👁️ **Jumlah Penonton**: {v_views}\n"
                     f"📂 **Genre**: {v_genre}\n"
                     f"📌 **Topik**: {v_topic}\n"
+                    f"📝 **Subtitle/Transkrip**: {sub_status}\n"
                     f"🔗 **URL**: {v_url}\n\n"
                     f"### Ringkasan Deskripsi Video:\n"
                     f"{cached_data.get('description', '')}"
+                    f"{subtitle_section}"
                 )
                 saved_item = store.add_material(
                     owner_id,
@@ -2199,10 +2232,18 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 from xiaozhi.services.mcp_service import signal_mcp_reload
                 signal_mcp_reload()
                 saved_status = True
-                saved_id = getattr(saved_item, "id", None) or (saved_item.get("id") if isinstance(saved_item, dict) else None)
+                saved_id = getattr(saved_item, "id", None) or (saved_item.get("id") if isinstance(saved_item, dict) else saved_item)
                 broadcast_material_event(owner_id, "material_created", {
                     "action": "create",
-                    "material": {"title": v_title, "category": category or "Video YouTube", "id": saved_id},
+                    "material": {
+                        "id": saved_id,
+                        "title": f"Video: {v_title}"[:160],
+                        "category": category or "Video YouTube",
+                        "content": content_text,
+                        "keywords": f"youtube, video, {v_channel}, {v_genre}",
+                        "api_url": v_url,
+                        "source_type": None,
+                    },
                     "message": f"Video '{v_title}' berhasil disimpan ke Database Materi Belajar.",
                 })
             except Exception as e_save:

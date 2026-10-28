@@ -860,19 +860,20 @@ class SQLiteStore:
                 if current_apis >= max_live_apis:
                     raise ValueError(f"Batas endpoint API realtime akun Anda telah tercapai ({max_live_apis} endpoint). Hapus API lama atau hubungi admin.")
 
-    def add_material(self, owner_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> None:
+    def add_material(self, owner_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> int:
         if not is_live_api_category(category):
             api_url = ""
         self._enforce_material_limits(owner_id, content=content, api_url=api_url, is_new=True)
         conn = self._get_conn()
         api_url_ciphertext = encrypt_secret(api_url) if api_url else None
         source_type = LIVE_API_SOURCE_TYPE if api_url else None
-        conn.execute(
+        cursor = conn.execute(
             """INSERT INTO materials (owner_id, title, category, content, keywords, source_type, api_url_ciphertext, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (owner_id, title, category, content, keywords, source_type, api_url_ciphertext, utc_now(), utc_now())
         )
         conn.commit()
+        return cursor.lastrowid
 
     def update_material(self, owner_id: int, material_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> bool:
         if not is_live_api_category(category):

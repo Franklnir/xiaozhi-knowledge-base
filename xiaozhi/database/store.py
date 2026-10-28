@@ -1007,7 +1007,7 @@ class HFJsonStore:
             )
         return payload
 
-    def add_material(self, owner_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> None:
+    def add_material(self, owner_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> int:
         payload = self._clean_material(title, category, content, keywords, api_url)
         clean_api_url = payload.pop("api_url", "")
         with self._lock:
@@ -1028,6 +1028,7 @@ class HFJsonStore:
                 row["api_url_ciphertext"] = encrypt_secret(clean_api_url)
             data["materials"].append(row)
             self._commit(data, "Add material")
+            return row["id"]
 
     def upsert_api_materials(self, owner_id: int, materials: List[Dict[str, str]]) -> Dict[str, int]:
         if not materials:

@@ -1372,10 +1372,17 @@ def classify_video_genre(categories: Optional[List[str]], title: str, descriptio
         genre = "Hiburan & Komedi"
     elif any(c in ["music"] for c in cats) or _matches_any(["musik", "music", "lagu", "song", "lirik", "soundtrack", "album", "cover"]):
         genre = "Musik & Lagu"
+    elif any(c in ["science & technology"] for c in cats) or _matches_any([
+        "sains", "teknologi", "pemrograman", "coding", "koding", "programmer", "developer",
+        "rust", "golang", "go", "pzn", "python", "javascript", "typescript", "java", "c++",
+        "cpp", "c#", "php", "esp32", "arduino", "iot", "robot", "ai", "hardware", "software",
+        "tech", "gadget", "backend", "frontend", "devops", "docker", "kubernetes", "linux",
+        "database", "sql", "api", "framework", "html", "css", "git", "github", "komputer",
+        "rekayasa", "arsitektur", "microcontroller", "firmware", "bug", "compiler"
+    ]):
+        genre = "Sains & Teknologi"
     elif any(c in ["education", "howto & style"] for c in cats) or _matches_any(["pendidikan", "education", "tutorial", "belajar", "kuliah", "pelajaran", "edukasi", "rumus", "soal", "materi", "penjelasan", "kursus"]):
         genre = "Pendidikan (Edukasi)"
-    elif any(c in ["science & technology"] for c in cats) or _matches_any(["sains", "teknologi", "pemrograman", "coding", "koding", "python", "javascript", "esp32", "arduino", "iot", "robot", "ai", "hardware", "software", "tech", "gadget"]):
-        genre = "Sains & Teknologi"
     elif any(c in ["news & politics"] for c in cats) or _matches_any(["berita", "news", "politik", "kabar", "debat", "presiden", "hukum", "peristiwa", "investigasi", "fakta"]):
         genre = "Berita & Wawasan"
     elif any(c in ["gaming"] for c in cats) or _matches_any(["game", "gaming", "gameplay", "walkthrough"]):
@@ -1385,8 +1392,12 @@ def classify_video_genre(categories: Optional[List[str]], title: str, descriptio
 
     clean_desc = re.sub(r"https?://\S+", "", description).strip()
     sentences = [s.strip() for s in re.split(r"[\n\.\!\?]+", clean_desc) if len(s.strip()) > 15]
-    if sentences:
-        topic_summary = sentences[0][:150]
+    clean_sentences = [
+        s for s in sentences
+        if not re.search(r"(?i)\b(join premium|discord|membership|subscribe|follow instagram|follow twitter|tiktok|patreon)\b", s)
+    ]
+    if clean_sentences:
+        topic_summary = clean_sentences[0][:150]
     else:
         topic_summary = f"Pembahasan mengenai {title[:80]}"
 
@@ -1396,7 +1407,8 @@ def classify_video_genre(categories: Optional[List[str]], title: str, descriptio
 
 def scrape_youtube_video_details(query_or_url: str, request_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Deep scrape YouTube video metadata: title, channel, duration, view count, genre, and topic.
+    Deep scrape YouTube video metadata: title, channel, duration, view count, genre, topic,
+    and public subtitle/transcript for RAG knowledge base integration.
     Generates a unique request_id to manage multi-turn confirmation safely.
     """
     req_id = request_id or f"ytr_{int(time.time())}_{uuid.uuid4().hex[:6]}"
@@ -1475,6 +1487,17 @@ def scrape_youtube_video_details(query_or_url: str, request_id: Optional[str] = 
     dur_formatted = format_duration_id(duration_sec)
     views_formatted = format_view_count_id(view_count)
 
+    # Extract subtitle / transcript text if available (Indonesian / English / Auto-generated)
+    transcript_text = ""
+    has_transcript = False
+    try:
+        t_res = extract_youtube_transcript(vid, f"https://www.youtube.com/watch?v={vid}", max_chars=25000)
+        if t_res.get("success") and t_res.get("content"):
+            transcript_text = t_res["content"]
+            has_transcript = True
+    except Exception as t_err:
+        logger.debug("Transcript extraction skipped or failed for %s: %s", vid, t_err)
+
     result_data = {
         "success": True,
         "request_id": req_id,
@@ -1487,9 +1510,13 @@ def scrape_youtube_video_details(query_or_url: str, request_id: Optional[str] = 
         "view_count_formatted": views_formatted,
         "genre": genre,
         "topic": topic,
-        "description": desc[:300],
+        "description": desc[:500],
         "thumbnail": thumb,
         "youtube_url": f"https://www.youtube.com/watch?v={vid}",
+        "has_transcript": has_transcript,
+        "transcript": transcript_text,
+        "transcript_chars": len(transcript_text),
+        "transcript_words": len(transcript_text.split()) if transcript_text else 0,
     }
 
     cache_youtube_video_request(req_id, result_data)
