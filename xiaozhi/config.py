@@ -273,6 +273,22 @@ ALL_MCP_TOOLS_CATALOG = [
         "description": "Pencarian dan pemutaran audio lagu dari YouTube.",
     },
     {
+        "name": "inspect_youtube_video",
+        "title": "Inspeksi Video YouTube & Deteksi Genre",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "📺",
+        "description": "Scraping metadata video YouTube (genre, topik, nama channel, durasi, jumlah penonton) dan meminta konfirmasi pemutaran/penyimpanan dengan request_id.",
+    },
+    {
+        "name": "confirm_play_and_save_video",
+        "title": "Konfirmasi Putar & Simpan Video",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "▶️",
+        "description": "Eksekusi pemutaran video YouTube yang dikonfirmasi ke speaker ESP32 dan/atau menyimpan materi ke Database Materi Belajar.",
+    },
+    {
         "name": "play_playlist_song",
         "title": "Putar Lagu dari Playlist",
         "category": "media",

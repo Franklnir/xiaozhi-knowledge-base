@@ -629,7 +629,10 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                 "jejak digital": "osint_recon", "ip lookup": "osint_recon", "cek domain": "osint_recon",
                 "cache playlist": "get_playlist_cache_status", "status unduhan": "get_playlist_cache_status",
                 "unduhan playlist": "get_playlist_cache_status", "siap putar": "get_playlist_cache_status",
+                "video youtube": "inspect_youtube_video", "tonton video": "inspect_youtube_video", "genre video": "inspect_youtube_video",
+                "konfirmasi video": "confirm_play_and_save_video",
             }
+
             for kw, t_name in tool_keywords.items():
                 if kw in q_lower:
                     for t in ALL_MCP_TOOLS_CATALOG:

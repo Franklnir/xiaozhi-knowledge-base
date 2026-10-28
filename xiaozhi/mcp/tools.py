@@ -1979,9 +1979,288 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             response = {"success": False, "message": f"Gagal mencari lagu: {exc}", "results": []}
             record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query}, response)
             return response
+        except Exception as exc:
+            logger.exception("Error YouTube search: %s", exc)
+            response = {"success": False, "message": f"Gagal mencari lagu: {exc}", "results": []}
+            record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query}, response)
+            return response
+
+    @mcp_server.tool()
+    def inspect_youtube_video(query: str, auto_save_requested: bool = False) -> dict:
+        """
+        Inspeksi dan scrape metadata video YouTube (genre, topik, nama channel, durasi, jumlah penonton)
+        sebelum video diputar. Menghasilkan request_id unik untuk mengelola alur konfirmasi ke pengguna.
+
+        Gunakan tool ini ketika pengguna ingin memutar, menonton, atau mencari VIDEO di YouTube.
+        (Jika pengguna hanya meminta memutar lagu/musik biasa, gunakan play_youtube_song).
+
+        Args:
+            query: Judul video, topik, atau URL video YouTube. Contoh: "tutorial esp32 bahasa indonesia", "video gerak melingkar", "https://youtube.com/watch?v=..."
+            auto_save_requested: Set True jika pengguna sejak awal instruksinya sudah meminta untuk menyimpan video/materi ke database materi belajar.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.scraper_service import scrape_youtube_video_details
+        from xiaozhi.services.sse_service import broadcast_material_event
+
+        clean_q = (query or "").strip()
+        # Deteksi otomatis apakah ada instruksi simpan sejak awal
+        save_keywords = [
+            "simpan ke materi", "simpan materi", "simpan ke database", "simpan di database",
+            "masukkan ke materi", "catat ke materi", "save ke materi", "simpan ke knowledge base",
+            "masukkan ke database", "simpan videonya", "simpan materi ini"
+        ]
+        has_save_intent = auto_save_requested or any(k in clean_q.lower() for k in save_keywords)
+        for k in save_keywords:
+            clean_q = re.sub(re.escape(k), "", clean_q, flags=re.IGNORECASE).strip()
+
+        video_data = scrape_youtube_video_details(clean_q)
+        if not video_data.get("success"):
+            response = {
+                "success": False,
+                "request_id": video_data.get("request_id", ""),
+                "message": video_data.get("error", f"Video '{query}' tidak ditemukan di YouTube."),
+                "results": [],
+            }
+            record_mcp_tool_history(owner_id, "inspect_youtube_video", query, {"query": query}, response)
+            return response
+
+        req_id = video_data.get("request_id") or f"ytr_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        video_data["request_id"] = req_id
+        from xiaozhi.services.scraper_service import cache_youtube_video_request
+        cache_youtube_video_request(req_id, video_data)
+
+        v_title = video_data["title"]
+        v_channel = video_data["channel_name"]
+        v_dur = video_data["duration_formatted"]
+        v_views = video_data["view_count_formatted"]
+        v_genre = video_data["genre"]
+        v_topic = video_data["topic"]
+        vid = video_data["video_id"]
+        v_url = video_data["youtube_url"]
+
+        already_saved = False
+        saved_material_id = None
+
+        # Jika user minta simpan sejak awal: langsung simpan ke Database Materi Belajar tanpa konfirmasi simpan
+        if has_save_intent and owner_id:
+            try:
+                content_text = (
+                    f"🎬 **Video YouTube**: {v_title}\n"
+                    f"📺 **Channel**: {v_channel}\n"
+                    f"⏱️ **Durasi**: {v_dur}\n"
+                    f"👁️ **Jumlah Penonton**: {v_views}\n"
+                    f"📂 **Genre**: {v_genre}\n"
+                    f"📌 **Topik**: {v_topic}\n"
+                    f"🔗 **URL**: {v_url}\n\n"
+                    f"### Ringkasan Deskripsi Video:\n"
+                    f"{video_data.get('description', '')}"
+                )
+                saved_item = store.add_material(
+                    owner_id,
+                    title=f"Video: {v_title}"[:160],
+                    category="Video YouTube",
+                    content=content_text,
+                    keywords=f"youtube, video, {v_channel}, {v_genre}",
+                    api_url=v_url,
+                )
+                from xiaozhi.services.mcp_service import signal_mcp_reload
+                signal_mcp_reload()
+                already_saved = True
+                saved_material_id = getattr(saved_item, "id", None) or (saved_item.get("id") if isinstance(saved_item, dict) else None)
+                broadcast_material_event(owner_id, "material_created", {
+                    "action": "create",
+                    "material": {"title": v_title, "category": "Video YouTube", "id": saved_material_id},
+                    "message": f"Materi video '{v_title}' otomatis disimpan ke Database Materi Belajar.",
+                })
+            except Exception as save_err:
+                logger.warning("Auto-save video to materials failed: %s", save_err)
+
+        if already_saved:
+            ask_msg = (
+                f"Saya menemukan video '{v_title}' dari channel '{v_channel}'.\n"
+                f"- Durasi: {v_dur}\n"
+                f"- Penonton: {v_views}\n"
+                f"- Genre: {v_genre}\n"
+                f"- Topik: {v_topic}\n\n"
+                f"Video ini SUDAH otomatis saya simpan ke Database Materi Belajar Anda (Kategori: Video YouTube).\n"
+                f"Apakah Anda ingin memutar videonya sekarang?"
+            )
+            instructions = (
+                f"Sampaikan info metadata video ke pengguna: Judul, Channel ('{v_channel}'), Durasi ('{v_dur}'), Penonton ('{v_views}'), Genre ('{v_genre}'), dan Topik ('{v_topic}'). "
+                f"Beri tahu bahwa video sudah tersimpan di Database Materi Belajar. "
+                f"Lalu tanyakan HANYA 1 konfirmasi: Apakah ingin memutar videonya sekarang? "
+                f"Gunakan request_id='{req_id}' saat user menjawab ya/tidak."
+            )
+        else:
+            ask_msg = (
+                f"Saya menemukan video '{v_title}' dari channel '{v_channel}'.\n"
+                f"- Durasi: {v_dur}\n"
+                f"- Penonton: {v_views}\n"
+                f"- Genre: {v_genre}\n"
+                f"- Topik: {v_topic}\n\n"
+                f"Apakah Anda ingin memutar video ini sekarang? Dan apakah Anda ingin menyimpannya ke Database Materi Belajar?"
+            )
+            instructions = (
+                f"Sampaikan info metadata video ke pengguna secara ramah: Judul ('{v_title}'), Channel ('{v_channel}'), Durasi ('{v_dur}'), Penonton ('{v_views}'), Genre ('{v_genre}'), dan Topik ('{v_topic}'). "
+                f"Lalu tanyakan 2 hal untuk konfirmasi: "
+                f"1. Apakah ingin memutar video ini sekarang? "
+                f"2. Apakah ingin menyimpannya ke Database Materi Belajar? "
+                f"Saat pengguna merespons, panggil tool `confirm_play_and_save_video` dengan request_id='{req_id}'."
+            )
+
+        response = {
+            "success": True,
+            "request_id": req_id,
+            "needs_confirmation": True,
+            "already_saved": already_saved,
+            "saved_material_id": saved_material_id,
+            "video_info": video_data,
+            "message": ask_msg,
+            "instructions": instructions,
+        }
+        record_mcp_tool_history(owner_id, "inspect_youtube_video", query, {"query": query, "auto_save": has_save_intent}, response)
+        return response
+
+    @mcp_server.tool()
+    def confirm_play_and_save_video(
+        request_id: str = "",
+        video_id: str = "",
+        play_now: bool = True,
+        save_to_materials: bool = False,
+        category: str = "Video YouTube",
+    ) -> dict:
+        """
+        Konfirmasi pemutaran dan/atau penyimpanan video YouTube yang sebelumnya telah diinspeksi.
+        Mengeksekusi pemutaran ke speaker XiaoZhi (ESP32) dan/atau menyimpan ringkasan ke Database Materi.
+
+        Args:
+            request_id: ID request unik dari pemanggilan inspect_youtube_video sebelumnya.
+            video_id: (Opsional) 11-karakter YouTube video ID jika request_id tidak tersedia.
+            play_now: Set True jika pengguna mengizinkan/ingin memutar video sekarang.
+            save_to_materials: Set True jika pengguna menyetujui materi video disimpan ke Database Materi Belajar.
+            category: Nama kategori penyimpanan materi (Default: "Video YouTube").
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.scraper_service import (
+            get_cached_youtube_video_request,
+            scrape_youtube_video_details,
+        )
+        from xiaozhi.services.sse_service import broadcast_material_event
+
+        clean_req_id = (request_id or "").strip()
+        cached_data = get_cached_youtube_video_request(clean_req_id) if clean_req_id else None
+
+        if not cached_data and video_id:
+            cached_data = scrape_youtube_video_details(video_id, request_id=clean_req_id or None)
+
+        if not cached_data or not cached_data.get("success"):
+            response = {
+                "success": False,
+                "request_id": clean_req_id,
+                "message": "Data video tidak ditemukan atau sesi request telah kedaluwarsa. Silakan cari ulang videonya.",
+            }
+            record_mcp_tool_history(owner_id, "confirm_play_and_save_video", clean_req_id, {"play_now": play_now, "save_to_materials": save_to_materials}, response)
+            return response
+
+        vid = cached_data.get("video_id", "")
+        v_title = cached_data.get("title", "")
+        v_channel = cached_data.get("channel_name", "")
+        v_dur = cached_data.get("duration_formatted", "")
+        v_views = cached_data.get("view_count_formatted", "")
+        v_genre = cached_data.get("genre", "Video YouTube")
+        v_topic = cached_data.get("topic", "")
+        v_url = cached_data.get("youtube_url", f"https://www.youtube.com/watch?v={vid}")
+
+        saved_id = None
+        saved_status = False
+
+        # 1. Simpan ke Database Materi Belajar jika user menyetujui
+        if save_to_materials and owner_id:
+            try:
+                content_text = (
+                    f"🎬 **Video YouTube**: {v_title}\n"
+                    f"📺 **Channel**: {v_channel}\n"
+                    f"⏱️ **Durasi**: {v_dur}\n"
+                    f"👁️ **Jumlah Penonton**: {v_views}\n"
+                    f"📂 **Genre**: {v_genre}\n"
+                    f"📌 **Topik**: {v_topic}\n"
+                    f"🔗 **URL**: {v_url}\n\n"
+                    f"### Ringkasan Deskripsi Video:\n"
+                    f"{cached_data.get('description', '')}"
+                )
+                saved_item = store.add_material(
+                    owner_id,
+                    title=f"Video: {v_title}"[:160],
+                    category=category or "Video YouTube",
+                    content=content_text,
+                    keywords=f"youtube, video, {v_channel}, {v_genre}",
+                    api_url=v_url,
+                )
+                from xiaozhi.services.mcp_service import signal_mcp_reload
+                signal_mcp_reload()
+                saved_status = True
+                saved_id = getattr(saved_item, "id", None) or (saved_item.get("id") if isinstance(saved_item, dict) else None)
+                broadcast_material_event(owner_id, "material_created", {
+                    "action": "create",
+                    "material": {"title": v_title, "category": category or "Video YouTube", "id": saved_id},
+                    "message": f"Video '{v_title}' berhasil disimpan ke Database Materi Belajar.",
+                })
+            except Exception as e_save:
+                logger.warning("Failed saving video to materials: %s", e_save)
+
+        # 2. Eksekusi pemutaran jika user setuju
+        instructions = ""
+        playback_queued = False
+        if play_now:
+            if owner_id:
+                user_mac = store.get_user_mac_address(owner_id) if hasattr(store, "get_user_mac_address") else ""
+                mac_param = f"&mac={user_mac}" if user_mac else ""
+                base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
+                device_base = base.replace("https://", "http://") if user_mac else base
+                stream_url = f"{device_base}/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
+                try:
+                    store.queue_audio_command(
+                        owner_id,
+                        title=v_title,
+                        stream_url=stream_url,
+                        video_url=v_url,
+                        duration=v_dur,
+                        video_id=vid,
+                    )
+                    playback_queued = True
+                except Exception as q_err:
+                    logger.warning("Failed to queue video audio stream: %s", q_err)
+
+            instructions = f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{v_title}' dan video_id='{vid}' agar speaker XiaoZhi memutar videonya."
+
+        # Pesan ramah untuk user
+        parts = []
+        if play_now:
+            parts.append(f"Memutar video '{v_title}' ({v_channel}).")
+        else:
+            parts.append("Baik, pemutaran video dibatalkan.")
+
+        if saved_status:
+            parts.append(f"Materi video telah berhasil disimpan ke Database Materi Belajar Anda (Kategori: '{category}').")
+
+        response = {
+            "success": True,
+            "request_id": clean_req_id,
+            "video_id": vid,
+            "title": v_title,
+            "played": play_now,
+            "playback_queued": playback_queued,
+            "saved_to_materials": saved_status,
+            "material_id": saved_id,
+            "message": " ".join(parts),
+            "instructions": instructions,
+        }
+        record_mcp_tool_history(owner_id, "confirm_play_and_save_video", clean_req_id, {"play_now": play_now, "save_to_materials": save_to_materials}, response)
+        return response
 
     @mcp_server.tool()
     def play_playlist_song(query: str) -> dict:
+
         """
         Putar lagu dari daftar Playlist Musik YouTube pribadi pengguna berdasarkan:
         - Nomor urut lagu (contoh: "1", "nomor 2", "track 3", "playlist 1")

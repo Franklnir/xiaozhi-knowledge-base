@@ -1,0 +1,189 @@
+"""
+Unit & Integration Tests for YouTube Video Scraping, Genre Classification,
+Confirmation Management with Request ID, and Material Saving.
+"""
+
+import tempfile
+import os
+import pytest
+from unittest.mock import MagicMock, patch
+
+from xiaozhi.database.sqlite_store import SQLiteStore
+from xiaozhi.mcp.context import mcp_active_owner_ctx
+from xiaozhi.mcp.tools import register_tools
+from xiaozhi.services.scraper_service import (
+    classify_video_genre,
+    format_duration_id,
+    format_view_count_id,
+    cache_youtube_video_request,
+    get_cached_youtube_video_request,
+    scrape_youtube_video_details,
+)
+
+
+class MockFastMCP:
+    def __init__(self):
+        self.tools = {}
+
+    def tool(self, *args, **kwargs):
+        def decorator(fn):
+            self.tools[fn.__name__] = fn
+            return fn
+        return decorator
+
+
+@pytest.fixture
+def test_setup(tmp_path):
+    db_file = str(tmp_path / "test_yt_video.db")
+    store = SQLiteStore(db_path=db_file)
+    user = store.create_user("videouser", "password123")
+    owner_id = user["id"]
+
+    mock_mcp = MockFastMCP()
+    history = []
+    def record_history(uid, name, query, args, res):
+        history.append((uid, name, query, args, res))
+
+    register_tools(mock_mcp, store, record_history)
+
+    token = mcp_active_owner_ctx.set(owner_id)
+    try:
+        yield owner_id, store, mock_mcp
+    finally:
+        mcp_active_owner_ctx.reset(token)
+
+
+def test_format_duration_and_views():
+    """Test Indonesian duration and view count formatters."""
+    assert format_duration_id(45) == "45 detik"
+    assert format_duration_id(125) == "2 menit 5 detik"
+    assert format_duration_id(3665) == "1 jam 1 menit 5 detik"
+
+    assert "ribu penonton" in format_view_count_id(15400)
+    assert "juta penonton" in format_view_count_id(2500000)
+    assert "miliar penonton" in format_view_count_id(1200000000)
+
+
+def test_genre_classification():
+    """Test video genre taxonomy and topic extraction."""
+    genre1, topic1 = classify_video_genre(
+        ["Education"],
+        "Tutorial Pemrograman Python Dasar untuk Mahasiswa",
+        "Dalam video ini kita akan belajar dasar sintaks bahasa python.",
+        ["python", "koding"]
+    )
+    assert genre1 in ("Pendidikan (Edukasi)", "Sains & Teknologi")
+    assert "python" in topic1.lower()
+
+    genre2, _ = classify_video_genre(
+        ["Entertainment"],
+        "Sketsa Lucu Komedi Stand Up",
+        "Video hiburan komedi akhir pekan.",
+        ["komedi", "lucu"]
+    )
+    assert genre2 == "Hiburan & Komedi"
+
+
+def test_request_id_caching():
+    """Test that video metadata is stored and retrievable by request_id."""
+    req_id = "ytr_test_999"
+    data = {
+        "title": "ESP32 C3 Mini Setup",
+        "video_id": "vid12345678",
+        "channel_name": "Tech Channel",
+        "duration_formatted": "10 menit",
+        "view_count_formatted": "50 ribu penonton",
+        "genre": "Sains & Teknologi",
+        "topic": "Microcontroller",
+        "youtube_url": "https://www.youtube.com/watch?v=vid12345678",
+        "success": True,
+    }
+    cache_youtube_video_request(req_id, data)
+    cached = get_cached_youtube_video_request(req_id)
+    assert cached is not None
+    assert cached["video_id"] == "vid12345678"
+    assert cached["channel_name"] == "Tech Channel"
+
+
+def test_inspect_youtube_video_with_auto_save(test_setup):
+    """Test inspect_youtube_video automatically saves to Knowledge Base if auto-save is detected."""
+    owner_id, store, mcp = test_setup
+    inspect_fn = mcp.tools["inspect_youtube_video"]
+
+    mock_details = {
+        "success": True,
+        "request_id": "ytr_req_101",
+        "video_id": "testvid1011",
+        "title": "Belajar Fisika Kuantum Dasar",
+        "channel_name": "Sains Asik",
+        "duration_formatted": "15 menit 30 detik",
+        "view_count_formatted": "120 ribu penonton",
+        "genre": "Pendidikan (Edukasi)",
+        "topic": "Mekanika gelombang dan foton",
+        "description": "Pengantar fisika kuantum untuk pemula.",
+        "thumbnail": "https://example.com/thumb.jpg",
+        "youtube_url": "https://www.youtube.com/watch?v=testvid1011",
+    }
+
+    with patch("xiaozhi.services.scraper_service.scrape_youtube_video_details", return_value=mock_details):
+        # User explicitly requested to save in prompt
+        res = inspect_fn(query="video fisika kuantum tolong simpan ke materi", auto_save_requested=False)
+
+        assert res["success"] is True
+        assert res["request_id"] == "ytr_req_101"
+        assert res["already_saved"] is True
+        assert "SUDAH otomatis saya simpan" in res["message"]
+
+        # Verify it was persisted to Database Materi Belajar with category "Video YouTube"
+        materials = store.list_materials(owner_id)
+        assert len(materials) == 1
+        assert materials[0]["category"] == "Video YouTube"
+        assert "Fisika Kuantum" in materials[0]["title"]
+
+
+def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
+    """Test full multi-turn workflow: inspect -> confirm play and save."""
+    owner_id, store, mcp = test_setup
+    inspect_fn = mcp.tools["inspect_youtube_video"]
+    confirm_fn = mcp.tools["confirm_play_and_save_video"]
+
+    mock_details = {
+        "success": True,
+        "request_id": "ytr_req_202",
+        "video_id": "testvid2022",
+        "title": "Tutorial ESP32 S3 Cam",
+        "channel_name": "Maker Indo",
+        "duration_formatted": "8 menit 20 detik",
+        "view_count_formatted": "45 ribu penonton",
+        "genre": "Sains & Teknologi",
+        "topic": "Streaming kamera ESP32",
+        "description": "Langkah menggunakan modul camera OV2640.",
+        "thumbnail": "https://example.com/thumb2.jpg",
+        "youtube_url": "https://www.youtube.com/watch?v=testvid2022",
+    }
+
+    with patch("xiaozhi.services.scraper_service.scrape_youtube_video_details", return_value=mock_details):
+        # Step 1: User asks to inspect video without auto-save
+        inspect_res = inspect_fn(query="putar video esp32 s3 cam")
+        assert inspect_res["success"] is True
+        assert inspect_res["already_saved"] is False
+        assert "Apakah Anda ingin memutar video ini sekarang?" in inspect_res["message"]
+        req_id = inspect_res["request_id"]
+
+        # Cache is populated
+        cached = get_cached_youtube_video_request(req_id)
+        assert cached is not None
+
+        # Step 2: User confirms both playing and saving
+        confirm_res = confirm_fn(request_id=req_id, play_now=True, save_to_materials=True)
+        assert confirm_res["success"] is True
+        assert confirm_res["played"] is True
+        assert confirm_res["saved_to_materials"] is True
+        assert "Memutar video" in confirm_res["message"]
+        assert "berhasil disimpan" in confirm_res["message"]
+
+        # Verify saved in Database Materi
+        mats = store.list_materials(owner_id)
+        assert len(mats) == 1
+        assert mats[0]["category"] == "Video YouTube"
+        assert "ESP32 S3 Cam" in mats[0]["title"]

@@ -12,10 +12,14 @@ import json
 import logging
 import re
 import socket
+import time
 import urllib.parse
 import urllib.request
+import uuid
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Tuple
+
+from xiaozhi.core.utils import utc_now
 
 logger = logging.getLogger("xiaozhi.scraper")
 
@@ -1281,7 +1285,219 @@ def extract_youtube_transcript(video_id: str, original_url: str, max_chars: int 
         return {"success": False, "error": f"Gagal mengekstrak transkrip YouTube: {str(exc)[:120]}"}
 
 
+# ── 6b. YouTube Video Deep Scraper & Genre Classifier with Request ID ─────────
+
+_YOUTUBE_VIDEO_REQUEST_CACHE: Dict[str, Dict[str, Any]] = {}
+_CACHE_TTL_SECONDS = 3600  # 1 hour TTL
+
+
+def _evict_expired_video_cache() -> None:
+    now = time.time()
+    expired = [k for k, v in _YOUTUBE_VIDEO_REQUEST_CACHE.items() if now - v.get("_cached_at", 0) > _CACHE_TTL_SECONDS]
+    for k in expired:
+        _YOUTUBE_VIDEO_REQUEST_CACHE.pop(k, None)
+
+
+def cache_youtube_video_request(req_id: str, data: Dict[str, Any]) -> None:
+    _evict_expired_video_cache()
+    data_copy = dict(data)
+    data_copy["_cached_at"] = time.time()
+    _YOUTUBE_VIDEO_REQUEST_CACHE[req_id] = data_copy
+
+
+def get_cached_youtube_video_request(req_id: str) -> Optional[Dict[str, Any]]:
+    _evict_expired_video_cache()
+    item = _YOUTUBE_VIDEO_REQUEST_CACHE.get(req_id)
+    if not item:
+        return None
+    res = dict(item)
+    res.pop("_cached_at", None)
+    return res
+
+
+def format_duration_id(seconds: Optional[int]) -> str:
+    """Format duration in seconds to human-readable Indonesian string."""
+    if not seconds:
+        return "Durasi tidak diketahui"
+    try:
+        sec = int(seconds)
+    except (ValueError, TypeError):
+        return str(seconds)
+    hours = sec // 3600
+    minutes = (sec % 3600) // 60
+    rem_sec = sec % 60
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours} jam")
+    if minutes > 0:
+        parts.append(f"{minutes} menit")
+    if rem_sec > 0 or not parts:
+        parts.append(f"{rem_sec} detik")
+    return " ".join(parts)
+
+
+def format_view_count_id(views: Optional[int]) -> str:
+    """Format view count number to human-readable Indonesian string."""
+    if not views:
+        return "Belum ada data penonton"
+    try:
+        v = int(views)
+    except (ValueError, TypeError):
+        return str(views)
+    if v >= 1_000_000_000:
+        return f"{v / 1_000_000_000:.1f} miliar penonton".replace(".", ",")
+    if v >= 1_000_000:
+        return f"{v / 1_000_000:.1f} juta penonton".replace(".", ",")
+    if v >= 1_000:
+        return f"{v / 1_000:.1f} ribu penonton".replace(".", ",")
+    return f"{v:,} penonton".replace(",", ".")
+
+
+def classify_video_genre(categories: Optional[List[str]], title: str, description: str, tags: Optional[List[str]] = None) -> Tuple[str, str]:
+    """
+    Classify YouTube video genre into structured categories and extract topic summary.
+    Returns (genre_label, topic_summary).
+    """
+    cats = [c.lower() for c in (categories or [])]
+    t_tags = [t.lower() for t in (tags or [])]
+    text_corpus = f"{' '.join(cats)} {title} {description[:400]} {' '.join(t_tags)}".lower()
+
+    def _matches_any(patterns: List[str]) -> bool:
+        for p in patterns:
+            if re.search(r"\b" + re.escape(p) + r"\b", text_corpus):
+                return True
+        return False
+
+    if any(c in ["entertainment", "comedy"] for c in cats) or _matches_any(["komedi", "comedy", "lucu", "sketsa", "stand up", "prank"]):
+        genre = "Hiburan & Komedi"
+    elif any(c in ["music"] for c in cats) or _matches_any(["musik", "music", "lagu", "song", "lirik", "soundtrack", "album", "cover"]):
+        genre = "Musik & Lagu"
+    elif any(c in ["education", "howto & style"] for c in cats) or _matches_any(["pendidikan", "education", "tutorial", "belajar", "kuliah", "pelajaran", "edukasi", "rumus", "soal", "materi", "penjelasan", "kursus"]):
+        genre = "Pendidikan (Edukasi)"
+    elif any(c in ["science & technology"] for c in cats) or _matches_any(["sains", "teknologi", "pemrograman", "coding", "koding", "python", "javascript", "esp32", "arduino", "iot", "robot", "ai", "hardware", "software", "tech", "gadget"]):
+        genre = "Sains & Teknologi"
+    elif any(c in ["news & politics"] for c in cats) or _matches_any(["berita", "news", "politik", "kabar", "debat", "presiden", "hukum", "peristiwa", "investigasi", "fakta"]):
+        genre = "Berita & Wawasan"
+    elif any(c in ["gaming"] for c in cats) or _matches_any(["game", "gaming", "gameplay", "walkthrough"]):
+        genre = "Game & Hiburan"
+    else:
+        genre = "Edukasi & Informasi Umum"
+
+    clean_desc = re.sub(r"https?://\S+", "", description).strip()
+    sentences = [s.strip() for s in re.split(r"[\n\.\!\?]+", clean_desc) if len(s.strip()) > 15]
+    if sentences:
+        topic_summary = sentences[0][:150]
+    else:
+        topic_summary = f"Pembahasan mengenai {title[:80]}"
+
+    return genre, topic_summary
+
+
+
+def scrape_youtube_video_details(query_or_url: str, request_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Deep scrape YouTube video metadata: title, channel, duration, view count, genre, and topic.
+    Generates a unique request_id to manage multi-turn confirmation safely.
+    """
+    req_id = request_id or f"ytr_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    raw_q = (query_or_url or "").strip()
+    if not raw_q:
+        return {"success": False, "request_id": req_id, "error": "Query atau link YouTube kosong."}
+
+    # 1. Check if direct URL / ID
+    vid = extract_youtube_video_id(raw_q)
+    target_search = f"https://www.youtube.com/watch?v={vid}" if vid else f"ytsearch1:{raw_q}"
+
+    title = ""
+    channel = ""
+    duration_sec = 0
+    view_count = 0
+    desc = ""
+    categories: List[str] = []
+    tags: List[str] = []
+    thumb = ""
+
+    # Try yt_dlp
+    try:
+        import yt_dlp
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": True,
+            "socket_timeout": 10,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            res = ydl.extract_info(target_search, download=False)
+            entry = None
+            if res:
+                if "entries" in res and res["entries"]:
+                    entry = res["entries"][0]
+                elif res.get("id"):
+                    entry = res
+
+            if entry:
+                vid = entry.get("id", vid or "")
+                title = entry.get("title", "") or f"Video ({vid})"
+                channel = entry.get("channel") or entry.get("uploader") or ""
+                duration_sec = int(entry.get("duration") or 0)
+                view_count = int(entry.get("view_count") or 0)
+                desc = entry.get("description", "") or ""
+                categories = entry.get("categories") or []
+                tags = entry.get("tags") or []
+                thumbnails = entry.get("thumbnails", [])
+                if thumbnails:
+                    thumb = thumbnails[-1].get("url", "")
+    except Exception as yt_err:
+        logger.warning("yt_dlp extraction error for '%s': %s", raw_q, yt_err)
+
+    # Fallback to oEmbed if title or channel missing and vid is known
+    if (not title or not channel) and vid:
+        try:
+            oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={vid}&format=json"
+            req = urllib.request.Request(oembed_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                o_data = json.loads(resp.read().decode("utf-8"))
+                if not title:
+                    title = o_data.get("title", "")
+                if not channel:
+                    channel = o_data.get("author_name", "")
+                if not thumb:
+                    thumb = o_data.get("thumbnail_url", "")
+        except Exception:
+            pass
+
+    if not vid:
+        return {"success": False, "request_id": req_id, "error": f"Video tidak ditemukan untuk query: '{raw_q}'"}
+
+    title = title or f"YouTube Video ({vid})"
+    channel = channel or "YouTube Channel"
+    genre, topic = classify_video_genre(categories, title, desc, tags)
+    dur_formatted = format_duration_id(duration_sec)
+    views_formatted = format_view_count_id(view_count)
+
+    result_data = {
+        "success": True,
+        "request_id": req_id,
+        "video_id": vid,
+        "title": title,
+        "channel_name": channel,
+        "duration_seconds": duration_sec,
+        "duration_formatted": dur_formatted,
+        "view_count": view_count,
+        "view_count_formatted": views_formatted,
+        "genre": genre,
+        "topic": topic,
+        "description": desc[:300],
+        "thumbnail": thumb,
+        "youtube_url": f"https://www.youtube.com/watch?v={vid}",
+    }
+
+    cache_youtube_video_request(req_id, result_data)
+    return result_data
+
+
 # ── 7. Main Unified Scraping Engines (Sync & Async) ───────────────────────────
+
 
 def scrape_url(url: str, max_length: int = 25000) -> Dict[str, Any]:
     """
