@@ -530,33 +530,38 @@
                 <div style="background:var(--app-soft, rgba(0,0,0,0.02)); border:1px solid var(--app-border); border-radius:12px; padding:18px;">
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
                         <span style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--app-muted);">Pilih Slot Konfigurasi:</span>
-                        <span id="mcpChip" class="app-chip app-chip-small app-chip-neutral font-bold">Memeriksa...</span>
+                        <span id="mcpChip" class="app-chip app-chip-small {% if mcp_status and mcp_status.connected %}app-chip-success{% elif mcp_status and mcp_status.tokenSaved %}app-chip-warning{% else %}app-chip-neutral{% endif %} font-bold">
+                            {% if mcp_status and mcp_status.connected %}Terhubung{% elif mcp_status and mcp_status.tokenSaved %}Standby{% else %}Belum Ada Endpoint{% endif %}
+                        </span>
                     </div>
 
                     <!-- 3-Slot Segmented Tab Switcher (Touch & Mobile Optimized) -->
                     <div class="mcp-segment-nav">
+                        {% set slot1 = mcp_slots[0] if mcp_slots and mcp_slots|length > 0 else none %}
+                        {% set slot2 = mcp_slots[1] if mcp_slots and mcp_slots|length > 1 else none %}
+                        {% set slot3 = mcp_slots[2] if mcp_slots and mcp_slots|length > 2 else none %}
                         <button type="button" class="mcp-segment-btn active" id="slotTab1" onclick="switchSlot(1)" title="Konfigurasi Slot 1">
                             <span class="mcp-segment-core">
-                                <span class="mcp-radar-dot idle" id="slotDot1"></span>
+                                <span class="mcp-radar-dot {% if slot1 and slot1.connected %}connected{% elif slot1 and slot1.saved %}connecting{% else %}idle{% endif %}" id="slotDot1"></span>
                                 <span>SLOT 01</span>
                             </span>
-                            <span class="mcp-segment-sub" id="slotTabLabel1">XiaoZhi 1</span>
+                            <span class="mcp-segment-sub" id="slotTabLabel1">{{ slot1.label if slot1 and slot1.label else 'XiaoZhi 1' }}</span>
                         </button>
 
                         <button type="button" class="mcp-segment-btn" id="slotTab2" onclick="switchSlot(2)" title="Konfigurasi Slot 2">
                             <span class="mcp-segment-core">
-                                <span class="mcp-radar-dot idle" id="slotDot2"></span>
+                                <span class="mcp-radar-dot {% if slot2 and slot2.connected %}connected{% elif slot2 and slot2.saved %}connecting{% else %}idle{% endif %}" id="slotDot2"></span>
                                 <span>SLOT 02</span>
                             </span>
-                            <span class="mcp-segment-sub" id="slotTabLabel2">XiaoZhi 2</span>
+                            <span class="mcp-segment-sub" id="slotTabLabel2">{{ slot2.label if slot2 and slot2.label else 'XiaoZhi 2' }}</span>
                         </button>
 
                         <button type="button" class="mcp-segment-btn" id="slotTab3" onclick="switchSlot(3)" title="Konfigurasi Slot 3">
                             <span class="mcp-segment-core">
-                                <span class="mcp-radar-dot idle" id="slotDot3"></span>
+                                <span class="mcp-radar-dot {% if slot3 and slot3.connected %}connected{% elif slot3 and slot3.saved %}connecting{% else %}idle{% endif %}" id="slotDot3"></span>
                                 <span>SLOT 03</span>
                             </span>
-                            <span class="mcp-segment-sub" id="slotTabLabel3">XiaoZhi 3</span>
+                            <span class="mcp-segment-sub" id="slotTabLabel3">{{ slot3.label if slot3 and slot3.label else 'XiaoZhi 3' }}</span>
                         </button>
                     </div>
 
@@ -972,11 +977,25 @@
 <script>
 let mcpPoll = null, mcpBusy = false;
 let currentSlot = 1;
-let slotsData = [
-    { slot: 1, label: "XiaoZhi 1", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" },
-    { slot: 2, label: "XiaoZhi 2", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" },
-    { slot: 3, label: "XiaoZhi 3", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" }
-];
+const initialSlotsFromServer = {{ mcp_slots|tojson if mcp_slots else '[]' }};
+let slotsData = (Array.isArray(initialSlotsFromServer) && initialSlotsFromServer.length > 0)
+    ? initialSlotsFromServer.map(s => ({
+        slot: s.slot,
+        label: s.label || ("XiaoZhi " + s.slot),
+        saved: !!s.saved,
+        connected: !!s.connected,
+        preview: s.preview || "",
+        board_mac: s.board_mac || "",
+        is_locked: !!s.is_locked,
+        is_active: s.is_active !== false,
+        is_restricted: !!s.is_restricted,
+        statusText: s.statusText || (s.connected ? "Terhubung" : (s.saved ? "Standby" : "Kosong"))
+    }))
+    : [
+        { slot: 1, label: "XiaoZhi 1", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" },
+        { slot: 2, label: "XiaoZhi 2", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" },
+        { slot: 3, label: "XiaoZhi 3", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" }
+    ];
 let latestRequestId = "";
 
 function switchSlot(slotNum) {
@@ -1113,7 +1132,7 @@ async function pollMcp() {
     if (mcpBusy) return;
     mcpBusy = true;
     try {
-        const res = await fetch("/mcp_status");
+        const res = await fetch("/api/mcp/status");
         if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
         

@@ -136,6 +136,30 @@ async def save_mcp(
         legacy_task = mcp_bridge_tasks.pop(user["id"], None)
         if legacy_task and not legacy_task.done():
             legacy_task.cancel()
+
+        # Reset cooldown failure state so reconnect is immediate
+        from xiaozhi.mcp.bridge import reset_bridge_failure, run_mcp_bridge
+        reset_bridge_failure(task_key)
+        reset_bridge_failure(f"{user['id']}:1")
+        reset_bridge_failure(str(user["id"]))
+
+        # Launch bridge task immediately without waiting for 30s background poll
+        from xiaozhi.mcp.server import mcp_server
+        if mcp_server is not None:
+            new_task = asyncio.create_task(
+                run_mcp_bridge(
+                    store,
+                    mcp_server,
+                    user["id"],
+                    mcp_token,
+                    token_hash,
+                    slot=slot_num,
+                    device_label=label_clean,
+                    board_mac=board_mac,
+                )
+            )
+            mcp_bridge_tasks[task_key] = new_task
+
         signal_mcp_reload()
         return JSONResponse({
             "success": True,
@@ -241,6 +265,31 @@ async def reconnect_mcp(
     user_task = mcp_bridge_tasks.pop(task_key, None)
     if user_task and not user_task.done():
         user_task.cancel()
+
+    # Reset failure cooldown immediately
+    raw_token = store.get_xiaozhi_token(user["id"], slot=slot_num)
+    board_mac = token_info.get("board_mac", "") if token_info else ""
+    from xiaozhi.mcp.bridge import reset_bridge_failure, run_mcp_bridge
+    reset_bridge_failure(task_key)
+    reset_bridge_failure(f"{user['id']}:1")
+    reset_bridge_failure(str(user["id"]))
+
+    from xiaozhi.mcp.server import mcp_server
+    if mcp_server is not None and raw_token:
+        new_task = asyncio.create_task(
+            run_mcp_bridge(
+                store,
+                mcp_server,
+                user["id"],
+                raw_token,
+                token_hash,
+                slot=slot_num,
+                device_label=label,
+                board_mac=board_mac,
+            )
+        )
+        mcp_bridge_tasks[task_key] = new_task
+
     signal_mcp_reload()
     return JSONResponse({
         "success": True,
@@ -451,6 +500,8 @@ async def delete_mcp_by_token(request: Request):
 
 
 @router.get("/api/mcp/status")
+@router.get("/mcp_status")
+@router.get("/api/v1/mcp/status")
 async def mcp_status_api(request: Request):
     req_id = _get_req_id(request)
     user = get_current_user(request)
@@ -475,6 +526,14 @@ async def mcp_status_api(request: Request):
     return {
         "success": True,
         "request_id": req_id,
+        "requestId": req_id,
+        "tokenSaved": legacy_status.get("tokenSaved", False),
+        "connected": legacy_status.get("connected", False),
+        "preview": legacy_status.get("tokenPreview", ""),
+        "statusText": legacy_status.get("statusText", ""),
+        "message": legacy_status.get("statusText", ""),
+        "board_mac": slot1_info.get("board_mac", "") if slot1_info else "",
+        "is_locked": bool(slot1_info.get("board_mac")) if slot1_info else False,
         "anyConnected": multi_payload["anyConnected"],
         "totalSaved": multi_payload["totalSaved"],
         "slots": multi_payload["slots"],

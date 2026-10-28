@@ -2507,6 +2507,7 @@
                 const csrfToken = {{ csrf_token|tojson }};
                 const fd = new FormData();
                 fd.append('mcp_token', token);
+                fd.append('slot', '1');
                 fd.append('csrf_token', csrfToken);
 
                 const resp = await fetch('/save_mcp', {
@@ -2519,19 +2520,22 @@
                     throw new Error(resData.detail || 'Gagal menyimpan endpoint MCP.');
                 }
 
-                // Poll /api/mcp/status for live status & connection confirmation
+                // Poll /api/mcp/status for live status & connection confirmation (400ms for fast feedback)
                 let attempts = 0;
+                const pollIntervalMs = 400;
                 const pollTimer = setInterval(async () => {
                     attempts++;
                     try {
                         const sResp = await fetch('/api/mcp/status', { credentials: 'same-origin' });
                         const sData = await sResp.json();
-                        if (sData && sData.success && sData.status) {
-                            const st = sData.status;
+                        if (sData && sData.success) {
+                            const st = sData.status || {};
+                            const isConnected = !!(st.connected || sData.anyConnected || (Array.isArray(sData.slots) && sData.slots.some(x => x.connected)));
+
                             if (st.statusText && statusText) {
                                 statusText.textContent = st.statusText;
                             }
-                            if (st.connected) {
+                            if (isConnected) {
                                 clearInterval(pollTimer);
                                 // Connected Animation State
                                 if (radar) {
@@ -2539,6 +2543,13 @@
                                     radar.classList.add('is-connected');
                                 }
                                 if (coreIcon) coreIcon.textContent = '✅';
+
+                                // Hide spinner and shimmer bar immediately
+                                const spinner = connPanel ? connPanel.querySelector('.mcp-tech-spinner') : null;
+                                if (spinner) spinner.style.display = 'none';
+                                const shimmer = connPanel ? connPanel.querySelector('.mcp-shimmer-track') : null;
+                                if (shimmer) shimmer.style.display = 'none';
+
                                 if (statusText) {
                                     statusText.innerHTML = '<span style="color:#059669; font-weight:900;">🎉 Berhasil Terhubung ke XiaoZhi!</span>';
                                 }
@@ -2550,17 +2561,29 @@
                                 }
                                 setTimeout(() => {
                                     window.location.reload();
-                                }, 1200);
+                                }, 600);
                                 return;
                             }
                         }
                     } catch (_) {}
 
-                    if (attempts >= 30) {
+                    if (attempts >= 40) { // 16s
                         clearInterval(pollTimer);
-                        throw new Error('Koneksi timeout (30s). Periksa apakah endpoint Xiaozhi aktif.');
+                        if (radar) radar.classList.remove('is-connecting');
+                        if (coreIcon) coreIcon.textContent = prefix === 'reqOverlay' ? '🔌' : '🔒';
+                        if (connPanel) connPanel.style.display = 'none';
+                        if (input) input.disabled = false;
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = '⚡ Hubungkan Sekarang';
+                            submitBtn.style.opacity = '1';
+                        }
+                        if (errorEl) {
+                            errorEl.textContent = 'Koneksi timeout. Pastikan endpoint WebSocket XiaoZhi aktif.';
+                            errorEl.style.display = 'block';
+                        }
                     }
-                }, 1000);
+                }, pollIntervalMs);
 
             } catch (err) {
                 if (radar) radar.classList.remove('is-connecting');
