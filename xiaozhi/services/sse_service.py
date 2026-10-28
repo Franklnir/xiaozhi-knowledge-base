@@ -940,9 +940,15 @@ async def stream_material_indexing(
 
         log_admin_event("material", f"User {user_id} menambahkan materi: '{title[:35]}'", {"user_id": user_id, "title": title})
 
+        item_payload = new_item if isinstance(new_item, dict) else ({"id": getattr(new_item, "id", str(new_item))} if new_item else {})
+        broadcast_material_event(user_id, "material_created", {
+            "action": "create",
+            "material": item_payload or {"title": title, "category": category},
+            "message": f"Materi '{title}' berhasil disimpan dan divektorisasi.",
+        })
+
         yield format_sse("progress", {"percent": 100, "step": "Selesai", "message": "Materi berhasil divektorisasi dan siap diakses AI!"})
         await asyncio.sleep(0.15)
-        item_payload = new_item if isinstance(new_item, dict) else ({"id": getattr(new_item, "id", str(new_item))} if new_item else {})
         yield format_sse("done", {
             "success": True,
             "message": "Materi berhasil disimpan dan divektorisasi.",
@@ -950,3 +956,155 @@ async def stream_material_indexing(
         })
     except Exception as exc:
         yield format_sse("error", {"message": f"Gagal menyimpan materi: {str(exc)}"})
+
+
+# ── 4. Real-Time Knowledge Base / Material Monitoring Hub (SSE) ─────────────
+
+class MaterialEventHub:
+    """Manages active SSE connections for real-time Material / Knowledge Base updates per user."""
+
+    def __init__(self) -> None:
+        self._subscribers: Dict[int, Set[asyncio.Queue]] = {}
+
+    def emit(self, user_id: int, event_type: str, data: Dict[str, Any]) -> None:
+        """Broadcast material event strictly to the target user's active SSE connections (multi-tenant safe)."""
+        uid = int(user_id)
+        queues = self._subscribers.get(uid, set())
+        if not queues:
+            return
+        payload = {
+            "type": event_type,
+            "data": data,
+            "timestamp": utc_now(),
+        }
+        for q in list(queues):
+            try:
+                q.put_nowait(payload)
+            except Exception:
+                pass
+
+    async def subscribe(self, user_id: int) -> asyncio.Queue:
+        q: asyncio.Queue = asyncio.Queue(maxsize=100)
+        uid = int(user_id)
+        if uid not in self._subscribers:
+            self._subscribers[uid] = set()
+        self._subscribers[uid].add(q)
+        return q
+
+    def unsubscribe(self, user_id: int, q: asyncio.Queue) -> None:
+        uid = int(user_id)
+        if uid in self._subscribers:
+            self._subscribers[uid].discard(q)
+            if not self._subscribers[uid]:
+                del self._subscribers[uid]
+
+    def subscriber_count(self, user_id: Optional[int] = None) -> int:
+        if user_id is not None:
+            return len(self._subscribers.get(int(user_id), set()))
+        return sum(len(qs) for qs in self._subscribers.values())
+
+
+material_event_hub = MaterialEventHub()
+
+
+def broadcast_material_event(user_id: int, event_type: str, data: Dict[str, Any]) -> None:
+    """Global helper to broadcast material events (created, updated, deleted, live_api_update, etc.) strictly to user."""
+    material_event_hub.emit(int(user_id), event_type, data)
+
+
+async def stream_material_events(
+    user_id: int,
+    request: Request,
+    store: Any = None,
+    live_api_interval_sec: float = 15.0,
+) -> AsyncGenerator[str, None]:
+    """
+    Generator for streaming real-time Material / Knowledge Base events to Web UI via SSE.
+    Strictly isolated to user_id (multi-tenant safe).
+    Includes:
+    1. Initial connection ACK with summary statistics.
+    2. Background check of user's live-api materials (if any) to detect external changes without client polling.
+    3. Real-time push of material_created, material_updated, material_deleted, live_api_update.
+    """
+    uid = int(user_id)
+    q = await material_event_hub.subscribe(uid)
+    last_live_check = 0.0
+    known_api_hashes: Dict[int, str] = {}
+
+    try:
+        initial_stats: Dict[str, Any] = {"total": 0, "categories": []}
+        if store is not None:
+            try:
+                materials = store.list_materials(uid)
+                initial_stats = {
+                    "total": len(materials),
+                    "tugas": sum(1 for m in materials if "tugas" in (m.get("category") or "").lower()),
+                    "pengumuman": sum(1 for m in materials if "pengumuman" in (m.get("category") or "").lower()),
+                    "materi": sum(1 for m in materials if "materi" in (m.get("category") or "").lower()),
+                    "live_api_count": sum(1 for m in materials if m.get("source_type") == "api_live"),
+                }
+                for m in materials:
+                    if m.get("source_type") == "api_live":
+                        mid = int(m.get("id", 0) or 0)
+                        if mid:
+                            known_api_hashes[mid] = str(m.get("content_hash") or m.get("live_content_hash") or "")
+            except Exception as stat_err:
+                logger.debug("Failed computing initial material stats: %s", stat_err)
+
+        yield format_sse("connected", {
+            "status": "ok",
+            "user_id": uid,
+            "stats": initial_stats,
+            "message": "Stream Database Materi Belajar aktif."
+        })
+
+        while True:
+            is_disc = request.is_disconnected()
+            if asyncio.iscoroutine(is_disc):
+                is_disc = await is_disc
+            if is_disc:
+                break
+
+            # Server-side periodic check for live API materials without client polling
+            now = time.time()
+            if store is not None and (now - last_live_check >= live_api_interval_sec):
+                last_live_check = now
+                try:
+                    materials = store.list_materials(uid)
+                    live_materials = [m for m in materials if m.get("source_type") == "api_live" and m.get("api_url")]
+                    if live_materials:
+                        from xiaozhi.core.utils import preview_live_api_content
+                        for m in live_materials:
+                            mid = int(m.get("id", 0) or 0)
+                            if not mid:
+                                continue
+                            prev_h = known_api_hashes.get(mid, "")
+                            try:
+                                preview = await asyncio.to_thread(preview_live_api_content, m["api_url"], prev_h)
+                                if preview.get("changed"):
+                                    known_api_hashes[mid] = preview.get("content_hash", "")
+                                    yield format_sse("live_api_update", {
+                                        "material_id": mid,
+                                        "content": preview.get("content", ""),
+                                        "content_hash": preview.get("content_hash", ""),
+                                        "total_items": preview.get("total_items", 0),
+                                        "content_size_label": preview.get("content_size_label", ""),
+                                        "updated_at": preview.get("updated_at", ""),
+                                        "api_label": preview.get("api_label", ""),
+                                    })
+                            except Exception as api_err:
+                                logger.debug("Live API check error for material %s: %s", mid, api_err)
+                except Exception as ex:
+                    logger.debug("Error checking live materials: %s", ex)
+
+            # Wait for event from event hub queue (with 10-second timeout for keepalive)
+            try:
+                payload = await asyncio.wait_for(q.get(), timeout=10.0)
+                event_name = payload.get("type", "material_update")
+                yield format_sse(event_name, payload.get("data", {}))
+            except asyncio.TimeoutError:
+                # Keep-alive heartbeat comment
+                yield ": keepalive\n\n"
+    finally:
+        material_event_hub.unsubscribe(uid, q)
+

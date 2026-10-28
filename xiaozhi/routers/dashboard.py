@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException, Query, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-from xiaozhi.services.sse_service import stream_material_indexing
+from xiaozhi.services.sse_service import (
+    broadcast_material_event,
+    stream_material_events,
+    stream_material_indexing,
+)
 
 from xiaozhi.config import DEFAULT_UI_THEME, LIVE_API_SOURCE_TYPE, UI_THEMES
 from xiaozhi.core.utils import (
@@ -90,8 +94,14 @@ async def add_material(
     if not is_live_api_category(category):
         api_url = ""
     try:
-        store.add_material(user["id"], title, category, content, keywords, api_url)
+        new_item = store.add_material(user["id"], title, category, content, keywords, api_url)
         signal_mcp_reload()
+        item_data = new_item if isinstance(new_item, dict) else {"id": new_item, "title": title, "category": category, "content": content, "keywords": keywords, "api_url": api_url}
+        broadcast_material_event(user["id"], "material_created", {
+            "action": "create",
+            "material": item_data,
+            "message": f"Materi '{title}' berhasil ditambahkan.",
+        })
         return redirect_with_message("/dashboard", "Data materi berhasil ditambahkan.")
     except ValueError as exc:
         return redirect_with_message("/dashboard", f"Gagal: {exc}")
@@ -182,6 +192,22 @@ async def api_materials_stream_index(request: Request):
     )
 
 
+@router.get("/api/materials/stream-events")
+async def api_materials_stream_events(request: Request):
+    """Real-time SSE monitoring stream for Knowledge Base / Database Materi."""
+    user = require_user(request)
+    store = get_store()
+    return StreamingResponse(
+        stream_material_events(user["id"], request, store),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.post("/api/materials/live-api/preview")
 async def api_materials_live_api_preview(request: Request):
     """Server-side live API preview with encryption and hash comparison."""
@@ -228,6 +254,11 @@ async def delete_material(request: Request, material_id: int, csrf_token: str = 
     deleted = store.delete_material(user["id"], material_id)
     if deleted:
         signal_mcp_reload()
+        broadcast_material_event(user["id"], "material_deleted", {
+            "action": "delete",
+            "material_id": material_id,
+            "message": "Materi berhasil dihapus.",
+        })
     return redirect_with_message("/dashboard", "Materi dihapus." if deleted else "Materi tidak ditemukan.")
 
 
@@ -254,6 +285,13 @@ async def update_material(
         updated = store.update_material(user["id"], material_id, title, category, content, keywords, api_url)
         if updated:
             signal_mcp_reload()
+            updated_item = store.get_material(user["id"], material_id)
+            broadcast_material_event(user["id"], "material_updated", {
+                "action": "update",
+                "material_id": material_id,
+                "material": updated_item or {"id": material_id, "title": title, "category": category, "content": content, "keywords": keywords, "api_url": api_url},
+                "message": f"Materi '{title}' berhasil diperbarui.",
+            })
         return redirect_with_message("/dashboard", "Materi diperbarui." if updated else "Materi tidak ditemukan.")
     except ValueError as exc:
         return redirect_with_message("/dashboard", f"Gagal: {exc}")

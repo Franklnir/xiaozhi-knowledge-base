@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from xiaozhi.dependencies import get_current_user, get_store, require_user, require_mcp_connected_if_not_admin
 from xiaozhi.services.mcp_service import is_mcp_connected, mcp_status_payload, signal_mcp_reload
+from xiaozhi.services.sse_service import broadcast_material_event
 
 router = APIRouter(prefix="/api/v1/materials", tags=["API v1 Materials"])
 
@@ -65,8 +66,14 @@ async def create_material(request: Request, body: MaterialCreate):
     store = get_store()
 
     try:
-        store.add_material(user["id"], body.title, body.category, body.content, body.keywords, body.api_url)
+        new_item = store.add_material(user["id"], body.title, body.category, body.content, body.keywords, body.api_url)
         signal_mcp_reload()
+        item_data = new_item if isinstance(new_item, dict) else {"id": new_item, "title": body.title, "category": body.category, "content": body.content, "keywords": body.keywords, "api_url": body.api_url}
+        broadcast_material_event(user["id"], "material_created", {
+            "action": "create",
+            "material": item_data,
+            "message": f"Materi '{body.title}' berhasil ditambahkan.",
+        })
         return ApiResponse(
             success=True,
             data={"title": body.title},
@@ -107,6 +114,13 @@ async def update_material(request: Request, material_id: int, body: MaterialUpda
             raise HTTPException(status_code=404, detail=ApiResponse(success=False, message="Materi tidak ditemukan."))
 
         signal_mcp_reload()
+        updated_item = store.get_material(user["id"], material_id)
+        broadcast_material_event(user["id"], "material_updated", {
+            "action": "update",
+            "material_id": material_id,
+            "material": updated_item or {"id": material_id, "title": body.title, "category": body.category, "content": body.content, "keywords": body.keywords, "api_url": body.api_url},
+            "message": f"Materi '{body.title}' berhasil diperbarui.",
+        })
         return ApiResponse(
             success=True,
             data={"material_id": material_id},
@@ -128,6 +142,11 @@ async def delete_material(request: Request, material_id: int):
         raise HTTPException(status_code=404, detail=ApiResponse(success=False, message="Materi tidak ditemukan."))
 
     signal_mcp_reload()
+    broadcast_material_event(user["id"], "material_deleted", {
+        "action": "delete",
+        "material_id": material_id,
+        "message": "Materi berhasil dihapus.",
+    })
     return ApiResponse(
         success=True,
         data={"material_id": material_id},
@@ -179,6 +198,11 @@ async def api_v1_scrape_material(request: Request, body: MaterialScrapeRequest):
             body.url,
         )
         signal_mcp_reload()
+        broadcast_material_event(user["id"], "material_created", {
+            "action": "create",
+            "material": {"id": mat_id, "title": res["title"], "category": res["category"], "url": body.url},
+            "message": f"Artikel '{res['title']}' berhasil di-scrape dan disimpan ke Knowledge Base.",
+        })
         return ApiResponse(
             success=True,
             data={"material_id": mat_id, "title": res["title"], "category": res["category"], "url": body.url},

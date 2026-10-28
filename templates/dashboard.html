@@ -443,9 +443,9 @@
             <p class="app-subtitle">Kelola database materi belajar, tugas, dan sumber data realtime yang diakses asisten suara cerdas Xiaozhi.</p>
         </div>
         <div class="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-            <div class="app-status-pill is-online" title="Knowledge Base tersinkronisasi">
-                <span class="app-status-dot"></span>
-                RAG Pipeline Siap
+            <div class="app-status-pill is-online" id="materialSseStatusPill" title="Knowledge Base tersinkronisasi real-time via SSE">
+                <span class="app-status-dot" id="materialSseDot"></span>
+                <span id="materialSseStatusText">SSE Realtime Aktif</span>
             </div>
             <button type="button" onclick="openAddModal()" class="app-button app-button-success btn-icon" style="font-weight:800;">
                 <svg class="dash-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -1836,10 +1836,36 @@
 
     syncLiveApiFields("add");
 
+    // ── Real-Time SSE Database Materi Monitoring ────────────────────────────
     const liveMaterialRows = Array.from(document.querySelectorAll('[data-live-api="true"]'));
     const liveMaterialState = new Map();
     const liveMaterialInflight = new Set();
 
+    function applyLiveApiUpdate(payload) {
+        const materialId = String(payload.material_id || payload.id || "");
+        if (!materialId) return;
+
+        const row = document.querySelector(`[data-material-id="${materialId}"]`);
+        const previousHash = liveMaterialState.get(materialId) || "";
+        liveMaterialState.set(materialId, payload.content_hash || "");
+
+        const contentEl = document.getElementById(`materialContent${materialId}`);
+        const statusEl = document.getElementById(`liveApiRowStatus${materialId}`);
+
+        if (contentEl && payload.content) {
+            contentEl.textContent = previewText(payload.content);
+        }
+        if (statusEl) {
+            statusEl.textContent = liveApiMetaText(payload);
+            statusEl.className = "font-semibold text-emerald-700 dark:text-emerald-400";
+        }
+        if (row && previousHash && previousHash !== payload.content_hash) {
+            flashElement(row);
+            if (contentEl) flashElement(contentEl);
+        }
+    }
+
+    // Single on-demand refresh helper (for initial load or fallback)
     async function refreshSavedLiveMaterial(row) {
         if (document.hidden) return;
         const materialId = row.dataset.materialId;
@@ -1854,21 +1880,9 @@
             });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(payload.detail || "Gagal membaca live API.");
-            if (!payload.changed) {
-                return;
-            }
-            liveMaterialState.set(materialId, payload.content_hash);
-
-            const contentEl = document.getElementById(`materialContent${materialId}`);
-            const statusEl = document.getElementById(`liveApiRowStatus${materialId}`);
-            if (contentEl) contentEl.textContent = previewText(payload.content);
-            if (statusEl) {
-                statusEl.textContent = liveApiMetaText(payload);
-                statusEl.className = "font-semibold text-emerald-700 dark:text-emerald-400";
-            }
-            if (previousHash && previousHash !== payload.content_hash) {
-                flashElement(row);
-                if (contentEl) flashElement(contentEl);
+            if (payload.changed) {
+                payload.material_id = materialId;
+                applyLiveApiUpdate(payload);
             }
         } catch (error) {
             const statusEl = document.getElementById(`liveApiRowStatus${materialId}`);
@@ -1881,14 +1895,115 @@
         }
     }
 
-    function refreshAllSavedLiveMaterials() {
-        liveMaterialRows.forEach((row) => refreshSavedLiveMaterial(row));
+    function initMaterialSSEMonitoring() {
+        if (!window.EventSource) {
+            console.warn("EventSource tidak didukung browser ini. Menggunakan fallback polling.");
+            if (liveMaterialRows.length) {
+                window.setInterval(() => liveMaterialRows.forEach(refreshSavedLiveMaterial), 15000);
+            }
+            return;
+        }
+
+        const pill = document.getElementById("materialSseStatusPill");
+        const pillText = document.getElementById("materialSseStatusText");
+
+        let es = null;
+
+        function connect() {
+            if (es) {
+                try { es.close(); } catch(e) {}
+            }
+
+            es = new EventSource("/api/materials/stream-events");
+
+            es.addEventListener("connected", (evt) => {
+                if (pill) {
+                    pill.classList.remove("is-offline");
+                    pill.classList.add("is-online");
+                    pill.title = "Monitoring real-time database materi aktif (SSE)";
+                }
+                if (pillText) pillText.textContent = "SSE Realtime Aktif";
+            });
+
+            es.addEventListener("live_api_update", (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    applyLiveApiUpdate(data);
+                } catch(e) {
+                    console.debug("Error parsing live_api_update:", e);
+                }
+            });
+
+            es.addEventListener("material_created", (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    const badge = document.getElementById("badgeRowCount");
+                    if (badge && data.material) {
+                        const current = parseInt(badge.textContent) || 0;
+                        badge.textContent = (current + 1) + " item";
+                        flashElement(badge);
+                    }
+                } catch(e) {}
+            });
+
+            es.addEventListener("material_updated", (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    const mid = data.material_id || (data.material && data.material.id);
+                    if (mid) {
+                        const row = document.querySelector(`[data-material-id="${mid}"]`);
+                        if (row) {
+                            flashElement(row);
+                            const contentEl = document.getElementById(`materialContent${mid}`);
+                            if (contentEl && data.material && data.material.content) {
+                                contentEl.textContent = previewText(data.material.content);
+                            }
+                        }
+                    }
+                } catch(e) {}
+            });
+
+            es.addEventListener("material_deleted", (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    const mid = data.material_id;
+                    if (mid) {
+                        const row = document.querySelector(`[data-material-id="${mid}"]`);
+                        if (row) {
+                            row.style.transition = "opacity 0.4s ease, transform 0.4s ease";
+                            row.style.opacity = "0";
+                            row.style.transform = "translateX(20px)";
+                            setTimeout(() => {
+                                row.remove();
+                                const badge = document.getElementById("badgeRowCount");
+                                if (badge) {
+                                    const current = parseInt(badge.textContent) || 0;
+                                    badge.textContent = Math.max(0, current - 1) + " item";
+                                }
+                            }, 400);
+                        }
+                    }
+                } catch(e) {}
+            });
+
+            es.onerror = (err) => {
+                if (pill) {
+                    pill.classList.remove("is-online");
+                    pill.classList.add("is-offline");
+                }
+                if (pillText) pillText.textContent = "Menghubungkan...";
+            };
+        }
+
+        connect();
     }
 
+    // Initial check once on load, then SSE handles real-time updates without polling
     if (liveMaterialRows.length) {
-        refreshAllSavedLiveMaterials();
-        window.setInterval(refreshAllSavedLiveMaterials, 5000);
+        liveMaterialRows.forEach((row) => refreshSavedLiveMaterial(row));
     }
+    initMaterialSSEMonitoring();
+
 </script>
 
 <script>
