@@ -52,3 +52,25 @@ def test_cooldown_reset_on_save():
     from xiaozhi.mcp.bridge import reset_bridge_failure
     reset_bridge_failure(task_key)
     assert is_bridge_in_cooldown(task_key) is False
+
+
+@pytest.mark.anyio
+async def test_wait_mcp_handshake():
+    """Verify _wait_mcp_handshake correctly detects connected state and respects timeout."""
+    from xiaozhi.routers.mcp_endpoints import _wait_mcp_handshake
+    user_id = 8888
+    slot = 1
+    token_hash = "testhash123"
+    
+    # Not connected -> times out safely
+    connected = await _wait_mcp_handshake(user_id, token_hash, slot=slot, timeout=0.2)
+    assert connected is False
+    
+    # Set connected -> detects immediately
+    set_mcp_connection_state(user_id, token_hash, connected=True, slot=slot)
+    connected = await _wait_mcp_handshake(user_id, token_hash, slot=slot, timeout=0.5)
+    assert connected is True
+    
+    # Cleanup
+    set_mcp_connection_state(user_id, token_hash, connected=False, slot=slot)
+

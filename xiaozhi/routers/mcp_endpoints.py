@@ -1,3 +1,5 @@
+import asyncio
+import time
 import uuid
 from typing import Optional
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -33,6 +35,16 @@ def _get_req_id(request: Request) -> str:
         or request.headers.get("X-Request-ID")
         or f"req-{uuid.uuid4().hex[:10]}"
     )
+
+
+async def _wait_mcp_handshake(user_id: int, token_hash: str, slot: int, timeout: float = 3.0) -> bool:
+    """Safely awaits up to `timeout` seconds for the WebSocket bridge handshake to confirm connected state."""
+    start = time.time()
+    while time.time() - start < timeout:
+        if is_mcp_connected(user_id, token_hash, slot=slot):
+            return True
+        await asyncio.sleep(0.08)
+    return False
 
 
 @router.get("/mcp", response_class=HTMLResponse)
@@ -161,14 +173,24 @@ async def save_mcp(
             mcp_bridge_tasks[task_key] = new_task
 
         signal_mcp_reload()
+
+        # Await WebSocket handshake confirmation for fast, zero-polling response
+        connected = await _wait_mcp_handshake(user["id"], token_hash, slot=slot_num, timeout=3.0)
+        status_msg = (
+            f"Koneksi Slot {slot_num} ({label_clean}) berhasil terhubung ke XiaoZhi!"
+            if connected
+            else f"Endpoint Slot {slot_num} ({label_clean}) berhasil disimpan. Menghubungkan ke XiaoZhi..."
+        )
+
         return JSONResponse({
             "success": True,
+            "connected": connected,
             "request_id": req_id,
             "slot": slot_num,
             "device_label": label_clean,
             "board_mac": board_mac,
             "is_locked": bool(board_mac),
-            "message": f"Endpoint Slot {slot_num} ({label_clean}) berhasil disimpan. Menghubungkan ke XiaoZhi...",
+            "message": status_msg,
         })
     except ValueError as exc:
         return JSONResponse({"success": False, "request_id": req_id, "detail": str(exc)}, status_code=400)
@@ -291,11 +313,21 @@ async def reconnect_mcp(
         mcp_bridge_tasks[task_key] = new_task
 
     signal_mcp_reload()
+
+    # Await WebSocket handshake confirmation for fast, zero-polling response
+    connected = await _wait_mcp_handshake(user["id"], token_hash, slot=slot_num, timeout=3.0)
+    status_msg = (
+        f"Koneksi Slot {slot_num} ({label}) berhasil terhubung ke XiaoZhi!"
+        if connected
+        else f"Koneksi Slot {slot_num} ({label}) sedang di-refresh."
+    )
+
     return JSONResponse({
         "success": True,
+        "connected": connected,
         "request_id": req_id,
         "slot": slot_num,
-        "message": f"Koneksi Slot {slot_num} ({label}) sedang di-refresh.",
+        "message": status_msg,
     })
 
 
