@@ -303,7 +303,7 @@ async def profile_scan_persona_api(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Sesi tidak valid.")
     store = get_store()
-    analysis = store.get_user_persona_analysis(user["id"])
+    analysis = store.get_user_persona_analysis(user["id"], force_refresh=True)
     return {
         "success": True,
         "message": "Profil persona berhasil dipindai ulang via RAG Vector.",

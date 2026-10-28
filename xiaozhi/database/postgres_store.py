@@ -3342,13 +3342,14 @@ class PostgresStore:
             return False
         return bool(dev.get("owner_id") is not None and int(dev.get("owner_id")) == int(owner_id))
 
-    def get_user_persona_analysis(self, owner_id: int, slot_number: Optional[int] = None) -> Dict[str, Any]:
+    def get_user_persona_analysis(self, owner_id: int, slot_number: Optional[int] = None, force_refresh: bool = False) -> Dict[str, Any]:
         """Runs RAG & Vector Semantic profiling on user chat history & stored personas."""
         from xiaozhi.services.semantic_memory_service import analyze_user_persona_from_chats
         try:
+            cache_key = f"pg:{owner_id}:{slot_number or 0}"
             chats = self.list_chat_history(owner_id, limit=300, slot_number=slot_number)
             stored_personas = self.get_user_persona(owner_id)
-            return analyze_user_persona_from_chats(chats, stored_personas)
+            return analyze_user_persona_from_chats(chats, stored_personas, cache_key=cache_key, force_refresh=force_refresh)
         except Exception as e:
             logger.exception("Error analyzing user persona for owner %s: %s", owner_id, e)
             return {

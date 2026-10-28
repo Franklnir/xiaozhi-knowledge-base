@@ -723,7 +723,7 @@ async def api_scan_persona(request: Request):
     if not user:
         return JSONResponse({"success": False, "message": "Unauthorized"}, status_code=401)
     store = get_store()
-    analysis = store.get_user_persona_analysis(user["id"])
+    analysis = store.get_user_persona_analysis(user["id"], force_refresh=True)
     return JSONResponse({
         "success": True,
         "message": "Profil persona dan karakter berhasil dipindai ulang via RAG Vector.",

@@ -2291,24 +2291,32 @@
 
         // 3. Challenges
         const cContainer = document.getElementById("challengesContainer");
-        if (cContainer && analysis.challenges && analysis.challenges.length > 0) {
-            cContainer.innerHTML = analysis.challenges.map(c => `
-                <div class="persona-stat-item">
-                    <div class="persona-stat-top">
-                        <div class="persona-stat-left">
-                            <span>${c.icon}</span>
-                            <span>${c.name}</span>
-                            <span class="app-chip app-chip-small ${c.badge === 'danger' ? 'app-chip-danger' : (c.badge === 'warning' ? 'app-chip-warning' : 'app-chip-neutral')}" style="font-size: 10px; padding: 2px 6px;">
-                                ${c.level}
-                            </span>
+        if (cContainer) {
+            if (analysis.challenges && analysis.challenges.length > 0) {
+                cContainer.innerHTML = analysis.challenges.map(c => `
+                    <div class="persona-stat-item">
+                        <div class="persona-stat-top">
+                            <div class="persona-stat-left">
+                                <span>${c.icon}</span>
+                                <span>${c.name}</span>
+                                <span class="app-chip app-chip-small ${c.badge === 'danger' ? 'app-chip-danger' : (c.badge === 'warning' ? 'app-chip-warning' : 'app-chip-neutral')}" style="font-size: 10px; padding: 2px 6px;">
+                                    ${c.level}
+                                </span>
+                            </div>
+                            <span class="persona-stat-pct" style="${c.badge === 'danger' ? 'color: var(--app-danger);' : ''}">${c.percent}%</span>
                         </div>
-                        <span class="persona-stat-pct" style="${c.badge === 'danger' ? 'color: var(--app-danger);' : ''}">${c.percent}%</span>
+                        <div class="persona-bar-track">
+                            <div class="persona-bar-fill ${c.badge === 'danger' ? 'persona-bar-danger' : (c.badge === 'warning' ? 'persona-bar-warning' : 'persona-bar-neutral')}" style="width: ${c.percent}%;"></div>
+                        </div>
                     </div>
-                    <div class="persona-bar-track">
-                        <div class="persona-bar-fill ${c.badge === 'danger' ? 'persona-bar-danger' : (c.badge === 'warning' ? 'persona-bar-warning' : 'persona-bar-neutral')}" style="width: ${c.percent}%;"></div>
+                `).join("");
+            } else {
+                cContainer.innerHTML = `
+                    <div style="font-size: 13px; color: var(--app-muted); text-align: center; padding: 16px;">
+                        Tidak ada kendala berat terdeteksi. Percakapan berjalan santai dan positif!
                     </div>
-                </div>
-            `).join("");
+                `;
+            }
         }
 
         // 4. Activities

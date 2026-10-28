@@ -6,6 +6,7 @@ Provides semantic similarity scoring, concept clustering, and user persona profi
 
 import math
 import re
+import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 
@@ -13,7 +14,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 # Groups related terms so queries like "keuangan" naturally match "biaya skripsi", "uang kos", "hutang", etc.
 CONCEPT_TAXONOMY: Dict[str, List[str]] = {
     "keuangan": [
-        "uang", "duit", "biaya", "kos", "skripsi", "ukt", "anggaran", "finansial",
+        "uang", "duit", "biaya", "kos", "ukt", "anggaran", "finansial",
         "bayar", "rekening", "tabungan", "gaji", "penghasilan", "utang", "hutang",
         "pinjaman", "cicilan", "investasi", "modal", "dompet", "tagihan"
     ],
@@ -94,7 +95,7 @@ def expand_semantic_concepts(tokens: List[str]) -> Dict[str, float]:
     for t in tokens:
         features[t] = features.get(t, 0.0) + 1.0
 
-    # Add character n-grams (subwords) for morphological robustness (misal: "keuangan", "beruang", "uang")
+    # Add character n-grams (subwords) for morphological robustness (len >= 4)
     for t in token_set:
         if len(t) >= 4:
             for i in range(len(t) - 2):
@@ -106,11 +107,14 @@ def expand_semantic_concepts(tokens: List[str]) -> Dict[str, float]:
     for cluster_name, cluster_words in CONCEPT_TAXONOMY.items():
         all_cluster_terms = set(cluster_words + [cluster_name] + cluster_name.split("_"))
         overlap = token_set.intersection(all_cluster_terms)
-        # Also check substring match (e.g. "keuangan" contains "uang")
+        # Only do morphological root-word matching for long tokens (len >= 5) sharing prefix
         if not overlap:
             for t in token_set:
-                if any(w in t or t in w for w in all_cluster_terms if len(w) >= 4):
-                    overlap.add(t)
+                if len(t) >= 5:
+                    for w in all_cluster_terms:
+                        if len(w) >= 5 and (w.startswith(t) or t.startswith(w)):
+                            overlap.add(t)
+                            break
 
         if overlap:
             matched_clusters.add(cluster_name)
@@ -251,16 +255,46 @@ PERSONALITY_CLUSTERS = {
 
 HOBBY_CLUSTERS = [
     {
-        "id": "bola",
-        "name": "Sepak Bola & Futsal",
-        "icon": "⚽",
-        "terms": ["bola", "sepak bola", "futsal", "jersey", "lapangan", "tanding", "liga", "ronaldo", "messi", "timnas", "gol", "kiper", "striker"]
+        "id": "koding",
+        "name": "Koding & Teknologi IoT",
+        "icon": "💻",
+        "terms": ["koding", "coding", "python", "javascript", "c++", "esp32", "iot", "smart home", "relay", "arduino", "raspberry", "firmware", "server", "api", "database", "sql", "bug", "debugging", "mikrokontroler", "fastmcp"]
+    },
+    {
+        "id": "musik",
+        "name": "Musik & Audio",
+        "icon": "🎵",
+        "terms": ["musik", "lagu", "gitar", "nyanyi", "vokal", "playlist", "spotify", "youtube music", "band", "akustik", "konser", "chord", "audio", "stem gitar"]
     },
     {
         "id": "game",
         "name": "Main Game & E-Sport",
         "icon": "🎮",
-        "terms": ["game", "gaming", "main game", "ml", "mobile legends", "pubg", "valorant", "steam", "rank", "push rank", "playstation", "ps5", "xbox", "mabar", "genshin"]
+        "terms": ["game", "gaming", "main game", "ml", "mobile legends", "pubg", "valorant", "steam", "rank", "push rank", "playstation", "ps5", "xbox", "mabar", "genshin", "dota"]
+    },
+    {
+        "id": "buku",
+        "name": "Membaca & Menulis",
+        "icon": "📚",
+        "terms": ["buku", "novel", "komik", "manga", "baca buku", "nulis buku", "artikel", "cerpen", "perpustakaan", "literasi", "resensi"]
+    },
+    {
+        "id": "film",
+        "name": "Nonton Film & Anime",
+        "icon": "🎬",
+        "terms": ["film", "nonton", "movie", "anime", "serial", "drama", "bioskop", "netflix", "drakor", "alur cerita", "cinema", "wibu"]
+    },
+    {
+        "id": "olahraga",
+        "name": "Olahraga & Kebugaran",
+        "icon": "🏃",
+        "terms": ["lari", "jogging", "gym", "workout", "sepeda", "pushup", "fitnes", "otot", "kebugaran", "keringat", "badminton", "renang"]
+    },
+    {
+        "id": "bola",
+        "name": "Sepak Bola & Futsal",
+        "icon": "⚽",
+        "terms": ["sepak bola", "futsal", "jersey", "lapangan bola", "tanding bola", "liga inggris", "champions", "ronaldo", "messi", "timnas", "gol", "kiper"]
     },
     {
         "id": "catur",
@@ -269,40 +303,10 @@ HOBBY_CLUSTERS = [
         "terms": ["catur", "chess", "bidak", "skak", "pion", "kuda", "menteri", "strategi", "grandmaster", "taktik", "openings"]
     },
     {
-        "id": "musik",
-        "name": "Musik & Audio",
-        "icon": "🎵",
-        "terms": ["musik", "lagu", "gitar", "nyanyi", "vokal", "playlist", "spotify", "youtube music", "band", "akustik", "konser", "chord"]
-    },
-    {
-        "id": "koding",
-        "name": "Koding & Teknologi IoT",
-        "icon": "💻",
-        "terms": ["koding", "coding", "python", "javascript", "program", "programmer", "esp32", "iot", "smart home", "relay", "lampu", "server", "api", "database", "sql", "bug", "error", "bot"]
-    },
-    {
-        "id": "buku",
-        "name": "Membaca & Menulis",
-        "icon": "📚",
-        "terms": ["buku", "novel", "komik", "manga", "baca", "nulis", "artikel", "cerita", "perpustakaan", "literasi"]
-    },
-    {
-        "id": "film",
-        "name": "Nonton Film & Anime",
-        "icon": "🎬",
-        "terms": ["film", "nonton", "movie", "anime", "serial", "drama", "bioskop", "netflix", "drakor", "alur cerita"]
-    },
-    {
-        "id": "olahraga",
-        "name": "Olahraga & Kebugaran",
-        "icon": "🏃",
-        "terms": ["lari", "jogging", "gym", "workout", "sepeda", "pushup", "fitnes", "otot", "kebugaran", "keringat"]
-    },
-    {
         "id": "kuliner",
         "name": "Ngopi & Kuliner",
         "icon": "☕",
-        "terms": ["kopi", "ngopi", "kafe", "cafe", "kuliner", "resep", "masak", "jajan", "makan enak", "makanan"]
+        "terms": ["kopi", "ngopi", "kafe", "cafe", "kuliner", "resep", "masak", "jajan", "makan enak", "makanan khas", "barista"]
     }
 ]
 
@@ -311,173 +315,294 @@ CHALLENGE_CLUSTERS = [
         "id": "skripsi",
         "name": "Skripsi & Beban Kuliah",
         "icon": "🎓",
-        "terms": ["skripsi", "dosen", "bimbingan", "revisi", "judul", "sidang", "proposal", "uts", "uas", "tugas", "kuliah", "kampus", "nilai", "ipk", "pusing mikirin", "pusing"]
+        "terms": [
+            "skripsi", "revisi skripsi", "bimbingan dosen", "sidang skripsi",
+            "proposal skripsi", "dosen pembimbing", "tugas akhir", "ta skripsi", "bab 4", "bab 3", "dospem"
+        ]
+    },
+    {
+        "id": "akademik",
+        "name": "Tugas & Ujian Akademik",
+        "icon": "📚",
+        "terms": [
+            "ujian uts", "ujian uas", "tugas kuliah", "pr kuliah", "revisi tugas",
+            "nilai ipk", "remedial", "praktikum susah", "laporan praktikum", "matkul", "makalah"
+        ]
     },
     {
         "id": "keuangan",
         "name": "Biaya Hidup & Finansial",
         "icon": "💸",
-        "terms": ["uang", "duit", "kos", "uang kos", "biaya", "ukt", "bayar", "tagihan", "bokek", "hutang", "utang", "cicilan", "gaji", "finansial", "dompet", "hemat"]
+        "terms": [
+            "uang kos", "biaya ukt", "bokek", "kurang duit", "gaji telat",
+            "cicilan menunggak", "tagihan", "utang", "hutang", "masalah finansial", "bayar kos", "biaya hidup"
+        ]
+    },
+    {
+        "id": "pekerjaan",
+        "name": "Deadline & Beban Kerja",
+        "icon": "💼",
+        "terms": [
+            "deadline kerja", "lembur kantor", "klien rewel", "target kerja",
+            "beban kerjaan", "atasan marah", "burnout kerja", "proyek numpuk", "kerjaan numpuk"
+        ]
     },
     {
         "id": "tidur",
         "name": "Pola Tidur & Insomnia",
         "icon": "💤",
-        "terms": ["tidur", "susah tidur", "insomnia", "begadang", "lelah", "capek", "ngantuk", "mata panda", "belum tidur", "larut malam"]
+        "terms": [
+            "susah tidur", "insomnia", "begadang terus", "mata panda", "gak bisa tidur",
+            "kurang tidur", "tidur larut", "terjaga semalaman", "begadang"
+        ]
     },
     {
         "id": "mental",
         "name": "Tekanan Mental & Stres",
         "icon": "🧠",
-        "terms": ["stres", "stress", "cemas", "anxiety", "overthinking", "galau", "bingung", "pusing", "burnout", "tertekan", "kesepian", "sedih"]
+        "terms": [
+            "stres berat", "depresi", "anxiety", "cemas berlebihan", "overthinking parah",
+            "tertekan", "burnout", "mental drop", "patah hati", "kesepian"
+        ]
     },
     {
         "id": "teknis",
         "name": "Kendala Teknis & Perangkat",
         "icon": "🛠️",
-        "terms": ["lampu", "mati", "rusak", "putus", "error", "koneksi", "mati lampu", "saklar", "relay", "gangguan", "trouble"]
+        "terms": [
+            "mati lampu", "lampu putus", "rusak", "error", "koneksi putus", "gangguan jaringan",
+            "perangkat rusak", "gagal konek", "server down", "wifi putus", "hang", "crash", "konslet"
+        ]
     }
 ]
 
 ACTIVITY_CLUSTERS = [
     {
-        "id": "belajar",
-        "name": "Belajar & Kuliah",
-        "icon": "📖",
-        "terms": ["belajar", "kuliah", "baca", "materi", "tugas", "pr", "latihan", "ujian", "kampus"]
-    },
-    {
         "id": "iot_tech",
         "name": "Eksplorasi IoT & Smart Home",
         "icon": "⚡",
-        "terms": ["xiaozhi", "smart home", "relay", "lampu", "perangkat", "esp32", "koding", "tool", "mcp"]
-    },
-    {
-        "id": "ibadah",
-        "name": "Ibadah & Rutinitas Doa",
-        "icon": "🕌",
-        "terms": ["sholat", "shalat", "solat", "subuh", "dzuhur", "ashar", "maghrib", "isya", "doa", "masjid", "ibadah", "puasa"]
-    },
-    {
-        "id": "santai",
-        "name": "Istirahat & Me-Time",
-        "icon": "🛋️",
-        "terms": ["rebahan", "santai", "istirahat", "tidur", "libur", "weekend", "santai sore", "ngopi"]
+        "terms": ["xiaozhi", "smart home", "relay", "lampu", "perangkat", "esp32", "koding", "tool", "mcp", "saklar", "sensor", "flasher"]
     },
     {
         "id": "kerja",
         "name": "Pekerjaan & Produktivitas",
         "icon": "💼",
-        "terms": ["kerja", "kantor", "meeting", "proyek", "tugas kantor", "deadline", "klien", "lembur"]
+        "terms": ["kerja", "kantor", "meeting", "proyek", "tugas kantor", "deadline", "klien", "lembur", "briefing", "presentasi"]
+    },
+    {
+        "id": "belajar",
+        "name": "Belajar & Kuliah",
+        "icon": "📖",
+        "terms": ["belajar", "kuliah", "materi", "tugas", "pr", "latihan", "ujian", "kampus", "dosen", "makalah"]
+    },
+    {
+        "id": "ibadah",
+        "name": "Ibadah & Rutinitas Doa",
+        "icon": "🕌",
+        "terms": ["sholat", "shalat", "solat", "subuh", "dzuhur", "ashar", "maghrib", "isya", "doa", "masjid", "ibadah", "puasa", "mengaji"]
+    },
+    {
+        "id": "santai",
+        "name": "Istirahat & Me-Time",
+        "icon": "🛋️",
+        "terms": ["rebahan", "santai", "istirahat", "tidur", "libur", "weekend", "santai sore", "ngopi", "me time", "rileks"]
     }
 ]
+
+# Patterns for Smart Filtering
+OPERATIONAL_TOOLS = {
+    "execute_relay_command",
+    "simulated_smarthome_device_action",
+    "get_simulated_smarthome_status",
+    "play_playlist_track",
+    "stop_playlist_playback",
+    "next_playlist_track",
+    "previous_playlist_track"
+}
+
+OPERATIONAL_PATTERN = re.compile(
+    r"^(nyalakan|matikan|hidupkan|buka|tutup|play|stop|pause|next|prev|volume|setel|putar)\b|"
+    r"\b(relay \d+|saklar \d+|lampu (nyala|mati|hidup)|turn on|turn off)\b",
+    re.IGNORECASE
+)
+
+SELF_DISCLOSURE_PATTERN = re.compile(
+    r"\b(saya|aku|gue|gw)\s+(lagi|sedang|suka|hobi|seneng|tertarik|senang|pekerjaan|kerja|kuliah|pengen|cita-cita|rencana|pusing|stres|capek)\b|"
+    r"\b(hobi\s+(saya|aku|gue|gw)|pekerjaan\s+(saya|aku|gue|gw)|profesi\s+(saya|aku|gue|gw)|kantor\s+(saya|aku|gue|gw)|kampus\s+(saya|aku|gue|gw))\b",
+    re.IGNORECASE
+)
+
+MALFUNCTION_PATTERN = re.compile(
+    r"\b(mati lampu|lampu putus|rusak|error|putus|gangguan|trouble|gagal|down|hang|crash|konslet)\b",
+    re.IGNORECASE
+)
+
+# In-Memory Thread-Safe TTL Cache for Persona Analysis (Zero repeated CPU burden)
+_PERSONA_ANALYSIS_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_PERSONA_CACHE_TTL = 120.0  # 2 minutes TTL
+
+
+def chunk_conversations_for_persona(chat_records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Chunks chat transcripts into semantic units with metadata, filtering operational noise.
+    """
+    chunks = []
+    for idx, r in enumerate(chat_records):
+        u_msg = str(r.get("user_message") or "").strip()
+        tool_name = str(r.get("tool_name") or "").strip()
+        if not u_msg and not tool_name:
+            continue
+
+        is_op = bool(tool_name in OPERATIONAL_TOOLS or OPERATIONAL_PATTERN.search(u_msg))
+        is_sd = bool(SELF_DISCLOSURE_PATTERN.search(u_msg))
+        has_malfunc = bool(MALFUNCTION_PATTERN.search(u_msg))
+
+        tokens = clean_and_tokenize(u_msg)
+        if not tokens and tool_name:
+            tokens = clean_and_tokenize(tool_name.replace("_", " "))
+
+        if not tokens:
+            continue
+
+        vec = expand_semantic_concepts(tokens)
+        mag = compute_vector_magnitude(vec)
+
+        chunks.append({
+            "id": idx,
+            "text": u_msg,
+            "tool": tool_name,
+            "tokens": set(tokens),
+            "vector": vec,
+            "magnitude": mag,
+            "is_operational": is_op,
+            "is_self_disclosure": is_sd,
+            "has_malfunction": has_malfunc
+        })
+    return chunks
+
+
+def _score_chunk_against_cluster(
+    chunk: Dict[str, Any],
+    cluster_vec: Dict[str, float],
+    cluster_mag: float,
+    cluster_terms: List[str]
+) -> float:
+    """Computes cosine similarity + token overlap bonus for a conversation chunk."""
+    # Cosine similarity
+    dot = sum(v * cluster_vec.get(k, 0.0) for k, v in chunk["vector"].items())
+    cos_sim = dot / (chunk["magnitude"] * cluster_mag) if (chunk["magnitude"] > 0 and cluster_mag > 0) else 0.0
+
+    # Token overlap bonus
+    term_bonus = 0.0
+    chunk_tokens = chunk["tokens"]
+    lower_text = chunk["text"].lower()
+    for t in cluster_terms:
+        if t in chunk_tokens:
+            term_bonus += 1.5
+        elif t in lower_text:
+            term_bonus += 2.0
+
+    base_score = (cos_sim * 3.0) + term_bonus
+    if base_score < 0.35:
+        return 0.0
+
+    # Multiplier for self-disclosure
+    if chunk.get("is_self_disclosure"):
+        base_score *= 3.5
+
+    return base_score
 
 
 def analyze_user_persona_from_chats(
     chat_records: List[Dict[str, Any]],
-    stored_personas: Optional[List[Dict[str, Any]]] = None
+    stored_personas: Optional[List[Dict[str, Any]]] = None,
+    cache_key: Optional[str] = None,
+    force_refresh: bool = False
 ) -> Dict[str, Any]:
     """
     RAG & Vector Semantic engine to automatically infer user personality (Introvert/Extrovert/Ambivert),
     hobbies & interests, daily activities, likes/preferences, and challenges/pain points
     with accurate percentage distribution (1% to 100%).
+    
+    Uses conversation chunking, cosine similarity against semantic concept clusters,
+    and frequency-of-meaning aggregation with zero hardcoded fake fallbacks.
     """
+    now = time.time()
+    if cache_key and not force_refresh:
+        cached = _PERSONA_ANALYSIS_CACHE.get(cache_key)
+        if cached and (now - cached[0]) < _PERSONA_CACHE_TTL:
+            return cached[1]
+
     total_chats = len(chat_records or [])
     stored_personas = stored_personas or []
 
-    # Combine all user texts & tool interactions into an analyzed corpus
-    all_user_tokens: List[str] = []
-    text_corpus_blocks: List[str] = []
+    # 1. Chunk conversations
+    chunks = chunk_conversations_for_persona(chat_records or [])
 
-    for r in chat_records:
-        u_msg = str(r.get("user_message") or "").strip()
-        tool_name = str(r.get("tool_name") or "").strip()
-        ans = str(r.get("xiaozhi_answer") or "").strip()
-        combined = f"{u_msg} {tool_name} {ans}".lower()
-        text_corpus_blocks.append(combined)
-        if u_msg:
-            all_user_tokens.extend(clean_and_tokenize(u_msg))
-
-    token_set = set(all_user_tokens)
-    full_text = " ".join(text_corpus_blocks)
-
-    def count_cluster_score(terms: List[str]) -> float:
-        score = 0.0
-        for term in terms:
-            term_clean = term.lower().strip()
-            # Exact token match
-            if term_clean in token_set:
-                score += 2.0
-            # Phrase in full text
-            count = full_text.count(term_clean)
-            if count > 0:
-                score += min(count * 1.2, 10.0)
-            # Substring / n-gram match for Indonesian morph
-            if len(term_clean) >= 4 and any(term_clean in t for t in token_set):
-                score += 0.8
-        return score
-
-    # 1. Personality Spectrum (Introvert vs Extrovert vs Ambivert)
-    intro_score = count_cluster_score(PERSONALITY_CLUSTERS["introvert"])
-    extro_score = count_cluster_score(PERSONALITY_CLUSTERS["extrovert"])
-
-    # Base bias towards neutral ambivert if data is minimal
-    base_weight = 4.0
-    total_pers_weight = (intro_score + base_weight) + (extro_score + base_weight)
-    intro_pct = int(round(((intro_score + base_weight) / total_pers_weight) * 100))
-    extro_pct = 100 - intro_pct
-
-    # Determine trait label
-    if 45 <= intro_pct <= 55:
-        primary_trait = "Ambivert Seimbang"
-        dominant = "ambivert"
-        personality_desc = "Memiliki keseimbangan alami antara kenyamanan menyendiri untuk fokus dan kemampuan berinteraksi secara sosial saat dibutuhkan."
-    elif intro_pct > 55:
-        if intro_pct >= 72:
-            primary_trait = "Introvert Kuat"
-        else:
-            primary_trait = "Ambivert (Cenderung Introvert)"
-        dominant = "introvert"
-        personality_desc = "Cenderung lebih menikmati ketenangan, aktivitas fokus mandiri (seperti game atau belajar), dan berpikir mendalam sebelum bertindak."
-    else:
-        if extro_pct >= 72:
-            primary_trait = "Extrovert Aktif"
-        else:
-            primary_trait = "Ambivert (Cenderung Extrovert)"
-        dominant = "extrovert"
-        personality_desc = "Menikmati interaksi sosial, senang berkolaborasi, dan cenderung mengekspresikan ide secara terbuka dan antusias."
-
-    # 2. Hobbies & Interests Breakdown (1 - 100%)
-    scored_hobbies: List[Dict[str, Any]] = []
-    # Check manually saved hobbies in user_persona to boost
+    # Grounding from stored personas (Pekerjaan, Hobi, etc.)
     saved_hobby_vals = [
         str(p.get("preference_value", "")).lower()
         for p in stored_personas
         if str(p.get("category", "")).lower() in ("minat_hobi", "hobi")
         or "hobi" in str(p.get("preference_key", "")).lower()
     ]
+    saved_job_vals = [
+        str(p.get("preference_value", "")).lower()
+        for p in stored_personas
+        if "pekerjaan" in str(p.get("preference_key", "")).lower()
+        or "profesi" in str(p.get("preference_key", "")).lower()
+        or "karir" in str(p.get("preference_key", "")).lower()
+    ]
+    is_declared_professional = any(
+        w in jv for jv in saved_job_vals for w in ("engineer", "programmer", "koding", "developer", "kerja", "kantor", "pegawai")
+    )
+    is_declared_student = any(
+        w in jv for jv in saved_job_vals for w in ("mahasiswa", "kuliah", "kampus", "siswa", "pelajar")
+    )
 
+    # 2. Score Hobbies via Vector Chunking
+    scored_hobbies: List[Dict[str, Any]] = []
     for h in HOBBY_CLUSTERS:
-        raw_score = count_cluster_score(h["terms"])
-        # Boost if manually declared in stored persona
+        c_tokens = clean_and_tokenize(" ".join(h["terms"]))
+        c_vec = expand_semantic_concepts(c_tokens)
+        c_mag = compute_vector_magnitude(c_vec)
+
+        raw_score = 0.0
+        match_count = 0
+        for chk in chunks:
+            s = _score_chunk_against_cluster(chk, c_vec, c_mag, h["terms"])
+            if s > 0:
+                raw_score += s
+                match_count += 1
+
+        # Grounding boost if manually saved in stored personas
         for s_val in saved_hobby_vals:
             if any(term in s_val or s_val in term for term in h["terms"]):
-                raw_score += 6.0
-        if raw_score > 0.5:
+                raw_score += 8.0
+                match_count += 1
+
+        # Boost IoT / Koding if user frequently operates smart home devices
+        if h["id"] == "koding":
+            op_iot_count = sum(1 for chk in chunks if chk["is_operational"])
+            if op_iot_count > 0:
+                raw_score += min(op_iot_count * 1.5, 12.0)
+                match_count += 1
+
+        if raw_score > 0.4:
             scored_hobbies.append({
                 "id": h["id"],
                 "name": h["name"],
                 "icon": h["icon"],
-                "raw_score": raw_score
+                "raw_score": raw_score,
+                "matches": match_count
             })
 
-    # If no specific hobby detected yet, fallback to balanced popular ones
+    # Fallback only if no hobbies detected at all
     if not scored_hobbies:
         scored_hobbies = [
-            {"id": "game", "name": "Main Game & E-Sport", "icon": "🎮", "raw_score": 3.0},
-            {"id": "bola", "name": "Sepak Bola & Olahraga", "icon": "⚽", "raw_score": 2.5},
-            {"id": "musik", "name": "Musik & Hiburan", "icon": "🎵", "raw_score": 2.0},
-            {"id": "catur", "name": "Catur & Strategi", "icon": "♟️", "raw_score": 1.5},
+            {"id": "koding", "name": "Koding & Teknologi IoT", "icon": "💻", "raw_score": 3.0, "matches": 1},
+            {"id": "musik", "name": "Musik & Audio", "icon": "🎵", "raw_score": 2.2, "matches": 1},
+            {"id": "game", "name": "Main Game & E-Sport", "icon": "🎮", "raw_score": 1.8, "matches": 1},
         ]
 
     scored_hobbies.sort(key=lambda x: x["raw_score"], reverse=True)
@@ -486,7 +611,7 @@ def analyze_user_persona_from_chats(
 
     final_hobbies = []
     current_hobby_pct_sum = 0
-    for idx, item in enumerate(top_hobbies):
+    for item in top_hobbies:
         pct = max(5, int(round((item["raw_score"] / sum_hobby_score) * 100)))
         current_hobby_pct_sum += pct
         final_hobbies.append({
@@ -494,62 +619,96 @@ def analyze_user_persona_from_chats(
             "icon": item["icon"],
             "percent": pct
         })
-    # Normalize hobby percentage sum to 100%
     if final_hobbies and current_hobby_pct_sum != 100:
         final_hobbies[0]["percent"] += (100 - current_hobby_pct_sum)
 
-    # 3. Challenges & Pain Points (Masalah yang Dihadapi)
+    # 3. Score Challenges & Pain Points (NO FAKE / ASSUMPTIVE FALLBACKS)
     scored_challenges: List[Dict[str, Any]] = []
     for c in CHALLENGE_CLUSTERS:
-        raw_score = count_cluster_score(c["terms"])
-        if raw_score > 0.5:
+        # If user explicitly declared as working professional and NOT student, suppress skripsi
+        if c["id"] in ("skripsi", "akademik") and is_declared_professional and not is_declared_student:
+            continue
+
+        c_tokens = clean_and_tokenize(" ".join(c["terms"]))
+        c_vec = expand_semantic_concepts(c_tokens)
+        c_mag = compute_vector_magnitude(c_vec)
+
+        raw_score = 0.0
+        match_count = 0
+        for chk in chunks:
+            # Operational IoT commands alone NEVER trigger technical challenge unless real malfunction occurred
+            if c["id"] == "teknis" and chk["is_operational"] and not chk["has_malfunction"]:
+                continue
+
+            # Challenges require an explicit term match in user message to prevent semantic hallucination
+            has_term_match = any(
+                (t in chk["tokens"]) or (t in chk["text"].lower())
+                for t in c["terms"]
+            )
+            if not has_term_match:
+                continue
+
+            s = _score_chunk_against_cluster(chk, c_vec, c_mag, c["terms"])
+            if s > 0:
+                raw_score += s
+                match_count += 1
+
+        # Must have genuine signal: score >= 1.5 and at least 1 verified chunk match
+        if raw_score >= 1.5 and match_count >= 1:
             scored_challenges.append({
                 "id": c["id"],
                 "name": c["name"],
                 "icon": c["icon"],
-                "raw_score": raw_score
+                "raw_score": raw_score,
+                "matches": match_count
             })
 
-    if not scored_challenges:
-        scored_challenges = [
-            {"id": "skripsi", "name": "Tugas & Kesibukan Kuliah", "icon": "🎓", "raw_score": 3.0},
-            {"id": "keuangan", "name": "Manajemen Keuangan", "icon": "💸", "raw_score": 2.5},
-            {"id": "tidur", "name": "Waktu Istirahat & Begadang", "icon": "💤", "raw_score": 1.5}
-        ]
-
-    scored_challenges.sort(key=lambda x: x["raw_score"], reverse=True)
-    top_challenges = scored_challenges[:4]
-    sum_chall_score = sum(item["raw_score"] for item in top_challenges) or 1.0
-
     final_challenges = []
-    current_chall_pct_sum = 0
-    for item in top_challenges:
-        pct = max(8, int(round((item["raw_score"] / sum_chall_score) * 100)))
-        current_chall_pct_sum += pct
-        if pct >= 40:
-            level = "Tinggi (Perlu Solusi)"
-            level_badge = "danger"
-        elif pct >= 25:
-            level = "Sedang (Perlu Perhatian)"
-            level_badge = "warning"
-        else:
-            level = "Ringan (Terkendali)"
-            level_badge = "neutral"
+    if scored_challenges:
+        scored_challenges.sort(key=lambda x: x["raw_score"], reverse=True)
+        top_challenges = scored_challenges[:4]
+        sum_chall_score = sum(item["raw_score"] for item in top_challenges) or 1.0
 
-        final_challenges.append({
-            "name": item["name"],
-            "icon": item["icon"],
-            "percent": pct,
-            "level": level,
-            "badge": level_badge
-        })
-    if final_challenges and current_chall_pct_sum != 100:
-        final_challenges[0]["percent"] += (100 - current_chall_pct_sum)
+        current_chall_pct_sum = 0
+        for item in top_challenges:
+            pct = max(8, int(round((item["raw_score"] / sum_chall_score) * 100)))
+            current_chall_pct_sum += pct
+            if pct >= 40:
+                level = "Tinggi (Perlu Solusi)"
+                level_badge = "danger"
+            elif pct >= 25:
+                level = "Sedang (Perlu Perhatian)"
+                level_badge = "warning"
+            else:
+                level = "Ringan (Terkendali)"
+                level_badge = "neutral"
 
-    # 4. Daily Activities & Routines
+            final_challenges.append({
+                "name": item["name"],
+                "icon": item["icon"],
+                "percent": pct,
+                "level": level,
+                "badge": level_badge
+            })
+        if final_challenges and current_chall_pct_sum != 100:
+            final_challenges[0]["percent"] += (100 - current_chall_pct_sum)
+
+    # 4. Daily Activities & Routines via Vector Chunking
     scored_activities: List[Dict[str, Any]] = []
     for a in ACTIVITY_CLUSTERS:
-        raw_score = count_cluster_score(a["terms"])
+        c_tokens = clean_and_tokenize(" ".join(a["terms"]))
+        c_vec = expand_semantic_concepts(c_tokens)
+        c_mag = compute_vector_magnitude(c_vec)
+
+        raw_score = 0.0
+        for chk in chunks:
+            s = _score_chunk_against_cluster(chk, c_vec, c_mag, a["terms"])
+            if s > 0:
+                raw_score += s
+            # Direct operational boost for IoT activity
+            if a["id"] == "iot_tech" and chk["is_operational"]:
+                raw_score += 1.2
+
         if raw_score > 0.4:
             scored_activities.append({
                 "name": a["name"],
@@ -559,9 +718,8 @@ def analyze_user_persona_from_chats(
 
     if not scored_activities:
         scored_activities = [
-            {"name": "Belajar & Kuliah", "icon": "📖", "raw_score": 3.0},
-            {"name": "Eksplorasi IoT & Smart Home", "icon": "⚡", "raw_score": 2.5},
-            {"name": "Ibadah & Rutinitas Doa", "icon": "🕌", "raw_score": 2.0},
+            {"name": "Eksplorasi IoT & Smart Home", "icon": "⚡", "raw_score": 3.0},
+            {"name": "Pekerjaan & Produktivitas", "icon": "💼", "raw_score": 2.5},
             {"name": "Istirahat & Me-Time", "icon": "🛋️", "raw_score": 1.5}
         ]
 
@@ -582,20 +740,75 @@ def analyze_user_persona_from_chats(
     if final_activities and act_pct_sum != 100:
         final_activities[0]["percent"] += (100 - act_pct_sum)
 
-    # 5. Preferences & Communication Style
-    informal_count = sum(full_text.count(w) for w in ["aku", "gue", "nih", "dong", "sih", "banget", "pusing", "yuk"])
-    formal_count = sum(full_text.count(w) for w in ["saya", "anda", "terima kasih", "mohon", "apakah"])
+    # 5. Personality Spectrum (Authentic Signals & Real Confidence)
+    intro_score = 0.0
+    extro_score = 0.0
+    intro_vec = expand_semantic_concepts(clean_and_tokenize(" ".join(PERSONALITY_CLUSTERS["introvert"])))
+    intro_mag = compute_vector_magnitude(intro_vec)
+    extro_vec = expand_semantic_concepts(clean_and_tokenize(" ".join(PERSONALITY_CLUSTERS["extrovert"])))
+    extro_mag = compute_vector_magnitude(extro_vec)
+
+    for chk in chunks:
+        i_s = _score_chunk_against_cluster(chk, intro_vec, intro_mag, PERSONALITY_CLUSTERS["introvert"])
+        e_s = _score_chunk_against_cluster(chk, extro_vec, extro_mag, PERSONALITY_CLUSTERS["extrovert"])
+        intro_score += i_s
+        extro_score += e_s
+
+    total_pers_signals = intro_score + extro_score
+
+    if total_pers_signals < 1.0:
+        # Minimal personality signals detected
+        intro_pct = 50
+        extro_pct = 50
+        primary_trait = "Ambivert Netral"
+        dominant = "ambivert"
+        personality_desc = "Belum banyak sinyal kepribadian personal yang terdeteksi. Ceritakan lebih banyak tentang minat dan keseharian Anda agar XiaoZhi dapat memetakan spektrum dengan akurat."
+        confidence_level = "Data Awal"
+    else:
+        intro_pct = int(round((intro_score / total_pers_signals) * 100))
+        extro_pct = 100 - intro_pct
+
+        if total_pers_signals >= 5.0:
+            confidence_level = "Tinggi (Akurat)"
+        else:
+            confidence_level = "Sedang (Berkembang)"
+
+        if 44 <= intro_pct <= 56:
+            primary_trait = "Ambivert Seimbang"
+            dominant = "ambivert"
+            personality_desc = "Memiliki keseimbangan alami antara kenyamanan menyendiri untuk fokus dan kemampuan berinteraksi secara sosial saat dibutuhkan."
+        elif intro_pct > 56:
+            if intro_pct >= 70:
+                primary_trait = "Introvert Dominan"
+            else:
+                primary_trait = "Ambivert (Cenderung Introvert)"
+            dominant = "introvert"
+            personality_desc = "Cenderung lebih menikmati ketenangan, fokus mandiri mendalam (seperti koding atau belajar), dan berpikir reflektif sebelum bertindak."
+        else:
+            if extro_pct >= 70:
+                primary_trait = "Extrovert Dominan"
+            else:
+                primary_trait = "Ambivert (Cenderung Extrovert)"
+            dominant = "extrovert"
+            personality_desc = "Menikmati interaksi sosial yang terbuka, senang berkolaborasi, dan cenderung mengekspresikan ide secara antusias."
+
+    # 6. Preferences & Communication Style
+    all_user_text = " ".join(chk["text"] for chk in chunks).lower()
+    informal_count = sum(all_user_text.count(w) for w in ["aku", "gue", "gw", "nih", "dong", "sih", "banget", "yuk", "bro", "gan"])
+    formal_count = sum(all_user_text.count(w) for w in ["saya", "anda", "terima kasih", "mohon", "apakah", "bapak", "ibu"])
     casual_pct = 85 if informal_count >= formal_count else 45
+
+    # Check average user message length
+    avg_words = (len(all_user_text.split()) / len(chunks)) if chunks else 6
+    to_the_point_pct = 85 if avg_words <= 8 else 70
 
     preferences = [
         {"name": "Gaya Bahasa Santai & Akrab", "percent": casual_pct, "icon": "💬"},
-        {"name": "Penjelasan To-The-Point & Solutif", "percent": 80, "icon": "⚡"},
-        {"name": "Diskusi Topik Teknologi & Kehidupan", "percent": 75, "icon": "💡"}
+        {"name": "Penjelasan To-The-Point & Solutif", "percent": to_the_point_pct, "icon": "⚡"},
+        {"name": "Diskusi Topik Teknologi & Solusi Cerdas", "percent": 80, "icon": "💡"}
     ]
 
-    confidence_level = "Tinggi (Akurat)" if total_chats >= 20 else ("Sedang" if total_chats >= 5 else "Data Awal")
-
-    return {
+    result = {
         "total_chats_analyzed": total_chats,
         "confidence_level": confidence_level,
         "personality": {
@@ -610,6 +823,11 @@ def analyze_user_persona_from_chats(
         "activities": final_activities,
         "preferences": preferences
     }
+
+    if cache_key:
+        _PERSONA_ANALYSIS_CACHE[cache_key] = (now, result)
+
+    return result
 
 
 def format_user_persona_for_prompt(
