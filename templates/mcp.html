@@ -4,131 +4,277 @@
 
 {% block content %}
 <style>
-    /* ── MCP Dedicated Styles ────────────────────────────────────────────── */
-    .mcp-stat-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-        gap: 16px;
-        margin-bottom: 24px;
-    }
-    .mcp-main-layout {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 24px;
-    }
-    @media (min-width: 1024px) {
-        .mcp-slots-config-grid {
-            display: grid;
-            grid-template-columns: 360px 1fr;
-            gap: 24px;
-            align-items: start;
-        }
-    }
-    .mcp-slots-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
-        margin-bottom: 16px;
-    }
-    @media (max-width: 640px) {
-        .mcp-slots-grid {
-            grid-template-columns: 1fr;
-            gap: 8px;
-        }
-    }
-    .mcp-slot-tab {
+    /* ── MCP Advanced Responsive Design System ───────────────────────────── */
+    .mcp-container {
         display: flex;
         flex-direction: column;
-        align-items: flex-start;
-        justify-content: space-between;
-        padding: 12px 14px;
-        min-height: 68px;
-        background: var(--app-surface-muted, #f8fafc);
-        border: 2px solid var(--app-border-strong, var(--app-border));
-        border-radius: var(--app-radius, 10px);
-        cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        text-align: left;
-        position: relative;
+        gap: 20px;
         width: 100%;
+        max-width: 1360px;
+        margin: 0 auto;
         box-sizing: border-box;
     }
-    .mcp-slot-tab:hover {
-        background: var(--app-surface);
-        border-color: var(--app-brand);
-        transform: translateY(-1px);
-    }
-    .mcp-slot-tab.active {
-        background: var(--app-surface);
-        border-color: #047857;
-        box-shadow: 0 0 0 2px rgba(4, 120, 87, 0.2), 0 4px 12px rgba(4, 120, 87, 0.08);
-    }
-    :root[data-theme="neo"] .mcp-slot-tab {
-        border: 2px solid #111;
-        box-shadow: 3px 3px 0 #111;
-    }
-    :root[data-theme="neo"] .mcp-slot-tab.active {
-        border: 2.5px solid #047857;
-        box-shadow: 4px 4px 0 #047857;
-    }
 
-    .slot-tab-header {
+    /* Page Header */
+    .mcp-header-card {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius, 14px);
+        padding: 20px 24px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        width: 100%;
-        margin-bottom: 6px;
+        gap: 16px;
+        flex-wrap: wrap;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
-    .slot-badge-tag {
-        font-size: 10px;
-        font-weight: 900;
-        text-transform: uppercase;
-        color: var(--app-muted);
-        background: var(--app-soft);
-        padding: 2px 7px;
-        border-radius: 4px;
-        border: 1px solid var(--app-border);
-        letter-spacing: 0.5px;
+    :root[data-theme="neo"] .mcp-header-card {
+        border: 2px solid #111;
+        box-shadow: 4px 4px 0 #111;
     }
-    .mcp-slot-tab.active .slot-badge-tag {
-        color: #047857;
-        background: #ecfdf5;
-        border-color: #a7f3d0;
-    }
-    .slot-radar-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        display: inline-block;
-    }
-    .slot-radar-dot.connected { background: #10b981; box-shadow: 0 0 8px #10b981; }
-    .slot-radar-dot.connecting { background: #0284c7; animation: mcpPulse 1.2s infinite; }
-    .slot-radar-dot.idle { background: #94a3b8; }
-
-    @keyframes mcpPulse {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.35); opacity: 0.55; }
-    }
-
-    .slot-main-label {
-        font-size: 13.5px;
+    .mcp-header-title {
+        margin: 4px 0 6px;
+        font-size: 22px;
         font-weight: 800;
         color: var(--app-text);
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .mcp-header-subtitle {
+        margin: 0;
+        font-size: 13px;
+        color: var(--app-muted);
+        line-height: 1.5;
+        max-width: 720px;
+    }
+
+    /* Top Stats Grid */
+    .mcp-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+    }
+    @media (max-width: 1024px) {
+        .mcp-stat-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+    }
+    @media (max-width: 520px) {
+        .mcp-stat-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+    }
+
+    .mcp-stat-card {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius, 12px);
+        padding: 16px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    :root[data-theme="neo"] .mcp-stat-card {
+        border: 2px solid #111;
+        box-shadow: 3px 3px 0 #111;
+    }
+    .mcp-stat-card:hover {
+        transform: translateY(-1px);
+        border-color: var(--app-brand, #10b981);
+    }
+    .mcp-stat-label {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--app-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+        display: block;
+    }
+    .mcp-stat-num {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--app-text);
+        line-height: 1.2;
+    }
+    .mcp-stat-icon-wrap {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    @media (max-width: 520px) {
+        .mcp-stat-card {
+            padding: 12px 14px;
+        }
+        .mcp-stat-num {
+            font-size: 17px;
+        }
+        .mcp-stat-icon-wrap {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+        }
+    }
+
+    /* Main 3-Slot Configuration Grid */
+    .mcp-main-grid {
+        display: grid;
+        grid-template-columns: 420px 1fr;
+        gap: 20px;
+        align-items: start;
+    }
+    @media (max-width: 1024px) {
+        .mcp-main-grid {
+            grid-template-columns: 1fr;
+            gap: 18px;
+        }
+    }
+
+    /* Card Panels */
+    .mcp-panel {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius, 14px);
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    :root[data-theme="neo"] .mcp-panel {
+        border: 2px solid #111;
+        box-shadow: 4px 4px 0 #111;
+    }
+    .mcp-panel-header {
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--app-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        background: var(--app-surface);
+    }
+    .mcp-panel-title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--app-text);
+        display: flex;
+        align-items: center;
+        gap: 9px;
+    }
+    .mcp-panel-body {
+        padding: 20px;
+    }
+    @media (max-width: 640px) {
+        .mcp-panel-header {
+            padding: 14px 16px;
+        }
+        .mcp-panel-body {
+            padding: 16px;
+        }
+    }
+
+    /* Segmented Slot Selector Tabs (Mobile Friendly) */
+    .mcp-segment-nav {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        background: var(--app-soft, rgba(0, 0, 0, 0.03));
+        padding: 6px;
+        border-radius: 12px;
+        border: 1px solid var(--app-border);
+        margin-bottom: 16px;
+    }
+    :root[data-theme="neo"] .mcp-segment-nav {
+        border: 2px solid #111;
+        background: #f1f5f9;
+    }
+    .mcp-segment-btn {
+        background: transparent;
+        border: 1.5px solid transparent;
+        border-radius: 8px;
+        padding: 8px 10px;
+        min-height: 48px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        transition: all 0.18s ease;
+        text-align: center;
+        position: relative;
+    }
+    .mcp-segment-btn:hover {
+        background: var(--app-surface);
+        border-color: var(--app-border);
+    }
+    .mcp-segment-btn.active {
+        background: var(--app-surface);
+        border-color: #059669;
+        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
+    }
+    :root[data-theme="neo"] .mcp-segment-btn.active {
+        border: 2px solid #111;
+        box-shadow: 2px 2px 0 #111;
+        background: #ffffff;
+    }
+    .mcp-segment-core {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.4px;
+        color: var(--app-text);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .mcp-segment-btn.active .mcp-segment-core {
+        color: #059669;
+    }
+    .mcp-segment-sub {
+        font-size: 10px;
+        color: var(--app-muted);
+        font-weight: 600;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         max-width: 100%;
     }
-    .mcp-slot-tab.active .slot-main-label {
-        color: #047857;
+
+    /* Radar Pulse Indicator */
+    .mcp-radar-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+    .mcp-radar-dot.connected { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .mcp-radar-dot.connecting { background: #0284c7; animation: mcpPulse 1.2s infinite; }
+    .mcp-radar-dot.idle { background: #94a3b8; }
+
+    @keyframes mcpPulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.35); opacity: 0.6; }
     }
 
+    /* Live Progress Connection Bar */
     .mcp-bar {
         height: 4px;
         background: var(--app-border);
         border-radius: 999px;
         overflow: hidden;
-        margin: 10px 0;
+        margin: 12px 0;
     }
     .mcp-bar-fill {
         height: 100%;
@@ -136,146 +282,289 @@
         transition: background 0.3s ease;
     }
     .mcp-bar-fill.connected { background: #10b981; }
-    .mcp-bar-fill.connecting { background: #0284c7; animation: mcpShimmer 1.5s infinite linear; background-size: 200% 100%; background-image: linear-gradient(90deg, #0284c7 0%, #38bdf8 50%, #0284c7 100%); }
+    .mcp-bar-fill.connecting { 
+        background: #0284c7; 
+        animation: mcpShimmer 1.5s infinite linear; 
+        background-size: 200% 100%; 
+        background-image: linear-gradient(90deg, #0284c7 0%, #38bdf8 50%, #0284c7 100%); 
+    }
     .mcp-bar-fill.idle { background: #94a3b8; }
 
     @keyframes mcpShimmer {
         0% { background-position: 200% 0; }
         100% { background-position: -200% 0; }
     }
+
+    /* Hardware Anti-Spoofing Box */
+    .mcp-hardware-box {
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--app-border);
+        background: var(--app-soft, rgba(0,0,0,0.02));
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+    :root[data-theme="neo"] .mcp-hardware-box {
+        border: 2px solid #111;
+        background: #ffffff;
+    }
+
+    /* 3-Slot Visual Cards Grid (Right Side) */
+    .mcp-slot-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+    @media (max-width: 768px) {
+        .mcp-slot-cards-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+    }
+    .mcp-slot-item-card {
+        border: 1.5px solid var(--app-border);
+        background: var(--app-surface);
+        border-radius: 12px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: all 0.2s ease;
+    }
+    :root[data-theme="neo"] .mcp-slot-item-card {
+        border: 2px solid #111;
+        box-shadow: 3px 3px 0 #111;
+    }
+    .mcp-slot-item-card:hover {
+        border-color: var(--app-brand, #10b981);
+    }
+    .mcp-slot-item-card.is-active-slot {
+        border-color: #059669;
+        box-shadow: 0 0 0 1.5px #059669;
+    }
+
+    /* Audit Table & Mobile Cards */
+    .mcp-history-desktop-table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+    }
+    .mcp-history-mobile-list {
+        display: none;
+    }
+    @media (max-width: 768px) {
+        .mcp-history-desktop-table {
+            display: none;
+        }
+        .mcp-history-mobile-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+    }
+
+    .mcp-audit-card-mobile {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    :root[data-theme="neo"] .mcp-audit-card-mobile {
+        border: 2px solid #111;
+        box-shadow: 3px 3px 0 #111;
+    }
+
+    /* Responsive Buttons & Form Inputs */
+    .mcp-input {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 13.5px;
+    }
+    @media (max-width: 640px) {
+        .mcp-input {
+            font-size: 15px; /* prevents mobile Safari auto-zoom */
+        }
+        .mcp-actions-row {
+            flex-direction: column;
+        }
+        .mcp-actions-row button {
+            width: 100%;
+        }
+    }
 </style>
 
-<div class="app-page">
-    <!-- Header Zone -->
-    <header class="app-page-header">
+<div class="mcp-container">
+    <!-- Top Header Card -->
+    <header class="mcp-header-card">
         <div>
             <div style="display:flex; align-items:center; gap:8px;">
-                <span class="app-eyebrow">Protokol FastMCP & Hardware ESP32</span>
-                <span class="app-chip app-chip-neutral app-chip-small" style="font-size:10px;">User ID #{{ user.id }}</span>
+                <span class="app-eyebrow" style="display:inline-flex; align-items:center; gap:5px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    Protokol FastMCP & Hardware ESP32
+                </span>
+                <span class="app-chip app-chip-neutral app-chip-small" style="font-size:10px; font-weight:700;">Akun ID #{{ user.id }}</span>
             </div>
-            <h1 class="app-title">Koneksi XiaoZhi & Hardware ESP32</h1>
-            <p class="app-subtitle">Hubungkan hingga 3 perangkat fisik ESP32 XiaoZhi, kunci hardware anti-spoofing otomatis, dan pantau riwayat transfer akun secara realtime.</p>
+            <h1 class="mcp-header-title">
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg" style="background:rgba(16,185,129,0.12); color:#10b981;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="4" width="16" height="16" rx="3"></rect>
+                        <rect x="9" y="9" width="6" height="6" rx="1"></rect>
+                        <path d="M15 2v2M9 2v2M15 20v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2"></path>
+                    </svg>
+                </span>
+                <span>Koneksi MCP XiaoZhi & Hardware ESP32</span>
+            </h1>
+            <p class="mcp-header-subtitle">
+                Hubungkan hingga 3 perangkat fisik ESP32 XiaoZhi, kunci hardware MAC anti-spoofing otomatis, dan pantau riwayat transfer akun secara realtime.
+            </p>
         </div>
-        <div class="flex items-center gap-2">
-            <span id="mcpLiveGlobalBadge" class="app-chip {% if mcp_status and mcp_status.connected %}app-chip-success{% else %}app-chip-neutral{% endif %}" style="font-weight:800; font-size:12px; padding:6px 14px;">
-                {% if mcp_status and mcp_status.connected %}🟢 MCP Terhubung{% else %}⚪ Standby / Cek Koneksi{% endif %}
+
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span id="mcpLiveGlobalBadge" class="app-chip {% if mcp_status and mcp_status.connected %}app-chip-success{% else %}app-chip-neutral{% endif %}" style="font-weight:800; font-size:12px; padding:6px 14px; display:inline-flex; align-items:center; gap:6px;">
+                <span class="mcp-radar-dot {% if mcp_status and mcp_status.connected %}connected{% else %}idle{% endif %}"></span>
+                <span>{% if mcp_status and mcp_status.connected %}MCP Online{% else %}Standby / Siap Hubung{% endif %}</span>
             </span>
         </div>
     </header>
 
-    <!-- Top Metric Overview Cards -->
+    <!-- Top Metrics Overview -->
     <section class="mcp-stat-grid">
-        <div class="stat-card-modern">
-            <div class="stat-card-info">
-                <span class="stat-card-label">Total Slot MCP</span>
-                <span class="stat-card-num" id="statSavedSlots">{{ stats.saved_slots }} / 3</span>
+        <div class="mcp-stat-card">
+            <div>
+                <span class="mcp-stat-label">Total Slot MCP</span>
+                <span class="mcp-stat-num" id="statSavedSlots">{{ stats.saved_slots }} / 3</span>
             </div>
-            <div class="stat-card-icon" style="color:#0284c7; background:rgba(2,132,199,0.08);">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
-            </div>
-        </div>
-
-        <div class="stat-card-modern">
-            <div class="stat-card-info">
-                <span class="stat-card-label">Hardware Terkunci (MAC)</span>
-                <span class="stat-card-num" id="statLockedMacs">{{ stats.locked_macs }} Board</span>
-            </div>
-            <div class="stat-card-icon" style="color:#059669; background:rgba(5,150,105,0.08);">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <div class="mcp-stat-icon-wrap" style="background:rgba(2,132,199,0.1); color:#0284c7;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
             </div>
         </div>
 
-        <div class="stat-card-modern">
-            <div class="stat-card-info">
-                <span class="stat-card-label">Riwayat Board & Transfer</span>
-                <span class="stat-card-num">{{ stats.total_history }} Catatan</span>
+        <div class="mcp-stat-card">
+            <div>
+                <span class="mcp-stat-label">Hardware Terkunci (MAC)</span>
+                <span class="mcp-stat-num" id="statLockedMacs">{{ stats.locked_macs }} Board</span>
             </div>
-            <div class="stat-card-icon" style="color:#7c3aed; background:rgba(124,58,237,0.08);">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <div class="mcp-stat-icon-wrap" style="background:rgba(5,150,105,0.1); color:#059669;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    <path d="m9 12 2 2 4-4"></path>
+                </svg>
             </div>
         </div>
 
-        <div class="stat-card-modern">
-            <div class="stat-card-info">
-                <span class="stat-card-label">Multi-Slot Akses</span>
-                <span class="stat-card-num" style="font-size:16px; margin-top:4px;">
+        <div class="mcp-stat-card">
+            <div>
+                <span class="mcp-stat-label">Riwayat Board & Transfer</span>
+                <span class="mcp-stat-num">{{ stats.total_history }} Catatan</span>
+            </div>
+            <div class="mcp-stat-icon-wrap" style="background:rgba(124,58,237,0.1); color:#7c3aed;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                    <path d="M3 3v5h5"></path>
+                    <path d="M12 7v5l4 2"></path>
+                </svg>
+            </div>
+        </div>
+
+        <div class="mcp-stat-card">
+            <div>
+                <span class="mcp-stat-label">Multi-Slot Akses</span>
+                <span class="mcp-stat-num" style="font-size:16px;">
                     {% if mcp_multislot_allowed %}
-                    <span style="color:#10b981; font-weight:800;">3 Slot Bebas</span>
+                    <span style="color:#10b981; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        3 Slot Bebas
+                    </span>
                     {% else %}
-                    <span style="color:#ef4444; font-weight:800;">Slot 1 Aktif</span>
+                    <span style="color:#ef4444; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        Slot 1 Aktif
+                    </span>
                     {% endif %}
                 </span>
             </div>
-            <div class="stat-card-icon" style="color:#d97706; background:rgba(217,119,6,0.08);">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            <div class="mcp-stat-icon-wrap" style="background:rgba(217,119,6,0.1); color:#d97706;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
             </div>
         </div>
     </section>
 
-    <!-- Section 1: Konfigurasi 3 Slot MCP & Hardware -->
-    <section class="mcp-main-layout">
-        <div class="app-card">
-            <div class="app-card-header flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                    <h2 class="app-section-title flex items-center gap-2">
-                        <span>🔌</span>
-                        <span>Perangkat Hardware & 3 Slot MCP XiaoZhi</span>
-                    </h2>
-                    <p class="app-section-subtitle">Setiap slot dapat dihubungkan ke ESP32 XiaoZhi yang berbeda (misal: Ruang Tamu, Kamar, Meja Kerja).</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="viewMyPastBoards()" class="app-button app-button-secondary app-button-small btn-icon" style="font-weight:700;">
-                        <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                        <span>Audit Semua Board</span>
-                    </button>
-                    <a href="/riwayat-chat" class="app-button app-button-ghost app-button-small btn-icon" style="font-weight:700;">
-                        <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                        <span>Riwayat Chat</span>
-                    </a>
-                </div>
+    <!-- Main Section: 3-Slot Configurator & Status Cards -->
+    <section class="mcp-panel">
+        <div class="mcp-panel-header">
+            <div>
+                <h2 class="mcp-panel-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#059669;">
+                        <rect x="4" y="4" width="16" height="16" rx="3"></rect>
+                        <rect x="9" y="9" width="6" height="6" rx="1"></rect>
+                        <path d="M15 2v2M9 2v2M15 20v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2"></path>
+                    </svg>
+                    <span>Perangkat Hardware & 3 Slot MCP XiaoZhi</span>
+                </h2>
+                <p style="margin:3px 0 0; font-size:12px; color:var(--app-muted);">
+                    Setiap slot dapat dihubungkan ke ESP32 XiaoZhi yang berbeda (misal: Ruang Tamu, Kamar, Meja Kerja).
+                </p>
             </div>
 
-            <div class="mcp-slots-config-grid">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button type="button" onclick="viewMyPastBoards()" class="app-button app-button-secondary app-button-small btn-icon" style="font-weight:700;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    <span>Audit Semua Board</span>
+                </button>
+                <a href="/riwayat-chat" class="app-button app-button-ghost app-button-small btn-icon" style="font-weight:700;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span>Riwayat Chat</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="mcp-panel-body">
+            <div class="mcp-main-grid">
                 <!-- Left Panel: Interactive Slot Editor Form -->
-                <div class="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Pilih Slot Konfigurasi:</span>
+                <div style="background:var(--app-soft, rgba(0,0,0,0.02)); border:1px solid var(--app-border); border-radius:12px; padding:18px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                        <span style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--app-muted);">Pilih Slot Konfigurasi:</span>
                         <span id="mcpChip" class="app-chip app-chip-small app-chip-neutral font-bold">Memeriksa...</span>
                     </div>
 
-                    <!-- 3 Slot Selector Tabs -->
-                    <div class="mcp-slots-grid">
-                        <button type="button" class="mcp-slot-tab active" id="slotTab1" onclick="switchSlot(1)" title="Slot 1: XiaoZhi 1">
-                            <div class="slot-tab-header">
-                                <span class="slot-badge-tag">SLOT 1</span>
-                                <div class="flex items-center gap-1.5">
-                                    <span class="slot-radar-dot idle" id="slotDot1"></span>
-                                    <span class="text-[10px] font-bold text-slate-500" id="slotStatusText1">Kosong</span>
-                                </div>
-                            </div>
-                            <div class="slot-main-label" id="slotTabLabel1">XiaoZhi 1</div>
+                    <!-- 3-Slot Segmented Tab Switcher (Touch & Mobile Optimized) -->
+                    <div class="mcp-segment-nav">
+                        <button type="button" class="mcp-segment-btn active" id="slotTab1" onclick="switchSlot(1)" title="Konfigurasi Slot 1">
+                            <span class="mcp-segment-core">
+                                <span class="mcp-radar-dot idle" id="slotDot1"></span>
+                                <span>SLOT 01</span>
+                            </span>
+                            <span class="mcp-segment-sub" id="slotTabLabel1">XiaoZhi 1</span>
                         </button>
 
-                        <button type="button" class="mcp-slot-tab" id="slotTab2" onclick="switchSlot(2)" title="Slot 2: XiaoZhi 2">
-                            <div class="slot-tab-header">
-                                <span class="slot-badge-tag">SLOT 2</span>
-                                <div class="flex items-center gap-1.5">
-                                    <span class="slot-radar-dot idle" id="slotDot2"></span>
-                                    <span class="text-[10px] font-bold text-slate-500" id="slotStatusText2">Kosong</span>
-                                </div>
-                            </div>
-                            <div class="slot-main-label" id="slotTabLabel2">XiaoZhi 2</div>
+                        <button type="button" class="mcp-segment-btn" id="slotTab2" onclick="switchSlot(2)" title="Konfigurasi Slot 2">
+                            <span class="mcp-segment-core">
+                                <span class="mcp-radar-dot idle" id="slotDot2"></span>
+                                <span>SLOT 02</span>
+                            </span>
+                            <span class="mcp-segment-sub" id="slotTabLabel2">XiaoZhi 2</span>
                         </button>
 
-                        <button type="button" class="mcp-slot-tab" id="slotTab3" onclick="switchSlot(3)" title="Slot 3: XiaoZhi 3">
-                            <div class="slot-tab-header">
-                                <span class="slot-badge-tag">SLOT 3</span>
-                                <div class="flex items-center gap-1.5">
-                                    <span class="slot-radar-dot idle" id="slotDot3"></span>
-                                    <span class="text-[10px] font-bold text-slate-500" id="slotStatusText3">Kosong</span>
-                                </div>
-                            </div>
-                            <div class="slot-main-label" id="slotTabLabel3">XiaoZhi 3</div>
+                        <button type="button" class="mcp-segment-btn" id="slotTab3" onclick="switchSlot(3)" title="Konfigurasi Slot 3">
+                            <span class="mcp-segment-core">
+                                <span class="mcp-radar-dot idle" id="slotDot3"></span>
+                                <span>SLOT 03</span>
+                            </span>
+                            <span class="mcp-segment-sub" id="slotTabLabel3">XiaoZhi 3</span>
                         </button>
                     </div>
 
@@ -285,246 +574,305 @@
                     <div class="mcp-bar"><div id="mcpBar" class="mcp-bar-fill idle"></div></div>
 
                     <!-- Slot Input Form -->
-                    <div class="space-y-3.5 mt-3">
+                    <div style="display:flex; flex-direction:column; gap:14px; margin-top:12px;">
                         <input type="hidden" id="mcpCsrf" value="{{ csrf_token }}">
                         
                         <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <label for="mcp_label" class="app-label !mb-0 text-xs font-bold">Nama / Ruangan Perangkat</label>
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                                <label for="mcp_label" class="app-label !mb-0 text-xs font-bold" style="display:flex; align-items:center; gap:5px;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                    <span>Nama / Ruangan Perangkat</span>
+                                </label>
                                 <button type="button" id="quickSaveLabelBtn" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline hidden" title="Simpan nama slot">Perbarui Nama</button>
                             </div>
-                            <input id="mcp_label" type="text" maxlength="60" placeholder="Contoh: XiaoZhi Meja Kerja" autocomplete="off" class="app-input text-xs">
+                            <input id="mcp_label" type="text" maxlength="60" placeholder="Contoh: XiaoZhi Meja Kerja" autocomplete="off" class="app-input mcp-input">
                         </div>
 
                         <!-- Hardware Board MAC Status (Anti-Spoofing Box) -->
-                        <div id="mcpBoardLockBox" class="p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <span id="mcpLockIcon" class="flex-shrink-0 select-none">
-                                    <svg class="dash-icon text-slate-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <div id="mcpBoardLockBox" class="mcp-hardware-box">
+                            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                                <span id="mcpLockIcon" style="flex-shrink:0;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#94a3b8;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                                 </span>
-                                <div class="min-w-0">
-                                    <span class="font-bold text-slate-800 dark:text-slate-200 block" id="mcpBoardMacTitle">Hardware Board MAC (Anti-Spoofing)</span>
-                                    <span class="font-mono text-slate-500 block truncate" id="mcpBoardMacValue">Belum ada board terhubung</span>
+                                <div style="min-width:0;">
+                                    <span style="font-weight:700; font-size:12px; display:block;" id="mcpBoardMacTitle">Hardware Board MAC (Anti-Spoofing)</span>
+                                    <span style="font-family:ui-monospace, monospace; font-size:11.5px; color:var(--app-muted); display:block; text-overflow:ellipsis; overflow:hidden;" id="mcpBoardMacValue">Belum ada board terhubung</span>
                                 </div>
                             </div>
-                            <div id="mcpBoardActionArea" class="flex-shrink-0"></div>
+                            <div id="mcpBoardActionArea" style="flex-shrink:0;"></div>
                         </div>
 
                         <div>
-                            <label for="mcp_token" class="app-label text-xs font-bold">Endpoint MCP WebSocket</label>
-                            <input id="mcp_token" type="password" placeholder="wss://api.xiaozhi.me/mcp/?token=..." autocomplete="off" class="app-input text-xs font-mono">
-                            <p class="app-field-hint text-[11px]" id="mcpPreviewHint">Endpoint wss:// dari XiaoZhi disimpan terenkripsi di server.</p>
+                            <label for="mcp_token" class="app-label text-xs font-bold" style="display:flex; align-items:center; gap:5px; margin-bottom:6px;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                                <span>Endpoint MCP WebSocket</span>
+                            </label>
+                            <input id="mcp_token" type="password" placeholder="wss://api.xiaozhi.me/mcp/?token=..." autocomplete="off" class="app-input mcp-input" style="font-family:ui-monospace, monospace;">
+                            <p class="app-field-hint text-[11px]" id="mcpPreviewHint" style="margin-top:5px;">Endpoint wss:// dari XiaoZhi disimpan terenkripsi di server.</p>
                         </div>
 
-                        <div class="flex gap-2 pt-1">
-                            <button id="saveMcpBtn" class="app-button app-button-primary flex-1 text-xs" style="font-weight:800;">Simpan Slot Ini</button>
-                            <button id="reconnectBtn" class="app-button app-button-secondary hidden text-xs" style="font-weight:700;">Reconnect</button>
-                            <button id="deleteBtn" class="app-button app-button-danger hidden text-xs">Hapus</button>
+                        <div class="mcp-actions-row" style="display:flex; gap:8px; padding-top:4px;">
+                            <button id="saveMcpBtn" class="app-button app-button-primary" style="flex:1; font-weight:800; font-size:12.5px; padding:9px 16px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg>
+                                <span>Simpan Slot Ini</span>
+                            </button>
+                            <button id="reconnectBtn" class="app-button app-button-secondary hidden" style="font-weight:700; font-size:12px; padding:9px 14px; display:inline-flex; align-items:center; gap:5px;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M3 21v-5h5"></path></svg>
+                                <span>Reconnect</span>
+                            </button>
+                            <button id="deleteBtn" class="app-button app-button-danger hidden" style="font-size:12px; padding:9px 12px; display:inline-flex; align-items:center; gap:5px;" title="Hapus slot ini">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                <span>Hapus</span>
+                            </button>
                         </div>
 
-                        <div id="mcpStatusDetail" class="pt-2 text-center text-[11px] text-slate-500 font-medium">Memuat status perangkat...</div>
+                        <div id="mcpStatusDetail" style="padding-top:4px; text-align:center; font-size:11px; color:var(--app-muted); font-weight:500;">Memuat status perangkat...</div>
                     </div>
                 </div>
 
-                <!-- Right Panel: 3 Slot Cards Status Overview -->
-                <div class="space-y-3">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Ringkasan Status 3 Slot:</h3>
-                    
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {% for sl in mcp_slots %}
-                        <div class="app-card" style="border: 2px solid {% if sl.connected %}rgba(16, 185, 129, 0.45){% elif sl.saved %}rgba(245, 158, 11, 0.45){% else %}var(--app-border){% endif %}; padding: 14px; border-radius: var(--app-radius); display: flex; flex-direction: column; justify-content: space-between;">
-                            <div>
-                                <div class="flex items-center justify-between mb-2">
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="text-base">{% if sl.slot == 1 %}🥇{% elif sl.slot == 2 %}🥈{% else %}🥉{% endif %}</span>
-                                        <span class="font-bold text-xs">Slot {{ sl.slot }}</span>
+                <!-- Right Panel: 3 Slot Live Overview Cards + Protocol Guide -->
+                <div style="display:flex; flex-direction:column; gap:16px;">
+                    <div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                            <span style="font-size:11.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--app-muted);">
+                                Status 3 Slot Perangkat Anda:
+                            </span>
+                        </div>
+                        
+                        <div class="mcp-slot-cards-grid">
+                            {% for sl in mcp_slots %}
+                            <div class="mcp-slot-item-card" id="slotOverviewCard{{ sl.slot }}">
+                                <div>
+                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                                        <div style="display:flex; align-items:center; gap:6px;">
+                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-md font-mono text-[11px] font-black" style="background:var(--app-soft); border:1px solid var(--app-border);">
+                                                0{{ sl.slot }}
+                                            </span>
+                                            <span style="font-weight:800; font-size:12.5px; color:var(--app-text);">Slot {{ sl.slot }}</span>
+                                        </div>
+                                        <div>
+                                            {% if sl.is_restricted %}
+                                            <span class="app-chip app-chip-small" style="background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.25); font-weight:700; font-size:9.5px;">Terkunci Plus</span>
+                                            {% elif sl.connected %}
+                                            <span class="app-chip app-chip-small app-chip-success" style="font-size:9.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
+                                                <span class="mcp-radar-dot connected" style="width:6px; height:6px;"></span>
+                                                Online
+                                            </span>
+                                            {% elif sl.saved %}
+                                            <span class="app-chip app-chip-small" style="background:rgba(245,158,11,0.12); color:#d97706; border:1px solid rgba(245,158,11,0.25); font-size:9.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
+                                                <span class="mcp-radar-dot connecting" style="width:6px; height:6px;"></span>
+                                                Standby
+                                            </span>
+                                            {% else %}
+                                            <span class="app-chip app-chip-small app-chip-neutral" style="font-size:9.5px;">Kosong</span>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                    <div>
-                                        {% if sl.is_restricted %}
-                                        <span class="app-chip app-chip-small" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700; font-size: 9.5px;">🔒 Plus</span>
-                                        {% elif sl.connected %}
-                                        <span class="app-chip app-chip-small app-chip-success" style="font-size: 9.5px; font-weight: 700;">🟢 Online</span>
-                                        {% elif sl.saved %}
-                                        <span class="app-chip app-chip-small" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 9.5px; font-weight: 700;">🟡 Standby</span>
+
+                                    <div style="font-weight:800; font-size:13px; color:var(--app-text); margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ sl.label }}">
+                                        {{ sl.label }}
+                                    </div>
+
+                                    <div style="background:var(--app-soft, rgba(0,0,0,0.03)); border:1px solid var(--app-border); border-radius:6px; padding:6px 8px; margin-bottom:8px;">
+                                        <div style="font-size:9.5px; font-weight:700; color:var(--app-muted); margin-bottom:2px;">ENDPOINT WEBSOCKET:</div>
+                                        {% if sl.preview %}
+                                        <div style="font-family:ui-monospace, monospace; font-size:10px; color:var(--app-text); word-break:break-all; font-weight:600;">
+                                            {{ sl.preview }}
+                                        </div>
                                         {% else %}
-                                        <span class="app-chip app-chip-small app-chip-neutral" style="font-size: 9.5px;">⚪ Kosong</span>
+                                        <div style="font-size:10px; color:var(--app-muted); font-style:italic;">Belum diatur</div>
+                                        {% endif %}
+                                    </div>
+
+                                    <div style="margin-bottom:8px;">
+                                        <div style="font-size:9.5px; font-weight:700; color:var(--app-muted); margin-bottom:2px;">KUNCI HARDWARE ESP32:</div>
+                                        {% if sl.board_mac %}
+                                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; padding:4px 8px; border-radius:6px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25);">
+                                            <code style="font-family:ui-monospace, monospace; font-size:11px; font-weight:800; color:#059669;" class="truncate">{{ sl.board_mac }}</code>
+                                            <button type="button" onclick="detachSlotBoardConfirm({{ sl.slot }}, '{{ sl.board_mac }}')" class="app-button app-button-small app-button-danger" style="font-size:9px; padding:2px 5px;" title="Lepaskan kunci MAC dari slot ini">
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18.84 12.25 1.72-1.71a4.84 4.84 0 0 0 0-6.84 4.84 4.84 0 0 0-6.84 0l-1.71 1.72"></path><path d="m5.16 11.75-1.72 1.71a4.84 4.84 0 0 0 0 6.84 4.84 4.84 0 0 0 6.84 0l1.71-1.72"></path><line x1="8" y1="2" x2="8" y2="5"></line><line x1="2" y1="8" x2="5" y2="8"></line><line x1="16" y1="19" x2="16" y2="22"></line><line x1="19" y1="16" x2="22" y2="16"></line></svg>
+                                            </button>
+                                        </div>
+                                        {% elif sl.saved %}
+                                        <div style="font-size:10.5px; color:#d97706; font-style:italic;">Siap mengunci board saat aktif</div>
+                                        {% else %}
+                                        <div style="font-size:10.5px; color:var(--app-muted); font-style:italic;">Belum ada hardware</div>
                                         {% endif %}
                                     </div>
                                 </div>
 
-                                <div class="font-bold text-sm text-slate-800 dark:text-slate-100 mb-2 truncate" title="{{ sl.label }}">
-                                    {{ sl.label }}
-                                </div>
-
-                                <div style="background: var(--app-soft, rgba(0,0,0,0.04)); border: 1px solid var(--app-border); border-radius: 6px; padding: 6px 8px; margin-bottom: 8px;">
-                                    <div style="font-size: 9.5px; font-weight: 700; color: var(--app-muted);">ENDPOINT:</div>
-                                    {% if sl.preview %}
-                                    <div style="font-family: ui-monospace, monospace; font-size: 10px; color: var(--app-text); word-break: break-all; font-weight: 600;">
-                                        {{ sl.preview }}
-                                    </div>
-                                    {% else %}
-                                    <div style="font-size: 10.5px; color: var(--app-muted); font-style: italic;">Belum diatur</div>
-                                    {% endif %}
-                                </div>
-
-                                <div class="mb-3">
-                                    <div style="font-size: 9.5px; font-weight: 700; color: var(--app-muted); margin-bottom: 2px;">HARDWARE ESP32:</div>
-                                    {% if sl.board_mac %}
-                                    <div class="flex items-center justify-between gap-1 p-1.5 rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
-                                        <code class="font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-400 truncate">{{ sl.board_mac }}</code>
-                                        <button type="button" onclick="detachSlotBoardConfirm({{ sl.slot }}, '{{ sl.board_mac }}')" class="app-button app-button-small app-button-danger text-[9.5px] py-0.5 px-1.5" title="Lepaskan kunci MAC">✂️</button>
-                                    </div>
-                                    {% elif sl.saved %}
-                                    <div class="text-[10.5px] text-amber-600 dark:text-amber-400 italic">Menunggu hardware online...</div>
-                                    {% else %}
-                                    <div class="text-[10.5px] text-slate-400 italic">Belum ada hardware</div>
+                                <div style="padding-top:8px; border-top:1px solid var(--app-border); display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                                    <button type="button" onclick="switchSlot({{ sl.slot }})" class="app-button app-button-ghost app-button-small" style="font-size:11px; font-weight:800; padding:4px 8px; color:var(--app-brand, #059669); display:inline-flex; align-items:center; gap:4px;">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                                        <span>Konfigurasi</span>
+                                    </button>
+                                    {% if sl.saved %}
+                                    <button type="button" onclick="deleteSlotConfirm({{ sl.slot }})" class="app-button app-button-ghost app-button-small" style="font-size:11px; padding:4px 6px; color:#ef4444;" title="Hapus slot ini">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
                                     {% endif %}
                                 </div>
                             </div>
-
-                            <div class="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
-                                <button type="button" onclick="switchSlot({{ sl.slot }})" class="app-button app-button-ghost app-button-small text-xs py-1 px-2 font-bold" style="color:var(--app-accent);">
-                                    ⚙️ Pilih Slot
-                                </button>
-                                {% if sl.saved %}
-                                <button type="button" onclick="deleteSlotConfirm({{ sl.slot }})" class="app-button app-button-ghost app-button-small app-button-text-danger text-xs py-1 px-2" title="Hapus slot ini">
-                                    🗑️
-                                </button>
-                                {% endif %}
-                            </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
                     </div>
 
                     <!-- Helpful MCP Protocol Card -->
-                    <div class="p-3.5 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-2 mt-4 text-slate-600 dark:text-slate-400">
-                        <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                            <span>💡</span>
-                            <span>Cara Mendapatkan Endpoint MCP WebSocket:</span>
+                    <div style="padding:14px 16px; background:var(--app-soft, rgba(0,0,0,0.02)); border:1px solid var(--app-border); border-radius:12px; font-size:12px; line-height:1.6; color:var(--app-muted);">
+                        <div style="font-weight:800; color:var(--app-text); display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#0284c7;">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                            <span>Panduan Cepat Koneksi Endpoint MCP:</span>
                         </div>
-                        <ol class="list-decimal pl-4 space-y-1">
-                            <li>Buka konsol resmi perangkat Anda di <a href="https://xiaozhi.me" target="_blank" class="text-sky-600 dark:text-sky-400 font-bold underline">xiaozhi.me</a>.</li>
-                            <li>Pilih perangkat Anda lalu salin URL endpoint yang diawali <code>wss://api.xiaozhi.me/mcp/?token=...</code></li>
-                            <li>Tempelkan ke input di atas lalu klik <strong>Simpan Slot Ini</strong>.</li>
-                            <li>ESP32 Anda akan otomatis mengikat Hardware MAC board-nya saat pertama kali streaming suara.</li>
+                        <ol style="margin:0; padding-left:18px; display:flex; flex-direction:column; gap:4px;">
+                            <li>Buka konsol resmi perangkat Anda di <a href="https://xiaozhi.me" target="_blank" style="color:#0284c7; font-weight:700; text-decoration:underline;">xiaozhi.me</a>.</li>
+                            <li>Pilih perangkat lalu salin URL endpoint berformat <code>wss://api.xiaozhi.me/mcp/?token=...</code></li>
+                            <li>Tempelkan ke input di formulir sebelah kiri lalu klik <strong>Simpan Slot Ini</strong>.</li>
+                            <li>ESP32 Anda akan otomatis mengunci ID Hardware MAC saat pertama kali online.</li>
                         </ol>
                     </div>
                 </div>
             </div>
         </div>
+    </section>
 
-        <!-- Section 2: Riwayat Pengikatan Hardware ESP32 & Transfer Akun -->
-        <div class="app-card" style="padding: 20px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-                <div>
-                    <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--app-text); display: flex; align-items: center; gap: 8px;">
-                        <span>📜</span>
-                        <span>Riwayat Pengikatan Hardware ESP32 & Transfer Akun</span>
-                    </h3>
-                    <p style="margin: 3px 0 0; font-size: 12.5px; color: var(--app-muted);">
-                        Audit linimasa board yang pernah dipakai akun ini. Jika board dipindah ke pengguna lain, pemilik akun barunya ditampilkan secara transparan di bawah.
-                    </p>
-                </div>
-                <span class="app-chip app-chip-neutral" style="font-size: 11.5px; font-weight: 700;">
-                    Total: {{ board_history|length }} Catatan
-                </span>
+    <!-- Section 2: Riwayat Pengikatan Hardware ESP32 & Transfer Akun -->
+    <section class="mcp-panel" id="boardHistorySection">
+        <div class="mcp-panel-header">
+            <div>
+                <h3 class="mcp-panel-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#7c3aed;">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    <span>Riwayat Pengikatan Hardware ESP32 & Transfer Akun</span>
+                </h3>
+                <p style="margin:3px 0 0; font-size:12.5px; color:var(--app-muted);">
+                    Audit linimasa board yang pernah dipakai akun ini. Jika board dipindah ke pengguna lain, pemilik akun barunya ditampilkan secara transparan.
+                </p>
             </div>
+            <span class="app-chip app-chip-neutral" style="font-size:11.5px; font-weight:700;">
+                Total: {{ board_history|length }} Catatan
+            </span>
+        </div>
 
+        <div class="mcp-panel-body">
             {% if not board_history or board_history|length == 0 %}
-            <div style="text-align: center; padding: 36px 20px; color: var(--app-muted); background: var(--app-soft, rgba(0,0,0,0.02)); border: 1px dashed var(--app-border); border-radius: var(--app-radius);">
-                <div style="font-size: 32px; margin-bottom: 8px;">📟</div>
-                <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">Belum Ada Riwayat Board</div>
-                <div style="font-size: 12.5px;">Board ESP32 Anda akan otomatis tercatat di sini saat pertama kali terhubung ke MCP atau memutar lagu/suara.</div>
+            <div style="text-align:center; padding:44px 20px; color:var(--app-muted); background:var(--app-soft, rgba(0,0,0,0.02)); border:1px dashed var(--app-border); border-radius:12px;">
+                <div style="display:inline-flex; align-items:center; justify-content:center; width:52px; height:52px; border-radius:14px; background:var(--app-surface); border:1px solid var(--app-border); color:var(--app-muted); margin-bottom:12px;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                        <rect x="8" y="2" width="8" height="2"></rect>
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M9 18h6"></path>
+                    </svg>
+                </div>
+                <div style="font-weight:800; font-size:14px; color:var(--app-text); margin-bottom:4px;">Belum Ada Riwayat Board</div>
+                <div style="font-size:12.5px; max-width:440px; margin:0 auto;">Board ESP32 Anda akan otomatis tercatat di sini saat pertama kali terhubung ke MCP atau memutar lagu/suara.</div>
             </div>
             {% else %}
-            <div style="overflow-x: auto; margin-top: 14px;">
-                <table class="app-table" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+            <!-- Desktop / Tablet Table View -->
+            <div class="mcp-history-desktop-table">
+                <table class="app-table" style="width:100%; border-collapse:collapse; font-size:12.5px;">
                     <thead>
-                        <tr style="border-bottom: 2px solid var(--app-border); text-align: left; color: var(--app-muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            <th style="padding: 10px 12px;">ID MAC Hardware</th>
-                            <th style="padding: 10px 12px;">Slot di Akun Anda</th>
-                            <th style="padding: 10px 12px;">Periode Tautan</th>
-                            <th style="padding: 10px 12px;">Status di Akun Anda</th>
-                            <th style="padding: 10px 12px;">Status Terhubung Saat Ini & Akun Baru</th>
-                            <th style="padding: 10px 12px; text-align: right;">Aksi</th>
+                        <tr style="border-bottom:2px solid var(--app-border); text-align:left; color:var(--app-muted); font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">
+                            <th style="padding:10px 12px;">ID MAC Hardware</th>
+                            <th style="padding:10px 12px;">Slot di Akun Anda</th>
+                            <th style="padding:10px 12px;">Periode Tautan</th>
+                            <th style="padding:10px 12px;">Status di Akun Anda</th>
+                            <th style="padding:10px 12px;">Status Terhubung Saat Ini & Akun Baru</th>
+                            <th style="padding:10px 12px; text-align:right;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for h in board_history %}
-                        <tr style="border-bottom: 1px solid var(--app-border); transition: background 0.15s ease;">
+                        <tr style="border-bottom:1px solid var(--app-border);">
                             <!-- MAC Hardware -->
-                            <td style="padding: 12px; vertical-align: middle;">
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <code style="font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 800; color: var(--app-text); background: var(--app-soft, rgba(0,0,0,0.05)); padding: 2px 7px; border-radius: 5px; border: 1px solid var(--app-border);">
+                            <td style="padding:12px; vertical-align:middle;">
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <code style="font-family:ui-monospace, monospace; font-size:12px; font-weight:800; color:var(--app-text); background:var(--app-soft, rgba(0,0,0,0.05)); padding:2px 7px; border-radius:5px; border:1px solid var(--app-border);">
                                         {{ h.device_mac }}
                                     </code>
                                     {% if h.is_protected %}
-                                    <span class="app-chip app-chip-small" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; background: #6366f1; color: white;" title="Master Protected Board">🛡️ Protected</span>
+                                    <span class="app-chip app-chip-small" style="font-size:9.5px; padding:1px 6px; font-weight:700; background:#6366f1; color:white; display:inline-flex; align-items:center; gap:3px;" title="Master Protected Board">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                        Protected
+                                    </span>
                                     {% endif %}
                                 </div>
                             </td>
 
                             <!-- Slot info -->
-                            <td style="padding: 12px; vertical-align: middle;">
-                                <span style="font-weight: 700; color: var(--app-text);">Slot {{ h.slot_number or 1 }}</span>
+                            <td style="padding:12px; vertical-align:middle;">
+                                <span style="font-weight:800; color:var(--app-text);">Slot {{ h.slot_number or 1 }}</span>
                                 {% if h.device_name %}
-                                <div style="font-size: 11px; color: var(--app-muted);">{{ h.device_name }}</div>
+                                <div style="font-size:11px; color:var(--app-muted);">{{ h.device_name }}</div>
                                 {% endif %}
                             </td>
 
                             <!-- Linked at -->
-                            <td style="padding: 12px; vertical-align: middle; font-size: 12px;">
-                                <div>📅 <strong>Tertaut:</strong> {{ h.linked_at_str or '-' }}</div>
+                            <td style="padding:12px; vertical-align:middle; font-size:11.5px;">
+                                <div><strong style="color:var(--app-muted);">Tertaut:</strong> {{ h.linked_at_str or '-' }}</div>
                                 {% if h.unlinked_at_str %}
-                                <div style="color: var(--app-muted); margin-top: 2px;">🔌 <strong>Dilepas:</strong> {{ h.unlinked_at_str }}</div>
+                                <div style="color:var(--app-muted); margin-top:2px;"><strong>Dilepas:</strong> {{ h.unlinked_at_str }}</div>
                                 {% endif %}
                             </td>
 
                             <!-- Status di akun ini -->
-                            <td style="padding: 12px; vertical-align: middle;">
+                            <td style="padding:12px; vertical-align:middle;">
                                 {% if h.status == 'ACTIVE' and h.is_current_owner %}
-                                <span class="app-chip app-chip-small app-chip-success" style="font-weight: 700; padding: 2px 8px;">
-                                    🟢 Sedang Tertaut
+                                <span class="app-chip app-chip-small app-chip-success" style="font-weight:700; padding:3px 9px; display:inline-flex; align-items:center; gap:4px;">
+                                    <span class="mcp-radar-dot connected" style="width:6px; height:6px;"></span>
+                                    Sedang Tertaut
                                 </span>
                                 {% else %}
-                                <span class="app-chip app-chip-small app-chip-neutral" style="font-weight: 600; padding: 2px 8px;">
-                                    ⚪ Terputus / Riwayat
+                                <span class="app-chip app-chip-small app-chip-neutral" style="font-weight:600; padding:3px 9px;">
+                                    Terputus / Riwayat
                                 </span>
                                 {% endif %}
                             </td>
 
                             <!-- Status Terhubung Saat Ini & Akun Baru -->
-                            <td style="padding: 12px; vertical-align: middle;">
+                            <td style="padding:12px; vertical-align:middle;">
                                 {% if h.is_transferred %}
-                                <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(245, 158, 11, 0.12); border: 1.5px solid #f59e0b; border-radius: 8px;">
-                                    <span style="font-size: 15px;">🔄</span>
+                                <div style="display:inline-flex; align-items:center; gap:8px; padding:6px 12px; background:rgba(245, 158, 11, 0.12); border:1.5px solid #f59e0b; border-radius:8px;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path><path d="M4 4l5 5"></path></svg>
                                     <div>
-                                        <div style="font-size: 10.5px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.3px;">
+                                        <div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; letter-spacing:0.3px;">
                                             Tersambung ke Akun Baru:
                                         </div>
-                                        <div style="font-size: 13px; font-weight: 800; color: #d97706;">
+                                        <div style="font-size:13px; font-weight:800; color:#d97706;">
                                             @{{ h.current_owner_username }} 
-                                            <span style="font-size: 11px; font-weight: 600; color: #92400e;">(Slot {{ h.current_slot_number or 1 }})</span>
+                                            <span style="font-size:11px; font-weight:600; color:#92400e;">(Slot {{ h.current_slot_number or 1 }})</span>
                                         </div>
                                     </div>
                                 </div>
                                 {% elif h.is_current_owner and h.current_status == 'ACTIVE' %}
-                                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; font-size: 12px; font-weight: 700; color: #059669;">
-                                    <span>🟢</span>
-                                    <span>Masih Aktif di Akun Anda (Slot {{ h.current_slot_number or h.slot_number or 1 }})</span>
+                                <div style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.3); border-radius:8px; font-size:11.5px; font-weight:700; color:#059669;">
+                                    <span class="mcp-radar-dot connected" style="width:6px; height:6px;"></span>
+                                    <span>Aktif di Akun Anda (Slot {{ h.current_slot_number or h.slot_number or 1 }})</span>
                                 </div>
                                 {% else %}
-                                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--app-soft, rgba(0,0,0,0.03)); border: 1px solid var(--app-border); border-radius: 8px; font-size: 11.5px; color: var(--app-muted);">
-                                    <span>⚪</span>
+                                <div style="display:inline-flex; align-items:center; gap:5px; padding:5px 10px; background:var(--app-soft, rgba(0,0,0,0.03)); border:1px solid var(--app-border); border-radius:8px; font-size:11px; color:var(--app-muted);">
                                     <span>{{ h.current_connection_text or 'Belum terhubung ke siapapun' }}</span>
                                 </div>
                                 {% endif %}
                             </td>
 
                             <!-- Action -->
-                            <td style="padding: 12px; vertical-align: middle; text-align: right;">
-                                <button type="button" onclick="viewBoardHistory('{{ h.device_mac }}')" class="app-button app-button-small" style="font-size: 11.5px; padding: 4px 10px; border-radius: 6px; cursor: pointer;">
-                                    📜 Detail Audit
+                            <td style="padding:12px; vertical-align:middle; text-align:right;">
+                                <button type="button" onclick="viewBoardHistory('{{ h.device_mac }}')" class="app-button app-button-small" style="font-size:11.5px; padding:4px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    <span>Detail Audit</span>
                                 </button>
                             </td>
                         </tr>
@@ -532,29 +880,93 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Mobile Card View (Optimized for Small Screens) -->
+            <div class="mcp-history-mobile-list">
+                {% for h in board_history %}
+                <div class="mcp-audit-card-mobile">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                        <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                            <code style="font-family:ui-monospace, monospace; font-size:12px; font-weight:800; color:var(--app-text); background:var(--app-soft, rgba(0,0,0,0.05)); padding:2px 7px; border-radius:5px; border:1px solid var(--app-border);" class="truncate">
+                                {{ h.device_mac }}
+                            </code>
+                            {% if h.is_protected %}
+                            <span class="app-chip app-chip-small" style="font-size:9.5px; padding:1px 5px; font-weight:700; background:#6366f1; color:white;">
+                                Protected
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        {% if h.status == 'ACTIVE' and h.is_current_owner %}
+                        <span class="app-chip app-chip-small app-chip-success" style="font-weight:700; font-size:10px;">
+                            Aktif
+                        </span>
+                        {% else %}
+                        <span class="app-chip app-chip-small app-chip-neutral" style="font-weight:600; font-size:10px;">
+                            Riwayat
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11.5px; background:var(--app-soft); padding:8px 10px; border-radius:8px;">
+                        <div>
+                            <span style="color:var(--app-muted); font-size:10px; display:block;">SLOT AKUN:</span>
+                            <strong>Slot {{ h.slot_number or 1 }}</strong> {% if h.device_name %}<span style="color:var(--app-muted);">({{ h.device_name }})</span>{% endif %}
+                        </div>
+                        <div>
+                            <span style="color:var(--app-muted); font-size:10px; display:block;">TERTAUT PADA:</span>
+                            <span>{{ h.linked_at_str or '-' }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Highlight Transfer Banner if transferred -->
+                    {% if h.is_transferred %}
+                    <div style="padding:8px 12px; background:rgba(245, 158, 11, 0.12); border:1.5px solid #f59e0b; border-radius:8px; display:flex; align-items:center; gap:8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path><path d="M4 4l5 5"></path></svg>
+                        <div>
+                            <div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase;">Tersambung ke Akun Baru:</div>
+                            <div style="font-size:13px; font-weight:800; color:#d97706;">
+                                @{{ h.current_owner_username }} <span style="font-size:11px; font-weight:600; color:#92400e;">(Slot {{ h.current_slot_number or 1 }})</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% elif h.is_current_owner and h.current_status == 'ACTIVE' %}
+                    <div style="padding:6px 10px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.3); border-radius:8px; font-size:11px; font-weight:700; color:#059669; display:flex; align-items:center; gap:6px;">
+                        <span class="mcp-radar-dot connected" style="width:6px; height:6px;"></span>
+                        <span>Masih aktif di akun Anda (Slot {{ h.current_slot_number or h.slot_number or 1 }})</span>
+                    </div>
+                    {% endif %}
+
+                    <button type="button" onclick="viewBoardHistory('{{ h.device_mac }}')" class="app-button app-button-small" style="width:100%; justify-content:center; font-weight:700; padding:8px;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <span>Lihat Detail Audit Trail</span>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
             {% endif %}
         </div>
     </section>
 </div>
 
-<!-- 📜 Modal Riwayat Tautan Board ID -->
-<div id="boardHistoryModal" style="display: none; position: fixed; inset: 0; z-index: 99999; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px;">
+<!-- Modal Riwayat Tautan Board ID -->
+<div id="boardHistoryModal" style="display: none; position: fixed; inset: 0; z-index: 99999; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); align-items: center; justify-content: center; padding: 16px;">
     <div style="background: var(--app-surface, #1e293b); border: 1px solid var(--app-border, #334155); border-radius: 16px; width: 100%; max-width: 680px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
         <div style="padding: 18px 24px; border-bottom: 1px solid var(--app-border, #334155); display: flex; align-items: center; justify-content: space-between;">
             <div>
-                <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--app-text, #f8fafc); display: flex; align-items: center; gap: 8px;">
-                    <span>📜</span>
+                <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--app-text, #f8fafc); display: flex; align-items: center; gap: 8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#059669;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                     <span id="boardHistoryModalTitle">Riwayat Tautan Board</span>
                 </h3>
-                <p id="boardHistoryModalSubtitle" style="margin: 4px 0 0 0; font-size: 12.5px; color: var(--app-muted, #94a3b8);">Audit trail siapa yang pernah tertaut & linimasa aktivitas</p>
+                <p id="boardHistoryModalSubtitle" style="margin: 4px 0 0 0; font-size: 12px; color: var(--app-muted, #94a3b8);">Audit trail siapa yang pernah tertaut & linimasa aktivitas</p>
             </div>
-            <button type="button" onclick="closeBoardHistoryModal()" style="background: transparent; border: none; font-size: 22px; cursor: pointer; color: var(--app-muted, #94a3b8); line-height: 1;">&times;</button>
+            <button type="button" onclick="closeBoardHistoryModal()" style="background: transparent; border: none; font-size: 24px; cursor: pointer; color: var(--app-muted, #94a3b8); line-height: 1; padding: 4px;">&times;</button>
         </div>
         <div id="boardHistoryContent" style="padding: 20px 24px; overflow-y: auto; flex: 1;">
             <div style="text-align: center; padding: 30px; color: var(--app-muted, #94a3b8);">Memuat riwayat...</div>
         </div>
         <div style="padding: 14px 24px; border-top: 1px solid var(--app-border, #334155); background: var(--app-soft, #0f172a); display: flex; justify-content: flex-end;">
-            <button type="button" onclick="closeBoardHistoryModal()" class="app-button" style="padding: 6px 18px; border-radius: 8px; font-size: 13px;">Tutup</button>
+            <button type="button" onclick="closeBoardHistoryModal()" class="app-button" style="padding: 7px 20px; border-radius: 8px; font-size: 13px; font-weight:700;">Tutup</button>
         </div>
     </div>
 </div>
@@ -573,11 +985,19 @@ function switchSlot(slotNum) {
     currentSlot = Number(slotNum);
     for (let i = 1; i <= 3; i++) {
         const tab = document.getElementById("slotTab" + i);
+        const card = document.getElementById("slotOverviewCard" + i);
         if (tab) {
             if (i === currentSlot) {
                 tab.classList.add("active");
             } else {
                 tab.classList.remove("active");
+            }
+        }
+        if (card) {
+            if (i === currentSlot) {
+                card.classList.add("is-active-slot");
+            } else {
+                card.classList.remove("is-active-slot");
             }
         }
     }
@@ -621,19 +1041,19 @@ function renderActiveSlotForm() {
     if (boardMacTitle && boardMacValue && boardActionArea) {
         if (s.is_locked && s.board_mac) {
             if (lockIcon) {
-                lockIcon.innerHTML = `<svg class="dash-icon text-emerald-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
+                lockIcon.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
             }
-            if (boardLockBox) boardLockBox.className = "p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800";
-            boardMacTitle.innerHTML = "Hardware MAC Terkunci <span class='text-emerald-700 dark:text-emerald-400 font-bold'>(Anti-Spoofing)</span>";
-            boardMacValue.innerHTML = `<strong class="text-emerald-800 dark:text-emerald-300 font-mono tracking-wider">${s.board_mac}</strong> <span class="text-slate-500 font-normal">→ ${s.label || ('Slot ' + currentSlot)}</span>`;
-            boardActionArea.innerHTML = `<span class="inline-flex items-center gap-1 font-mono text-emerald-800 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 font-bold text-[11px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>Terikat</span>`;
+            if (boardLockBox) boardLockBox.style.borderColor = "rgba(16, 185, 129, 0.4)";
+            boardMacTitle.innerHTML = "Hardware MAC Terkunci <span style='color:#059669; font-weight:800;'>(Anti-Spoofing)</span>";
+            boardMacValue.innerHTML = `<strong style="color:#059669; font-family:ui-monospace, monospace; letter-spacing:0.5px;">${s.board_mac}</strong> <span style="color:var(--app-muted);">→ ${s.label || ('Slot ' + currentSlot)}</span>`;
+            boardActionArea.innerHTML = `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px; font-weight:800; padding:2px 7px;">Terikat</span>`;
         } else {
             if (lockIcon) {
-                lockIcon.innerHTML = `<svg class="dash-icon text-slate-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+                lockIcon.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--app-muted);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
             }
-            if (boardLockBox) boardLockBox.className = "p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800";
+            if (boardLockBox) boardLockBox.style.borderColor = "var(--app-border)";
             boardMacTitle.textContent = "Hardware Board MAC (Anti-Spoofing)";
-            boardMacValue.innerHTML = `<span class="text-slate-500 italic">Belum ada board terhubung (ESP32 mengunci otomatis saat online)</span>`;
+            boardMacValue.innerHTML = `<span style="color:var(--app-muted); font-style:italic;">Belum ada board terhubung (ESP32 mengunci otomatis saat online)</span>`;
             boardActionArea.innerHTML = "";
         }
     }
@@ -649,17 +1069,17 @@ function renderActiveSlotForm() {
     if (s.saved) {
         if (reconnectBtn) reconnectBtn.classList.remove("hidden");
         if (deleteBtn) deleteBtn.classList.remove("hidden");
-        if (saveBtn) saveBtn.textContent = "Perbarui Slot " + currentSlot;
+        if (saveBtn) saveBtn.querySelector("span").textContent = "Perbarui Slot " + currentSlot;
     } else {
         if (reconnectBtn) reconnectBtn.classList.add("hidden");
         if (deleteBtn) deleteBtn.classList.add("hidden");
-        if (saveBtn) saveBtn.textContent = "Simpan Slot " + currentSlot;
+        if (saveBtn) saveBtn.querySelector("span").textContent = "Simpan Slot " + currentSlot;
     }
 
     if (s.is_restricted || (s.saved && !s.is_active)) {
         if (alertBox) {
             alertBox.className = "app-alert app-alert-danger";
-            alertBox.innerHTML = `<strong>Slot ${currentSlot} Dinonaktifkan oleh Admin (Akses Plus)</strong><br><span style="font-size:11px;">Slot 2 & 3 dibatasi untuk akun Anda. Hubungi admin untuk membuka paket langganan Akses Plus.</span>`;
+            alertBox.innerHTML = `<strong>Slot ${currentSlot} Dibatasi Akses Plus Admin</strong><br><span style="font-size:11px;">Slot 2 & 3 dibatasi untuk akun Anda. Hubungi admin untuk mengaktifkan paket multi-slot.</span>`;
         }
         if (bar) bar.className = "mcp-bar-fill idle";
         if (detail) detail.textContent = "Slot dibatasi oleh konfigurasi Akses Plus Admin.";
@@ -734,28 +1154,19 @@ async function pollMcp() {
         slotsData.forEach(s => {
             if (s.connected) anyConnected = true;
             const dot = document.getElementById("slotDot" + s.slot);
-            const text = document.getElementById("slotStatusText" + s.slot);
             const labelEl = document.getElementById("slotTabLabel" + s.slot);
             
             if (labelEl) labelEl.textContent = s.label || ("XiaoZhi " + s.slot);
             
-            if (dot && text) {
+            if (dot) {
                 if (s.is_restricted) {
-                    dot.className = "slot-radar-dot idle";
-                    text.textContent = "🔒 Plus";
-                    text.style.color = "#ef4444";
+                    dot.className = "mcp-radar-dot idle";
                 } else if (s.connected) {
-                    dot.className = "slot-radar-dot connected";
-                    text.textContent = "Online";
-                    text.style.color = "#10b981";
+                    dot.className = "mcp-radar-dot connected";
                 } else if (s.saved) {
-                    dot.className = "slot-radar-dot connecting";
-                    text.textContent = "Standby";
-                    text.style.color = "#d97706";
+                    dot.className = "mcp-radar-dot connecting";
                 } else {
-                    dot.className = "slot-radar-dot idle";
-                    text.textContent = "Kosong";
-                    text.style.color = "#94a3b8";
+                    dot.className = "mcp-radar-dot idle";
                 }
             }
         });
@@ -782,10 +1193,10 @@ async function pollMcp() {
         if (globalLiveBadge) {
             if (anyConnected) {
                 globalLiveBadge.className = "app-chip app-chip-success";
-                globalLiveBadge.textContent = "🟢 MCP Terhubung";
+                globalLiveBadge.innerHTML = `<span class="mcp-radar-dot connected" style="width:6px;height:6px;"></span><span>MCP Online</span>`;
             } else {
                 globalLiveBadge.className = "app-chip app-chip-neutral";
-                globalLiveBadge.textContent = "⚪ Standby";
+                globalLiveBadge.innerHTML = `<span class="mcp-radar-dot idle" style="width:6px;height:6px;"></span><span>Standby / Siap Hubung</span>`;
             }
         }
 
@@ -848,29 +1259,28 @@ if (saveMcpBtn) {
         }
 
         saveMcpBtn.disabled = true;
-        saveMcpBtn.textContent = "Menyimpan Slot " + currentSlot + "...";
-
+        saveMcpBtn.querySelector("span").textContent = "Menghubungkan...";
         try {
             const fd = new FormData();
             fd.append("slot", currentSlot);
-            fd.append("device_label", labelVal);
             fd.append("mcp_token", tokenVal);
+            fd.append("device_label", labelVal || ("XiaoZhi " + currentSlot));
             fd.append("csrf_token", csrf);
 
             const res = await fetch("/save_mcp", { method: "POST", body: fd });
             const data = await res.json();
-
             if (res.ok && data.success) {
-                if (tokenInp) tokenInp.value = "";
-                pollMcp();
+                tokenInp.value = "";
+                await pollMcp();
+                alert(data.message || "Endpoint berhasil disimpan!");
             } else {
-                alert(data.detail || data.message || "Gagal menyimpan endpoint MCP.");
+                alert(data.detail || data.message || "Gagal menyimpan endpoint.");
             }
-        } catch(err) {
-            alert("Terjadi kesalahan: " + err.message);
+        } catch(e) {
+            alert("Error: " + e.message);
         } finally {
             saveMcpBtn.disabled = false;
-            renderActiveSlotForm();
+            saveMcpBtn.querySelector("span").textContent = "Simpan Slot " + currentSlot;
         }
     });
 }
@@ -880,10 +1290,9 @@ const reconnectBtn = document.getElementById("reconnectBtn");
 if (reconnectBtn) {
     reconnectBtn.addEventListener("click", async function() {
         reconnectBtn.disabled = true;
-        reconnectBtn.textContent = "Reconnecting...";
-        const csrf = document.getElementById("mcpCsrf").value;
-
+        reconnectBtn.textContent = "Menghubungkan...";
         try {
+            const csrf = document.getElementById("mcpCsrf").value;
             const fd = new FormData();
             fd.append("slot", currentSlot);
             fd.append("csrf_token", csrf);
@@ -891,7 +1300,7 @@ if (reconnectBtn) {
             const res = await fetch("/reconnect_mcp", { method: "POST", body: fd });
             const data = await res.json();
             if (res.ok && data.success) {
-                pollMcp();
+                await pollMcp();
             } else {
                 alert(data.detail || data.message || "Gagal reconnect.");
             }
@@ -904,20 +1313,20 @@ if (reconnectBtn) {
     });
 }
 
-// Delete MCP Button Handler
+// Delete Slot Handler
 const deleteBtn = document.getElementById("deleteBtn");
 if (deleteBtn) {
-    deleteBtn.addEventListener("click", function() {
-        deleteSlotConfirm(currentSlot);
+    deleteBtn.addEventListener("click", async function() {
+        await deleteSlotConfirm(currentSlot);
     });
 }
 
 async function deleteSlotConfirm(slot) {
-    if (!confirm(`Hapus endpoint MCP untuk Slot ${slot}?\n\nTautan board hardware pada slot ini juga akan dilepaskan secara otomatis.`)) {
+    if (!confirm(`Hapus konfigurasi Slot ${slot}?\n\nTautan hardware board pada slot ini juga akan dilepaskan.`)) {
         return;
     }
-    const csrf = document.getElementById("mcpCsrf").value;
     try {
+        const csrf = document.getElementById("mcpCsrf").value;
         const fd = new FormData();
         fd.append("slot", slot);
         fd.append("csrf_token", csrf);
@@ -925,7 +1334,7 @@ async function deleteSlotConfirm(slot) {
         const res = await fetch("/delete_mcp", { method: "POST", body: fd });
         const data = await res.json();
         if (res.ok && data.success) {
-            pollMcp();
+            alert(data.message || `Slot ${slot} berhasil dihapus.`);
             window.location.reload();
         } else {
             alert(data.detail || data.message || "Gagal menghapus slot.");
@@ -939,8 +1348,8 @@ async function detachSlotBoardConfirm(slot, mac) {
     if (!confirm(`Lepas kunci Hardware Board MAC (${mac}) dari Slot ${slot}?\n\nEndpoint MCP tetap tersimpan, dan slot ini akan siap menerima board hardware ESP32 baru.`)) {
         return;
     }
-    const csrf = document.getElementById("mcpCsrf").value;
     try {
+        const csrf = document.getElementById("mcpCsrf").value;
         const fd = new FormData();
         fd.append("slot", slot);
         fd.append("csrf_token", csrf);
@@ -978,24 +1387,25 @@ async function viewBoardHistory(deviceMac) {
         let html = '';
         if (data.is_protected) {
             html += `<div style="margin-bottom: 14px; padding: 10px 14px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 10px; font-size: 12.5px; color: #818cf8; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 16px;">🛡️</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                 <span><strong>Protected Master Board:</strong> ID perangkat ini terlindungi permanen di sistem dan tidak akan pernah dihapus walau MCP diputus.</span>
             </div>`;
         }
 
+        // Show prominent current connection & new owner info at top
         if (data.current_owner && data.current_owner.username) {
             const co = data.current_owner;
             const isSelf = (Number(co.user_id) === Number({{ user.id }}));
             if (isSelf && co.status === 'ACTIVE') {
                 html += `<div style="margin-bottom: 16px; padding: 10px 14px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px; font-size: 13px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 16px;">🟢</span>
+                    <span class="mcp-radar-dot connected"></span>
                     <span>Status Saat Ini: <strong>Masih Aktif di Akun Anda (Slot ${co.slot_number || 1})</strong></span>
                 </div>`;
             } else if (!isSelf) {
                 html += `<div style="margin-bottom: 16px; padding: 12px 16px; background: rgba(245, 158, 11, 0.14); border: 1.5px solid #f59e0b; border-radius: 10px; display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 20px;">🔄</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path><path d="M4 4l5 5"></path></svg>
                     <div>
-                        <div style="font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.3px;">Status Terhubung Saat Ini:</div>
+                        <div style="font-size: 11px; font-weight: 800; color: #b45309; text-transform: uppercase; letter-spacing: 0.3px;">Status Terhubung Saat Ini:</div>
                         <div style="font-size: 14px; font-weight: 800; color: #d97706;">
                             Tersambung ke Akun Baru: <strong>@${co.username}</strong> <span style="font-size: 11.5px; font-weight: 600; color: #92400e;">(Slot ${co.slot_number || 1})</span>
                         </div>
@@ -1011,37 +1421,36 @@ async function viewBoardHistory(deviceMac) {
             data.history.forEach((h) => {
                 const isActive = h.status === 'ACTIVE';
                 const statusBadge = isActive 
-                    ? `<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">🟢 Sedang Tertaut (Aktif)</span>`
-                    : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600;">⚪ Terputus / Riwayat Lampau</span>`;
+                    ? `<span class="app-chip app-chip-small app-chip-success" style="font-weight: 800;">Aktif</span>`
+                    : `<span class="app-chip app-chip-small app-chip-neutral" style="font-weight: 600;">Riwayat</span>`;
                 
                 let transferBadge = '';
                 if (h.is_transferred && h.current_owner_username) {
                     transferBadge = `<div style="margin-top: 8px; padding: 6px 12px; background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; font-size: 12px; color: #d97706; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;">
-                        <span>🔄</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path><path d="M4 4l5 5"></path></svg>
                         <span>Tersambung ke Akun Baru: <strong>@${h.current_owner_username}</strong> (Slot ${h.current_slot_number || 1})</span>
                     </div>`;
                 } else if (h.is_current_owner && h.current_status === 'ACTIVE') {
                     transferBadge = `<div style="margin-top: 8px; padding: 4px 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; font-size: 11.5px; color: #059669; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                        <span>🟢</span>
+                        <span class="mcp-radar-dot connected" style="width:6px; height:6px;"></span>
                         <span>Masih Aktif di Akun Anda (Slot ${h.current_slot_number || h.slot_number || 1})</span>
                     </div>`;
                 }
                 
                 html += `
-                <div style="background: var(--app-card, rgba(255,255,255,0.03)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 12px; padding: 14px 16px;">
+                <div style="background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 12px; padding: 14px 16px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
-                        <div style="font-weight: 700; font-size: 14px; color: var(--app-text, #fff); display: flex; align-items: center; gap: 6px;">
-                            <span>👤</span>
+                        <div style="font-weight: 800; font-size: 13.5px; color: var(--app-text); display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                             <span>${h.username || 'User ID: ' + h.user_id}</span>
-                            <span style="font-size: 11px; color: var(--app-muted, #94a3b8); font-weight: 500;">(Slot: ${h.slot_number || 1})</span>
+                            <span style="font-size: 11px; color: var(--app-muted); font-weight: 600;">(Slot: ${h.slot_number || 1})</span>
                         </div>
                         ${statusBadge}
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 12px; color: var(--app-muted, #94a3b8);">
-                        <div>📅 <strong>Pernah Tertaut:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
-                        <div>⏱️ <strong>Terakhir Aktif:</strong> ${h.last_active_str || h.last_active_at || '-'}</div>
-                        <div>🔌 <strong>Terakhir Tertaut / Diputus:</strong> ${h.unlinked_at_str ? h.unlinked_at_str : '<span style="color: #10b981; font-weight: 600;">Masih aktif sampai sekarang</span>'}</div>
-                        <div>📝 <strong>Catatan:</strong> ${h.notes || 'Normal binding'}</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; font-size: 11.5px; color: var(--app-muted);">
+                        <div><strong>Tertaut:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
+                        <div><strong>Terakhir Aktif:</strong> ${h.last_active_str || h.last_active_at || '-'}</div>
+                        <div><strong>Dilepas:</strong> ${h.unlinked_at_str ? h.unlinked_at_str : '<span style="color: #10b981; font-weight: 700;">Masih aktif</span>'}</div>
                     </div>
                     ${transferBadge}
                 </div>`;
@@ -1079,36 +1488,35 @@ async function viewMyPastBoards() {
             data.history.forEach((h) => {
                 const isActive = h.status === 'ACTIVE' && h.is_current_owner;
                 const statusBadge = isActive 
-                    ? `<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">🟢 Sedang Tertaut</span>`
-                    : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600;">⚪ Terputus / Riwayat</span>`;
+                    ? `<span class="app-chip app-chip-small app-chip-success" style="font-weight: 800;">Aktif</span>`
+                    : `<span class="app-chip app-chip-small app-chip-neutral" style="font-weight: 600;">Riwayat</span>`;
                 
                 let transferBadge = '';
                 if (h.is_transferred && h.current_owner_username) {
                     transferBadge = `<div style="margin-top: 8px; padding: 6px 12px; background: rgba(245, 158, 11, 0.14); border: 1px solid #f59e0b; border-radius: 8px; font-size: 12px; color: #d97706; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;">
-                        <span>🔄</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path><path d="M4 4l5 5"></path></svg>
                         <span>Tersambung ke Akun Baru: <strong>@${h.current_owner_username}</strong> (Slot ${h.current_slot_number || 1})</span>
                     </div>`;
                 } else if (h.is_current_owner && h.current_status === 'ACTIVE') {
                     transferBadge = `<div style="margin-top: 8px; padding: 4px 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; font-size: 11.5px; color: #059669; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                        <span>🟢</span>
+                        <span class="mcp-radar-dot connected" style="width:6px; height:6px;"></span>
                         <span>Masih Aktif di Akun Anda (Slot ${h.current_slot_number || h.slot_number || 1})</span>
                     </div>`;
                 }
                 
                 html += `
-                <div style="background: var(--app-card, rgba(255,255,255,0.03)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 12px; padding: 14px 16px;">
+                <div style="background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 12px; padding: 14px 16px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                        <div style="font-weight: 700; font-size: 14px; color: var(--app-text, #fff); font-family: monospace;">
-                            📟 ${h.device_mac}
-                            ${h.is_protected ? '<span style="color: #818cf8; font-size: 11px; margin-left: 6px;">🛡️ Protected</span>' : ''}
+                        <div style="font-weight: 800; font-size: 13.5px; color: var(--app-text); font-family: monospace;">
+                            ${h.device_mac}
+                            ${h.is_protected ? '<span style="color: #818cf8; font-size: 11px; margin-left: 6px;">Protected</span>' : ''}
                         </div>
                         ${statusBadge}
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 12px; color: var(--app-muted, #94a3b8);">
-                        <div>🏷️ <strong>Slot Anda:</strong> Slot ${h.slot_number || 1}</div>
-                        <div>📅 <strong>Tertaut Pada:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
-                        <div>🔌 <strong>Diputus Pada:</strong> ${h.unlinked_at_str || '<span style="color: #10b981;">Masih aktif</span>'}</div>
-                        <div>📝 <strong>Catatan:</strong> ${h.notes || 'Normal binding'}</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; font-size: 11.5px; color: var(--app-muted);">
+                        <div><strong>Slot:</strong> Slot ${h.slot_number || 1}</div>
+                        <div><strong>Tertaut:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
+                        <div><strong>Diputus:</strong> ${h.unlinked_at_str || '<span style="color: #10b981;">Masih aktif</span>'}</div>
                     </div>
                     ${transferBadge}
                 </div>`;
@@ -1126,11 +1534,13 @@ function closeBoardHistoryModal() {
     if (modal) modal.style.display = "none";
 }
 
-// Start polling on load
+// Initialize on page load
 document.addEventListener("DOMContentLoaded", function() {
+    switchSlot(1);
     pollMcp();
-    mcpPoll = setInterval(pollMcp, 4000);
+    mcpPoll = setInterval(pollMcp, 5000);
 });
+
 window.addEventListener("beforeunload", function() {
     if (mcpPoll) clearInterval(mcpPoll);
 });

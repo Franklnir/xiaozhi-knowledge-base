@@ -911,13 +911,20 @@
                     <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
                 </div>
                 {% endif %}
-                <a href="/mcp" class="app-button app-button-small" style="padding: 5px 14px; font-size: 11.5px; border-radius: 999px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); color: #6366f1; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
-                    <span>🔌 Kelola 3 Slot MCP & Riwayat</span>
+                <a href="/mcp" class="app-button app-button-small" style="padding: 5px 14px; font-size: 11.5px; border-radius: 999px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); color: #6366f1; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"></rect><rect x="9" y="9" width="6" height="6" rx="1"></rect><path d="M15 2v2M9 2v2M15 20v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2"></path></svg>
+                    <span>Kelola 3 Slot MCP & Riwayat</span>
                 </a>
-                <a href="/mcp#boardHistorySection" class="app-button app-button-small" style="padding: 5px 14px; font-size: 11.5px; border-radius: 999px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #3b82f6; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">📜 Riwayat Board Akun</a>
+                <a href="/mcp#boardHistorySection" class="app-button app-button-small" style="padding: 5px 14px; font-size: 11.5px; border-radius: 999px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #3b82f6; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+                    <span>Riwayat Board Akun</span>
+                </a>
                 {% if user.role == 'admin' and device_mac %}
-                <button type="button" onclick="unlinkMyBoard('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-weight: 700; cursor: pointer;" title="Pisahkan board ini (Hanya Admin)">✂️ Putus Tautan (Admin)</button>
-                <button type="button" onclick="promptSaveMac('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">✏️ Ganti MAC</button>
+                <button type="button" onclick="unlinkMyBoard('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;" title="Pisahkan board ini (Hanya Admin)">
+                    <svg class="dash-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18.84 12.25 1.72-1.71a4.84 4.84 0 0 0 0-6.84 4.84 4.84 0 0 0-6.84 0l-1.71 1.72"/><path d="m5.16 11.75-1.72 1.71a4.84 4.84 0 0 0 0 6.84 4.84 4.84 0 0 0 6.84 0l1.71-1.72"/><line x1="8" y1="2" x2="8" y2="5"/><line x1="2" y1="8" x2="5" y2="8"/><line x1="16" y1="19" x2="16" y2="22"/><line x1="19" y1="16" x2="22" y2="16"/></svg>
+                    <span>Putus Tautan (Admin)</span>
+                </button>
+                <button type="button" onclick="promptSaveMac('{{ device_mac }}')" class="app-button app-button-small" style="padding: 4px 12px; font-size: 11.5px; border-radius: 999px; cursor: pointer;">Ganti MAC</button>
                 {% endif %}
             </div>
         </div>
@@ -1275,7 +1282,13 @@
             <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap;">
                 <div style="max-width: 680px;">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                        <span style="font-size: 26px;">🔌</span>
+                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl" style="background: rgba(99, 102, 241, 0.15); color: #6366f1;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="4" y="4" width="16" height="16" rx="3"></rect>
+                                <rect x="9" y="9" width="6" height="6" rx="1"></rect>
+                                <path d="M15 2v2M9 2v2M15 20v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2"></path>
+                            </svg>
+                        </span>
                         <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--app-text);">
                             Perangkat Hardware & 3 Slot MCP XiaoZhi
                         </h3>
@@ -1308,10 +1321,11 @@
                 <div style="display: flex; flex-direction: column; gap: 10px; align-self: center;">
                     <a href="/mcp" class="app-button app-button-primary" style="padding: 10px 22px; font-size: 13.5px; font-weight: 800; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);">
                         <span>Buka Halaman MCP (3 Slot)</span>
-                        <span>→</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                     </a>
                     <a href="/mcp#boardHistorySection" class="app-button" style="padding: 8px 18px; font-size: 12.5px; font-weight: 700; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;">
-                        <span>📜 Riwayat Transfer Board</span>
+                        <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+                        <span>Riwayat Transfer Board</span>
                     </a>
                 </div>
             </div>
