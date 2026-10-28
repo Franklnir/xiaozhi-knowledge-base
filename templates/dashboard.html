@@ -11,14 +11,8 @@
     .dashboard-grid {
         display: grid;
         gap: 22px;
-        grid-template-columns: minmax(0, 1.65fr) minmax(340px, 1fr);
+        grid-template-columns: 1fr;
         align-items: start;
-    }
-
-    @media (max-width: 1080px) {
-        .dashboard-grid {
-            grid-template-columns: 1fr;
-        }
     }
 
     /* Icon Utilities */
@@ -575,6 +569,10 @@
                     <p class="app-section-subtitle">Data materi ini menjadi sumber prompt RAG utama Xiaozhi saat menjawab suara.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <a href="/mcp" class="app-button app-button-secondary app-button-small btn-icon" style="font-weight:700;">
+                        <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                        <span>Koneksi MCP (3 Slot)</span>
+                    </a>
                     <button type="button" onclick="openCategoryModal()" class="app-button app-button-secondary app-button-small btn-icon" style="font-weight:700;">
                         <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
                         <span>Kategori ({{ categories|length }})</span>
@@ -743,137 +741,40 @@
             </div>
         </div>
 
-        <!-- Sidebar Column: Koneksi XiaoZhi 3-Slot & Quick Hub -->
-        <aside class="space-y-6">
-            <!-- 3-Slot MCP Card -->
-            <div class="app-card" id="mcpCard">
-                <div class="app-card-header is-compact">
-                    <div>
-                        <h2 class="app-section-title">Koneksi XiaoZhi (3 Slot)</h2>
-                        <p class="app-section-subtitle">Hubungkan hingga 3 perangkat fisik ESP32 XiaoZhi.{% if user and user.role == 'admin' %} <span style="color:#047857; font-weight:700;">(Opsional Admin)</span>{% endif %}</p>
-                    </div>
-                    <span id="mcpChip" class="app-chip app-chip-small app-chip-neutral">
-                        Memeriksa...
-                    </span>
-                </div>
-
-                <!-- 3 Slot Tabs Bar -->
-                <div class="mcp-slots-grid">
-                    <button type="button" class="mcp-slot-tab active" id="slotTab1" onclick="switchSlot(1)" title="Slot 1: XiaoZhi 1">
-                        <div class="slot-tab-header">
-                            <span class="slot-badge-tag">SLOT 1</span>
-                            <div class="flex items-center gap-1.5">
-                                <span class="slot-radar-dot idle" id="slotDot1"></span>
-                                <span class="text-[10px] font-bold text-slate-500" id="slotStatusText1">Kosong</span>
-                            </div>
-                        </div>
-                        <div class="slot-main-label" id="slotTabLabel1">XiaoZhi 1</div>
-                    </button>
-                    <button type="button" class="mcp-slot-tab" id="slotTab2" onclick="switchSlot(2)" title="Slot 2: XiaoZhi 2">
-                        <div class="slot-tab-header">
-                            <span class="slot-badge-tag">SLOT 2</span>
-                            <div class="flex items-center gap-1.5">
-                                <span class="slot-radar-dot idle" id="slotDot2"></span>
-                                <span class="text-[10px] font-bold text-slate-500" id="slotStatusText2">Kosong</span>
-                            </div>
-                        </div>
-                        <div class="slot-main-label" id="slotTabLabel2">XiaoZhi 2</div>
-                    </button>
-                    <button type="button" class="mcp-slot-tab" id="slotTab3" onclick="switchSlot(3)" title="Slot 3: XiaoZhi 3">
-                        <div class="slot-tab-header">
-                            <span class="slot-badge-tag">SLOT 3</span>
-                            <div class="flex items-center gap-1.5">
-                                <span class="slot-radar-dot idle" id="slotDot3"></span>
-                                <span class="text-[10px] font-bold text-slate-500" id="slotStatusText3">Kosong</span>
-                            </div>
-                        </div>
-                        <div class="slot-main-label" id="slotTabLabel3">XiaoZhi 3</div>
-                    </button>
-                </div>
-
-                <div id="mcpAlert" class="app-alert app-alert-warning" style="margin-bottom:10px;">
-                    Pilih slot untuk mengonfigurasi endpoint XiaoZhi.
-                </div>
-                <div class="mcp-bar"><div id="mcpBar" class="mcp-bar-fill idle"></div></div>
-
-                <div class="mt-4 space-y-3">
-                    <input type="hidden" id="mcpCsrf" value="{{ csrf_token }}">
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <label for="mcp_label" class="app-label !mb-0 text-xs">Nama / Ruangan Perangkat</label>
-                            <button type="button" id="quickSaveLabelBtn" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline hidden" title="Simpan nama slot">Perbarui Nama</button>
-                        </div>
-                        <input id="mcp_label" type="text" maxlength="60" placeholder="Contoh: XiaoZhi Ruang Kerja" autocomplete="off" class="app-input text-xs">
-                    </div>
-
-                    <!-- Hardware Board MAC Status (Anti-Spoofing Box) -->
-                    <div id="mcpBoardLockBox" class="p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <span id="mcpLockIcon" class="flex-shrink-0 select-none">
-                                <svg class="dash-icon text-slate-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                            </span>
-                            <div class="min-w-0">
-                                <span class="font-bold text-slate-800 dark:text-slate-200 block" id="mcpBoardMacTitle">Hardware Board MAC (Anti-Spoofing)</span>
-                                <span class="font-mono text-slate-500 block truncate" id="mcpBoardMacValue">Belum ada board terhubung</span>
-                            </div>
-                        </div>
-                        <div id="mcpBoardActionArea" class="flex-shrink-0"></div>
-                    </div>
-
-                    <div>
-                        <label for="mcp_token" class="app-label text-xs">Endpoint MCP WebSocket</label>
-                        <input id="mcp_token" type="password" placeholder="wss://api.xiaozhi.me/mcp/?token=..." autocomplete="off" class="app-input text-xs">
-                        <p class="app-field-hint text-[11px]" id="mcpPreviewHint">Endpoint wss:// dari XiaoZhi disimpan terenkripsi.</p>
-                    </div>
-
-                    <div class="flex gap-2 pt-1">
-                        <button id="saveMcpBtn" class="app-button app-button-primary flex-1 text-xs">Simpan Slot Ini</button>
-                        <button id="reconnectBtn" class="app-button app-button-secondary hidden text-xs">Reconnect</button>
-                        <button id="deleteBtn" class="app-button app-button-danger hidden text-xs">Hapus</button>
-                    </div>
-                </div>
-
-                <div class="pt-3 border-t border-slate-200 dark:border-slate-800 mt-4">
-                    <a href="/riwayat-chat" class="app-button app-button-full text-xs btn-icon justify-center" {% if user and user.role != 'admin' and not mcp_connected %}onclick="return handleMcpLockedNav(event, 'Riwayat Chat')"{% endif %}>
-                        <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                        <span>Buka Riwayat Percakapan Chat</span>
-                        {% if user and user.role != 'admin' and not mcp_connected %}
-                        <svg class="dash-icon text-slate-400 ml-1" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                        {% endif %}
-                    </a>
-                    <div id="mcpStatusDetail" class="mt-2 app-field-hint text-[11px] text-center">Memuat status perangkat...</div>
-                </div>
-            </div>
-
-            <!-- Quick Tips & Hub Card -->
-            <div class="app-card">
-                <div class="app-card-header is-compact">
+        <!-- Quick Tips & Shortcut Hub Card -->
+        <div class="app-card">
+            <div class="app-card-header is-compact">
+                <div class="flex items-center justify-between w-full flex-wrap gap-2">
                     <div class="flex items-center gap-2">
                         <div class="text-amber-500">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="18" x2="15" y2="18"></line><line x1="10" y1="22" x2="14" y2="22"></line><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>
                         </div>
                         <div>
-                            <h3 class="app-section-title text-sm">Tips Knowledge Base</h3>
-                            <p class="app-section-subtitle text-xs">Optimasi respons asisten suara Anda.</p>
+                            <h3 class="app-section-title text-sm">Tips Knowledge Base & RAG</h3>
+                            <p class="app-section-subtitle text-xs">Optimasi respons asisten suara XiaoZhi Anda.</p>
                         </div>
                     </div>
-                </div>
-                <div class="space-y-2.5 text-xs text-slate-600 dark:text-slate-400">
-                    <div class="flex items-start gap-2">
-                        <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 font-bold text-[10px] flex-shrink-0 mt-0.5">1</span>
-                        <span><strong>Web Scraper:</strong> Ekstrak artikel bersih dari tautan berita atau modul belajar otomatis.</span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                        <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 font-bold text-[10px] flex-shrink-0 mt-0.5">2</span>
-                        <span><strong>API Live:</strong> Gunakan kategori <code>data dari api</code> jika ingin menyuplai data harga atau status realtime ke Xiaozhi.</span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                        <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 font-bold text-[10px] flex-shrink-0 mt-0.5">3</span>
-                        <span><strong>Kata Kunci:</strong> Tambahkan sinonim atau kata kunci spesifik agar relevansi pencarian RAG semakin akurat.</span>
-                    </div>
+                    <a href="/mcp" class="app-button app-button-secondary app-button-small btn-icon" style="font-weight:700;">
+                        <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                        <span>Kelola 3 Slot MCP & Hardware &rarr;</span>
+                    </a>
                 </div>
             </div>
-        </aside>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-600 dark:text-slate-400 p-2">
+                <div class="flex items-start gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800">
+                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 font-bold text-xs flex-shrink-0 mt-0.5">1</span>
+                    <span><strong>Web Scraper:</strong> Ekstrak artikel bersih dari tautan berita, jurnal, atau video YouTube secara otomatis.</span>
+                </div>
+                <div class="flex items-start gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800">
+                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 font-bold text-xs flex-shrink-0 mt-0.5">2</span>
+                    <span><strong>API Live:</strong> Gunakan kategori <code>data dari api</code> jika ingin menyuplai data harga atau status realtime ke Xiaozhi.</span>
+                </div>
+                <div class="flex items-start gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800">
+                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 font-bold text-xs flex-shrink-0 mt-0.5">3</span>
+                    <span><strong>Kata Kunci:</strong> Tambahkan sinonim atau kata kunci spesifik agar relevansi pencarian RAG semakin akurat.</span>
+                </div>
+            </div>
+        </div>
     </section>
 </div>
 
@@ -2156,336 +2057,7 @@
 </script>
 
 <script>
-let mcpPoll = null, mcpBusy = false;
-let currentSlot = 1;
-let slotsData = [
-    { slot: 1, label: "XiaoZhi 1", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" },
-    { slot: 2, label: "XiaoZhi 2", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" },
-    { slot: 3, label: "XiaoZhi 3", saved: false, connected: false, preview: "", board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" }
-];
-let latestRequestId = "";
-
-function switchSlot(slotNum) {
-    currentSlot = Number(slotNum);
-    for (let i = 1; i <= 3; i++) {
-        const tab = document.getElementById("slotTab" + i);
-        if (tab) {
-            if (i === currentSlot) {
-                tab.classList.add("active");
-            } else {
-                tab.classList.remove("active");
-            }
-        }
-    }
-    const tokenInp = document.getElementById("mcp_token");
-    if (tokenInp) tokenInp.value = "";
-    renderActiveSlotForm();
-}
-
-function renderActiveSlotForm() {
-    const s = slotsData.find(x => x.slot === currentSlot) || { slot: currentSlot, label: "XiaoZhi " + currentSlot, saved: false, connected: false, board_mac: "", is_locked: false, statusText: "Belum dikonfigurasi" };
-    
-    const labelInput = document.getElementById("mcp_label");
-    const previewHint = document.getElementById("mcpPreviewHint");
-    const reconnectBtn = document.getElementById("reconnectBtn");
-    const deleteBtn = document.getElementById("deleteBtn");
-    const saveBtn = document.getElementById("saveMcpBtn");
-    const alertBox = document.getElementById("mcpAlert");
-    const bar = document.getElementById("mcpBar");
-    const detail = document.getElementById("mcpStatusDetail");
-
-    // Board MAC lock elements
-    const lockIcon = document.getElementById("mcpLockIcon");
-    const boardMacTitle = document.getElementById("mcpBoardMacTitle");
-    const boardMacValue = document.getElementById("mcpBoardMacValue");
-    const boardActionArea = document.getElementById("mcpBoardActionArea");
-    const quickSaveLabelBtn = document.getElementById("quickSaveLabelBtn");
-    const boardLockBox = document.getElementById("mcpBoardLockBox");
-
-    if (labelInput && !labelInput.matches(':focus')) {
-        labelInput.value = s.label || ("XiaoZhi " + currentSlot);
-    }
-
-    if (quickSaveLabelBtn) {
-        if (s.saved) {
-            quickSaveLabelBtn.classList.remove("hidden");
-        } else {
-            quickSaveLabelBtn.classList.add("hidden");
-        }
-    }
-
-    if (boardMacTitle && boardMacValue && boardActionArea) {
-        if (s.is_locked && s.board_mac) {
-            if (lockIcon) {
-                lockIcon.innerHTML = `<svg class="dash-icon text-emerald-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
-            }
-            if (boardLockBox) boardLockBox.className = "p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800";
-            boardMacTitle.innerHTML = "Hardware MAC Terkunci <span class='text-emerald-700 dark:text-emerald-400 font-bold'>(Anti-Spoofing)</span>";
-            boardMacValue.innerHTML = `<strong class="text-emerald-800 dark:text-emerald-300 font-mono tracking-wider">${s.board_mac}</strong> <span class="text-slate-500 font-normal">→ ${s.label || ('Slot ' + currentSlot)}</span>`;
-            boardActionArea.innerHTML = `<span class="inline-flex items-center gap-1 font-mono text-emerald-800 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 font-bold text-[11px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>Terikat</span>`;
-        } else {
-            if (lockIcon) {
-                lockIcon.innerHTML = `<svg class="dash-icon text-slate-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
-            }
-            if (boardLockBox) boardLockBox.className = "p-2.5 rounded-lg border text-xs flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800";
-            boardMacTitle.textContent = "Hardware Board MAC (Anti-Spoofing)";
-            boardMacValue.innerHTML = `<span class="text-slate-500 italic">Belum ada board terhubung (ESP32 mengunci otomatis saat online)</span>`;
-            boardActionArea.innerHTML = "";
-        }
-    }
-
-    if (previewHint) {
-        if (s.saved && s.preview) {
-            previewHint.innerHTML = "Tersimpan: <code style='color:#0284c7;font-weight:700;'>" + s.preview + "</code> (Isi endpoint baru di atas jika ingin menimpa token).";
-        } else {
-            previewHint.textContent = "Endpoint wss:// dari XiaoZhi disimpan terenkripsi.";
-        }
-    }
-
-    if (s.saved) {
-        if (reconnectBtn) reconnectBtn.classList.remove("hidden");
-        if (deleteBtn) deleteBtn.classList.remove("hidden");
-        if (saveBtn) saveBtn.textContent = "Perbarui Slot " + currentSlot;
-    } else {
-        if (reconnectBtn) reconnectBtn.classList.add("hidden");
-        if (deleteBtn) deleteBtn.classList.add("hidden");
-        if (saveBtn) saveBtn.textContent = "Simpan Slot " + currentSlot;
-    }
-
-    if (s.is_restricted || (s.saved && !s.is_active)) {
-        if (alertBox) {
-            alertBox.className = "app-alert app-alert-danger";
-            alertBox.innerHTML = `<strong>Slot ${currentSlot} Dinonaktifkan oleh Admin (Akses Plus)</strong><br><span style="font-size:11px;">Slot 2 & 3 dibatasi untuk akun Anda. Hubungi admin untuk membuka paket langganan Akses Plus.</span>`;
-        }
-        if (bar) bar.className = "mcp-bar-fill idle";
-        if (detail) {
-            detail.textContent = `Slot ${currentSlot} (${s.label}): Dinonaktifkan oleh Admin (Akses Plus)`;
-            detail.style.color = "#ef4444";
-        }
-        if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.title = "Dibatasi oleh Admin";
-        }
-        if (reconnectBtn) reconnectBtn.disabled = true;
-        if (deleteBtn) deleteBtn.disabled = mcpBusy;
-    } else {
-        if (alertBox) {
-            alertBox.className = "app-alert " + (s.connected ? "app-alert-success" : s.saved ? "app-alert-info" : "app-alert-warning");
-            alertBox.textContent = s.connected ? (s.label + " Terhubung (" + s.statusText + ")") : s.saved ? (s.statusText || "Menghubungkan...") : ("Slot " + currentSlot + " belum tersimpan.");
-        }
-        if (bar) bar.className = "mcp-bar-fill " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
-        if (detail) {
-            const reqStr = latestRequestId ? ` | ID: ${latestRequestId}` : "";
-            detail.textContent = "Slot " + currentSlot + " (" + s.label + "): " + s.statusText + " | " + (s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString("id-ID") : "-") + reqStr;
-            detail.style.color = s.connected ? "#047857" : mcpBusy ? "#0369a1" : "#64748b";
-        }
-        if (saveBtn) saveBtn.disabled = mcpBusy;
-        if (reconnectBtn) reconnectBtn.disabled = mcpBusy;
-        if (deleteBtn) deleteBtn.disabled = mcpBusy;
-    }
-}
-
-async function quickSaveLabel() {
-    const labelInput = document.getElementById("mcp_label");
-    const label = labelInput ? labelInput.value.trim() : "";
-    if (!label) {
-        alert("Nama ruangan / label perangkat tidak boleh kosong.");
-        return;
-    }
-    mcpBusy = true;
-    renderActiveSlotForm();
-    try {
-        const resp = await ajaxMcp("/api/mcp/slots/update-label", { slot: currentSlot, device_label: label });
-        const data = await resp.json().catch(() => ({}));
-        if (resp.ok && data.success) {
-            latestRequestId = data.request_id || "";
-            const detail = document.getElementById("mcpStatusDetail");
-            if (detail) detail.textContent = `Nama ruangan Slot ${currentSlot} diubah menjadi "${label}" [Req: ${latestRequestId}]`;
-            const cur = slotsData.find(x => x.slot === currentSlot);
-            if (cur) cur.label = label;
-            const tabLbl = document.getElementById("slotTabLabel" + currentSlot);
-            if (tabLbl) tabLbl.textContent = label;
-        } else {
-            alert(`Gagal memperbarui nama: ${data.detail || 'Terjadi kesalahan'}`);
-        }
-    } catch (err) {
-        alert("Gagal menghubungi server: " + err.message);
-    } finally {
-        mcpBusy = false;
-        pollMcp();
-    }
-}
-
-function updateSlotsUI(data) {
-    if (data.request_id) {
-        latestRequestId = data.request_id;
-    }
-    if (data.slots && Array.isArray(data.slots)) {
-        slotsData = data.slots;
-    }
-    
-    // Update tabs indicators
-    for (let i = 1; i <= 3; i++) {
-        const s = slotsData.find(x => x.slot === i);
-        const dot = document.getElementById("slotDot" + i);
-        const label = document.getElementById("slotTabLabel" + i);
-        const statusText = document.getElementById("slotStatusText" + i);
-        const tabBtn = document.getElementById("slotTab" + i);
-
-        if (dot && s) {
-            if (s.is_restricted || (!s.is_active && s.saved)) {
-                dot.className = "slot-radar-dot idle";
-            } else {
-                dot.className = "slot-radar-dot " + (s.connected ? "connected" : s.saved ? "connecting" : "idle");
-            }
-        }
-        if (statusText && s) {
-            if (s.is_restricted || (!s.is_active && s.saved)) {
-                statusText.textContent = "Dibatasi";
-                statusText.style.color = "#ef4444";
-            } else {
-                statusText.textContent = s.connected ? "Online" : s.saved ? "Tersimpan" : "Kosong";
-                statusText.style.color = s.connected ? "#059669" : s.saved ? "#0284c7" : "#94a3b8";
-            }
-        }
-        if (label && s) {
-            const displayLabel = s.label || ("XiaoZhi " + i);
-            label.textContent = displayLabel;
-            if (tabBtn) {
-                tabBtn.title = `Slot ${i}: ${displayLabel} (${s.connected ? 'Online' : s.saved ? 'Tersimpan' : 'Kosong'})`;
-            }
-        }
-    }
-
-    // Global Chip
-    const chip = document.getElementById("mcpChip");
-    if (chip) {
-        if (data.anyConnected) {
-            chip.className = "app-chip app-chip-small app-chip-success";
-            chip.innerHTML = "Aktif (" + data.totalSaved + "/3 slot)";
-        } else if (data.totalSaved > 0) {
-            chip.className = "app-chip app-chip-small app-chip-info" + (mcpBusy ? " mcp-loading" : "");
-            chip.innerHTML = (mcpBusy ? '<span class="mcp-spinner"></span>' : '') + "Menghubungkan (" + data.totalSaved + " slot)...";
-        } else {
-            chip.className = "app-chip app-chip-small app-chip-neutral";
-            chip.innerHTML = "Belum aktif";
-        }
-    }
-
-    renderActiveSlotForm();
-}
-
-function pollMcp() {
-    fetch("/api/mcp/status", {credentials:"same-origin"})
-        .then(r => r.json())
-        .then(d => {
-            if (d.success) updateSlotsUI(d);
-        })
-        .catch(() => {});
-}
-
-function startConnect() {
-    mcpBusy = true;
-    pollMcp();
-    if (mcpPoll) clearInterval(mcpPoll);
-    mcpPoll = setInterval(pollMcp, 1000);
-    setTimeout(() => {
-        if (mcpPoll) clearInterval(mcpPoll);
-        mcpBusy = false;
-        mcpPoll = setInterval(pollMcp, 5000);
-        pollMcp();
-    }, 25000);
-}
-
-async function ajaxMcp(url, body) {
-    const csrf = document.getElementById("mcpCsrf").value;
-    const fd = new FormData();
-    fd.append("csrf_token", csrf);
-    for (const k in body) {
-        if (body[k] !== undefined && body[k] !== null) fd.append(k, body[k]);
-    }
-    const resp = await fetch(url, {method:"POST", body:fd, credentials:"same-origin", redirect:"manual"});
-    return resp;
-}
-
 document.addEventListener("DOMContentLoaded", function() {
-    // Quick save label button - AJAX
-    const quickLabelBtn = document.getElementById("quickSaveLabelBtn");
-    if (quickLabelBtn) {
-        quickLabelBtn.addEventListener("click", quickSaveLabel);
-    }
-
-    // Save button - AJAX
-    const saveBtn = document.getElementById("saveMcpBtn");
-    if (saveBtn) saveBtn.addEventListener("click", async function() {
-        const token = document.getElementById("mcp_token").value.trim();
-        const label = document.getElementById("mcp_label").value.trim();
-        const currentSlotData = slotsData.find(x => x.slot === currentSlot);
-        if (!token && (!currentSlotData || !currentSlotData.saved)) {
-            alert("Masukkan endpoint wss:// untuk Slot " + currentSlot);
-            return;
-        }
-        if (token && !token.startsWith("wss://")) {
-            alert("Endpoint harus diawali wss://");
-            return;
-        }
-        startConnect();
-        const payload = { slot: currentSlot, device_label: label };
-        if (token) payload.mcp_token = token;
-        try {
-            const resp = await ajaxMcp("/save_mcp", payload);
-            const resJson = await resp.json().catch(() => ({}));
-            if (resJson.request_id) latestRequestId = resJson.request_id;
-        } catch (e) {}
-        document.getElementById("mcp_token").value = "";
-        pollMcp();
-    });
-
-    // Reconnect button - AJAX
-    const reconnectBtn = document.getElementById("reconnectBtn");
-    if (reconnectBtn) reconnectBtn.addEventListener("click", async function() {
-        startConnect();
-        try {
-            const resp = await ajaxMcp("/reconnect_mcp", { slot: currentSlot });
-            const resJson = await resp.json().catch(() => ({}));
-            if (resJson.request_id) latestRequestId = resJson.request_id;
-        } catch (e) {}
-        pollMcp();
-    });
-
-    // Delete button - AJAX
-    const deleteBtn = document.getElementById("deleteBtn");
-    if (deleteBtn) deleteBtn.addEventListener("click", async function() {
-        const s = slotsData.find(x => x.slot === currentSlot);
-        const name = s ? s.label : ("Slot " + currentSlot);
-        if (!confirm("Hapus endpoint " + name + " (Slot " + currentSlot + ")? Koneksi slot ini dan MAC hardware yang terkunci akan dilepas.")) return;
-        mcpBusy = true;
-        try {
-            const resp = await ajaxMcp("/delete_mcp", { slot: currentSlot });
-            const resJson = await resp.json().catch(() => ({}));
-            if (resJson.request_id) latestRequestId = resJson.request_id;
-        } catch (e) {}
-        mcpBusy = false;
-        pollMcp();
-    });
-
-    // Start polling immediately
-    pollMcp();
-    mcpPoll = setInterval(pollMcp, 5000);
-
-    // If URL has #mcpCard, scroll and focus input
-    if (window.location.hash === '#mcpCard') {
-        const card = document.getElementById('mcpCard');
-        const inp = document.getElementById('mcp_token');
-        if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            card.style.outline = '3px solid #047857';
-            card.style.outlineOffset = '4px';
-            setTimeout(() => { card.style.outline = 'none'; }, 4000);
-        }
-        if (inp) setTimeout(() => inp.focus(), 600);
-    }
-
     // Reset autofill browser pada input pencarian materi
     const sInput = document.getElementById("searchInput");
     if (sInput) {

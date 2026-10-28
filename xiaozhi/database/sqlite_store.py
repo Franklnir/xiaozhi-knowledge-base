@@ -450,6 +450,11 @@ class SQLiteStore:
                     conn.execute("ALTER TABLE board_binding_history ADD COLUMN action TEXT NOT NULL DEFAULT 'bind';")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_board_hist_slot ON board_binding_history(slot_number);")
 
+            # Migration check registered_devices
+            rd_cols = [r["name"] for r in conn.execute("PRAGMA table_info(registered_devices)").fetchall()]
+            if rd_cols and "is_protected" not in rd_cols:
+                conn.execute("ALTER TABLE registered_devices ADD COLUMN is_protected INTEGER NOT NULL DEFAULT 0;")
+
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_user_slot ON xiaozhi_tokens(user_id, slot_number);")
 
             # Migration check Access Plus
@@ -2433,7 +2438,18 @@ class SQLiteStore:
             params.extend([norm.lower(), clean])
         sql += " ORDER BY bbh.id DESC LIMIT ?"
         params.append(int(limit or 50))
-        rows = conn.execute(sql, params).fetchall()
+        try:
+            rows = conn.execute(sql, params).fetchall()
+        except sqlite3.OperationalError:
+            sql_fallback = "SELECT bbh.*, 0 as is_protected FROM board_binding_history bbh WHERE 1=1"
+            if user_id is not None:
+                sql_fallback += " AND bbh.user_id = ?"
+            if target_slot is not None:
+                sql_fallback += " AND bbh.slot_number = ?"
+            if device_mac:
+                sql_fallback += " AND (LOWER(bbh.device_mac) = ? OR LOWER(REPLACE(REPLACE(bbh.device_mac, ':', ''), '-', '')) = ?)"
+            sql_fallback += " ORDER BY bbh.id DESC LIMIT ?"
+            rows = conn.execute(sql_fallback, params).fetchall()
         res = []
         for r in rows:
             item = dict(r)

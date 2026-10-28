@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from xiaozhi.core.security import mask_secret, normalize_token_hash, xiaozhi_token_hash
 from xiaozhi.dependencies import (
@@ -11,6 +11,7 @@ from xiaozhi.dependencies import (
     validate_csrf,
     require_admin,
     require_user,
+    render,
 )
 from xiaozhi.services.mcp_service import (
     clear_mcp_state,
@@ -31,6 +32,57 @@ def _get_req_id(request: Request) -> str:
         getattr(getattr(request, "state", None), "request_id", None)
         or request.headers.get("X-Request-ID")
         or f"req-{uuid.uuid4().hex[:10]}"
+    )
+
+
+@router.get("/mcp", response_class=HTMLResponse)
+async def mcp_page(request: Request):
+    """Halaman khusus manajemen Koneksi MCP XiaoZhi (3 Slot), Kunci Hardware ESP32 & Riwayat Transfer Akun."""
+    user = get_current_user(request)
+    if not user:
+        return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
+    store = get_store()
+    token_info = store.get_xiaozhi_token_info(user["id"])
+    token_hash = token_info.get("token_hash", "") if token_info else ""
+    features = store.get_user_features(user["id"])
+    mcp_status = mcp_status_payload(
+        user["id"],
+        token_saved=bool(token_info),
+        token_preview=token_info.get("preview", "") if token_info else "",
+        token_hash=token_hash,
+    )
+    mcp_slots_data = mcp_slots_payload(user["id"], store)
+    user_tokens = store.list_user_xiaozhi_tokens(user["id"]) if hasattr(store, "list_user_xiaozhi_tokens") else []
+    board_history = store.get_board_binding_history(user_id=user["id"], limit=50) if hasattr(store, "get_board_binding_history") else []
+    device_mac = store.get_user_mac_address(user["id"]) if hasattr(store, "get_user_mac_address") else None
+
+    slots_list = mcp_slots_data.get("slots", [])
+    total_saved_slots = sum(1 for s in slots_list if s.get("saved"))
+    total_connected_slots = sum(1 for s in slots_list if s.get("connected"))
+    total_locked_macs = sum(1 for s in slots_list if s.get("board_mac"))
+
+    return render(
+        request,
+        "mcp.html",
+        {
+            "user": user,
+            "page": "mcp",
+            "active_page": "mcp",
+            "mcp_status": mcp_status,
+            "mcp_slots": slots_list,
+            "mcp_multislot_allowed": mcp_slots_data.get("multislotAllowed", True),
+            "user_tokens": user_tokens,
+            "board_history": board_history,
+            "device_mac": device_mac,
+            "features": features,
+            "stats": {
+                "total_slots": len(slots_list),
+                "saved_slots": total_saved_slots,
+                "connected_slots": total_connected_slots,
+                "locked_macs": total_locked_macs,
+                "total_history": len(board_history),
+            },
+        },
     )
 
 
