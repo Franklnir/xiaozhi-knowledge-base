@@ -301,12 +301,46 @@
         box-shadow: 0 0 0 1.5px #059669;
     }
 
-    /* Audit Table & Mobile Cards */
+    /* Audit Table & Mobile Cards (Limited to 7 entries with smooth scrolling) */
     .mcp-history-desktop-table {
         display: block;
         width: 100%;
+        max-height: 420px; /* Batasi tampilan 7 baris pertama, sisanya di-scroll */
+        overflow-y: auto;
         overflow-x: auto;
+        border: 1px solid var(--app-border);
+        border-radius: 8px;
     }
+    :root[data-theme="neo"] .mcp-history-desktop-table {
+        border: 2px solid #111;
+    }
+    .mcp-history-desktop-table thead th {
+        position: sticky;
+        top: 0;
+        background: var(--app-surface);
+        z-index: 2;
+        box-shadow: 0 1px 0 var(--app-border);
+    }
+    :root[data-theme="neo"] .mcp-history-desktop-table thead th {
+        box-shadow: 0 2px 0 #111;
+        background: #f1f5f9;
+    }
+    .mcp-history-desktop-table::-webkit-scrollbar,
+    .mcp-history-mobile-list::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    .mcp-history-desktop-table::-webkit-scrollbar-track,
+    .mcp-history-mobile-list::-webkit-scrollbar-track {
+        background: var(--app-soft, rgba(0, 0, 0, 0.03));
+        border-radius: 4px;
+    }
+    .mcp-history-desktop-table::-webkit-scrollbar-thumb,
+    .mcp-history-mobile-list::-webkit-scrollbar-thumb {
+        background: var(--app-border-strong, #cbd5e1);
+        border-radius: 4px;
+    }
+
     .mcp-history-mobile-list {
         display: none;
     }
@@ -318,6 +352,9 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            max-height: 580px;
+            overflow-y: auto;
+            padding-right: 2px;
         }
     }
 
@@ -899,6 +936,12 @@
                 </div>
                 {% endfor %}
             </div>
+            {% if board_history and board_history|length > 7 %}
+            <div style="font-size: 11px; color: var(--app-muted); text-align: right; margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                <span>Menampilkan 7 daftar teratas • Gulir (scroll) ke bawah untuk melihat riwayat lainnya.</span>
+            </div>
+            {% endif %}
             {% endif %}
         </div>
     </section>
