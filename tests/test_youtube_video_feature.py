@@ -185,8 +185,8 @@ def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
         inspect_res = inspect_fn(query="putar video esp32 s3 cam")
         assert inspect_res["success"] is True
         assert inspect_res["already_saved"] is False
-        assert "Apakah Anda ingin memutar video ini sekarang?" in inspect_res["message"]
-        assert "Tersedia" in inspect_res["message"]
+        assert "Apakah benar video ini yang ingin Anda putar?" in inspect_res["message"]
+        assert "Maker Indo" in inspect_res["message"]
         req_id = inspect_res["request_id"]
 
         # Cache is populated
@@ -194,17 +194,92 @@ def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
         assert cached is not None
         assert cached["has_transcript"] is True
 
-        # Step 2: User confirms both playing and saving
-        confirm_res = confirm_fn(request_id=req_id, play_now=True, save_to_materials=True)
+        # Step 2: User confirms playing (play_now=True) -> automatically saves to memory database!
+        confirm_res = confirm_fn(request_id=req_id, play_now=True)
         assert confirm_res["success"] is True
         assert confirm_res["played"] is True
         assert confirm_res["saved_to_materials"] is True
         assert "Memutar video" in confirm_res["message"]
-        assert "berhasil disimpan" in confirm_res["message"]
+        assert "database memori" in confirm_res["message"]
 
-        # Verify saved in Database Materi
+        # Verify saved in Database Materi (materials)
         mats = store.list_materials(owner_id)
         assert len(mats) == 1
         assert mats[0]["category"] == "Video YouTube"
         assert "ESP32 S3 Cam" in mats[0]["title"]
         assert "Konfigurasi pin D0 sampai D7" in mats[0]["content"]
+
+        # Verify saved in User Playlist memory
+        playlist_tracks = store.get_user_playlist(owner_id)
+        assert len(playlist_tracks) >= 1
+        assert any(t["video_id"] == "testvid2022" for t in playlist_tracks)
+
+
+def test_play_youtube_song_intercepts_video_query(test_setup):
+    """Test play_youtube_song intercepts video queries and delegates to inspect_youtube_video."""
+    owner_id, store, mcp = test_setup
+    play_fn = mcp.tools["play_youtube_song"]
+
+    mock_details = {
+        "success": True,
+        "request_id": "ytr_req_303",
+        "video_id": "vid_lofi_99",
+        "title": "Lofi Chill Beats to Relax",
+        "channel_name": "Chill Vibe",
+        "duration_formatted": "1 jam 20 menit",
+        "view_count_formatted": "500 ribu penonton",
+        "genre": "Musik & Seni",
+        "topic": "Musik santai instrumental",
+        "description": "Koleksi musik santai untuk fokus.",
+        "thumbnail": "https://example.com/lofi.jpg",
+        "youtube_url": "https://www.youtube.com/watch?v=vid_lofi_99",
+        "has_transcript": False,
+        "transcript": "",
+    }
+
+    with patch("xiaozhi.services.scraper_service.scrape_youtube_video_details", return_value=mock_details):
+        # User says "putar video lofi" -> should NOT directly play, must inspect and ask confirmation!
+        res = play_fn(query="putar video lofi chill")
+        assert res["success"] is True
+        assert res.get("needs_confirmation") is True
+        assert "Apakah benar video ini yang ingin Anda putar?" in res["message"]
+        assert res.get("request_id") == "ytr_req_303"
+
+
+def test_confirm_workflow_cancelled_by_user(test_setup):
+    """Test user cancels playback (play_now=False) -> no audio queued, not saved to materials."""
+    owner_id, store, mcp = test_setup
+    inspect_fn = mcp.tools["inspect_youtube_video"]
+    confirm_fn = mcp.tools["confirm_play_and_save_video"]
+
+    mock_details = {
+        "success": True,
+        "request_id": "ytr_req_404",
+        "video_id": "vid_cancel_00",
+        "title": "Video Salah Sasaran",
+        "channel_name": "Random Channel",
+        "duration_formatted": "5 menit",
+        "view_count_formatted": "1 ribu penonton",
+        "genre": "Hiburan & Komedi",
+        "topic": "Sketsa",
+        "description": "Video random.",
+        "thumbnail": "https://example.com/rand.jpg",
+        "youtube_url": "https://www.youtube.com/watch?v=vid_cancel_00",
+        "has_transcript": False,
+        "transcript": "",
+    }
+
+    with patch("xiaozhi.services.scraper_service.scrape_youtube_video_details", return_value=mock_details):
+        inspect_res = inspect_fn(query="video random")
+        req_id = inspect_res["request_id"]
+
+        # User says "bukan, jangan diputar" -> play_now=False
+        confirm_res = confirm_fn(request_id=req_id, play_now=False)
+        assert confirm_res["success"] is True
+        assert confirm_res["played"] is False
+        assert confirm_res["saved_to_materials"] is False
+        assert "Baik, pemutaran video dibatalkan." in confirm_res["message"]
+
+        # Ensure nothing was saved in Database Materi
+        mats = store.list_materials(owner_id)
+        assert len(mats) == 0
