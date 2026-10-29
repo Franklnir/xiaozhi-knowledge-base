@@ -478,6 +478,36 @@ def _auto_save_to_knowledge_base(store, owner_id: int, title: str, category: str
             if clean_title.lower() in m.get("title", "").lower() or m.get("title", "").lower() in clean_title.lower():
                 return m.get("id")
 
+        # OPSI C: Cek apakah materi terbaru adalah materi Video YouTube / Riset terkait topik serupa
+        # Jika iya, satukan ke dalam 1 materi gabungan (Riset & Video YouTube)
+        if hasattr(store, "list_materials") and hasattr(store, "update_material"):
+            recent_mats = store.list_materials(owner_id) or []
+            if recent_mats:
+                latest_m = recent_mats[0]
+                l_cat = latest_m.get("category", "")
+                if "video" in l_cat.lower() or "riset" in l_cat.lower():
+                    from xiaozhi.services.semantic_memory_service import clean_and_tokenize
+                    q_words = set(clean_and_tokenize(f"{clean_title} {keywords}"))
+                    m_words = set(clean_and_tokenize(f"{latest_m.get('title', '')} {latest_m.get('keywords', '')}"))
+                    if q_words.intersection(m_words):
+                        merged_content = f"### 🌐 Temuan Riset Web:\n{content.strip()[:10000]}\n\n---\n" + latest_m.get("content", "")
+                        merged_title = latest_m.get("title", "")
+                        if "Riset" not in merged_title:
+                            merged_title = f"Riset & {merged_title}"[:160]
+                        merged_cat = "Riset & Video YouTube"
+                        merged_kw = f"{latest_m.get('keywords', '')}, {keywords}"[:200]
+                        store.update_material(
+                            owner_id=owner_id,
+                            material_id=latest_m["id"],
+                            title=merged_title,
+                            category=merged_cat,
+                            content=merged_content,
+                            keywords=merged_kw,
+                            api_url=latest_m.get("api_url", "")
+                        )
+                        logger.info("Merged research into existing material id=%s ('%s') for owner_id=%s", latest_m["id"], merged_title, owner_id)
+                        return latest_m["id"]
+
         mat_id = store.add_material(
             owner_id=owner_id,
             title=clean_title,
@@ -1845,12 +1875,26 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         """
         owner_id = mcp_active_owner_ctx.get()
         try:
-            # 0. Intersep permintaan VIDEO agar tidak asal putar (wajib inspeksi & konfirmasi user dahulu)
+            q_clean = (query or "").strip().lower()
+
+            # 0a. Cek apakah pengguna HANYA ingin MENGECEK status/riwayat (bukan menyuruh putar lagu baru)
+            check_indicators = [
+                "cek lagu", "cek video", "cek musik", "cek pencarian", "cek pemutaran", "cek riwayat",
+                "tadi lagu", "tadi video", "tadi cari", "tadi putar", "tadi apa",
+                "lagu tadi", "video tadi", "pencarian tadi", "riwayat tadi",
+                "lagu terakhir", "video terakhir", "pencarian terakhir", "pemutaran terakhir",
+                "yang tadi diputar", "yang barusan diputar", "lagu apa ini", "video apa ini",
+                "sedang putar apa", "apa yang sedang diputar", "status pemutaran", "status lagu", "status musik"
+            ]
+            if any(ind in q_clean for ind in check_indicators):
+                logger.info("Redirecting play_youtube_song to get_playback_status because query is an inquiry: %s", query)
+                return get_playback_status(query=query)
+
+            # 0b. Intersep permintaan VIDEO agar tidak asal putar (wajib inspeksi & konfirmasi user dahulu)
             video_indicators = [
                 "video", "tonton", "nonton", "lihat", "clip", "klip", "tayangan",
                 "channel", "eps", "episode", "vlog", "trailer", "youtube.com", "youtu.be"
             ]
-            q_clean = (query or "").strip().lower()
             if any(ind in q_clean for ind in video_indicators):
                 logger.info("Redirecting play_youtube_song to inspect_youtube_video for query: %s", query)
                 return inspect_youtube_video(query=query)
@@ -2057,6 +2101,20 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         from xiaozhi.services.sse_service import broadcast_material_event
 
         clean_q = (query or "").strip()
+        q_lower = clean_q.lower()
+
+        # 0. Jika pengguna HANYA ingin MENGECEK status/riwayat video tadi (inquiry), alihkan ke get_playback_status
+        check_indicators = [
+            "cek video", "cek lagu", "cek pencarian", "cek pemutaran", "cek riwayat",
+            "tadi video", "tadi lagu", "tadi cari", "tadi putar",
+            "video tadi", "lagu tadi", "pencarian tadi", "riwayat tadi",
+            "video terakhir", "lagu terakhir", "pencarian terakhir", "pemutaran terakhir",
+            "video apa ini", "lagu apa ini", "yang tadi diputar", "yang barusan diputar"
+        ]
+        if any(ind in q_lower for ind in check_indicators):
+            logger.info("Redirecting inspect_youtube_video to get_playback_status because query is an inquiry: %s", query)
+            return get_playback_status(query=clean_q)
+
         # Deteksi otomatis apakah ada instruksi simpan sejak awal
         save_keywords = [
             "simpan ke materi", "simpan materi", "simpan ke database", "simpan di database",
@@ -2268,6 +2326,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
         saved_id = None
         saved_status = False
+        is_consolidated = False
 
         # 1. Simpan OTOMATIS ke database memori jika pengguna setuju memutar video (atau eksplisit save_to_materials=True)
         # Jika pengguna membatalkan (play_now=False), tidak disimpan kecuali eksplisit diminta simpan
@@ -2296,31 +2355,80 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                         f"{cached_data.get('description', '')}"
                         f"{subtitle_section}"
                     )
-                    saved_item = store.add_material(
-                        owner_id,
-                        title=f"Video: {v_title}"[:160],
-                        category=category or "Video YouTube",
-                        content=content_text,
-                        keywords=f"youtube, video, {v_channel}, {v_genre}",
-                        api_url=v_url,
-                    )
-                    from xiaozhi.services.mcp_service import signal_mcp_reload
-                    signal_mcp_reload()
-                    saved_status = True
-                    saved_id = getattr(saved_item, "id", None) or (saved_item.get("id") if isinstance(saved_item, dict) else saved_item)
-                    broadcast_material_event(owner_id, "material_created", {
-                        "action": "create",
-                        "material": {
-                            "id": saved_id,
-                            "title": f"Video: {v_title}"[:160],
-                            "category": category or "Video YouTube",
-                            "content": content_text,
-                            "keywords": f"youtube, video, {v_channel}, {v_genre}",
-                            "api_url": v_url,
-                            "source_type": None,
-                        },
-                        "message": f"Video '{v_title}' berhasil disimpan ke database memori.",
-                    })
+
+                    # OPSI C: Cek apakah baru saja ada materi riset terkait topik yang sama
+                    # Jika ada, satukan ke dalam 1 materi gabungan (Riset & Video YouTube)
+                    recent_materials = store.list_materials(owner_id) if hasattr(store, "list_materials") else []
+                    related_mat = None
+                    from xiaozhi.services.semantic_memory_service import clean_and_tokenize
+                    v_words = set(clean_and_tokenize(f"{v_title} {v_topic} {v_genre}"))
+
+                    for rm in recent_materials[:5]:
+                        rm_cat = (rm.get("category") or "").lower()
+                        rm_title = (rm.get("title") or "").lower()
+                        rm_words = set(clean_and_tokenize(f"{rm_title} {rm.get('keywords', '')}"))
+                        overlap = v_words.intersection(rm_words)
+                        is_recent_research = rm.get("source_type") == "auto_search_cache" or "riset" in rm_cat or "pengetahuan" in rm_cat
+                        if is_recent_research and (overlap or rm == recent_materials[0]):
+                            related_mat = rm
+                            break
+
+                    if related_mat and hasattr(store, "update_material"):
+                        # Satukan ke materi yang sudah ada!
+                        mat_id = related_mat["id"]
+                        base_title = related_mat.get("title", "")
+                        if "Video" not in base_title:
+                            merged_title = f"{base_title} & Video: {v_title}"[:160]
+                        else:
+                            merged_title = base_title
+                        merged_cat = "Riset & Video YouTube"
+                        merged_kw = f"{related_mat.get('keywords', '')}, youtube, {v_channel}, {v_genre}"[:200]
+                        merged_content = (
+                            f"{related_mat.get('content', '')}\n\n"
+                            f"---\n"
+                            f"## 🎬 Video YouTube Terkait & Subtitle Transkrip:\n"
+                            f"{content_text}"
+                        )
+                        store.update_material(
+                            owner_id=owner_id,
+                            material_id=mat_id,
+                            title=merged_title,
+                            category=merged_cat,
+                            content=merged_content,
+                            keywords=merged_kw,
+                            api_url=v_url,
+                        )
+                        from xiaozhi.services.mcp_service import signal_mcp_reload
+                        signal_mcp_reload()
+                        saved_status = True
+                        saved_id = mat_id
+                        is_consolidated = True
+                    else:
+                        saved_item = store.add_material(
+                            owner_id,
+                            title=f"Video: {v_title}"[:160],
+                            category=category or "Video YouTube",
+                            content=content_text,
+                            keywords=f"youtube, video, {v_channel}, {v_genre}",
+                            api_url=v_url,
+                        )
+                        from xiaozhi.services.mcp_service import signal_mcp_reload
+                        signal_mcp_reload()
+                        saved_status = True
+                        saved_id = getattr(saved_item, "id", None) or (saved_item.get("id") if isinstance(saved_item, dict) else saved_item)
+                        broadcast_material_event(owner_id, "material_created", {
+                            "action": "create",
+                            "material": {
+                                "id": saved_id,
+                                "title": f"Video: {v_title}"[:160],
+                                "category": category or "Video YouTube",
+                                "content": content_text,
+                                "keywords": f"youtube, video, {v_channel}, {v_genre}",
+                                "api_url": v_url,
+                                "source_type": None,
+                            },
+                            "message": f"Video '{v_title}' berhasil disimpan ke database memori.",
+                        })
             except Exception as e_save:
                 logger.warning("Failed saving video to materials: %s", e_save)
 
@@ -2389,6 +2497,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             "played": play_now,
             "playback_queued": playback_queued,
             "saved_to_materials": saved_status,
+            "consolidated": is_consolidated,
             "material_id": saved_id,
             "message": " ".join(parts),
             "instructions": instructions,
@@ -2414,6 +2523,19 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return {"success": False, "message": "Belum ada koneksi akun/perangkat aktif."}
 
         try:
+            q_clean = (query or "").strip().lower()
+            check_indicators = [
+                "cek lagu", "cek video", "cek musik", "cek pencarian", "cek pemutaran", "cek riwayat",
+                "tadi lagu", "tadi video", "tadi cari", "tadi putar", "tadi apa",
+                "lagu tadi", "video tadi", "pencarian tadi", "riwayat tadi",
+                "lagu terakhir", "video terakhir", "pencarian terakhir", "pemutaran terakhir",
+                "yang tadi diputar", "yang barusan diputar", "lagu apa ini", "video apa ini",
+                "sedang putar apa", "apa yang sedang diputar", "status pemutaran", "status lagu", "status musik"
+            ]
+            if any(ind in q_clean for ind in check_indicators):
+                logger.info("Redirecting play_playlist_song to get_playback_status because query is an inquiry: %s", query)
+                return get_playback_status(query=query)
+
             features = store.get_user_features(owner_id)
             if not features.get("youtube_music", True):
                 return {"success": False, "message": "Fitur YouTube Music telah dinonaktifkan untuk akun Anda."}
@@ -2805,23 +2927,176 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
 
     @mcp_server.tool()
-    def get_playback_status() -> dict:
+    def get_playback_status(query: str = "") -> dict:
         """
-        Cek status lagu atau audio YouTube yang sedang atau baru saja selesai diputar di speaker perangkat XiaoZhi.
-        Gunakan tool ini saat user bertanya:
-        - "Lagu apa yang lagi diputar?"
-        - "Lagu apa ini?"
-        - "Apakah lagunya masih jalan?"
-        - "Apakah lagunya sudah selesai?"
-        - "Tadi putar lagu apa?"
+        Cek status dan informasi riwayat pemutaran lagu YouTube, video terakhir yang dicek/ditonton,
+        serta riset atau pencarian web terakhir TANPA memutar audio apapun.
+        Gunakan tool ini saat user bertanya atau ingin mengecek konteks terkini:
+        - "Cek lagu terakhir kita" / "Tadi lagu apa yang diputar?"
+        - "Cek video terakhir kita" / "Video apa yang tadi kita tonton atau cek?"
+        - "Cek pencarian terakhir kita" / "Tadi kita cari apa?" / "Riset terakhir kita tentang apa?"
+        - "Lagu apa yang sedang diputar?" / "Status pemutaran sekarang apa?"
+        PENTING: Tool ini HANYA untuk mengecek dan melaporkan konteks/informasi ke user.
+        JANGAN memutar audio dan JANGAN panggil self.audio.play_youtube kecuali pengguna secara eksplisit meminta 'putar lagi' atau 'mainkan kembali'.
+
+        Args:
+            query: Pertanyaan atau konteks pengecekan dari user. Contoh: "cek video terakhir", "tadi lagu apa", "pencarian terakhir kita apa"
         """
         owner_id = mcp_active_owner_ctx.get()
         if owner_id is None:
             return {"success": False, "is_playing": False, "message": "Belum ada koneksi perangkat aktif."}
+
         from xiaozhi.services.playback_tracker import playback_tracker
-        status = playback_tracker.get_playback_status(owner_id)
-        record_mcp_tool_history(owner_id, "get_playback_status", "status pemutaran", {}, status)
-        return {"success": True, **status}
+        tracker_status = playback_tracker.get_playback_status(owner_id)
+
+        clean_q = (query or "").strip().lower()
+
+        # Ambil riwayat aktivitas terbaru pengguna untuk memahami konteks lengkap
+        recent_chats = []
+        if store and hasattr(store, "list_chat_history"):
+            try:
+                recent_chats = store.list_chat_history(owner_id, limit=25)
+            except Exception as e_ch:
+                logger.debug("Failed listing chat history in get_playback_status: %s", e_ch)
+
+        last_song = None
+        last_video = None
+        last_search = None
+
+        # 1. Cari riwayat lagu terakhir
+        if tracker_status.get("current_track"):
+            last_song = {
+                "title": tracker_status["current_track"].get("title", ""),
+                "video_id": tracker_status["current_track"].get("video_id", ""),
+                "status": "sedang diputar" if tracker_status.get("is_playing") else "terakhir diputar",
+                "source": "playback_tracker"
+            }
+        elif tracker_status.get("last_track"):
+            last_song = {
+                "title": tracker_status["last_track"].get("title", ""),
+                "video_id": tracker_status["last_track"].get("video_id", ""),
+                "status": "selesai diputar",
+                "source": "playback_tracker"
+            }
+
+        # Jika belum ada di tracker, telusuri chat_history
+        for chat in recent_chats:
+            t_name = chat.get("tool_name") or ""
+            if not last_song and t_name in ("play_youtube_song", "play_playlist_song"):
+                resp = chat.get("response_payload") or {}
+                if isinstance(resp, dict):
+                    np = resp.get("now_playing") or {}
+                    title = np.get("title") or chat.get("user_message") or ""
+                    if title:
+                        last_song = {
+                            "title": title,
+                            "video_id": np.get("video_id", ""),
+                            "status": "terakhir diputar",
+                            "source": "chat_history"
+                        }
+
+            # 2. Cari riwayat video YouTube terakhir
+            if not last_video and t_name in ("inspect_youtube_video", "confirm_play_and_save_video"):
+                resp = chat.get("response_payload") or {}
+                if isinstance(resp, dict):
+                    v_detail = resp.get("video_detail") or resp.get("video_data") or {}
+                    title = v_detail.get("title") or resp.get("title") or chat.get("user_message") or ""
+                    if title:
+                        last_video = {
+                            "title": title,
+                            "channel": v_detail.get("channel_name", "") or resp.get("channel", ""),
+                            "duration": v_detail.get("duration_formatted", "") or resp.get("duration", ""),
+                            "genre": v_detail.get("genre", ""),
+                            "video_url": v_detail.get("url", "") or resp.get("video_url", ""),
+                            "source": "chat_history"
+                        }
+
+            # 3. Cari riwayat pencarian/riset web terakhir
+            if not last_search and t_name in ("search_web", "search_web_deep", "search_news"):
+                req_p = chat.get("request_payload") or {}
+                q_term = req_p.get("query") or chat.get("user_message") or ""
+                resp = chat.get("response_payload") or {}
+                results = resp.get("results") if isinstance(resp, dict) else []
+                top_title = results[0].get("title", "") if results else ""
+                if q_term:
+                    last_search = {
+                        "query": q_term,
+                        "top_result": top_title,
+                        "source": "chat_history"
+                    }
+
+        # Jika video belum ditemukan di chat_history, cek materi database terakhir
+        if not last_video and store and hasattr(store, "list_materials"):
+            try:
+                mats = store.list_materials(owner_id)
+                for m in mats:
+                    if "video" in (m.get("category") or "").lower():
+                        last_video = {
+                            "title": m.get("title", ""),
+                            "genre": m.get("category", ""),
+                            "source": "materials_db"
+                        }
+                        break
+            except Exception:
+                pass
+
+        # Tentukan pesan dan fokus respon berdasarkan query pengecekan user
+        is_video_inquiry = any(k in clean_q for k in ["video", "tonton", "nonton", "clip", "klip", "tayangan", "channel"])
+        is_search_inquiry = any(k in clean_q for k in ["cari", "pencarian", "riset", "berita", "google", "web"])
+        is_song_inquiry = any(k in clean_q for k in ["lagu", "musik", "play", "playlist", "putar", "dengar", "audio"])
+
+        response_message = ""
+        if is_video_inquiry and last_video:
+            ch_info = f" dari channel {last_video['channel']}" if last_video.get("channel") else ""
+            dur_info = f" (durasi {last_video['duration']})" if last_video.get("duration") else ""
+            response_message = f"Video terakhir yang kita cek adalah '{last_video['title']}'{ch_info}{dur_info}. Jika Anda ingin memutarnya sekarang, silakan katakan 'putar lagi'."
+        elif is_search_inquiry and last_search:
+            res_info = f" Hasil teratasnya mengenai '{last_search['top_result']}'." if last_search.get("top_result") else ""
+            response_message = f"Pencarian terakhir yang kita lakukan adalah tentang '{last_search['query']}'.{res_info}"
+        elif is_song_inquiry and last_song:
+            if tracker_status.get("is_playing"):
+                pos = tracker_status.get("elapsed_seconds", 0)
+                pos_str = f" pada detik ke-{pos}" if pos else ""
+                response_message = f"Saat ini sedang memutar lagu '{last_song['title']}'{pos_str}."
+            else:
+                response_message = f"Lagu terakhir yang tadi kita dengarkan adalah '{last_song['title']}'. Saat ini pemutaran sudah selesai. Jika ingin mendengarkannya kembali, silakan katakan 'putar lagi'."
+        else:
+            # Ringkasan konteks umum
+            parts = []
+            if tracker_status.get("is_playing") and last_song:
+                parts.append(f"sedang memutar lagu '{last_song['title']}'")
+            elif last_song:
+                parts.append(f"lagu terakhir tadi adalah '{last_song['title']}'")
+            if last_video:
+                parts.append(f"video YouTube terakhir yang dicek adalah '{last_video['title']}'")
+            if last_search:
+                parts.append(f"pencarian terakhir tentang '{last_search['query']}'")
+
+            if parts:
+                response_message = "Konteks riwayat terakhir kita: " + "; ".join(parts) + ". Silakan beri tahu jika Anda ingin memutar ulang atau melanjutkan."
+            else:
+                response_message = "Saat ini belum ada rekaman pemutaran lagu atau pencarian aktif. Ada yang bisa saya bantu cari atau putarkan?"
+
+        result = {
+            "success": True,
+            **tracker_status,
+            "query": query,
+            "message": response_message,
+            "context_summary": {
+                "last_song": last_song,
+                "last_video": last_video,
+                "last_search": last_search,
+            },
+            "instructions": (
+                "PENTING: Pengguna HANYA sedang mengecek informasi atau status konteks terakhir. "
+                "JANGAN memutar lagu atau audio! JANGAN panggil tool perangkat `self.audio.play_youtube`! "
+                "Cukup sampaikan informasi di atas dengan bahasa ramah dan santun kepada pengguna. "
+                "Hanya putar lagu jika pengguna secara eksplisit meminta 'putar lagi' atau 'mainkan kembali'."
+            )
+        }
+
+        record_mcp_tool_history(owner_id, "get_playback_status", query or "status pemutaran", {"query": query}, result)
+        return result
 
     @mcp_server.tool()
     def stop_youtube_song() -> dict:
@@ -2868,6 +3143,15 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         """
         owner_id = mcp_active_owner_ctx.get()
         try:
+            clean_q = (query or "").strip().lower()
+            search_check_indicators = [
+                "cek pencarian", "cek riset", "pencarian terakhir", "riset terakhir",
+                "tadi kita cari", "tadi cari apa", "apa yang tadi kita cari", "riwayat pencarian"
+            ]
+            if any(ind in clean_q for ind in search_check_indicators):
+                logger.info("Redirecting search_web to get_playback_status because query is an inquiry: %s", query)
+                return get_playback_status(query=query)
+
             query = clean_text(query, max_len=200, min_len=1, field="Pencarian")
             max_results = max(1, min(int(max_results or 5), 10))
 
@@ -2936,6 +3220,15 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         """
         owner_id = mcp_active_owner_ctx.get()
         try:
+            clean_q = (query or "").strip().lower()
+            search_check_indicators = [
+                "cek pencarian", "cek riset", "pencarian terakhir", "riset terakhir",
+                "tadi kita cari", "tadi cari apa", "apa yang tadi kita cari", "riwayat pencarian"
+            ]
+            if any(ind in clean_q for ind in search_check_indicators):
+                logger.info("Redirecting search_web_deep to get_playback_status because query is an inquiry: %s", query)
+                return get_playback_status(query=query)
+
             query = clean_text(query, max_len=200, min_len=1, field="Pencarian Mendalam")
             max_results = max(1, min(int(max_results or 5), 10))
 

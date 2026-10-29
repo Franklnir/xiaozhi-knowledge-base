@@ -322,11 +322,11 @@ ALL_MCP_TOOLS_CATALOG = [
     },
     {
         "name": "get_playback_status",
-        "title": "Status Pemutaran Musik",
+        "title": "Cek Konteks Riwayat & Status Pemutaran",
         "category": "media",
         "category_label": "Media & Web",
         "icon": "🎧",
-        "description": "Mengecek status lagu YouTube yang sedang atau baru saja selesai diputar di speaker.",
+        "description": "Mengecek status riwayat lagu terakhir, video YouTube terakhir yang dicek, atau pencarian/riset terakhir TANPA memutar audio (hanya cek info konteks kecuali disuruh putar lagi).",
     },
     {
         "name": "stop_youtube_song",

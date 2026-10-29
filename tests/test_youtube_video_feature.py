@@ -283,3 +283,84 @@ def test_confirm_workflow_cancelled_by_user(test_setup):
         # Ensure nothing was saved in Database Materi
         mats = store.list_materials(owner_id)
         assert len(mats) == 0
+
+
+def test_option_c_material_consolidation(test_setup):
+    """Test Opsi C: Consolidating web research and video on same topic into 1 unified material."""
+    owner_id, store, mcp = test_setup
+    confirm_fn = mcp.tools["confirm_play_and_save_video"]
+
+    # 1. Existing research material
+    mat_id = store.add_material(
+        owner_id=owner_id,
+        title="Riset: Golang Tutorial Kelebihan",
+        category="Riset & Pengetahuan",
+        content="Golang memiliki kelebihan konkurensi goroutine yang ringan dan kompilasi cepat.",
+        keywords="golang tutorial kelebihan"
+    )
+
+    mock_details = {
+        "success": True,
+        "request_id": "ytr_req_505",
+        "video_id": "vid_golang_01",
+        "title": "Tutorial Golang Dasar untuk Pemula",
+        "channel_name": "Koding ID",
+        "duration_formatted": "15 menit",
+        "view_count_formatted": "25 ribu penonton",
+        "genre": "Sains & Teknologi",
+        "topic": "Golang tutorial dasar",
+        "description": "Video belajar Golang lengkap.",
+        "thumbnail": "https://example.com/go.jpg",
+        "youtube_url": "https://www.youtube.com/watch?v=vid_golang_01",
+        "has_transcript": True,
+        "transcript": "Halo semuanya, hari ini kita belajar Golang dasar.",
+    }
+    cache_youtube_video_request("ytr_req_505", mock_details)
+
+    # Confirm and save video -> should merge into existing material #mat_id
+    res = confirm_fn(request_id="ytr_req_505", play_now=True, save_to_materials=True)
+    assert res["success"] is True
+    assert res["saved_to_materials"] is True
+    assert res.get("consolidated") is True
+
+    # Check total materials: must remain 1 (consolidated), NOT 2!
+    mats = store.list_materials(owner_id)
+    assert len(mats) == 1
+    consolidated_mat = mats[0]
+    assert consolidated_mat["category"] == "Riset & Video YouTube"
+    assert "Golang" in consolidated_mat["title"]
+    assert "Video YouTube Terkait" in consolidated_mat["content"]
+    assert "goroutine" in consolidated_mat["content"]
+
+
+def test_inquiry_checks_not_playing_audio(test_setup):
+    """Test user inquiry (checking last video/song/search) redirects to get_playback_status and does NOT play audio."""
+    owner_id, store, mcp = test_setup
+    play_fn = mcp.tools["play_youtube_song"]
+    pl_play_fn = mcp.tools["play_playlist_song"]
+    inspect_fn = mcp.tools["inspect_youtube_video"]
+    status_fn = mcp.tools["get_playback_status"]
+
+    # 1. User asks "cek lagu terakhir tadi apa" via play_youtube_song
+    res_song = play_fn(query="cek lagu terakhir tadi apa")
+    assert res_song["success"] is True
+    # Must NOT contain instructions to call play_youtube!
+    assert "JANGAN memutar lagu" in res_song["instructions"]
+    assert "self.audio.play_youtube" not in res_song.get("message", "")
+
+    # 2. User asks "tadi video apa" via inspect_youtube_video
+    res_vid = inspect_fn(query="tadi video apa yang kita tonton")
+    assert res_vid["success"] is True
+    assert "JANGAN memutar lagu" in res_vid["instructions"]
+
+    # 3. User asks "cek pemutaran terakhir" via play_playlist_song
+    res_pl = pl_play_fn(query="cek pemutaran terakhir")
+    assert res_pl["success"] is True
+    assert "JANGAN memutar lagu" in res_pl["instructions"]
+
+    # 4. Direct call to get_playback_status with inquiry query
+    status_res = status_fn(query="cek video terakhir kita")
+    assert status_res["success"] is True
+    assert "instructions" in status_res
+    assert "JANGAN memutar lagu atau audio!" in status_res["instructions"]
+
