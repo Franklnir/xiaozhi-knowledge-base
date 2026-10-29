@@ -2084,30 +2084,21 @@
  * FIRMWARE RELAY NYATA XIAOZHI AI (HYBRID GO + MQTT)
  * ============================================================
  * Mikrokontroler: ${profile.name}
- * Target Board  : ${profile.arduinoBoard} (Pilih di Arduino IDE -> Tools -> Board)
- * Arsitektur    : Ultra-Lightweight Event-Driven MQTT (Eclipse Mosquitto)
- * Ruangan       : ${room.nama_tempat}
- * Client ID     : ${room.api_client_id}
- * Jumlah Channel: ${numRelays} Channel Relay (Maks. ${profile.pins.length} CH)
- *
- * Pemetaan Pinout Fisik Aman:
-${pinComments}
- *
- * Fitur Keamanan Hardware:
- * 1. Output diset level OFF sebelum pinMode OUTPUT (anti chattering).
- * 2. LWT (Last Will & Testament): Broker Mosquitto otomatis menandai status 'offline' jika perangkat padam.
- * 3. 2-Way Hardware Feedback: Mengirim status fisik sebenarnya ke topic 'state' setelah GPIO beralih.
- * 4. Deduplikasi ID Perintah: Mencegah eksekusi ganda jika ada retransmisi paket jaringan.
- * 5. Sangat Ringan: RAM < 2KB, CPU ~0%, Zero-Lag latensi < 5 milidetik.
- *
- * Library yang dibutuhkan (Install via Arduino Library Manager):
- * - PubSubClient (oleh Nick O'Leary)
- * - ArduinoJson (oleh Benoit Blanchon) versi 6.x atau 7.x
+ * Fitur:
+ * 1. Hybrid Environment: Auto-detect Wokwi Simulator vs Hardware Fisik
+ * 2. Event-Driven MQTT ke Mosquitto (Xiaozhi Gateway)
+ * 3. 2-Way Hardware Feedback & LWT (Last Will & Testament)
+ * 4. Deduplikasi Command ID (Anti retransmisi)
+ * 5. Serial CLI Control: 'status', 'all on', 'all off', '1 on', dll.
+ * ============================================================
  */
 
 ${profile.includeWifi}
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#if defined(ESP32)
+#include <esp_wifi.h>
+#endif
 
 // ============================================================
 // 1. KONFIGURASI WIFI RUMAH
@@ -2123,7 +2114,6 @@ const int   MQTT_PORT     = 1883;
 const char* CLIENT_ID     = "${room.api_client_id}";
 const char* DEVICE_TOKEN  = "${room.api_token}";
 
-// Topic MQTT Khusus Ruangan Ini
 const char* TOPIC_COMMAND      = "xiaozhi/relay/${slug}/set";
 const char* TOPIC_STATE        = "xiaozhi/relay/${slug}/state";
 const char* TOPIC_AVAILABILITY = "xiaozhi/relay/${slug}/availability";
@@ -2135,7 +2125,7 @@ const char* TOPIC_ERROR        = "xiaozhi/relay/${slug}/err";
 const int NUM_RELAYS = ${numRelays};
 ${pinArray}
 
-// ${activeLow ? "ACTIVE LOW: Relay menyala saat pin LOW (GND)" : "ACTIVE HIGH: Relay menyala saat pin HIGH (3.3V)"}
+// ${activeLow ? "ACTIVE LOW: Relay menyala saat pin bernilai LOW (GND)" : "ACTIVE HIGH: Relay menyala saat pin bernilai HIGH (3.3V)"}
 const bool RELAY_ACTIVE_LOW = ${logicStr};
 
 bool relayStates[NUM_RELAYS] = { ${Array(numRelays).fill("false").join(", ")} };
@@ -2177,7 +2167,7 @@ void applyRelay(int index, bool turnOn) {
 
 void printSystemStatus() {
     Serial.println("\\n============================================================");
-    Serial.println("  📊 STATUS REAL-TIME: XIAOZHI ESP32 SMART RELAY");
+    Serial.println("   📊 STATUS REAL-TIME: XIAOZHI ESP32 SMART RELAY");
     Serial.println("============================================================");
     Serial.printf("⏱️  Uptime        : %lu detik (%lu menit)\\n", millis() / 1000, millis() / 60000);
     Serial.printf("📶 WiFi Status   : %s\\n", (WiFi.status() == WL_CONNECTED) ? "TERHUBUNG (Online)" : "TERPUTUS (Offline)");
@@ -2213,16 +2203,17 @@ void publishState(int relayIndex, const String& cmdId) {
     char buffer[256];
     size_t len = serializeJson(doc, buffer);
     mqttClient.publish(TOPIC_STATE, (uint8_t*)buffer, len, false);
-    Serial.printf("[STATUS MQTT] 📤 State terkirim ke Broker: CH %d = %s (Cmd: %s)\\n", relayIndex + 1, relayStates[relayIndex] ? "ON" : "OFF", cmdId.c_str());
+    Serial.printf("[STATUS MQTT] 📤 State terkirim ke Broker: CH %d = %s (Cmd: %s)\\n", 
+                  relayIndex + 1, relayStates[relayIndex] ? "ON" : "OFF", cmdId.c_str());
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-    Serial.printf("[MQTT RECV] Pesan di topic [%s]\\n", topic);
+    Serial.printf("[MQTT RECV] Pesan diterima di topic [%s]\\n", topic);
 
     StaticJsonDocument<512> doc;
     DeserializationError err = deserializeJson(doc, payload, length);
     if (err) {
-        Serial.printf("[MQTT ERR] Gagal parse JSON: %s\\n", err.c_str());
+        Serial.printf("[MQTT ERR] Gagal parse JSON payload: %s\\n", err.c_str());
         return;
     }
 
@@ -2233,12 +2224,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
     int idx = relayNum - 1;
     if (idx < 0 || idx >= NUM_RELAYS) {
-        Serial.printf("[WARN] Channel %d di luar batas (Max: %d)\\n", relayNum, NUM_RELAYS);
+        Serial.printf("[WARN] Channel %d di luar batas konfigurasi (Max: %d)\\n", relayNum, NUM_RELAYS);
         return;
     }
 
     if (isDuplicate(cmdId)) {
-        Serial.printf("[DEDUP] Command %s sudah diproses sebelumnya.\\n", cmdId.c_str());
+        Serial.printf("[DEDUP] Perintah %s sudah pernah diproses. Mengirim state ulang.\\n", cmdId.c_str());
         publishState(idx, cmdId);
         return;
     }
@@ -2259,39 +2250,78 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
 void connectWiFi() {
     if (WiFi.status() == WL_CONNECTED) return;
-    WiFi.disconnect();
-    delay(100);
+
+    Serial.println("\\n[WIFI] Memulai pemindaian access point...");
+
+    WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true, true);
+    delay(100);
 
-    bool isPlaceholder = (String(WIFI_SSID) == "WIFI_RUMAH_ANDA" || strlen(WIFI_SSID) == 0);
-    bool useWokwi = false;
+    #if defined(ESP32)
+    // Buka frekuensi region Indonesia (Channel 1-13)
+    wifi_country_t country = {
+        .cc = "ID",
+        .schan = 1,
+        .nchan = 13,
+        .max_tx_power = 78,
+        .policy = WIFI_COUNTRY_POLICY_AUTO
+    };
+    esp_wifi_set_country(&country);
 
-    if (isPlaceholder) {
-        int n = WiFi.scanNetworks();
-        for (int i = 0; i < n; i++) {
-            if (WiFi.SSID(i) == "Wokwi-GUEST") { useWokwi = true; break; }
+    WiFi.setSleep(false);
+    WiFi.setTxPower(WIFI_POWER_18_5dBm);
+    #endif
+
+    int n = WiFi.scanNetworks(false, true);
+    bool isWokwi = false;
+    int targetIndex = -1;
+
+    for (int i = 0; i < n; ++i) {
+        String ssidFound = WiFi.SSID(i);
+        if (ssidFound == "Wokwi-GUEST") {
+            isWokwi = true;
         }
+        if (ssidFound == WIFI_SSID) {
+            targetIndex = i;
+        }
+    }
+
+    if (isWokwi && targetIndex == -1) {
+        // Lingkungan Simulator Wokwi
+        Serial.println("[WIFI] Lingkungan terdeteksi: SIMULATOR WOKWI");
+        Serial.println("[WIFI] Menghubungkan ke access point virtual 'Wokwi-GUEST'...");
         WiFi.scanDelete();
-    }
-
-    if (useWokwi) {
-        Serial.println("[WIFI] Simulator Wokwi terdeteksi...");
         WiFi.begin("Wokwi-GUEST", "", 6);
+    } else if (targetIndex != -1) {
+        // Lingkungan Hardware Nyata
+        int chan = WiFi.channel(targetIndex);
+        uint8_t* bssid = WiFi.BSSID(targetIndex);
+        Serial.printf("[WIFI] Lingkungan terdeteksi: HARDWARE FISIK NYATA\\n");
+        Serial.printf("[WIFI] Mengunci ke '%s' (Kanal: %d, RSSI: %d dBm)...\\n", WIFI_SSID, chan, WiFi.RSSI(targetIndex));
+        WiFi.scanDelete();
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD, chan, bssid);
     } else {
-        Serial.printf("[WIFI] Menghubungkan ke Wi-Fi: %s...\\n", WIFI_SSID);
-        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+        Serial.printf("[WIFI] ❌ SSID '%s' tidak ditemukan di sekitar.\\n", WIFI_SSID);
+        WiFi.scanDelete();
+        return;
     }
 
-    int tries = 0;
-    while (WiFi.status() != WL_CONNECTED && tries < 30) {
+    int timeout = 0;
+    while (WiFi.status() != WL_CONNECTED && timeout < 35) {
         delay(500);
         Serial.print(".");
-        tries++;
+        timeout++;
     }
     Serial.println();
 
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.printf("[WIFI] Terhubung! IP: %s\\n", WiFi.localIP().toString().c_str());
+        Serial.println("[WIFI] ✅ BERHASIL TERHUBUNG!");
+        Serial.printf("[WIFI] IP Address  : %s\\n", WiFi.localIP().toString().c_str());
+        Serial.printf("[WIFI] Gateway     : %s\\n", WiFi.gatewayIP().toString().c_str());
+        Serial.printf("[WIFI] Signal RSSI : %d dBm\\n\\n", WiFi.RSSI());
+    } else {
+        Serial.printf("[WIFI] ❌ Gagal terhubung (Status: %d)\\n", WiFi.status());
     }
 }
 
@@ -2300,28 +2330,22 @@ void reconnectMQTT() {
     if (WiFi.status() != WL_CONNECTED) return;
 
     Serial.print("[MQTT] Menghubungkan ke broker Mosquitto...");
-
-    // Bersihkan socket TCP lama yang menggantung sebelum mencoba koneksi baru (anti rc=-2)
     espClient.stop();
     delay(50);
 
-    // LWT: Jika koneksi terputus tiba-tiba, Mosquitto otomatis broadcast status offline
+    // LWT: Jika koneksi putus mendadak, Mosquitto otomatis mempublikasikan "offline"
     if (mqttClient.connect(CLIENT_ID, TOPIC_AVAILABILITY, 1, true, "offline")) {
         Serial.println(" BERHASIL!");
-        // Publish status online saat koneksi berhasil
         mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
-
-        // Subscribe perintah ruangan
         mqttClient.subscribe(TOPIC_COMMAND, 1);
         Serial.printf("[MQTT] Subscribed ke topic: %s\\n", TOPIC_COMMAND);
 
-        // Kirim status awal semua channel ke server
         for (int i = 0; i < NUM_RELAYS; i++) {
             publishState(i, "init_boot");
         }
-        Serial.println("[MQTT] ✅ Status awal seluruh channel relay berhasil dipublish ke Broker.");
+        Serial.println("[MQTT] ✅ Status awal seluruh relay berhasil dipublikasikan.");
     } else {
-        Serial.printf(" GAGAL (rc=%d). Akan coba lagi dalam 5 detik.\\n", mqttClient.state());
+        Serial.printf(" GAGAL (rc=%d). Coba lagi dalam 5 detik.\\n", mqttClient.state());
     }
 }
 
@@ -2382,16 +2406,22 @@ void handleSerialInput() {
                 publishState(idx, "serial_toggle");
             }
         } else {
-            Serial.printf("[SERIAL] Perintah '%s' tidak dikenal. Ketik 'status' atau 'help'.\\n", cmd.c_str());
+            Serial.printf("[SERIAL] Perintah '%s' tidak dikenal. Ketik 'help' atau 'status'.\\n", cmd.c_str());
         }
     }
 }
 
 void setup() {
     Serial.begin(115200);
-${cdcBootCode}
 
-    // Proteksi hardware anti cetak-cetek saat startup
+    // Sinkronisasi port USB CDC Serial
+    unsigned long startSerial = millis();
+    while (!Serial && (millis() - startSerial < 3000)) {
+        delay(10);
+    }
+    delay(400);
+
+    // Inisialisasi pin relay dengan proteksi anti-chattering saat startup
     for (int i = 0; i < NUM_RELAYS; i++) {
         digitalWrite(RELAY_PINS[i], RELAY_ACTIVE_LOW ? HIGH : LOW);
         pinMode(RELAY_PINS[i], OUTPUT);
@@ -2399,8 +2429,7 @@ ${cdcBootCode}
     }
 
     Serial.println("\\n==========================================");
-    Serial.printf(" XIAOZHI SMART RELAY (%s) READY\\n", "${profile.headerTitle}");
-    Serial.printf(" Board Target   : %s\\n", "${profile.arduinoBoard}");
+    Serial.printf(" XIAOZHI SMART RELAY (%s) BOOTED\\n", "${profile.headerTitle}");
     Serial.printf(" Client ID      : %s\\n", CLIENT_ID);
     Serial.printf(" Active Channels: %d\\n", NUM_RELAYS);
     Serial.println("==========================================");
@@ -2412,24 +2441,28 @@ ${cdcBootCode}
     mqttClient.setBufferSize(512);
     mqttClient.setKeepAlive(60);
 
-    reconnectMQTT();
+    if (WiFi.status() == WL_CONNECTED) {
+        reconnectMQTT();
+    }
 
-    // Tampilkan ringkasan status perdana di Serial Monitor
     printSystemStatus();
 }
 
 void loop() {
     unsigned long now = millis();
 
-    // Terima perintah langsung dari Serial Monitor
     handleSerialInput();
 
+    // Reconnect Wi-Fi berkala jika koneksi terputus
     if (WiFi.status() != WL_CONNECTED) {
-        connectWiFi();
-        delay(500);
+        if (now - lastMqttRetry >= 10000) {
+            lastMqttRetry = now;
+            connectWiFi();
+        }
         return;
     }
 
+    // Reconnect MQTT berkala
     if (!mqttClient.connected()) {
         if (now - lastMqttRetry >= 5000) {
             lastMqttRetry = now;
@@ -2438,18 +2471,19 @@ void loop() {
     } else {
         mqttClient.loop();
 
-        // Heartbeat berkala tiap 15 detik agar koneksi tetap segar dan tidak terkena timeout broker
+        // Heartbeat berkala tiap 15 detik
         if (now - lastHeartbeat >= 15000) {
             lastHeartbeat = now;
             mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
         }
     }
 
-    // Tampilkan status ringkas di Serial Monitor secara berkala (tiap 30 detik)
+    // Tampilkan ringkasan status di Serial Monitor tiap 30 detik
     if (now - lastStatusPrint >= 30000) {
         lastStatusPrint = now;
-        Serial.printf("[STATUS LIVE] ⏱️ %lus | WiFi: %d dBm | MQTT: %s | Kondisi Relay: [", 
-                      now / 1000, WiFi.RSSI(), mqttClient.connected() ? "ONLINE" : "OFFLINE");
+        Serial.printf("[STATUS LIVE] ⏱️ %lus | RSSI: %d dBm | MQTT: %s | Relay: [", 
+                      now / 1000, WiFi.RSSI(), 
+                      mqttClient.connected() ? "ONLINE" : "OFFLINE");
         for (int i = 0; i < NUM_RELAYS; i++) {
             Serial.printf("CH%d:%s%s", i + 1, relayStates[i] ? "ON" : "OFF", (i < NUM_RELAYS - 1) ? " " : "");
         }
