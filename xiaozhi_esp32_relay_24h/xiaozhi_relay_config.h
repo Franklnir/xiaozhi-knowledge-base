@@ -12,8 +12,8 @@ const char* WIFI_SSID     = "WIFI_RUMAH_ANDA";
 const char* WIFI_PASSWORD = "PASSWORD_WIFI";
 
 // 2. KONEKSI BROKER MQTT XIAOZHI GATEWAY
-// Menggunakan subdomain DNS-Only 'mqtt.xiaozhiscig.biz.id' (atau IP '163.61.58.235')
-const char* MQTT_BROKER   = "mqtt.xiaozhiscig.biz.id"; // Atau "163.61.58.235"
+// Menggunakan domain resmi 'mqtt.xiaozhiscig.biz.id'
+const char* MQTT_BROKER   = "mqtt.xiaozhiscig.biz.id";
 const int   MQTT_PORT     = 1883;
 
 // Kredensial Perangkat (Cocokkan dengan yang ada di menu Relay Nyata Web UI)

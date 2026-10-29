@@ -1562,7 +1562,7 @@
                     <div>
                         <label class="app-label" style="font-size:11px; margin-bottom:3px;">MQTT Broker Host:</label>
                         <div class="relay-copy-input-group">
-                            <input type="text" class="relay-copy-input" id="cfgMqttBroker" value="163.61.58.235" readonly>
+                            <input type="text" class="relay-copy-input" id="cfgMqttBroker" value="mqtt.xiaozhiscig.biz.id" readonly>
                             <button type="button" class="app-button app-button-small" onclick="copyInputField('cfgMqttBroker', this)">Salin</button>
                         </div>
                     </div>
@@ -2119,8 +2119,7 @@ const char* WIFI_PASSWORD = "${pass}";
 // ============================================================
 // 2. KONFIGURASI MQTT BROKER MOSQUITTO (XIAOZHI GATEWAY)
 // ============================================================
-// Catatan: Gunakan subdomain DNS-Only 'mqtt.xiaozhiscig.biz.id' atau IP langsung '163.61.58.235'
-const char* MQTT_BROKER   = "mqtt.xiaozhiscig.biz.id"; // Atau "163.61.58.235"
+const char* MQTT_BROKER   = "mqtt.xiaozhiscig.biz.id";
 const int   MQTT_PORT     = 1883;
 const char* CLIENT_ID     = "${room.api_client_id}";
 const char* DEVICE_TOKEN  = "${room.api_token}";
@@ -3198,7 +3197,7 @@ void loop() {
             protokol: "MQTT Mosquitto (Zero-Lag Event-Driven)",
             client_id: room.api_client_id,
             token: room.api_token,
-            mqtt_broker: "163.61.58.235:1883",
+            mqtt_broker: "mqtt.xiaozhiscig.biz.id:1883",
             mqtt_topics: {
                 command_subscribe: `xiaozhi/relay/${slug}/set`,
                 hardware_state_ack: `xiaozhi/relay/${slug}/state`,

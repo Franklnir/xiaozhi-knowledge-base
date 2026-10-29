@@ -929,8 +929,7 @@ const char* WIFI_PASSWORD = "PASSWORD_WIFI";
 // ============================================================
 // 2. KONFIGURASI MQTT BROKER MOSQUITTO (XIAOZHI GATEWAY)
 // ============================================================
-// Catatan: Gunakan subdomain DNS-Only 'mqtt.xiaozhiscig.biz.id' atau IP langsung '163.61.58.235'
-const char* MQTT_BROKER   = "mqtt.xiaozhiscig.biz.id"; // Atau "163.61.58.235"
+const char* MQTT_BROKER   = "mqtt.xiaozhiscig.biz.id";
 const int   MQTT_PORT     = 1883;
 const char* CLIENT_ID     = "{room.get('api_client_id', 'esp32_relay')}";
 const char* DEVICE_TOKEN  = "{room.get('api_token', '')}";
