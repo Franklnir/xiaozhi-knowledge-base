@@ -19,20 +19,22 @@ import (
 )
 
 type RelayHandler struct {
-	cfg         *config.Config
-	relayStore  *store.RelayStore
-	sseHub      *hub.SSEHub
-	mqttService *relaymqtt.RelayMQTTService
-	httpClient  *http.Client
+	cfg          *config.Config
+	relayStore   *store.RelayStore
+	sseHub       *hub.SSEHub
+	userEventHub *hub.UserEventHub
+	mqttService  *relaymqtt.RelayMQTTService
+	httpClient   *http.Client
 }
 
-func NewRelayHandler(cfg *config.Config, relayStore *store.RelayStore, sseHub *hub.SSEHub, mqttService *relaymqtt.RelayMQTTService) *RelayHandler {
+func NewRelayHandler(cfg *config.Config, relayStore *store.RelayStore, sseHub *hub.SSEHub, userEventHub *hub.UserEventHub, mqttService *relaymqtt.RelayMQTTService) *RelayHandler {
 	return &RelayHandler{
-		cfg:         cfg,
-		relayStore:  relayStore,
-		sseHub:      sseHub,
-		mqttService: mqttService,
-		httpClient:  &http.Client{Timeout: 2 * time.Second},
+		cfg:          cfg,
+		relayStore:   relayStore,
+		sseHub:       sseHub,
+		userEventHub: userEventHub,
+		mqttService:  mqttService,
+		httpClient:   &http.Client{Timeout: 2 * time.Second},
 	}
 }
 
@@ -191,7 +193,23 @@ func (h *RelayHandler) HandlePostStatus(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
-	// 9. Notify Python Web UI
+	// 9. Direct fan-out to connected user web clients (Ultra-fast, zero Python lag)
+	if h.userEventHub != nil {
+		for _, rel := range relays {
+			h.userEventHub.Broadcast(room.OwnerID, "relay_update", map[string]any{
+				"room_id":      room.ID,
+				"relay_number": rel.RelayNumber,
+				"status":       rel.Status,
+				"pending":      "",
+				"desired":      rel.Desired,
+				"source":       "device_ack",
+				"room_name":    room.NamaTempat,
+				"relay_name":   rel.NamaRelay,
+			})
+		}
+	}
+
+	// 10. Notify Python Web UI (backward compatibility)
 	go h.notifyPythonBroadcast(room.OwnerID, room.ID, room.NamaTempat, relays)
 
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})

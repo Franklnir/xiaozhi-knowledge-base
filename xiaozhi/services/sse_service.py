@@ -123,6 +123,73 @@ def _gateway_dispatcher_worker():
 _dispatcher_thread = threading.Thread(target=_gateway_dispatcher_worker, daemon=True, name="go-sse-dispatcher")
 _dispatcher_thread.start()
 
+# ── User Event Dispatcher (Forward events to Go Gateway UserEventHub) ───────
+_GATEWAY_USER_EMIT_URL = os.getenv("GATEWAY_USER_EMIT_URL", "http://gateway:8080/api/internal/events/emit")
+_user_emit_queue: queue.Queue = queue.Queue(maxsize=2000)
+
+def _gateway_user_dispatcher_worker():
+    """Background daemon worker forwarding user events to Go Gateway UserEventHub."""
+    while True:
+        try:
+            payload = _user_emit_queue.get()
+            if payload is None:
+                break
+            data = json.dumps(payload).encode("utf-8")
+            urls = [_GATEWAY_USER_EMIT_URL, "http://127.0.0.1:8085/api/internal/events/emit"]
+            for target_url in urls:
+                try:
+                    req = urllib.request.Request(
+                        target_url,
+                        data=data,
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=1.0) as resp:
+                        if resp.status == 200:
+                            break
+                except Exception:
+                    pass
+            _user_emit_queue.task_done()
+        except Exception:
+            pass
+
+_user_dispatcher_thread = threading.Thread(target=_gateway_user_dispatcher_worker, daemon=True, name="go-user-sse-dispatcher")
+_user_dispatcher_thread.start()
+
+
+def generate_sse_stream_token(user_id: int) -> str:
+    """Generate tamper-proof HMAC-SHA256 signed stream token for SSE connection."""
+    import hashlib
+    import hmac
+    secret = os.getenv("APP_SECRET_KEY", "xiaozhi_secret_key_default")
+    ts = int(time.time())
+    msg = f"{user_id}.{ts}"
+    sig = hmac.new(secret.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{user_id}.{ts}.{sig}"
+
+
+def emit_user_event(user_id: int, event: str, data: Dict[str, Any]) -> None:
+    """Global helper to emit user events to Go Gateway SSE Hub."""
+    try:
+        _user_emit_queue.put_nowait({
+            "user_id": int(user_id),
+            "event": event,
+            "data": data or {},
+        })
+    except queue.Full:
+        pass
+
+
+def broadcast_unread_badge(user_id: int, community_count: Optional[int] = None, marketplace_count: Optional[int] = None) -> None:
+    """Broadcast unread count update to user's browser, eliminating 8s-10s polling."""
+    badge_data: Dict[str, Any] = {}
+    if community_count is not None:
+        badge_data["community_unread"] = int(community_count)
+    if marketplace_count is not None:
+        badge_data["marketplace_unread"] = int(marketplace_count)
+    emit_user_event(int(user_id), "unread_badge", badge_data)
+
+
 admin_log_hub = AdminLogHub()
 
 
@@ -210,6 +277,7 @@ chat_history_hub = ChatHistoryHub()
 def broadcast_chat_history(user_id: int, item: Dict[str, Any], event_type: str = "new_chat"):
     """Global helper to broadcast chat history item to SSE clients in real time."""
     chat_history_hub.emit(user_id, item, event_type)
+    emit_user_event(int(user_id), event_type, item)
 
 
 async def stream_chat_history_events(
@@ -314,20 +382,22 @@ def broadcast_relay_update(
     desired: str = "",
 ) -> None:
     """Global helper to broadcast relay state changes in real time."""
+    relay_data = {
+        "room_id": int(room_id),
+        "relay_number": int(relay_number),
+        "status": str(status).upper(),
+        "pending": str(pending).upper(),
+        "desired": str(desired or status).upper(),
+        "source": source,
+        "room_name": room_name,
+        "relay_name": relay_name,
+    }
     relay_event_hub.emit(
         user_id=int(user_id),
-        data={
-            "room_id": int(room_id),
-            "relay_number": int(relay_number),
-            "status": str(status).upper(),
-            "pending": str(pending).upper(),
-            "desired": str(desired or status).upper(),
-            "source": source,
-            "room_name": room_name,
-            "relay_name": relay_name,
-        },
+        data=relay_data,
         event_type="relay_update",
     )
+    emit_user_event(int(user_id), "relay_update", relay_data)
 
 
 def broadcast_relay_device_status(
@@ -338,16 +408,18 @@ def broadcast_relay_device_status(
     device_label: str = "",
 ) -> None:
     """Global helper to broadcast device online/offline status."""
+    device_data = {
+        "room_id": int(room_id),
+        "device_connected": bool(connected),
+        "device_last_seen_at": last_seen_at or utc_now(),
+        "device_connection_label": device_label,
+    }
     relay_event_hub.emit(
         user_id=int(user_id),
-        data={
-            "room_id": int(room_id),
-            "device_connected": bool(connected),
-            "device_last_seen_at": last_seen_at or utc_now(),
-            "device_connection_label": device_label,
-        },
+        data=device_data,
         event_type="device_status",
     )
+    emit_user_event(int(user_id), "device_status", device_data)
 
 
 async def stream_relay_events(user_id: int, request: Request) -> AsyncGenerator[str, None]:
@@ -1013,6 +1085,7 @@ material_event_hub = MaterialEventHub()
 def broadcast_material_event(user_id: int, event_type: str, data: Dict[str, Any]) -> None:
     """Global helper to broadcast material events (created, updated, deleted, live_api_update, etc.) strictly to user."""
     material_event_hub.emit(int(user_id), event_type, data)
+    emit_user_event(int(user_id), event_type, data)
 
 
 async def stream_material_events(
@@ -1054,7 +1127,10 @@ async def stream_material_events(
             except Exception as stat_err:
                 logger.debug("Failed computing initial material stats: %s", stat_err)
 
-        yield format_sse("connected", {
+        # Flush initial anti-buffering padding comment (2KB) together with connected event
+        # Lines starting with ':' are standard W3C SSE comments, ignored by parsers but forcing reverse proxies to flush immediately.
+        init_padding = f": {' ' * 2048}\n"
+        yield init_padding + format_sse("connected", {
             "status": "ok",
             "user_id": uid,
             "stats": initial_stats,

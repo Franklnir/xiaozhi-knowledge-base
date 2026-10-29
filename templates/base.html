@@ -2647,71 +2647,100 @@
             });
         })();
 
-        // Real-time / Periodic unread community chat badge updater
+        // Unified Real-Time User Event Stream (SSE over Go Gateway - Zero Polling)
         (function () {
             {% if user %}
+            const sseToken = "{{ sse_stream_token or '' }}";
             const badge = document.getElementById('navChatBadge');
+            const mktChatBadge = document.getElementById('globalMktChatBadge');
+            const subBadge = document.getElementById('chatUnreadBadgeSubTab');
             const isChatPage = window.location.pathname.startsWith('/chat');
 
-            async function checkUnreadChat() {
+            function updateCommunityBadge(count) {
                 if (isChatPage) {
                     if (badge) badge.style.display = 'none';
                     return;
                 }
-                try {
-                    const r = await fetch('/api/community/chat/unread-count', { credentials: 'same-origin' });
-                    if (r.ok) {
-                        const d = await r.json();
-                        const count = parseInt(d.unread_count || 0, 10);
-                        if (badge) {
-                            if (count > 0) {
-                                badge.textContent = count > 99 ? '99+' : count;
-                                badge.style.display = 'inline-block';
-                            } else {
-                                badge.style.display = 'none';
-                            }
-                        }
-                    }
-                } catch (err) {
-                    // silent fallback
+                if (!badge) return;
+                const c = parseInt(count || 0, 10);
+                if (c > 0) {
+                    badge.textContent = c > 99 ? '99+' : c;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
                 }
             }
 
-            checkUnreadChat();
-            if (!isChatPage) {
-                setInterval(checkUnreadChat, 10000);
+            function updateMarketplaceBadge(count) {
+                const c = parseInt(count || 0, 10);
+                if (mktChatBadge) {
+                    if (c > 0) {
+                        mktChatBadge.textContent = c > 99 ? '99+' : c;
+                        mktChatBadge.style.display = 'inline-block';
+                    } else {
+                        mktChatBadge.style.display = 'none';
+                    }
+                }
+                if (subBadge) {
+                    if (c > 0) {
+                        subBadge.textContent = c > 99 ? '99+' : c;
+                        subBadge.style.display = 'inline-block';
+                    } else {
+                        subBadge.style.display = 'none';
+                    }
+                }
             }
 
-            // Real-time unread product chat badge updater
-            const mktChatBadge = document.getElementById('globalMktChatBadge');
-            async function checkUnreadMarketplaceChat() {
+            // Initial fetch once on page load
+            async function initialBadgeSync() {
                 try {
-                    const r = await fetch('/api/v1/marketplace/chats/unread-count', { credentials: 'same-origin' });
-                    if (r.ok) {
-                        const d = await r.json();
-                        const count = parseInt(d.unread_count || 0, 10);
-                        if (mktChatBadge) {
-                            if (count > 0) {
-                                mktChatBadge.textContent = count > 99 ? '99+' : count;
-                                mktChatBadge.style.display = 'inline-block';
-                            } else {
-                                mktChatBadge.style.display = 'none';
-                            }
-                        }
-                        const subBadge = document.getElementById('chatUnreadBadgeSubTab');
-                        if (subBadge) {
-                            if (count > 0) {
-                                subBadge.textContent = count > 99 ? '99+' : count;
-                                subBadge.style.display = 'inline-block';
-                            } else {
-                                subBadge.style.display = 'none';
-                            }
-                        }
+                    const [r1, r2] = await Promise.all([
+                        fetch('/api/community/chat/unread-count', { credentials: 'same-origin' }),
+                        fetch('/api/v1/marketplace/chats/unread-count', { credentials: 'same-origin' })
+                    ]);
+                    if (r1.ok) {
+                        const d1 = await r1.json();
+                        updateCommunityBadge(d1.unread_count);
                     }
-                } catch (err) {}
+                    if (r2.ok) {
+                        const d2 = await r2.json();
+                        updateMarketplaceBadge(d2.unread_count);
+                    }
+                } catch(e) {}
             }
-            checkUnreadMarketplaceChat();
-            setInterval(checkUnreadMarketplaceChat, 8000);
+            initialBadgeSync();
+
+            // Setup Real-Time Push via Go Gateway SSE (Zero Polling!)
+            let userES = null;
+            function connectUserSSE() {
+                if (!window.EventSource) return;
+                if (userES) { try { userES.close(); } catch(e) {} }
+                const url = sseToken ? ('/api/events/stream?token=' + encodeURIComponent(sseToken)) : '/api/events/stream';
+                userES = new EventSource(url);
+
+                userES.addEventListener('unread_badge', function(e) {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (data.community_unread !== undefined) updateCommunityBadge(data.community_unread);
+                        if (data.marketplace_unread !== undefined) updateMarketplaceBadge(data.marketplace_unread);
+                    } catch(err) {}
+                });
+
+                // Forward user events to window CustomEvents so any page component can react instantly
+                ['material_created', 'material_updated', 'material_deleted', 'live_api_update', 'relay_update', 'device_status'].forEach(function(evtName) {
+                    userES.addEventListener(evtName, function(e) {
+                        window.dispatchEvent(new CustomEvent('xiaozhi:' + evtName, { detail: e.data }));
+                    });
+                });
+
+                userES.onerror = function() {
+                    // Browser automatically reconnects with standard backoff
+                };
+            }
+            connectUserSSE();
+
+            // Relaxed 5-minute background fallback sync (replaces 8s/10s polling)
+            setInterval(initialBadgeSync, 300000);
             {% endif %}
         })();
     </script>

@@ -28,6 +28,50 @@
         gap: 6px;
     }
 
+    #materialSseStatusPill.is-online {
+        border-color: #a7f3d0 !important;
+        background: #ecfdf5 !important;
+        color: #047857 !important;
+    }
+    #materialSseStatusPill.is-online .app-status-dot {
+        background: #10b981 !important;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: ssePulseDot 2s infinite;
+    }
+    :root[data-theme="neo"] #materialSseStatusPill.is-online {
+        background: #dcfce7 !important;
+        border: 2px solid #111111 !important;
+        color: #166534 !important;
+        box-shadow: 2px 2px 0 #111111 !important;
+    }
+    :root[data-theme="neo"] #materialSseStatusPill.is-online .app-status-dot {
+        background: #16a34a !important;
+    }
+    #materialSseStatusPill.is-offline {
+        border-color: #fecaca !important;
+        background: #fef2f2 !important;
+        color: #b91c1c !important;
+    }
+    #materialSseStatusPill.is-offline .app-status-dot {
+        background: #f43f5e !important;
+        animation: none;
+    }
+    :root[data-theme="neo"] #materialSseStatusPill.is-offline {
+        background: #fee2e2 !important;
+        border: 2px solid #111111 !important;
+        color: #991b1b !important;
+        box-shadow: 2px 2px 0 #111111 !important;
+    }
+    :root[data-theme="neo"] #materialSseStatusPill {
+        border: 2px solid #111111 !important;
+        box-shadow: 2px 2px 0 #111111 !important;
+    }
+    @keyframes ssePulseDot {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1.1); box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
     /* Enhanced Stat Cards */
     .dashboard-stat-grid {
         display: grid;
@@ -562,9 +606,13 @@
         <div class="app-card" id="databaseMateriSection" style="scroll-margin-top: 80px;">
             <div class="app-card-header flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <h2 class="app-section-title">Database Materi Belajar</h2>
                         <span id="badgeRowCount" class="app-chip app-chip-neutral app-chip-small">{{ materials|length }} item</span>
+                        <span id="materialSseStatusPill" class="app-status-pill app-chip-small is-connecting" title="Monitoring real-time database materi aktif (SSE)" style="font-size:11px; padding:3px 9px; cursor:default;">
+                            <span class="app-status-dot"></span>
+                            <span id="materialSseStatusText">Menghubungkan...</span>
+                        </span>
                     </div>
                     <p class="app-section-subtitle">Data materi ini menjadi sumber prompt RAG utama Xiaozhi saat menjawab suara.</p>
                 </div>
@@ -1468,8 +1516,14 @@
                             titleEl.innerText = 'Selesai!';
                             msgEl.innerText = parsed.message || 'Materi berhasil disimpan dan divektorisasi.';
                             setTimeout(() => {
-                                window.location.href = '/dashboard?message=Data+materi+berhasil+ditambahkan+dan+divektorisasi.';
-                            }, 600);
+                                modal.classList.remove('is-open');
+                                document.body.style.overflow = '';
+                                form.reset();
+                                const emptyRow = document.getElementById("emptyTableRow");
+                                if (emptyRow) emptyRow.remove();
+                                const tableWrap = document.querySelector('.app-table-wrap');
+                                if (tableWrap) tableWrap.scrollTo({ top: 0, behavior: 'smooth' });
+                            }, 500);
                             return true;
                         } else if (currentEvent === 'error') {
                             alert('Gagal: ' + (parsed.message || 'Terjadi kesalahan'));
@@ -1826,23 +1880,39 @@
 
         let es = null;
 
+        function markOnline() {
+            if (pill) {
+                pill.classList.remove("is-offline", "is-connecting");
+                pill.classList.add("is-online");
+                pill.title = "Monitoring real-time database materi aktif (SSE)";
+            }
+            if (pillText) pillText.textContent = "SSE Realtime Aktif";
+        }
+
+        function markOffline(label) {
+            if (pill) {
+                pill.classList.remove("is-online");
+                pill.classList.add("is-offline");
+                pill.title = "Koneksi realtime terputus, mencoba menghubungkan kembali...";
+            }
+            if (pillText) pillText.textContent = label || "Menghubungkan...";
+        }
+
         function connect() {
             if (es) {
                 try { es.close(); } catch(e) {}
             }
 
-            es = new EventSource("/api/materials/stream-events");
+            const sseToken = "{{ sse_stream_token or '' }}";
+            const sseUrl = sseToken ? ("/api/events/stream?token=" + encodeURIComponent(sseToken)) : "/api/materials/stream-events";
+            es = new EventSource(sseUrl);
 
-            es.addEventListener("connected", (evt) => {
-                if (pill) {
-                    pill.classList.remove("is-offline");
-                    pill.classList.add("is-online");
-                    pill.title = "Monitoring real-time database materi aktif (SSE)";
-                }
-                if (pillText) pillText.textContent = "SSE Realtime Aktif";
-            });
+            es.onopen = markOnline;
+            es.addEventListener("open", markOnline);
+            es.addEventListener("connected", markOnline);
 
             es.addEventListener("live_api_update", (evt) => {
+                markOnline();
                 try {
                     const data = JSON.parse(evt.data);
                     applyLiveApiUpdate(data);
@@ -1852,6 +1922,7 @@
             });
 
             es.addEventListener("material_created", (evt) => {
+                markOnline();
                 try {
                     const data = JSON.parse(evt.data);
                     const mat = data.material;
@@ -2045,13 +2116,22 @@
             });
 
             es.onerror = (err) => {
-                if (pill) {
-                    pill.classList.remove("is-online");
-                    pill.classList.add("is-offline");
+                if (es.readyState === EventSource.CONNECTING) {
+                    markOffline("Menghubungkan...");
+                } else if (es.readyState === EventSource.CLOSED) {
+                    markOffline("Menghubungkan...");
+                    setTimeout(connect, 2000);
                 }
-                if (pillText) pillText.textContent = "Menghubungkan...";
             };
         }
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                if (!es || es.readyState === EventSource.CLOSED) {
+                    connect();
+                }
+            }
+        });
 
         connect();
     }

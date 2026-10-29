@@ -139,9 +139,18 @@ def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None
         except Exception:
             active_announcement = None
 
+    sse_token = ""
+    if user and isinstance(user, dict) and "id" in user:
+        try:
+            from xiaozhi.services.sse_service import generate_sse_stream_token
+            sse_token = generate_sse_stream_token(int(user["id"]))
+        except Exception:
+            sse_token = ""
+
     merged = {
         "user": user,
         "csrf_token": make_csrf_token(user),
+        "sse_stream_token": sse_token,
         "mcp_connected": mcp_connected,
         "mcp_required": mcp_required,
         "active_announcement": active_announcement,

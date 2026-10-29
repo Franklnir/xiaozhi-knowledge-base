@@ -47,6 +47,7 @@ func main() {
 
 	// Hubs (Real-Time Pub/Sub & Device Registry)
 	sseHub := hub.NewSSEHub()
+	userEventHub := hub.NewUserEventHub()
 	deviceHub := hub.NewDeviceHub()
 
 	// MQTT Relay Engine (Mosquitto Integration)
@@ -58,9 +59,10 @@ func main() {
 	// Handlers
 	devHandler := handler.NewDeviceHandler(cfg, deviceStore, audioStore)
 	streamHandler := handler.NewAudioStreamHandler(cfg, deviceStore, audioStore)
-	sseHandler := handler.NewSSEHandler(cfg, sseHub, deviceHub)
+	sseHandler := handler.NewSSEHandler(cfg, sseHub, userEventHub, deviceHub)
 	wsHandler := handler.NewWSDeviceHandler(cfg, deviceStore, audioStore, sseHub, deviceHub)
-	relayHandler := handler.NewRelayHandler(cfg, relayStore, sseHub, mqttRelay)
+	relayHandler := handler.NewRelayHandler(cfg, relayStore, sseHub, userEventHub, mqttRelay)
+	userEventsHandler := handler.NewUserEventsHandler(cfg, userEventHub)
 
 	// Router
 	r := chi.NewRouter()
@@ -91,6 +93,13 @@ func main() {
 	// Admin Server-Sent Events (SSE) Stream & Internal Broadcast
 	r.Get("/admin/api/logs/stream", sseHandler.HandleLogsStream)
 	r.Post("/api/internal/sse/emit", sseHandler.HandleInternalEmit)
+
+	// Unified User Server-Sent Events (SSE) Stream & Internal Dispatcher
+	// Serves dashboard materials, live API changes, relay status, and chat notifications with ~2KB RAM per client
+	r.Get("/api/events/stream", userEventsHandler.HandleUserEventsStream)
+	r.Get("/api/materials/stream-events", userEventsHandler.HandleUserEventsStream)
+	r.Get("/api/relay-nyata/stream", userEventsHandler.HandleUserEventsStream)
+	r.Post("/api/internal/events/emit", userEventsHandler.HandleEmitUserEvent)
 
 	// Persistent WebSocket ESP32 Connections (Goroutines ~2KB RAM/conn)
 	r.Get("/ws/device/audio/{device_id}", wsHandler.HandleDeviceAudioWS)

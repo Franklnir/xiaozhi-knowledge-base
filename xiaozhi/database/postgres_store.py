@@ -1072,6 +1072,23 @@ class PostgresStore:
                 )
                 material_id = cur.fetchone()["id"]
             conn.commit()
+        try:
+            from xiaozhi.services.sse_service import broadcast_material_event
+            broadcast_material_event(int(owner_id), "material_created", {
+                "action": "create",
+                "material": {
+                    "id": material_id,
+                    "title": title.strip(),
+                    "category": category.strip(),
+                    "content": content.strip(),
+                    "keywords": keywords.strip(),
+                    "api_url": api_url.strip(),
+                    "source_type": s_type,
+                },
+                "message": f"Materi '{title.strip()}' berhasil disimpan.",
+            })
+        except Exception:
+            pass
         return material_id
 
     def update_material(
@@ -1107,6 +1124,25 @@ class PostgresStore:
                 )
                 affected = cur.rowcount > 0
             conn.commit()
+        if affected:
+            try:
+                from xiaozhi.services.sse_service import broadcast_material_event
+                broadcast_material_event(int(owner_id), "material_updated", {
+                    "action": "update",
+                    "material_id": int(material_id),
+                    "material": {
+                        "id": int(material_id),
+                        "title": title.strip(),
+                        "category": category.strip(),
+                        "content": content.strip(),
+                        "keywords": keywords.strip(),
+                        "api_url": api_url.strip(),
+                        "source_type": source_type,
+                    },
+                    "message": f"Materi '{title.strip()}' berhasil diperbarui.",
+                })
+            except Exception:
+                pass
         return affected
 
     def delete_material(self, owner_id: int, material_id: int) -> bool:
@@ -1116,6 +1152,16 @@ class PostgresStore:
                 cur.execute("DELETE FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                 affected = cur.rowcount > 0
             conn.commit()
+        if affected:
+            try:
+                from xiaozhi.services.sse_service import broadcast_material_event
+                broadcast_material_event(int(owner_id), "material_deleted", {
+                    "action": "delete",
+                    "material_id": int(material_id),
+                    "message": "Materi berhasil dihapus.",
+                })
+            except Exception:
+                pass
         return affected
 
     def list_live_api_materials(self, owner_id: int, keyword: str = "", limit: int = 5) -> List[Dict[str, Any]]:

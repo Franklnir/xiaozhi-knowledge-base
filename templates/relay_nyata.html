@@ -3500,7 +3500,9 @@ void loop() {
         }
 
         try {
-            relaySSE = new EventSource("/api/relay-nyata/stream");
+            const sseToken = "{{ sse_stream_token or '' }}";
+            const sseUrl = sseToken ? ("/api/events/stream?token=" + encodeURIComponent(sseToken)) : "/api/relay-nyata/stream";
+            relaySSE = new EventSource(sseUrl);
 
             relaySSE.addEventListener("connected", () => {
                 stopFallbackPolling();

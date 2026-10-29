@@ -92,3 +92,34 @@ def test_sse_endpoint_unauthorized():
     response = client.get("/api/materials/stream-events", follow_redirects=False)
     # Auth guard redirects to login (302/303) or returns 401
     assert response.status_code in (302, 303, 401)
+
+
+def test_auto_save_broadcasts_material_created():
+    """Verify that _auto_save_to_knowledge_base in mcp/tools.py triggers broadcast_material_event."""
+    from xiaozhi.mcp.tools import _auto_save_to_knowledge_base
+    async def _test():
+        hub = material_event_hub
+        q = await hub.subscribe(999)
+        try:
+            mock_store = MagicMock()
+            mock_store.search_materials.return_value = []
+            mock_store.add_material.return_value = 615
+
+            res = _auto_save_to_knowledge_base(
+                store=mock_store,
+                owner_id=999,
+                title="Riset: Robot Bebek Hugging Face Viral",
+                category="Riset & Pengetahuan",
+                content="Data riset robot bebek dengan konten yang cukup panjang untuk memenuhi batas minimal 80 karakter pada sistem...",
+                keywords="robot bebek"
+            )
+            assert res == 615
+
+            evt = await asyncio.wait_for(q.get(), timeout=1.0)
+            assert evt["type"] == "material_created"
+            assert evt["data"]["material"]["id"] == 615
+            assert "Robot Bebek" in evt["data"]["material"]["title"]
+        finally:
+            hub.unsubscribe(999, q)
+
+    asyncio.run(_test())

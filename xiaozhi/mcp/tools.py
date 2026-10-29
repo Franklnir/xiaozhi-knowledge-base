@@ -487,6 +487,23 @@ def _auto_save_to_knowledge_base(store, owner_id: int, title: str, category: str
             source_type="auto_search_cache"
         )
         logger.info("Auto-saved knowledge material id=%s ('%s') for owner_id=%s", mat_id, clean_title, owner_id)
+        try:
+            from xiaozhi.services.sse_service import broadcast_material_event
+            broadcast_material_event(int(owner_id), "material_created", {
+                "action": "create",
+                "material": {
+                    "id": mat_id,
+                    "title": clean_title,
+                    "category": clean_cat,
+                    "content": content.strip()[:10000],
+                    "keywords": keywords.strip()[:200],
+                    "api_url": "",
+                    "source_type": "auto_search_cache",
+                },
+                "message": f"Riset '{clean_title}' otomatis disimpan ke Database Materi Belajar.",
+            })
+        except Exception as _b_err:
+            logger.debug("Failed broadcasting material_created event: %s", _b_err)
         return mat_id
     except Exception as exc:
         if "Batas materi" in str(exc) and hasattr(store, "_get_conn"):
@@ -504,7 +521,16 @@ def _auto_save_to_knowledge_base(store, owner_id: int, title: str, category: str
                             cur.execute("DELETE FROM materials WHERE id = %s AND owner_id = %s", (del_id, int(owner_id)))
                             conn.commit()
                             logger.info("Pruned oldest auto_search_cache id=%s for owner_id=%s", del_id, owner_id)
-                            return store.add_material(
+                            try:
+                                from xiaozhi.services.sse_service import broadcast_material_event
+                                broadcast_material_event(int(owner_id), "material_deleted", {
+                                    "action": "delete",
+                                    "material_id": int(del_id),
+                                    "message": "Cache riset materi lama otomatis dibersihkan.",
+                                })
+                            except Exception:
+                                pass
+                            retry_id = store.add_material(
                                 owner_id=owner_id,
                                 title=clean_title,
                                 category=clean_cat,
@@ -512,6 +538,24 @@ def _auto_save_to_knowledge_base(store, owner_id: int, title: str, category: str
                                 keywords=keywords.strip()[:200],
                                 source_type="auto_search_cache"
                             )
+                            try:
+                                from xiaozhi.services.sse_service import broadcast_material_event
+                                broadcast_material_event(int(owner_id), "material_created", {
+                                    "action": "create",
+                                    "material": {
+                                        "id": retry_id,
+                                        "title": clean_title,
+                                        "category": clean_cat,
+                                        "content": content.strip()[:10000],
+                                        "keywords": keywords.strip()[:200],
+                                        "api_url": "",
+                                        "source_type": "auto_search_cache",
+                                    },
+                                    "message": f"Riset '{clean_title}' otomatis disimpan ke Database Materi Belajar.",
+                                })
+                            except Exception:
+                                pass
+                            return retry_id
             except Exception as e2:
                 logger.debug("Prune cache retry error: %s", e2)
         logger.warning("Gagal auto-save ke knowledge base: %s", exc)
@@ -3529,6 +3573,23 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             )
             from xiaozhi.services.mcp_service import signal_mcp_reload
             signal_mcp_reload()
+            try:
+                from xiaozhi.services.sse_service import broadcast_material_event
+                broadcast_material_event(int(owner_id), "material_created", {
+                    "action": "create",
+                    "material": {
+                        "id": mat_id,
+                        "title": res["title"],
+                        "category": res.get("category", "Web Scraping"),
+                        "content": res["content"],
+                        "keywords": res.get("keywords", f"web, scraping, {url}"),
+                        "api_url": url,
+                        "source_type": "web_scraping",
+                    },
+                    "message": f"Artikel '{res['title']}' berhasil di-scrape dan disimpan ke Knowledge Base.",
+                })
+            except Exception:
+                pass
 
             ret = {
                 "success": True,
@@ -3700,6 +3761,23 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             )
             from xiaozhi.services.mcp_service import signal_mcp_reload
             signal_mcp_reload()
+            try:
+                from xiaozhi.services.sse_service import broadcast_material_event
+                broadcast_material_event(int(owner_id), "material_created", {
+                    "action": "create",
+                    "material": {
+                        "id": mat_id,
+                        "title": clean_title,
+                        "category": clean_cat,
+                        "content": clean_content,
+                        "keywords": keywords,
+                        "api_url": url or "",
+                        "source_type": "autonomous_research",
+                    },
+                    "message": f"Materi '{clean_title}' berhasil disimpan ke Knowledge Base.",
+                })
+            except Exception:
+                pass
 
             ret = {
                 "success": True,

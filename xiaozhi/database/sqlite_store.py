@@ -878,7 +878,25 @@ class SQLiteStore:
             (owner_id, title, category, content, keywords, source_type, api_url_ciphertext, utc_now(), utc_now())
         )
         conn.commit()
-        return cursor.lastrowid
+        last_id = cursor.lastrowid
+        try:
+            from xiaozhi.services.sse_service import broadcast_material_event
+            broadcast_material_event(int(owner_id), "material_created", {
+                "action": "create",
+                "material": {
+                    "id": last_id,
+                    "title": title.strip(),
+                    "category": category.strip(),
+                    "content": content.strip(),
+                    "keywords": keywords.strip(),
+                    "api_url": api_url.strip(),
+                    "source_type": source_type,
+                },
+                "message": f"Materi '{title.strip()}' berhasil disimpan.",
+            })
+        except Exception:
+            pass
+        return last_id
 
     def update_material(self, owner_id: int, material_id: int, title: str, category: str, content: str, keywords: str, api_url: str = "") -> bool:
         if not is_live_api_category(category):
@@ -893,13 +911,44 @@ class SQLiteStore:
             (title, category, content, keywords, source_type, api_url_ciphertext, utc_now(), material_id, owner_id)
         )
         conn.commit()
-        return cursor.rowcount > 0
+        affected = cursor.rowcount > 0
+        if affected:
+            try:
+                from xiaozhi.services.sse_service import broadcast_material_event
+                broadcast_material_event(int(owner_id), "material_updated", {
+                    "action": "update",
+                    "material_id": int(material_id),
+                    "material": {
+                        "id": int(material_id),
+                        "title": title.strip(),
+                        "category": category.strip(),
+                        "content": content.strip(),
+                        "keywords": keywords.strip(),
+                        "api_url": api_url.strip(),
+                        "source_type": source_type,
+                    },
+                    "message": f"Materi '{title.strip()}' berhasil diperbarui.",
+                })
+            except Exception:
+                pass
+        return affected
 
     def delete_material(self, owner_id: int, material_id: int) -> bool:
         conn = self._get_conn()
         cursor = conn.execute("DELETE FROM materials WHERE id = ? AND owner_id = ?", (material_id, owner_id))
         conn.commit()
-        return cursor.rowcount > 0
+        affected = cursor.rowcount > 0
+        if affected:
+            try:
+                from xiaozhi.services.sse_service import broadcast_material_event
+                broadcast_material_event(int(owner_id), "material_deleted", {
+                    "action": "delete",
+                    "material_id": int(material_id),
+                    "message": "Materi berhasil dihapus.",
+                })
+            except Exception:
+                pass
+        return affected
 
     def list_live_api_materials(self, owner_id: int, keyword: str = "", limit: int = 5) -> List[Dict[str, Any]]:
         conn = self._get_conn()

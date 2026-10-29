@@ -192,6 +192,7 @@ async def api_materials_stream_index(request: Request):
     )
 
 
+@router.get("/api/events/stream")
 @router.get("/api/materials/stream-events")
 async def api_materials_stream_events(request: Request):
     """Real-time SSE monitoring stream for Knowledge Base / Database Materi."""

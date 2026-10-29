@@ -13,18 +13,20 @@ import (
 )
 
 type SSEHandler struct {
-	cfg       *config.Config
-	sseHub    *hub.SSEHub
-	deviceHub *hub.DeviceHub
-	startTime time.Time
+	cfg          *config.Config
+	sseHub       *hub.SSEHub
+	userEventHub *hub.UserEventHub
+	deviceHub    *hub.DeviceHub
+	startTime    time.Time
 }
 
-func NewSSEHandler(cfg *config.Config, sseHub *hub.SSEHub, deviceHub *hub.DeviceHub) *SSEHandler {
+func NewSSEHandler(cfg *config.Config, sseHub *hub.SSEHub, userEventHub *hub.UserEventHub, deviceHub *hub.DeviceHub) *SSEHandler {
 	return &SSEHandler{
-		cfg:       cfg,
-		sseHub:    sseHub,
-		deviceHub: deviceHub,
-		startTime: time.Now(),
+		cfg:          cfg,
+		sseHub:       sseHub,
+		userEventHub: userEventHub,
+		deviceHub:    deviceHub,
+		startTime:    time.Now(),
 	}
 }
 
@@ -130,14 +132,23 @@ func (h *SSEHandler) HandleSystemStatus(w http.ResponseWriter, r *http.Request) 
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
+	userSubs := 0
+	activeUsers := 0
+	if h.userEventHub != nil {
+		userSubs = h.userEventHub.TotalSubscribers()
+		activeUsers = h.userEventHub.ActiveUserCount()
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":          "ok",
-		"service":         "xiaozhi-gateway-go",
-		"uptime":          uptime,
-		"active_devices":  h.deviceHub.Count(),
-		"sse_subscribers": h.sseHub.SubscriberCount(),
-		"goroutines":      runtime.NumGoroutine(),
-		"memory_alloc_mb": float64(m.Alloc) / 1024 / 1024,
+		"status":               "ok",
+		"service":              "xiaozhi-gateway-go",
+		"uptime":               uptime,
+		"active_devices":       h.deviceHub.Count(),
+		"sse_subscribers":      h.sseHub.SubscriberCount(),
+		"user_sse_subscribers": userSubs,
+		"active_sse_users":     activeUsers,
+		"goroutines":           runtime.NumGoroutine(),
+		"memory_alloc_mb":      float64(m.Alloc) / 1024 / 1024,
 	})
 }
 
