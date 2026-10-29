@@ -1,0 +1,16 @@
+;; ==============================================================================
+;; CLOUDFLARE DNS IMPORT FILE (ZONE FILE BIND FORMAT)
+;; Domain: xiaozhiscig.biz.id
+;; Tujuan: Menambahkan subdomain MQTT (A Record) khusus bypassing Cloudflare proxy
+;; Cara Import di Cloudflare:
+;; 1. Buka dashboard Cloudflare -> Pilih domain xiaozhiscig.biz.id
+;; 2. Buka menu DNS -> Records
+;; 3. Klik tombol "Import and Export" -> "Import"
+;; 4. Pilih file ini. Pastikan Proxy Status untuk record 'mqtt' adalah DNS Only (Awan Abu-abu).
+;; ==============================================================================
+
+$ORIGIN xiaozhiscig.biz.id.
+$TTL 300
+
+; Record MQTT langsung menembus port TCP 1883 ke VPS tanpa blokir proxy Cloudflare
+mqtt    300    IN    A    163.61.58.235

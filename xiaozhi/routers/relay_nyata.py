@@ -889,11 +889,11 @@ async def download_arduino_project_zip(room_id: int, request: Request):
         elif "s3" in board_lower:
             default_pins = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
         elif "c3" in board_lower:
-            default_pins = [0, 1, 3, 4, 5, 6, 7, 10]
+            default_pins = [4, 5, 6, 7, 10, 3, 1, 0]
         elif "8266" in board_lower:
             default_pins = [5, 4, 14, 12, 13, 15]
         else:
-            default_pins = [4, 5, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33]
+            default_pins = [4, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 5, 13, 14]
 
         num_relays = max(1, min(len(room.get("relays", [])) or int(room.get("jumlah_relay", 2) or 2), len(default_pins)))
         pins_str = ", ".join(str(p) for p in default_pins[:num_relays])
@@ -929,7 +929,8 @@ const char* WIFI_PASSWORD = "PASSWORD_WIFI";
 // ============================================================
 // 2. KONFIGURASI MQTT BROKER MOSQUITTO (XIAOZHI GATEWAY)
 // ============================================================
-const char* MQTT_BROKER   = "163.61.58.235";
+// Catatan: Gunakan subdomain DNS-Only 'mqtt.xiaozhiscig.biz.id' atau IP langsung '163.61.58.235'
+const char* MQTT_BROKER   = "mqtt.xiaozhiscig.biz.id"; // Atau "163.61.58.235"
 const int   MQTT_PORT     = 1883;
 const char* CLIENT_ID     = "{room.get('api_client_id', 'esp32_relay')}";
 const char* DEVICE_TOKEN  = "{room.get('api_token', '')}";
@@ -961,6 +962,7 @@ PubSubClient mqttClient(espClient);
 unsigned long lastMqttRetry = 0;
 unsigned long lastHeartbeat = 0;
 unsigned long lastStatusPrint = 0;
+unsigned long wifiDisconnectSince = 0;
 
 bool isDuplicate(const String& id) {{
     if (id.length() == 0) return false;
@@ -987,9 +989,21 @@ void applyRelay(int index, bool turnOn) {{
 
 void printSystemStatus() {{
     Serial.println("\\n============================================================");
-    Serial.println("   📊 STATUS REAL-TIME: XIAOZHI ESP32 SMART RELAY");
+    Serial.println("   📊 STATUS REAL-TIME: XIAOZHI ESP32 SMART RELAY (24/7)");
     Serial.println("============================================================");
-    Serial.printf("⏱️  Uptime        : %lu detik (%lu menit)\\n", millis() / 1000, millis() / 60000);
+    unsigned long upSec = millis() / 1000;
+    unsigned long upDays = upSec / 86400;
+    unsigned long upHours = (upSec % 86400) / 3600;
+    unsigned long upMins = (upSec % 3600) / 60;
+    unsigned long upSecs = upSec % 60;
+    if (upDays > 0) {{
+        Serial.printf("⏱️  Uptime        : %lu hari, %lu jam, %lu menit, %lu detik\\n", upDays, upHours, upMins, upSecs);
+    }} else {{
+        Serial.printf("⏱️  Uptime        : %lu jam, %lu menit, %lu detik\\n", upHours, upMins, upSecs);
+    }}
+    #if defined(ESP32) || defined(ESP8266)
+    Serial.printf("💾 RAM Bebas (Heap): %u bytes (Stabil)\\n", ESP.getFreeHeap());
+    #endif
     Serial.printf("📶 WiFi Status   : %s\\n", (WiFi.status() == WL_CONNECTED) ? "TERHUBUNG (Online)" : "TERPUTUS (Offline)");
     if (WiFi.status() == WL_CONNECTED) {{
         Serial.printf("🌐 IP Address    : %s\\n", WiFi.localIP().toString().c_str());
@@ -1273,13 +1287,22 @@ void loop() {{
 
     handleSerialInput();
 
-    // Reconnect Wi-Fi berkala jika koneksi terputus
+    // Reconnect Wi-Fi berkala jika koneksi terputus (Failsafe 24/7)
     if (WiFi.status() != WL_CONNECTED) {{
+        if (wifiDisconnectSince == 0) {{
+            wifiDisconnectSince = now;
+        }} else if (now - wifiDisconnectSince >= 300000) {{ // 5 menit terputus total
+            Serial.println("\\n[FAILSAFE 24/7] Wi-Fi terputus > 5 menit. Merestart mikrokontroler demi stabilitas...");
+            delay(500);
+            ESP.restart();
+        }}
         if (now - lastMqttRetry >= 10000) {{
             lastMqttRetry = now;
             connectWiFi();
         }}
         return;
+    }} else {{
+        wifiDisconnectSince = 0;
     }}
 
     // Reconnect MQTT berkala
@@ -1291,7 +1314,7 @@ void loop() {{
     }} else {{
         mqttClient.loop();
 
-        // Heartbeat berkala tiap 15 detik
+        // Heartbeat berkala tiap 15 detik (menjaga NAT router firewall tetap terbuka 24/7)
         if (now - lastHeartbeat >= 15000) {{
             lastHeartbeat = now;
             mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
@@ -1301,8 +1324,13 @@ void loop() {{
     // Tampilkan ringkasan status di Serial Monitor tiap 30 detik
     if (now - lastStatusPrint >= 30000) {{
         lastStatusPrint = now;
-        Serial.printf("[STATUS LIVE] ⏱️ %lus | RSSI: %d dBm | MQTT: %s | Relay: [", 
-                      now / 1000, WiFi.RSSI(), 
+        #if defined(ESP32) || defined(ESP8266)
+        uint32_t freeRam = ESP.getFreeHeap();
+        #else
+        uint32_t freeRam = 0;
+        #endif
+        Serial.printf("[STATUS LIVE] ⏱️ %lus | RAM: %uB | RSSI: %d dBm | MQTT: %s | Relay: [", 
+                      now / 1000, freeRam, WiFi.RSSI(), 
                       mqttClient.connected() ? "ONLINE" : "OFFLINE");
         for (int i = 0; i < NUM_RELAYS; i++) {{
             Serial.printf("CH%d:%s%s", i + 1, relayStates[i] ? "ON" : "OFF", (i < NUM_RELAYS - 1) ? " " : "");
