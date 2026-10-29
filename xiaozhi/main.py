@@ -372,7 +372,10 @@ async def robots_txt():
 
 
 @app.get("/api/v1/nginx-diag", response_class=PlainTextResponse, include_in_schema=False)
-async def nginx_diag():
+async def nginx_diag(request: Request):
+    """Nginx diagnostics — admin only."""
+    from xiaozhi.dependencies import require_admin
+    require_admin(request)  # Block non-admin access
     diag_file = Path("/app/data/nginx_diag.txt")
     if diag_file.exists():
         return PlainTextResponse(diag_file.read_text(encoding="utf-8", errors="ignore"))
@@ -446,8 +449,16 @@ async def sitemap_xml():
 
 
 @app.get("/health/db", tags=["Health"])
-async def health_check_db():
-    """Check database connection latency and backend health."""
+async def health_check_db(request: Request):
+    """Check database connection latency and backend health.
+    
+    Public users only see status + latency.
+    Admin users see full details (backend, store_class, error).
+    """
+    from xiaozhi.dependencies import get_current_user
+    user = get_current_user(request)
+    is_admin = user and user.get("role") == "admin"
+
     start = time.perf_counter()
     backend = os.getenv("DB_BACKEND", "auto")
     try:
@@ -461,36 +472,42 @@ async def health_check_db():
                 else:
                     conn.execute("SELECT 1")
         latency_ms = round((time.perf_counter() - start) * 1000, 2)
-        return {
-            "status": "healthy",
-            "backend": backend,
-            "latency_ms": latency_ms,
-            "store_class": store.__class__.__name__,
-        }
+        result = {"status": "healthy", "latency_ms": latency_ms}
+        if is_admin:
+            result["backend"] = backend
+            result["store_class"] = store.__class__.__name__
+        return result
     except Exception as exc:
         logger.error("DB health check failed: %s", exc)
-        return {
-            "status": "unhealthy",
-            "backend": backend,
-            "error": str(exc),
-            "store_class": store.__class__.__name__,
-        }
+        result = {"status": "unhealthy"}
+        if is_admin:
+            result["backend"] = backend
+            result["error"] = str(exc)
+            result["store_class"] = store.__class__.__name__
+        return result
 
 
 @app.get("/health/storage", tags=["Health"])
-async def health_check_storage():
-    """Check S3 Object Storage connectivity, bucket status, and latency."""
+async def health_check_storage(request: Request):
+    """Check S3 Object Storage connectivity, bucket status, and latency.
+    
+    Public users only see status + latency.
+    Admin users see full details (endpoint, region, bucket names).
+    """
+    from xiaozhi.dependencies import get_current_user
     from xiaozhi.marketplace.storage import storage_service
     from xiaozhi.config import S3_ENDPOINT, S3_REGION, S3_BUCKET_PUBLIC, S3_BUCKET_PRIVATE
+
+    user = get_current_user(request)
+    is_admin = user and user.get("role") == "admin"
     
     start = time.perf_counter()
     if not storage_service.has_s3:
-        return {
-            "status": "warning",
-            "has_s3": False,
-            "mode": "local_fallback",
-            "message": "S3 credentials not configured in environment; running on local fallback storage.",
-        }
+        result = {"status": "warning", "has_s3": False}
+        if is_admin:
+            result["mode"] = "local_fallback"
+            result["message"] = "S3 credentials not configured in environment; running on local fallback storage."
+        return result
     
     try:
         s3 = storage_service._get_s3()
@@ -505,31 +522,26 @@ async def health_check_storage():
         public_exists = S3_BUCKET_PUBLIC in detected_buckets
         private_exists = S3_BUCKET_PRIVATE in detected_buckets
         
-        return {
+        result = {
             "status": "healthy" if (public_exists and private_exists) else "degraded",
             "has_s3": True,
-            "mode": "s3_object_storage",
-            "endpoint": S3_ENDPOINT,
-            "region": S3_REGION,
             "latency_ms": latency_ms,
-            "bucket_public": {
-                "name": S3_BUCKET_PUBLIC,
-                "exists": public_exists,
-            },
-            "bucket_private": {
-                "name": S3_BUCKET_PRIVATE,
-                "exists": private_exists,
-            },
-            "all_detected_buckets": detected_buckets,
         }
+        if is_admin:
+            result["mode"] = "s3_object_storage"
+            result["endpoint"] = S3_ENDPOINT
+            result["region"] = S3_REGION
+            result["bucket_public"] = {"name": S3_BUCKET_PUBLIC, "exists": public_exists}
+            result["bucket_private"] = {"name": S3_BUCKET_PRIVATE, "exists": private_exists}
+            result["all_detected_buckets"] = detected_buckets
+        return result
     except Exception as exc:
         logger.error("Storage health check failed: %s", exc)
-        return {
-            "status": "unhealthy",
-            "has_s3": True,
-            "mode": "s3_object_storage",
-            "endpoint": S3_ENDPOINT,
-            "error": str(exc),
-        }
+        result = {"status": "unhealthy", "has_s3": True}
+        if is_admin:
+            result["mode"] = "s3_object_storage"
+            result["endpoint"] = S3_ENDPOINT
+            result["error"] = str(exc)
+        return result
 
 
