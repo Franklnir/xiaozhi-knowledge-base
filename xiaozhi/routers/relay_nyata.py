@@ -875,14 +875,16 @@ async def download_arduino_project_zip(room_id: int, request: Request):
             body = {}
 
     code = body.get("code", "")
-    board_name = body.get("board", "ESP32-S3")
+    board_name = body.get("board", "ESP32-S3 N16R8")
     room_name = room.get("nama_tempat", "Smart_Home")
     clean_slug = re.sub(r'[^a-zA-Z0-9_]+', '_', room_name).strip('_') or f"Room_{room_id}"
     folder_name = f"{clean_slug}_ESP32_Relay"
 
     if not code:
         board_lower = board_name.lower()
-        if "s2" in board_lower:
+        if "n16r8" in board_lower or ("s3" in board_lower and "16" in board_lower):
+            default_pins = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21]
+        elif "s2" in board_lower:
             default_pins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         elif "s3" in board_lower:
             default_pins = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]

@@ -1496,7 +1496,8 @@
                     <div>
                         <label class="app-label" style="font-size:11px; font-weight:800; margin-bottom:4px; display:block;">PILIHAN CHIPSET / BOARD:</label>
                         <select id="cfgBoardType" class="app-select" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; color:#0284c7; background:rgba(2,132,199,0.06); border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" onchange="regenerateArduinoCode()">
-                            <option value="esp32_s3" selected>🚀 ESP32-S3 (Xtensa Dual-Core AI)</option>
+                            <option value="esp32_s3_n16r8" selected>👑 ESP32-S3 N16R8 (16MB Flash + 8MB Octal PSRAM)</option>
+                            <option value="esp32_s3">🚀 ESP32-S3 Standar (Xtensa Dual-Core AI)</option>
                             <option value="esp32_s2">⚡ ESP32-S2 (Xtensa Single-Core USB)</option>
                             <option value="esp32_classic">📦 ESP32 Klasik (WROOM-32 / WROVER)</option>
                             <option value="esp32_c3">🌱 ESP32-C3 (RISC-V Architecture)</option>
@@ -2001,6 +2002,15 @@
     }
 
     const BOARD_PROFILES = {
+        esp32_s3_n16r8: {
+            name: "ESP32-S3 N16R8 (16MB Flash, 8MB Octal PSRAM)",
+            headerTitle: "ESP32-S3 N16R8",
+            arduinoBoard: "ESP32S3 Dev Module",
+            pins: [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21],
+            note: "Pinout ESP32-S3 N16R8 memakai GPIO aman [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21]. PENTING: Jangan gunakan GPIO 33-37 karena terhubung ke Octal PSRAM (R8) & GPIO 26-32 (SPI Flash N16), serta hindari strapping GPIO 0, 3, 45, 46.",
+            includeWifi: "#include <WiFi.h>",
+            cdcBoot: true
+        },
         esp32_s3: {
             name: "ESP32-S3 (Xtensa Dual-Core AI)",
             headerTitle: "ESP32-S3",
@@ -2049,12 +2059,12 @@
         }
     };
 
-    const SAFE_PINS = BOARD_PROFILES.esp32_s3.pins;
+    const SAFE_PINS = BOARD_PROFILES.esp32_s3_n16r8.pins;
 
     function buildArduinoCode(room, wifiSsid, wifiPass, activeLow, protocol, boardKey) {
         if (!room) return "// Memuat konfigurasi...";
-        const key = boardKey || document.getElementById("cfgBoardType")?.value || "esp32_s3";
-        const profile = BOARD_PROFILES[key] || BOARD_PROFILES.esp32_s3;
+        const key = boardKey || document.getElementById("cfgBoardType")?.value || "esp32_s3_n16r8";
+        const profile = BOARD_PROFILES[key] || BOARD_PROFILES.esp32_s3_n16r8 || BOARD_PROFILES.esp32_s3;
 
         const maxBoardPins = profile.pins.length;
         const numRelays = Math.max(1, Math.min(Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)), maxBoardPins));
@@ -2967,8 +2977,8 @@ void loop() {
         const pass = document.getElementById("cfgWifiPass")?.value.trim() || "PASSWORD_WIFI";
         const activeLow = document.getElementById("cfgRelayLogic")?.value === "true";
         const proto = document.getElementById("cfgProtocol")?.value || "mqtt";
-        const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3";
-        const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3;
+        const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3_n16r8";
+        const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3_n16r8 || BOARD_PROFILES.esp32_s3;
 
         // Update Pinout Guide in UI dynamically
         const numRelays = Math.max(1, Math.min(Number(currentConfigRoom.jumlah_relay || (currentConfigRoom.relays ? currentConfigRoom.relays.length : 1)), profile.pins.length));
@@ -2996,8 +3006,8 @@ void loop() {
     function copyArduinoCode(btn) {
         const box = document.getElementById("arduinoCodeBox");
         if (!box) return;
-        const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3";
-        const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3;
+        const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3_n16r8";
+        const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3_n16r8 || BOARD_PROFILES.esp32_s3;
         navigator.clipboard.writeText(box.textContent).then(() => {
             const orig = btn.innerHTML;
             btn.innerHTML = `<span>✓ Kode ${profile.headerTitle} Disalin!</span>`;
@@ -3018,8 +3028,8 @@ void loop() {
             alert("Kodingan Arduino belum digenerate.");
             return;
         }
-        const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3";
-        const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3;
+        const boardKey = document.getElementById("cfgBoardType")?.value || "esp32_s3_n16r8";
+        const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_s3_n16r8 || BOARD_PROFILES.esp32_s3;
 
         saveWifiCredentials();
 
