@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Dokumentasi 63 Tools MCP, Skema Hardware & Panduan Xiaozhi Indonesia{% endblock %}
-{% block meta_title %}Dokumentasi 63 Tools MCP, Skema Hardware & Panduan Xiaozhi Indonesia{% endblock %}
-{% block meta_desc %}Panduan resmi Xiaozhi Indonesia: spesifikasi hardware ESP32, skema wiring mic INMP441 & amplifier MAX98357A, serta katalog lengkap 63 Tools FastMCP cerdas.{% endblock %}
-{% block og_title %}Dokumentasi 63 Tools MCP, Skema Hardware & Panduan Xiaozhi Indonesia{% endblock %}
-{% block og_desc %}Panduan resmi Xiaozhi: skema wiring ESP32, setup koneksi token, dan dokumentasi lengkap 63 Tools MCP realtime.{% endblock %}
-{% block tw_title %}Dokumentasi 63 Tools MCP & Panduan Hardware Xiaozhi Indonesia{% endblock %}
-{% block tw_desc %}Panduan resmi Xiaozhi: skema wiring ESP32, setup koneksi token, dan dokumentasi lengkap 63 Tools MCP realtime.{% endblock %}
+{% block title %}Dokumentasi 66 Tools MCP, Skema Hardware & Panduan Xiaozhi Indonesia{% endblock %}
+{% block meta_title %}Dokumentasi 66 Tools MCP, Skema Hardware & Panduan Xiaozhi Indonesia{% endblock %}
+{% block meta_desc %}Panduan resmi Xiaozhi Indonesia: spesifikasi hardware ESP32, skema wiring mic INMP441 & amplifier MAX98357A, serta katalog lengkap 66 Tools FastMCP cerdas.{% endblock %}
+{% block og_title %}Dokumentasi 66 Tools MCP, Skema Hardware & Panduan Xiaozhi Indonesia{% endblock %}
+{% block og_desc %}Panduan resmi Xiaozhi: skema wiring ESP32, setup koneksi token, dan dokumentasi lengkap 66 Tools MCP realtime.{% endblock %}
+{% block tw_title %}Dokumentasi 66 Tools MCP & Panduan Hardware Xiaozhi Indonesia{% endblock %}
+{% block tw_desc %}Panduan resmi Xiaozhi: skema wiring ESP32, setup koneksi token, dan dokumentasi lengkap 66 Tools MCP realtime.{% endblock %}
 
 {% block content %}
 <!-- Schema.org FAQPage for Google Rich Snippets -->
@@ -20,7 +20,7 @@
       "name": "Apa itu Xiaozhi Indonesia (xiaozhiscig)?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Xiaozhi Indonesia adalah platform asisten suara cerdas berbasis mikrokontroler IoT ESP32 yang terhubung dengan kecerdasan buatan (AI), protokol FastMCP dengan 63 tools ilmiah, pemutar musik YouTube streaming, dan kontrol perangkat Smart Home."
+        "text": "Xiaozhi Indonesia adalah platform asisten suara cerdas berbasis mikrokontroler IoT ESP32 yang terhubung dengan kecerdasan buatan (AI), protokol FastMCP dengan 66 tools ilmiah, pemutar musik YouTube streaming, dan kontrol perangkat Smart Home."
       }
     },
     {
@@ -65,10 +65,10 @@
     },
     {
       "@type": "Question",
-      "name": "Apa itu 63 Tools FastMCP di Xiaozhi?",
+      "name": "Apa itu 66 Tools FastMCP di Xiaozhi?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "63 Tools FastMCP adalah serangkaian alat cerdas yang otomatis dipanggil oleh asisten suara saat Anda berbicara, mencakup kalkulator, pemecah soal, kamus KBBI, cuaca BMKG, info gempa, pencarian web mendalam, pemutar musik YouTube, kontrol relay smart home, riset jurnal ilmiah, guru bahasa asing, hingga memori percakapan jangka panjang."
+        "text": "66 Tools FastMCP adalah serangkaian alat cerdas yang otomatis dipanggil oleh asisten suara saat Anda berbicara, mencakup kalkulator, pemecah soal, kamus KBBI, cuaca BMKG, info gempa, pencarian web mendalam, pemutar musik YouTube, inspeksi video & riset otomatis, kontrol relay smart home, riset jurnal ilmiah, guru bahasa asing, hingga memori percakapan jangka panjang."
       }
     },
     {
@@ -755,10 +755,10 @@
         <div class="app-card">
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🔧</span> Daftar 63 Tools MCP Xiaozhi
+                    <span>🔧</span> Daftar 66 Tools MCP Xiaozhi
                 </div>
                 <p class="doc-step-desc">
-                    Xiaozhi terhubung dengan <strong>63 Tools MCP</strong> berstandar ilmiah, memori semantik vektor, profil persona pengguna, dan realtime. Tools ini otomatis dipanggil oleh Xiaozhi saat mendengarkan pertanyaan atau instruksi suara kamu.
+                    Xiaozhi terhubung dengan <strong>66 Tools MCP</strong> berstandar ilmiah, memori semantik vektor, profil persona pengguna, dan realtime. Tools ini otomatis dipanggil oleh Xiaozhi saat mendengarkan pertanyaan atau instruksi suara kamu.
                 </p>
 
                 <!-- Search box for tools -->
@@ -1191,6 +1191,19 @@
                             🗣️ <em>"Xiaozhi, matikan semua relay fisik."</em>
                         </div>
                     </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">set_smarthome_simulation_mode</span>
+                            <span class="badge badge-warning" style="font-size: 0.65rem;">Mode Switch</span>
+                        </div>
+                        <div class="tool-desc">
+                            Mengaktifkan atau menonaktifkan mode Simulasi Smart Home Virtual (beralih secara mulus antara simulator virtual dan relay fisik nyata).
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, aktifkan mode simulasi smart home."</em> atau <em>"Gunakan relay fisik nyata."</em>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1300,6 +1313,32 @@
 
                     <div class="tool-card">
                         <div class="tool-header">
+                            <span class="tool-name">inspect_youtube_video</span>
+                            <span class="badge badge-info" style="font-size: 0.65rem; background: #0284c7; color: #fff;">Video Inspect</span>
+                        </div>
+                        <div class="tool-desc">
+                            Menginspeksi detail video YouTube (judul, channel, durasi, topik) dan menanyakan konfirmasi kepada pengguna sebelum memutar. Memastikan konten video sesuai sebelum dieksekusi.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Xiaozhi, cek video tutorial ESP32 di YouTube."</em> atau <em>"Tonton video podcast Deddy Corbuzier."</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span class="tool-name">confirm_play_and_save_video</span>
+                            <span class="badge badge-success" style="font-size: 0.65rem; background: #10b981; color: #fff;">Auto-Save</span>
+                        </div>
+                        <div class="tool-desc">
+                            Mengeksekusi pemutaran video YouTube setelah konfirmasi pengguna disetujui, serta otomatis menyatukan materi hasil riset ke database memori pengguna.
+                        </div>
+                        <div class="tool-sample">
+                            🗣️ <em>"Ya putar yang itu."</em> atau <em>"Lanjutkan putar videonya."</em>
+                        </div>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-header">
                             <span class="tool-name">play_playlist_song</span>
                             <span class="badge badge-primary" style="font-size: 0.65rem;">Playlist</span>
                         </div>
@@ -1353,12 +1392,13 @@
                     <div class="tool-card">
                         <div class="tool-header">
                             <span class="tool-name">get_playback_status</span>
+                            <span class="badge badge-primary" style="font-size: 0.65rem;">Context Aware</span>
                         </div>
                         <div class="tool-desc">
-                            Melihat status pemutaran audio yang sedang aktif, judul lagu, dan progress durasi lagu.
+                            Mengecek status riwayat lagu terakhir, video YouTube terakhir yang dicek, atau pencarian/riset terakhir TANPA memutar audio (hanya mengecek info konteks kecuali disuruh putar lagi).
                         </div>
                         <div class="tool-sample">
-                            🗣️ <em>"Xiaozhi, lagu apa yang sedang diputar sekarang?"</em>
+                            🗣️ <em>"Xiaozhi, apa video yang tadi kita cek?"</em> atau <em>"Cek lagu terakhir yang tadi diputar."</em>
                         </div>
                     </div>
 
