@@ -1489,13 +1489,13 @@
                         <span>📶 Konfigurasi Hardware &amp; Wi-Fi (Otomatis Menyesuaikan Kodingan):</span>
                     </div>
                     <span id="wifiSavedStatusBadge" style="display:none; font-size:10.5px; font-weight:850; color:#065f46; background:#d1fae5; border:1.5px solid #10b981; border-radius:6px; padding:2px 8px; align-items:center; gap:5px; box-shadow:1.5px 1.5px 0 #111;">
-                        <span>💾</span> <span>Wi-Fi Tersimpan di Browser</span>
+                        <span>💾</span> <span>Konfigurasi Tersimpan di Browser</span>
                     </span>
                 </div>
                 <div class="relay-config-grid">
                     <div>
                         <label class="app-label" style="font-size:11px; font-weight:800; margin-bottom:4px; display:block;">PILIHAN CHIPSET / BOARD:</label>
-                        <select id="cfgBoardType" class="app-select" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; color:#0284c7; background:rgba(2,132,199,0.06); border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" onchange="regenerateArduinoCode()">
+                        <select id="cfgBoardType" class="app-select" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; color:#0284c7; background:rgba(2,132,199,0.06); border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" onchange="saveHardwareWifiConfig(); regenerateArduinoCode();">
                             <option value="esp32_s3_n16r8" selected>👑 ESP32-S3 N16R8 (16MB Flash + 8MB Octal PSRAM)</option>
                             <option value="esp32_s3">🚀 ESP32-S3 Standar (Xtensa Dual-Core AI)</option>
                             <option value="esp32_s2">⚡ ESP32-S2 (Xtensa Single-Core USB)</option>
@@ -1506,14 +1506,14 @@
                     </div>
                     <div>
                         <label class="app-label" style="font-size:11px; font-weight:800; margin-bottom:4px; display:block;">TIPE MODUL RELAY:</label>
-                        <select id="cfgRelayLogic" class="app-select" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" onchange="regenerateArduinoCode()">
+                        <select id="cfgRelayLogic" class="app-select" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" onchange="saveHardwareWifiConfig(); regenerateArduinoCode();">
                             <option value="true" selected>🔵 ACTIVE LOW (Relay Biru Songle pada umumnya)</option>
                             <option value="false">🔴 ACTIVE HIGH (Relay ON saat sinyal 3.3V)</option>
                         </select>
                     </div>
                     <div>
                         <label class="app-label" style="font-size:11px; font-weight:800; margin-bottom:4px; display:block;">NAMA WI-FI (SSID):</label>
-                        <input type="text" id="cfgWifiSsid" class="app-input" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" value="WIFI_RUMAH_ANDA" placeholder="Contoh: MyHome_WiFi" oninput="saveWifiCredentials(); regenerateArduinoCode();">
+                        <input type="text" id="cfgWifiSsid" class="app-input" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" value="WIFI_RUMAH_ANDA" placeholder="Contoh: MyHome_WiFi" oninput="saveHardwareWifiConfig(); regenerateArduinoCode();">
                     </div>
                     <div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -1522,7 +1522,7 @@
                                 <span>👁️</span> <span>Intip Password</span>
                             </button>
                         </div>
-                        <input type="password" id="cfgWifiPass" class="app-input" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" value="PASSWORD_WIFI" placeholder="Contoh: Rahasia123" oninput="saveWifiCredentials(); regenerateArduinoCode();">
+                        <input type="password" id="cfgWifiPass" class="app-input" style="width:100%; padding:7px 10px; font-size:12px; font-weight:700; border:1.5px solid #111; box-shadow:2px 2px 0 #111; border-radius:6px;" value="PASSWORD_WIFI" placeholder="Contoh: Rahasia123" oninput="saveHardwareWifiConfig(); regenerateArduinoCode();">
                     </div>
                 </div>
             </div>
@@ -2916,47 +2916,88 @@ void loop() {
 `;
     }
 
-    function loadSavedWifiCredentials() {
+    function loadHardwareWifiConfig() {
         try {
+            const savedBoard = localStorage.getItem('xiaozhi_relay_board_type');
+            const savedLogic = localStorage.getItem('xiaozhi_relay_logic');
             const savedSsid = localStorage.getItem('xiaozhi_relay_wifi_ssid');
             const savedPass = localStorage.getItem('xiaozhi_relay_wifi_pass');
+
+            const boardEl = document.getElementById('cfgBoardType');
+            const logicEl = document.getElementById('cfgRelayLogic');
             const ssidEl = document.getElementById('cfgWifiSsid');
             const passEl = document.getElementById('cfgWifiPass');
             const statusBadge = document.getElementById('wifiSavedStatusBadge');
 
+            let hasSaved = false;
+
+            if (savedBoard && boardEl) {
+                const optExists = Array.from(boardEl.options).some(opt => opt.value === savedBoard);
+                if (optExists) {
+                    boardEl.value = savedBoard;
+                    hasSaved = true;
+                }
+            }
+            if (savedLogic !== null && logicEl) {
+                logicEl.value = savedLogic;
+                hasSaved = true;
+            }
             if (savedSsid && ssidEl) {
                 ssidEl.value = savedSsid;
+                hasSaved = true;
             }
             if (savedPass !== null && passEl) {
                 passEl.value = savedPass;
+                hasSaved = true;
             }
-            if (savedSsid && statusBadge) {
+
+            if (hasSaved && statusBadge) {
                 statusBadge.style.display = 'inline-flex';
-                statusBadge.textContent = '💾 Tersimpan di Browser';
+                statusBadge.innerHTML = '<span>💾</span> <span>Konfigurasi Tersimpan di Browser</span>';
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error("Gagal membaca konfigurasi hardware & Wi-Fi:", e);
+        }
     }
 
-    function saveWifiCredentials() {
+    function saveHardwareWifiConfig() {
         try {
+            const boardEl = document.getElementById('cfgBoardType');
+            const logicEl = document.getElementById('cfgRelayLogic');
             const ssidEl = document.getElementById('cfgWifiSsid');
             const passEl = document.getElementById('cfgWifiPass');
             const statusBadge = document.getElementById('wifiSavedStatusBadge');
+
+            const board = boardEl ? boardEl.value : '';
+            const logic = logicEl ? logicEl.value : '';
             const ssid = ssidEl ? ssidEl.value.trim() : '';
             const pass = passEl ? passEl.value : '';
 
+            if (board) {
+                localStorage.setItem('xiaozhi_relay_board_type', board);
+            }
+            if (logic !== '') {
+                localStorage.setItem('xiaozhi_relay_logic', logic);
+            }
             if (ssid && ssid !== 'WIFI_RUMAH_ANDA') {
                 localStorage.setItem('xiaozhi_relay_wifi_ssid', ssid);
-                localStorage.setItem('xiaozhi_relay_wifi_pass', pass);
-                if (statusBadge) {
-                    statusBadge.style.display = 'inline-flex';
-                    statusBadge.textContent = '💾 Tersimpan di Browser';
-                }
-            } else if (!ssid || ssid === 'WIFI_RUMAH_ANDA') {
-                if (statusBadge) statusBadge.style.display = 'none';
             }
-        } catch (e) {}
+            if (pass !== null && pass !== undefined && pass !== 'PASSWORD_WIFI') {
+                localStorage.setItem('xiaozhi_relay_wifi_pass', pass);
+            }
+
+            if (statusBadge) {
+                statusBadge.style.display = 'inline-flex';
+                statusBadge.innerHTML = '<span>💾</span> <span>Konfigurasi Tersimpan di Browser</span>';
+            }
+        } catch (e) {
+            console.error("Gagal menyimpan konfigurasi hardware & Wi-Fi:", e);
+        }
     }
+
+    // Alias backward-compatibility
+    const loadSavedWifiCredentials = loadHardwareWifiConfig;
+    const saveWifiCredentials = saveHardwareWifiConfig;
 
     function toggleWifiPassVisibility() {
         const passEl = document.getElementById('cfgWifiPass');
@@ -3119,7 +3160,7 @@ void loop() {
         const mqttLwtEl = document.getElementById("cfgMqttLwtTopic");
         if (mqttLwtEl) mqttLwtEl.value = `xiaozhi/relay/${slug}/availability`;
 
-        loadSavedWifiCredentials();
+        loadHardwareWifiConfig();
         switchConfigTab("arduino");
         regenerateArduinoCode();
 
@@ -3664,6 +3705,7 @@ void loop() {
 
     // Inisialisasi awal
     renderRelayInputs(1);
+    loadHardwareWifiConfig();
     initRelaySSE();
 
     // Liveness watcher real-time: cek status online/offline setiap 2 detik
