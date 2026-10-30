@@ -289,6 +289,61 @@
         border-color: var(--app-brand);
         outline: none;
     }
+
+    /* Documentation Screenshot Boxes & Badges */
+    .doc-screenshot-box {
+        margin: 14px 0 16px 0;
+        padding: 10px;
+        background: var(--app-surface-muted, #f8fafc);
+        border: 1.5px solid var(--app-border, #e2e8f0);
+        border-radius: var(--app-radius, 8px);
+        display: inline-block;
+        max-width: 100%;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    :root[data-theme="neo"] .doc-screenshot-box {
+        border: 2px solid #111;
+        box-shadow: 3px 3px 0 #111;
+        background: #fff;
+    }
+    :root[data-theme="dark"] .doc-screenshot-box {
+        background: #1e293b;
+        border-color: #334155;
+    }
+    .doc-screenshot-img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        border-radius: calc(var(--app-radius, 8px) - 2px);
+        border: 1px solid var(--app-border, rgba(0,0,0,0.08));
+    }
+    .doc-screenshot-caption {
+        font-size: 11.5px;
+        color: var(--app-muted, #64748b);
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+    }
+    .doc-badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: rgba(99, 102, 241, 0.12);
+        color: #4f46e5;
+        border: 1px solid rgba(99, 102, 241, 0.25);
+    }
+    .doc-badge-pill.green {
+        background: rgba(16, 185, 129, 0.12);
+        color: #059669;
+        border-color: rgba(16, 185, 129, 0.25);
+    }
+
 </style>
 
 <div class="app-page">
@@ -1598,6 +1653,7 @@
 
 
     <!-- MCP Setup Tab -->
+        <!-- Tab MCP Setup -->
     <div id="tab-mcp" class="doc-tab-content">
         <div class="app-card">
             <div class="doc-section">
@@ -1605,74 +1661,125 @@
                     <span>🔌</span> Apa itu MCP?
                 </div>
                 <p class="doc-step-desc">
-                    MCP (Model Context Protocol) adalah protokol yang menghubungkan asisten suara XiaoZhi dengan knowledge base Xiaozhi Indonesia. 
-                    Dengan MCP, XiaoZhi bisa membaca materi, mengontrol smarthome, memutar lagu, dan lainnya.
+                    <strong>MCP (Model Context Protocol)</strong> adalah jembatan komunikasi cerdas yang menghubungkan perangkat suara XiaoZhi (ESP32) dengan sistem backend Xiaozhi Indonesia. 
+                    Dengan menghubungkan MCP, XiaoZhi dapat mengakses seluruh ekosistem fitur: Knowledge Base dokumen, 63 Tools MCP, Pemutar Musik &amp; Playlist YouTube, kontrol Smart Home IoT, pencarian web, dan riwayat obrolan secara real-time.
                 </p>
+                <div class="doc-tip" style="margin-top: 14px;">
+                    <strong>ℹ️ Prasyarat Awal:</strong> Pastikan perangkat ESP32 Anda telah selesai di-flash firmware dan <strong>berhasil terkoneksi ke jaringan Wi-Fi</strong>. 
+                    Saat Wi-Fi terhubung, ESP32 akan mengeluarkan suara atau menampilkan <strong>6 Digit Kode Pairing / Bind Code</strong> di layar OLED/TFT (misal: <code>482910</code>). Kode inilah yang digunakan untuk menghubungkan perangkat ke akun xiaozhi.me.
+                </div>
             </div>
 
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>📋</span> Langkah-Langkah Setup MCP
+                    <span>📋</span> Langkah-Langkah Menghubungkan MCP ke Xiaozhi Indonesia
                 </div>
 
+                <!-- STEP 1 -->
                 <div class="doc-step">
                     <div class="doc-step-number">1</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Buka Website XiaoZhi</div>
+                        <div class="doc-step-title">Buka xiaozhi.me &amp; Tambahkan Perangkat</div>
                         <div class="doc-step-desc">
-                            Kunjungi <a href="https://xiaozhi.me" class="doc-link" target="_blank">https://xiaozhi.me</a> dan login ke akun XiaoZhi kamu.
+                            Kunjungi portal resmi <a href="https://xiaozhi.me" class="doc-link" target="_blank" rel="noopener noreferrer">https://xiaozhi.me</a> dan login ke akun XiaoZhi Anda.<br>
+                            Di halaman dashboard utama, klik tombol biru <strong>"+ Tambah Perangkat"</strong> yang terletak di pojok kanan atas.<br>
+                            Masukkan <strong>6 Digit Kode Pairing</strong> yang muncul dari perangkat ESP32 Anda, lalu klik konfirmasi untuk mendaftarkan perangkat.
+                        </div>
+                        <div class="doc-screenshot-box" style="max-width: 280px;">
+                            <img src="/static/img/docs/mcp-step1-tambah-perangkat.png" alt="Tombol Tambah Perangkat di xiaozhi.me" class="doc-screenshot-img" loading="lazy">
+                            <div class="doc-screenshot-caption">
+                                <span>🔍</span> Klik tombol <strong>+ Tambah Perangkat</strong> di xiaozhi.me
+                            </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- STEP 2 -->
                 <div class="doc-step">
                     <div class="doc-step-number">2</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Ambil Token MCP</div>
+                        <div class="doc-step-title">Buka Konfigurasi Perangkat (Configure)</div>
                         <div class="doc-step-desc">
-                            Di halaman XiaoZhi, cari menu <strong>"MCP Endpoint"</strong> atau <strong>"Koneksi MCP"</strong>.<br>
-                            Salin URL yang dimulai dengan <code>wss://</code>
+                            Setelah perangkat berhasil ditambahkan dengan kode 6 digit, kartu agen / perangkat Anda akan muncul di daftar (misal bernama <em>"Agen tanpa nama"</em> atau nama kustom Anda).<br>
+                            Klik tombol <strong>"Konfigurasikan"</strong> (atau <em>Konfigurasik...</em>) di bagian bawah kartu perangkat tersebut untuk membuka menu setelan agen.
                         </div>
-                        <div class="doc-code">
-                            Contoh: wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1Ni...
-                        </div>
-                        <div class="doc-tip">
-                            <strong>💡 Tips:</strong> Pastikan menyalin URL LENGKAP, bukan hanya token-nya saja!
+                        <div class="doc-screenshot-box" style="max-width: 420px;">
+                            <img src="/static/img/docs/mcp-step2-konfigurasikan.png" alt="Kartu Agen dan Tombol Konfigurasikan" class="doc-screenshot-img" loading="lazy">
+                            <div class="doc-screenshot-caption">
+                                <span>⚙️</span> Klik tombol <strong>Konfigurasik...</strong> pada kartu agen perangkat
+                            </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- STEP 3 -->
                 <div class="doc-step">
                     <div class="doc-step-number">3</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Tempel di Dashboard Xiaozhi Indonesia</div>
+                        <div class="doc-step-title">Pilih Tab "Perluasan" &amp; Salin MCP Endpoint URL</div>
                         <div class="doc-step-desc">
-                            Kembali ke halaman <strong>Dashboard</strong> Xiaozhi Indonesia.<br>
-                            Cari bagian <strong>"Koneksi XiaoZhi"</strong> di sidebar kanan.<br>
-                            Tempel URL MCP yang sudah disalin, lalu klik <strong>"Simpan"</strong>.
+                            Pada jendela popup pengaturan agen yang terbuka:
+                            <ol style="margin: 8px 0 10px 20px; line-height: 1.7;">
+                                <li>Pilih tab <strong>"Perluasan"</strong> di baris navigasi atas (di sebelah Pengakuan Pembicara).</li>
+                                <li>Gulir ke bawah ke bagian <strong>"Layanan Kustom"</strong>, lalu klik untuk membuka opsi <strong>"MCP Endpoint"</strong>.</li>
+                                <li>Pastikan <strong>Endpoint Status</strong> bertuliskan <span class="doc-badge-pill green">● Online</span>.</li>
+                                <li>Pada kotak <strong>URL endpoint</strong>, Anda akan melihat alamat koneksi yang diawali dengan <code>wss://api.xiaozhi.me/mcp/?token=...</code>.</li>
+                                <li>Klik <strong>ikon Salin (Copy)</strong> yang ada di sebelah kanan kolom URL untuk menyalin seluruh tautan endpoint ke clipboard.</li>
+                            </ol>
+                        </div>
+                        <div class="doc-screenshot-box" style="max-width: 720px;">
+                            <img src="/static/img/docs/mcp-step3-perluasan-mcp.png" alt="Tab Perluasan dan Menu MCP Endpoint" class="doc-screenshot-img" loading="lazy">
+                            <div class="doc-screenshot-caption">
+                                <span>📋</span> Buka tab <strong>Perluasan</strong> &gt; <strong>MCP Endpoint</strong> &gt; Klik <strong>Ikon Salin</strong>
+                            </div>
+                        </div>
+                        <div class="doc-warning" style="margin-top: 10px;">
+                            <strong>⚠️ PENTING:</strong> Pastikan Anda menyalin <strong>SELURUH URL LENGKAP</strong> yang diawali dengan <code>wss://</code> (contoh: <code>wss://api.xiaozhi.me/mcp/?token=eyJhbGciOi...</code>), <strong>jangan</strong> hanya menyalin bagian token acaknya saja!
                         </div>
                     </div>
                 </div>
 
+                <!-- STEP 4 -->
                 <div class="doc-step">
                     <div class="doc-step-number">4</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Tunggu Koneksi</div>
+                        <div class="doc-step-title">Masuk ke xiaozhiscig.biz.id &amp; Buka Menu "MCP XiaoZhi"</div>
                         <div class="doc-step-desc">
-                            Setelah menyimpan, sistem akan mencoba menghubungkan ke XiaoZhi.<br>
-                            Tunggu beberapa detik hingga status berubah menjadi <strong>"Terhubung"</strong>.
+                            Buka portal website <strong><a href="https://xiaozhiscig.biz.id" class="doc-link" target="_blank">xiaozhiscig.biz.id</a></strong> dan login ke akun Anda.<br>
+                            Di menu sidebar sebelah kiri, klik menu <strong><a href="/mcp" class="doc-link">"MCP XiaoZhi"</a></strong> (atau Anda juga dapat mengakses form input <em>"Koneksi XiaoZhi"</em> langsung di halaman Dashboard).
                         </div>
                     </div>
                 </div>
 
+                <!-- STEP 5 -->
                 <div class="doc-step">
                     <div class="doc-step-number">5</div>
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Verifikasi di XiaoZhi</div>
+                        <div class="doc-step-title">Tempelkan URL MCP Endpoint &amp; Simpan</div>
                         <div class="doc-step-desc">
-                            Kembali ke <a href="https://xiaozhi.me" class="doc-link" target="_blank">https://xiaozhi.me</a>.<br>
-                            Cek apakah status MCP sudah <strong>"Online"</strong> atau <strong>"Terhubung"</strong>.<br>
-                            Jika sudah, XiaoZhi sudah bisa membaca data dari Xiaozhi Indonesia!
+                            Di halaman MCP XiaoZhi, tempelkan (<em>paste</em>) URL endpoint yang sudah disalin tadi ke kolom input <strong>"URL MCP / Token Endpoint"</strong>.<br>
+                            Klik tombol <strong>"Simpan"</strong> atau <strong>"Hubungkan"</strong>.<br>
+                            Sistem server Xiaozhi Indonesia akan segera melakukan jabat tangan (handshake) WebSocket dengan endpoint XiaoZhi Anda.
+                        </div>
+                        <div class="doc-code">
+                            Format URL yang ditempel: wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1Ni...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 6 -->
+                <div class="doc-step">
+                    <div class="doc-step-number">6</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Simpan di xiaozhi.me &amp; Verifikasi Status Terhubung</div>
+                        <div class="doc-step-desc">
+                            Kembali ke tab/jendela <strong>xiaozhi.me</strong>, lalu klik tombol biru <strong>"Simpan"</strong> di pojok kanan bawah modal konfigurasi untuk memastikan pengaturan tersimpan.<br>
+                            Tunggu 3-5 detik:
+                            <ul style="margin: 8px 0 0 20px; line-height: 1.6;">
+                                <li>Di dashboard <strong>xiaozhiscig.biz.id</strong>, indikator status radar akan berubah menjadi <span class="doc-badge-pill green">● Terhubung</span>.</li>
+                                <li>Di <strong>xiaozhi.me</strong>, status MCP Endpoint akan menampilkan <span class="doc-badge-pill green">● Online</span>.</li>
+                            </ul>
+                            <strong>🎉 Selamat!</strong> Perangkat XiaoZhi Anda kini telah terhubung penuh dengan Xiaozhi Indonesia. Anda bisa langsung mencoba memanggil XiaoZhi: <em>"XiaoZhi, putarkan lagu favorit"</em> atau <em>"XiaoZhi, nyalakan lampu ruang tamu"</em>!
                         </div>
                     </div>
                 </div>
@@ -1680,16 +1787,16 @@
 
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>⚠️</span> Troubleshooting MCP
+                    <span>⚠️</span> Troubleshooting &amp; Kendala Umum MCP
                 </div>
 
                 <div class="doc-warning">
-                    <strong>Jika koneksi gagal:</strong>
-                    <ul style="margin:8px 0 0 20px">
-                        <li>Pastikan URL dimulai dengan <code>wss://</code></li>
-                        <li>Pastikan menyalin URL LENGKAP (bukan hanya token)</li>
-                        <li>Coba hapus dan simpan ulang token</li>
-                        <li>Periksa koneksi internet</li>
+                    <strong>Jika status MCP tidak kunjung "Terhubung" atau muncul pesan error:</strong>
+                    <ul style="margin:8px 0 0 20px; line-height: 1.7;">
+                        <li><strong>Cek Format URL:</strong> Pastikan URL diawali dengan <code>wss://api.xiaozhi.me/mcp/?token=</code> dan tidak terpotong saat di-copy.</li>
+                        <li><strong>Status Wi-Fi ESP32:</strong> Pastikan board ESP32 Anda tetap menyala dan terhubung dengan jaringan internet yang stabil.</li>
+                        <li><strong>Token Baru:</strong> Jika token kedaluwarsa atau berubah, klik ikon refresh di samping "Endpoint Status" pada xiaozhi.me untuk membuat URL baru, lalu salin dan tempel ulang di <a href="/mcp" class="doc-link">xiaozhiscig.biz.id</a>.</li>
+                        <li><strong>Tombol Simpan:</strong> Jangan lupa klik tombol biru <strong>"Simpan"</strong> di modal xiaozhi.me setelah menghubungkan.</li>
                     </ul>
                 </div>
             </div>
