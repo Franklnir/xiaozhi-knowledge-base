@@ -62,11 +62,8 @@ func (h *RelayHandler) HandleGetCommands(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// 1. Extract Token from Header or Query Param
+	// Device credentials belong in headers, never URLs (URLs are commonly logged).
 	token := strings.TrimSpace(r.Header.Get("X-Device-Token"))
-	if token == "" {
-		token = strings.TrimSpace(r.URL.Query().Get("token"))
-	}
 	if token == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Token diperlukan."})
 		return
@@ -133,9 +130,6 @@ func (h *RelayHandler) HandlePostStatus(w http.ResponseWriter, r *http.Request) 
 	token := strings.TrimSpace(payload.Token)
 	if token == "" {
 		token = strings.TrimSpace(r.Header.Get("X-Device-Token"))
-	}
-	if token == "" {
-		token = strings.TrimSpace(r.URL.Query().Get("token"))
 	}
 	if token == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Token diperlukan."})
@@ -237,6 +231,9 @@ func (h *RelayHandler) notifyPythonBroadcast(ownerID, roomID int64, roomName str
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if h.cfg.InternalAPIKey != "" {
+		req.Header.Set("X-Gateway-Internal-Key", h.cfg.InternalAPIKey)
+	}
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
@@ -274,6 +271,15 @@ func (h *RelayHandler) HandlePostControl(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Nomor relay tidak valid (harus antara 1 dan 16)."})
 		return
 	}
+	if payload.Token == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"detail": "Token perangkat diperlukan."})
+		return
+	}
+	command := strings.ToUpper(strings.TrimSpace(payload.Command))
+	if command != "ON" && command != "OFF" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Perintah harus ON atau OFF."})
+		return
+	}
 
 	// 2. Keamanan otorisasi: Pastikan ruangan ada
 	room, err := h.relayStore.GetRoomBySlug(r.Context(), slug)
@@ -281,31 +287,41 @@ func (h *RelayHandler) HandlePostControl(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusNotFound, map[string]any{"detail": "API slug ruangan tidak ditemukan."})
 		return
 	}
+	if !h.relayStore.VerifyToken(room, payload.Token) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"detail": "Token perangkat tidak valid."})
+		return
+	}
 
 	// 3. Keamanan batas ruangan: Pastikan relay benar-benar terdaftar pada ruangan tersebut
 	relays, err := h.relayStore.GetRoomRelays(r.Context(), room.ID)
-	if err == nil && len(relays) > 0 {
-		isAuthorized := false
-		for _, rItem := range relays {
-			if rItem.RelayNumber == payload.Relay {
-				isAuthorized = true
-				break
-			}
-		}
-		if !isAuthorized {
-			writeJSON(w, http.StatusForbidden, map[string]any{
-				"detail": fmt.Sprintf("Akses ditolak: Relay %d melebihi batas relay terdaftar pada ruangan '%s' (Maksimal: %d channel).", payload.Relay, room.NamaTempat, len(relays)),
-			})
-			return
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": "Gagal memvalidasi channel relay."})
+		return
+	}
+	isAuthorized := false
+	for _, rItem := range relays {
+		if rItem.RelayNumber == payload.Relay {
+			isAuthorized = true
+			break
 		}
 	}
+	if !isAuthorized {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"detail": fmt.Sprintf("Akses ditolak: Relay %d tidak terdaftar pada ruangan ini.", payload.Relay),
+		})
+		return
+	}
 
-	cmdClean := store.NormalizeRelayState(payload.Command)
+	cmdClean := command
 
-	if h.mqttService != nil {
-		if err := h.mqttService.PublishCommand(slug, payload.Relay, cmdClean, payload.CmdID); err != nil {
-			log.Printf("[RELAY] Warning: Gagal publish MQTT ke %s: %v", slug, err)
-		}
+	if h.mqttService == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "detail": "Layanan MQTT belum tersedia."})
+		return
+	}
+	if err := h.mqttService.PublishCommand(slug, payload.Relay, cmdClean, payload.CmdID); err != nil {
+		log.Printf("[RELAY] Gagal publish MQTT ke %s: %v", slug, err)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "detail": "Perintah gagal dikirim melalui MQTT. Coba lagi setelah gateway terhubung."})
+		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -316,4 +332,3 @@ func (h *RelayHandler) HandlePostControl(w http.ResponseWriter, r *http.Request)
 		"mode":    "mqtt",
 	})
 }
-

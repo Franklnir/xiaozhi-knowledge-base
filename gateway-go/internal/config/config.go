@@ -54,7 +54,7 @@ func LoadConfig() *Config {
 	baseURL := getEnvOrDefault("SERVER_BASE_URL", "https://xiaozhiscig.biz.id")
 	pythonURL := getEnvOrDefault("PYTHON_BACKEND_URL", "http://127.0.0.1:8080")
 	audioCacheDir := getEnvOrDefault("AUDIO_CACHE_DIR", "/app/data/audio_cache")
-	mqttURL := getEnvOrDefault("MQTT_BROKER_URL", "tcp://xiaozhi-mosquitto:1883")
+	mqttURL := getEnvOrDefault("MQTT_BROKER_URL", "tcp://mqtt.xiaozhiscig.biz.id:1883")
 	appSecret := getEnvOrDefault("APP_SECRET_KEY", "")
 	internalKey := getEnvOrDefault("GATEWAY_INTERNAL_KEY", appSecret)
 

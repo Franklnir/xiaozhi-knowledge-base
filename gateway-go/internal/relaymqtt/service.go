@@ -75,17 +75,22 @@ func (s *RelayMQTTService) Start(ctx context.Context) error {
 	opts.SetPingTimeout(3 * time.Second)
 
 	opts.SetOnConnectHandler(func(c mqtt.Client) {
+		log.Printf("[MQTT] Terhubung ke Broker Mosquitto di %s", broker)
+		if err := s.subscribeTopics(c); err != nil {
+			s.mu.Lock()
+			s.connected = false
+			s.mu.Unlock()
+			log.Printf("[MQTT] Gagal memasang subscription relay: %v; memutus koneksi untuk mencoba ulang", err)
+			c.Disconnect(250)
+			return
+		}
 		s.mu.Lock()
 		s.connected = true
 		s.mu.Unlock()
 
-		log.Printf("[MQTT] Terhubung ke Broker Mosquitto di %s", broker)
 		if s.sseHub != nil {
 			s.sseHub.Broadcast("mqtt", "Gateway terhubung ke Eclipse Mosquitto Broker", map[string]any{"broker": broker})
 		}
-
-		// Subscribe to topics
-		s.subscribeTopics(c)
 	})
 
 	opts.SetConnectionLostHandler(func(c mqtt.Client, err error) {
@@ -104,7 +109,9 @@ func (s *RelayMQTTService) Start(ctx context.Context) error {
 
 	token := client.Connect()
 	go func() {
-		if token.WaitTimeout(10*time.Second) && token.Error() != nil {
+		if !token.WaitTimeout(10 * time.Second) {
+			log.Printf("[MQTT] Timeout koneksi awal ke Mosquitto: %s (akan mencoba ulang otomatis)", broker)
+		} else if token.Error() != nil {
 			log.Printf("[MQTT] Warning: Gagal koneksi awal ke Mosquitto: %v. (Akan auto-reconnect di background)", token.Error())
 		}
 	}()
@@ -112,23 +119,41 @@ func (s *RelayMQTTService) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *RelayMQTTService) subscribeTopics(c mqtt.Client) {
+func (s *RelayMQTTService) subscribeTopics(c mqtt.Client) error {
 	// 1. Subscribe to hardware state updates: xiaozhi/relay/+/state
-	c.Subscribe("xiaozhi/relay/+/state", 1, func(client mqtt.Client, msg mqtt.Message) {
+	if err := subscribeAndWait(c, "xiaozhi/relay/+/state", func(client mqtt.Client, msg mqtt.Message) {
 		go s.handleStateMessage(msg.Topic(), msg.Payload())
-	})
+	}); err != nil {
+		return err
+	}
 
 	// 2. Subscribe to availability / LWT: xiaozhi/relay/+/availability
-	c.Subscribe("xiaozhi/relay/+/availability", 1, func(client mqtt.Client, msg mqtt.Message) {
+	if err := subscribeAndWait(c, "xiaozhi/relay/+/availability", func(client mqtt.Client, msg mqtt.Message) {
 		go s.handleAvailabilityMessage(msg.Topic(), string(msg.Payload()))
-	})
+	}); err != nil {
+		return err
+	}
 
 	// 3. Subscribe to hardware error diagnostics: xiaozhi/relay/+/err
-	c.Subscribe("xiaozhi/relay/+/err", 1, func(client mqtt.Client, msg mqtt.Message) {
+	if err := subscribeAndWait(c, "xiaozhi/relay/+/err", func(client mqtt.Client, msg mqtt.Message) {
 		go s.handleErrorMessage(msg.Topic(), msg.Payload())
-	})
+	}); err != nil {
+		return err
+	}
 
 	log.Println("[MQTT] Subscribed to topics: xiaozhi/relay/+/state, availability, err")
+	return nil
+}
+
+func subscribeAndWait(c mqtt.Client, topic string, callback mqtt.MessageHandler) error {
+	token := c.Subscribe(topic, 1, callback)
+	if !token.WaitTimeout(5 * time.Second) {
+		return fmt.Errorf("timeout subscribe topic %s", topic)
+	}
+	if err := token.Error(); err != nil {
+		return fmt.Errorf("subscribe topic %s: %w", topic, err)
+	}
+	return nil
 }
 
 func (s *RelayMQTTService) handleStateMessage(topic string, payload []byte) {
@@ -261,7 +286,10 @@ func (s *RelayMQTTService) PublishCommand(slug string, relayNum int, action stri
 	}
 
 	token := client.Publish(topic, 1, false, data)
-	if token.WaitTimeout(3*time.Second) && token.Error() != nil {
+	if !token.WaitTimeout(3 * time.Second) {
+		return fmt.Errorf("timeout publish MQTT ke %s", topic)
+	}
+	if token.Error() != nil {
 		return fmt.Errorf("gagal publish MQTT: %w", token.Error())
 	}
 
@@ -291,6 +319,9 @@ func (s *RelayMQTTService) notifyPython(ownerID, roomID int64, roomName string, 
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if s.cfg.InternalAPIKey != "" {
+		req.Header.Set("X-Gateway-Internal-Key", s.cfg.InternalAPIKey)
+	}
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {

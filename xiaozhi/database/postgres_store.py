@@ -991,7 +991,11 @@ class PostgresStore:
                 row = cur.fetchone()
                 if not row:
                     return dict(USER_LIMIT_DEFAULTS)
-                return {k: int(row.get(k, v) or v) for k, v in USER_LIMIT_DEFAULTS.items()}
+                limits = {}
+                for key, default in USER_LIMIT_DEFAULTS.items():
+                    value = row.get(key, default)
+                    limits[key] = default if value is None else max(0, int(value))
+                return limits
 
     def _enforce_material_limits(
         self, owner_id: int, content: str = "", api_url: str = "", is_new: bool = True, material_id: int = 0
@@ -2434,16 +2438,9 @@ class PostgresStore:
     def add_relay_room(
         self, owner_id: int, nama_tempat: str, api_slug: str, api_token: str, api_client_id: str, relays: List[Dict]
     ) -> int:
-        if not self._is_admin(owner_id):
-            limits = self._get_user_limits_dict(owner_id)
-            max_rooms = limits.get("max_relay_rooms", 7)
-            if max_rooms > 0:
-                with self._get_conn() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("SELECT COUNT(*) as cnt FROM relay_rooms WHERE owner_id = %s", (int(owner_id),))
-                        if cur.fetchone()["cnt"] >= max_rooms:
-                            raise ValueError(f"Batas perangkat Relay Nyata akun Anda telah tercapai ({max_rooms} ruangan).")
-
+        is_admin = self._is_admin(owner_id)
+        limits = self._get_user_limits_dict(owner_id) if not is_admin else {"max_relay_rooms": 0}
+        max_rooms = limits.get("max_relay_rooms", 7)
         t_cipher = encrypt_secret(api_token.strip()) if api_token.strip() else None
         t_hash = hashlib.sha256(api_token.strip().encode()).hexdigest() if api_token.strip() else None
         now = utc_now()
@@ -2451,6 +2448,16 @@ class PostgresStore:
 
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                # Serialize room creation per user so simultaneous requests cannot
+                # pass the quota check together and exceed the administrator limit.
+                cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (73129, int(owner_id)))
+                if not is_admin and max_rooms > 0:
+                    cur.execute("SELECT COUNT(*) AS cnt FROM relay_rooms WHERE owner_id = %s", (int(owner_id),))
+                    if cur.fetchone()["cnt"] >= max_rooms:
+                        raise ValueError(
+                            f"Batas perangkat Relay Nyata akun Anda telah tercapai ({max_rooms} ruangan). "
+                            "Hubungi admin jika ingin menambah kuota."
+                        )
                 cur.execute("SELECT 1 FROM relay_rooms WHERE api_slug = %s", (target_slug,))
                 if cur.fetchone():
                     target_slug = f"{target_slug}-{secrets.token_hex(3)}"

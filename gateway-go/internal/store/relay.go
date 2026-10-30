@@ -68,7 +68,9 @@ func (s *RelayStore) GetRoomBySlug(ctx context.Context, slug string) (*RelayRoom
 	cached, found := s.slugCache[slug]
 	s.slugCacheMu.RUnlock()
 
-	if found && cached != nil && time.Since(cached.CachedAt) < 30*time.Second {
+	// Keep room credential/revocation changes visible quickly even though room
+	// mutations are performed by the Python service and cannot invalidate this cache.
+	if found && cached != nil && time.Since(cached.CachedAt) < 2*time.Second {
 		return cached, nil
 	}
 

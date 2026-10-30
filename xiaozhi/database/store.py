@@ -336,7 +336,10 @@ class HFJsonStore:
         limit = self._limits_for_user_unlocked(data, owner_id)["max_relay_rooms"]
         current = self._usage_for_user_unlocked(data, owner_id)["relay_rooms"]
         if limit and current + additional > limit:
-            raise ValueError(f"Batas perangkat Relay Nyata akun ini adalah {limit} ruangan.")
+            raise ValueError(
+                f"Batas perangkat Relay Nyata akun ini adalah {limit} ruangan. "
+                "Hubungi admin jika ingin menambah kuota."
+            )
 
     def has_admin_user(self) -> bool:
         with self._lock:
@@ -3460,6 +3463,7 @@ class HFJsonStore:
     def add_relay_room(self, owner_id: int, nama_tempat: str, api_slug: str, api_token: str, api_client_id: str, relays: List[Dict]) -> int:
         with self._lock:
             data = self._load()
+            self._enforce_relay_room_limit_unlocked(data, owner_id)
             room_id = self._next_id(data, "relay_rooms")
             data["relay_rooms"].append({
                 "id": room_id,

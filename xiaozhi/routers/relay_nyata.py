@@ -1,5 +1,7 @@
 import hashlib
+import hmac
 import io
+import os
 from pathlib import Path
 import re
 import secrets
@@ -37,6 +39,24 @@ from xiaozhi.database.models import RealRelayControlCommand, RealRelayDeviceStat
 
 router = APIRouter()
 _relay_device_last_broadcast: Dict[int, float] = {}
+
+
+def _device_token_matches(room: dict, supplied_token: str) -> bool:
+    """Fail closed unless the room has a configured per-device credential."""
+    supplied_token = str(supplied_token or "")
+    if not supplied_token:
+        return False
+    expected = str(room.get("api_token") or "")
+    if expected and hmac.compare_digest(supplied_token, expected):
+        return True
+    expected_hash = str(room.get("api_token_hash") or "")
+    supplied_hash = hashlib.sha256(supplied_token.encode("utf-8")).hexdigest()
+    return bool(expected_hash) and hmac.compare_digest(supplied_hash, expected_hash)
+
+
+def _gateway_internal_key() -> str:
+    from xiaozhi.config import APP_SECRET_KEY
+    return os.getenv("GATEWAY_INTERNAL_KEY", "").strip() or str(APP_SECRET_KEY or "")
 
 
 @router.get("/relay-nyata", response_class=HTMLResponse)
@@ -80,13 +100,15 @@ def real_relay_page_payload(owner_id: int) -> Dict[str, Any]:
     return {"rooms": rooms}
 
 
-def _forward_mqtt_command(slug: str, relay_number: int, command: str, cmd_id: str) -> bool:
+def _forward_mqtt_command(slug: str, relay_number: int, command: str, cmd_id: str, device_token: str) -> bool:
     import json
     import os
     import urllib.request
     
     clean_slug = (slug or "").strip().lower()
     if not clean_slug:
+        return False
+    if not device_token:
         return False
         
     base_urls = [
@@ -101,6 +123,7 @@ def _forward_mqtt_command(slug: str, relay_number: int, command: str, cmd_id: st
         "relay": int(relay_number),
         "command": str(command).upper(),
         "cmd_id": str(cmd_id),
+        "token": device_token,
     }).encode("utf-8")
     
     for base in base_urls:
@@ -134,7 +157,19 @@ def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, sou
     cmd_id = f"cmd_{int(time.time() * 1000)}_{relay_num}"
 
     # 1. Forward instant command to Go Gateway -> Mosquitto MQTT: xiaozhi/relay/{slug}/set
-    _forward_mqtt_command(slug, relay_num, target_status, cmd_id)
+    if not _forward_mqtt_command(slug, relay_num, target_status, cmd_id, str(room.get("api_token") or "")):
+        return {
+            "success": False,
+            "pending": False,
+            "validated": False,
+            "message": "Gateway belum berhasil mengirim perintah lewat MQTT. Periksa koneksi gateway/broker, lalu coba lagi.",
+            "room": room.get("nama_tempat", ""),
+            "relay": relay.get("nama_relay", ""),
+            "current_status": current_status,
+            "desired_status": target_status,
+            "cmd_id": cmd_id,
+            "source": source,
+        }
 
     # 2. Broadcast SSE update with status = current_status, pending = target_status, desired = target_status
     try:
@@ -224,6 +259,8 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
     store = get_store()
     rooms = store.list_relay_rooms(owner_id)
     count = 0
+    failed_count = 0
+    expected_relays = []
     import time
     for room in rooms:
         slug = room.get("slug") or room.get("api_slug") or ""
@@ -231,8 +268,11 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
             relay_num = int(relay.get("relay_number", 1))
             current_status = str(relay.get("status", "OFF")).upper()
             cmd_id = f"cmd_{int(time.time() * 1000)}_{relay_num}"
-            _forward_mqtt_command(slug, relay_num, target_status, cmd_id)
+            if not _forward_mqtt_command(slug, relay_num, target_status, cmd_id, str(room.get("api_token") or "")):
+                failed_count += 1
+                continue
             count += 1
+            expected_relays.append((int(room["id"]), relay_num))
             try:
                 from xiaozhi.services.sse_service import broadcast_relay_update
                 broadcast_relay_update(
@@ -259,14 +299,12 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
             time.sleep(0.1)
             try:
                 refreshed_rooms = store.list_relay_rooms(owner_id)
-                all_match = True
-                for r_room in refreshed_rooms:
-                    for r_relay in r_room.get("relays", []):
-                        if str(r_relay.get("status", "")).upper() != target_status:
-                            all_match = False
-                            break
-                    if not all_match:
-                        break
+                statuses = {
+                    (int(r_room["id"]), int(r_relay.get("relay_number", 0))): str(r_relay.get("status", "")).upper()
+                    for r_room in refreshed_rooms
+                    for r_relay in r_room.get("relays", [])
+                }
+                all_match = all(statuses.get(key) == target_status for key in expected_relays)
                 if all_match:
                     all_confirmed = True
                     break
@@ -277,11 +315,12 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
         status_word = "aktif (ON)" if target_status == "ON" else "mati (OFF)"
         if all_confirmed:
             return {
-                "success": True,
+                "success": failed_count == 0,
                 "pending": False,
-                "validated": True,
-                "message": f"Berhasil! Seluruh {count} relay telah {action_word} dan terkonfirmasi fisik {status_word} oleh perangkat ESP32.",
+                "validated": failed_count == 0,
+                "message": f"{count} relay terkonfirmasi fisik {status_word}. " + (f"{failed_count} perintah gagal dikirim melalui MQTT." if failed_count else f"Seluruh relay berhasil {action_word}."),
                 "count": count,
+                "failed_count": failed_count,
                 "desired_status": target_status,
                 "source": source,
             }
@@ -290,17 +329,19 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
                 "success": False,
                 "pending": True,
                 "validated": False,
-                "message": f"Perintah {action_word} untuk {count} relay telah dikirim, namun sebagian perangkat ESP32 belum memberikan konfirmasi balik fisik lengkap.",
+                "message": f"Perintah {action_word} terkirim ke {count} relay, {failed_count} gagal dikirim, dan sebagian perangkat belum memberikan konfirmasi fisik.",
                 "count": count,
+                "failed_count": failed_count,
                 "desired_status": target_status,
                 "source": source,
             }
 
     return {
-        "success": True,
-        "pending": True,
-        "message": f"Perintah {target_status} untuk {count} relay dikirim ke ESP32. Menunggu konfirmasi fisik...",
+        "success": failed_count == 0,
+        "pending": count > 0,
+        "message": f"Perintah {target_status} terkirim ke {count} relay; {failed_count} gagal dikirim melalui MQTT.",
         "count": count,
+        "failed_count": failed_count,
         "desired_status": target_status,
         "source": source,
     }
@@ -448,18 +489,13 @@ async def add_relay_room(
     store = get_store()
     validate_csrf(request, csrf_token, user)
 
-    # 1. Pastikan simulasi virtual otomatis dinonaktifkan saat user menambahkan Relay Fisik
-    feature_settings = store.get_feature_settings(user["id"])
-    was_virtual_active = bool(feature_settings.get("virtual_smarthome_enabled", False))
-    if was_virtual_active:
-        store.set_feature_setting(user["id"], "virtual_smarthome_enabled", False)
-
-    # 2. Cek kuota relay rooms user
+    # Check the account's current admin-configured limit before any side effects.
     quota = store.user_quota(user["id"])
     if quota.get("relay_rooms", {}).get("reached"):
         return redirect_with_message(
             "/relay-nyata",
-            f"Gagal: Batas perangkat Relay Nyata akun Anda ({quota.get('relay_rooms', {}).get('limit', 7)} ruangan) telah tercapai."
+            f"Batas perangkat Relay Nyata akun Anda ({quota.get('relay_rooms', {}).get('limit', 7)} ruangan) telah tercapai. "
+            "Hubungi admin jika ingin menambah kuota."
         )
 
     try:
@@ -496,6 +532,10 @@ async def add_relay_room(
             api_client_id = f"device-{api_slug}"
 
         store.add_relay_room(user["id"], nama_tempat, api_slug, api_token, api_client_id, relays)
+        feature_settings = store.get_feature_settings(user["id"])
+        was_virtual_active = bool(feature_settings.get("virtual_smarthome_enabled", False))
+        if was_virtual_active:
+            store.set_feature_setting(user["id"], "virtual_smarthome_enabled", False)
         success_msg = f"Ruangan '{nama_tempat}' berhasil ditambahkan."
         if was_virtual_active:
             success_msg += " Simulasi Virtual otomatis dinonaktifkan agar perintah suara langsung mengontrol Relay Fisik."
@@ -654,10 +694,19 @@ async def relay_nyata_room_control(request: Request):
     if not room:
         raise HTTPException(status_code=404, detail="Ruangan tidak ditemukan atau bukan milik akun Anda.")
 
-    for relay in room.get("relays", []):
+    results = [
         control_real_relay(user["id"], room, relay, command, source="web_ui")
+        for relay in room.get("relays", [])
+    ]
+    failed = [item for item in results if not item.get("success")]
     updated_room = store.get_relay_room(user["id"], int(room_id))
-    return {"success": True, "command": command, "updated_room": updated_room}
+    return {
+        "success": not failed,
+        "command": command,
+        "failed_count": len(failed),
+        "message": failed[0].get("message") if failed else f"Perintah {command} terkirim ke semua channel.",
+        "updated_room": updated_room,
+    }
 
 
 @router.get("/api/relay-nyata/stream")
@@ -683,18 +732,16 @@ async def relay_nyata_stream(request: Request):
 
 
 @router.get("/api/device/relay/{api_slug}/commands")
-async def device_relay_commands(request: Request, api_slug: str, token: str = Query("")):
+async def device_relay_commands(request: Request, api_slug: str):
     store = get_store()
-    auth_token = token or request.headers.get("X-Device-Token", "")
+    auth_token = request.headers.get("X-Device-Token", "")
     if not auth_token:
         raise HTTPException(status_code=400, detail="Token diperlukan.")
     owner = store.find_relay_room_by_slug(api_slug)
     if not owner:
         raise HTTPException(status_code=404, detail="API slug tidak ditemukan.")
-    if owner.get("api_token") and auth_token != owner["api_token"]:
-        auth_hash = hashlib.sha256(auth_token.encode()).hexdigest()
-        if auth_hash != owner.get("api_token_hash"):
-            raise HTTPException(status_code=401, detail="Token perangkat tidak valid.")
+    if not _device_token_matches(owner, auth_token):
+        raise HTTPException(status_code=401, detail="Token perangkat tidak valid.")
 
     try:
         store.ack_relay_command(owner["user_id"], owner["room_id"])
@@ -742,10 +789,8 @@ async def device_relay_status(request: Request, api_slug: str, cmd: RealRelayDev
     owner = store.find_relay_room_by_slug(api_slug)
     if not owner:
         raise HTTPException(status_code=404, detail="API slug tidak ditemukan.")
-    if owner.get("api_token") and auth_token != owner["api_token"]:
-        auth_hash = hashlib.sha256(auth_token.encode()).hexdigest()
-        if auth_hash != owner.get("api_token_hash"):
-            raise HTTPException(status_code=401, detail="Token perangkat tidak valid.")
+    if not _device_token_matches(owner, auth_token):
+        raise HTTPException(status_code=401, detail="Token perangkat tidak valid.")
 
     store.ack_relay_command(owner["user_id"], owner["room_id"], cmd.command_id)
 
@@ -805,6 +850,11 @@ async def internal_relay_broadcast(request: Request):
     Internal webhook called by gateway-go to notify Python's SSE stream
     whenever ESP32 polls commands or confirms hardware status.
     """
+    internal_key = _gateway_internal_key()
+    supplied_key = request.headers.get("X-Gateway-Internal-Key", "")
+    if not internal_key or not supplied_key or not hmac.compare_digest(supplied_key, internal_key):
+        raise HTTPException(status_code=401, detail="Akses internal ditolak.")
+
     try:
         data = await request.json()
     except Exception:
@@ -814,21 +864,28 @@ async def internal_relay_broadcast(request: Request):
     room_id = data.get("room_id")
     room_name = str(data.get("room_name", ""))
     relays = data.get("relays", [])
+    connected = bool(data.get("connected", True))
 
     if not user_id or not room_id:
         return JSONResponse({"success": False, "detail": "user_id dan room_id diperlukan."}, status_code=400)
 
     try:
         from xiaozhi.services.sse_service import broadcast_relay_device_status, broadcast_relay_update
+        last_seen_at = utc_now() if connected else ""
+        device_label = "ESP32 Terhubung" if connected else "ESP32 Terputus"
+        if not connected:
+            last_room = get_store().get_relay_room(int(user_id), int(room_id))
+            if last_room:
+                last_seen_at = str(last_room.get("device_last_seen_at") or "")
         broadcast_relay_device_status(
             user_id=int(user_id),
             room_id=int(room_id),
-            connected=True,
-            last_seen_at=utc_now(),
-            device_label="ESP32 Terhubung",
+            connected=connected,
+            last_seen_at=last_seen_at,
+            device_label=device_label,
         )
 
-        for r in relays:
+        for r in (relays if connected else []):
             if isinstance(r, dict) and "relay" in r:
                 r_num = int(r["relay"])
                 r_status = str(r.get("status", "OFF")).upper()
@@ -1129,7 +1186,8 @@ void connectWiFi() {{
     }} else if (targetIndex != -1) {{
         // Lingkungan Hardware Nyata
         int chan = WiFi.channel(targetIndex);
-        uint8_t* bssid = WiFi.BSSID(targetIndex);
+        uint8_t bssid[6] = {{0}};
+        memcpy(bssid, WiFi.BSSID(targetIndex), sizeof(bssid));
         Serial.printf("[WIFI] Lingkungan terdeteksi: HARDWARE FISIK NYATA\\n");
         Serial.printf("[WIFI] Mengunci ke '%s' (Kanal: %d, RSSI: %d dBm)...\\n", WIFI_SSID, chan, WiFi.RSSI(targetIndex));
         WiFi.scanDelete();

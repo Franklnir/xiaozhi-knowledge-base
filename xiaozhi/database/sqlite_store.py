@@ -2091,28 +2091,36 @@ class SQLiteStore:
         return result
 
     def add_relay_room(self, owner_id: int, nama_tempat: str, api_slug: str, api_token: str, api_client_id: str, relays: List[Dict]) -> int:
-        if not self._is_admin(owner_id):
-            conn = self._get_conn()
-            limits = self._get_user_limits_dict(owner_id)
-            max_relay_rooms = limits.get("max_relay_rooms", 7)
-            if max_relay_rooms > 0:
-                current_rooms = conn.execute("SELECT COUNT(*) FROM relay_rooms WHERE owner_id = ?", (owner_id,)).fetchone()[0]
-                if current_rooms >= max_relay_rooms:
-                    raise ValueError(f"Batas perangkat Relay Nyata akun Anda telah tercapai ({max_relay_rooms} ruangan). Hubungi admin jika membutuhkan kapasitas tambahan.")
-
         conn = self._get_conn()
-        cursor = conn.execute(
-            "INSERT INTO relay_rooms (owner_id, nama_tempat, api_slug, api_token, api_client_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (owner_id, nama_tempat, api_slug, api_token, api_client_id, utc_now())
-        )
-        room_id = cursor.lastrowid
-        for relay in relays:
-            conn.execute(
-                "INSERT INTO relay_devices (room_id, relay_number, nama_relay, voice_command_on, voice_command_off, status) VALUES (?, ?, ?, ?, ?, ?)",
-                (room_id, relay.get("relay_number", 1), relay.get("nama_relay", ""), relay.get("voice_command_on", ""), relay.get("voice_command_off", ""), relay.get("status", "OFF"))
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            if not self._is_admin(owner_id):
+                max_relay_rooms = self._get_user_limits_dict(owner_id).get("max_relay_rooms", 7)
+                if max_relay_rooms > 0:
+                    current_rooms = conn.execute(
+                        "SELECT COUNT(*) FROM relay_rooms WHERE owner_id = ?", (owner_id,)
+                    ).fetchone()[0]
+                    if current_rooms >= max_relay_rooms:
+                        raise ValueError(
+                            f"Batas perangkat Relay Nyata akun Anda telah tercapai ({max_relay_rooms} ruangan). "
+                            "Hubungi admin jika ingin menambah kuota."
+                        )
+
+            cursor = conn.execute(
+                "INSERT INTO relay_rooms (owner_id, nama_tempat, api_slug, api_token, api_client_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (owner_id, nama_tempat, api_slug, api_token, api_client_id, utc_now())
             )
-        conn.commit()
-        return room_id
+            room_id = cursor.lastrowid
+            for relay in relays:
+                conn.execute(
+                    "INSERT INTO relay_devices (room_id, relay_number, nama_relay, voice_command_on, voice_command_off, status) VALUES (?, ?, ?, ?, ?, ?)",
+                    (room_id, relay.get("relay_number", 1), relay.get("nama_relay", ""), relay.get("voice_command_on", ""), relay.get("voice_command_off", ""), relay.get("status", "OFF"))
+                )
+            conn.commit()
+            return room_id
+        except Exception:
+            conn.rollback()
+            raise
 
     def get_relay_room(self, owner_id: int, room_id: int) -> Optional[Dict[str, Any]]:
         conn = self._get_conn()

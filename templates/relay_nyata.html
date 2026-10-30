@@ -1202,7 +1202,7 @@
 
     {% if quota.relay_rooms.reached %}
     <div class="app-alert app-alert-warning">
-        Batas perangkat Relay Nyata sudah tercapai: {{ quota.relay_rooms.label }}. Hubungi admin jika membutuhkan kapasitas tambahan.
+        Batas perangkat Relay Nyata sudah tercapai: {{ quota.relay_rooms.label }}. Hubungi admin jika ingin menambah kuota.
     </div>
     {% endif %}
 
@@ -2061,6 +2061,15 @@
 
     const SAFE_PINS = BOARD_PROFILES.esp32_s3_n16r8.pins;
 
+    function cppStringLiteral(value) {
+        return String(value ?? "")
+            .replace(/\\/g, "\\\\")
+            .replace(/"/g, '\\"')
+            .replace(/\r/g, "\\r")
+            .replace(/\n/g, "\\n")
+            .replace(/\t/g, "\\t");
+    }
+
     function buildArduinoCode(room, wifiSsid, wifiPass, activeLow, protocol, boardKey) {
         if (!room) return "// Memuat konfigurasi...";
         const key = boardKey || document.getElementById("cfgBoardType")?.value || "esp32_s3_n16r8";
@@ -2070,10 +2079,12 @@
         const numRelays = Math.max(1, Math.min(Number(room.jumlah_relay || (room.relays ? room.relays.length : 1)), maxBoardPins));
         const pins = profile.pins.slice(0, numRelays).join(", ");
         const pinArray = `const int RELAY_PINS[NUM_RELAYS] = { ${pins} };`;
-        const ssid = wifiSsid || "WIFI_RUMAH_ANDA";
-        const pass = wifiPass || "PASSWORD_WIFI";
+        const ssid = cppStringLiteral(wifiSsid || "WIFI_RUMAH_ANDA");
+        const pass = cppStringLiteral(wifiPass || "PASSWORD_WIFI");
         const logicStr = activeLow ? "true" : "false";
-        const slug = room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        // MQTT topic must use the persisted unique slug used by the server/gateway.
+        // Deriving it from the display name drops the random suffix and breaks routing.
+        const slug = room.api_slug || room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
         const isMqtt = (protocol === 'mqtt' || !protocol);
 
         const pinComments = Array.from({ length: numRelays }, (_, i) => {
@@ -2225,9 +2236,14 @@ void publishState(int relayIndex, const String& cmdId) {
 
     char buffer[256];
     size_t len = serializeJson(doc, buffer);
-    mqttClient.publish(TOPIC_STATE, (uint8_t*)buffer, len, false);
-    Serial.printf("[STATUS MQTT] 📤 State terkirim ke Broker: CH %d = %s (Cmd: %s)\\n", 
-                  relayIndex + 1, relayStates[relayIndex] ? "ON" : "OFF", cmdId.c_str());
+    bool sent = mqttClient.publish(TOPIC_STATE, (uint8_t*)buffer, len, false);
+    if (!sent) {
+        Serial.printf("[MQTT ACK ERROR] Gagal mengirim state CH %d (connected=%s, state=%d).\\n",
+                      relayIndex + 1, mqttClient.connected() ? "true" : "false", mqttClient.state());
+    }
+    if (sent) {
+        Serial.println("[STATUS MQTT] State terkirim ke client MQTT.");
+    }
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -2318,12 +2334,12 @@ void connectWiFi() {
         WiFi.begin("Wokwi-GUEST", "", 6);
     } else if (targetIndex != -1) {
         // Lingkungan Hardware Nyata
-        int chan = WiFi.channel(targetIndex);
-        uint8_t* bssid = WiFi.BSSID(targetIndex);
         Serial.printf("[WIFI] Lingkungan terdeteksi: HARDWARE FISIK NYATA\\n");
-        Serial.printf("[WIFI] Mengunci ke '%s' (Kanal: %d, RSSI: %d dBm)...\\n", WIFI_SSID, chan, WiFi.RSSI(targetIndex));
+        Serial.printf("[WIFI] Menghubungkan ke '%s' (RSSI: %d dBm)...\\n", WIFI_SSID, WiFi.RSSI(targetIndex));
         WiFi.scanDelete();
-        WiFi.begin(WIFI_SSID, WIFI_PASSWORD, chan, bssid);
+        // Do not pin the connection to a scan-result BSSID. That pointer becomes
+        // invalid after scanDelete(), and fixed BSSID selection breaks roaming.
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     } else {
         Serial.printf("[WIFI] ❌ SSID '%s' tidak ditemukan di sekitar.\\n", WIFI_SSID);
         WiFi.scanDelete();
@@ -2513,6 +2529,10 @@ void loop() {
     // Tampilkan ringkasan status di Serial Monitor tiap 30 detik
     if (now - lastStatusPrint >= 30000) {
         lastStatusPrint = now;
+        // Periodic reconciliation repairs missed QoS 0 state reports.
+        for (int i = 0; i < NUM_RELAYS; i++) {
+            publishState(i, "heartbeat");
+        }
         #if defined(ESP32) || defined(ESP8266)
         uint32_t freeRam = ESP.getFreeHeap();
         #else
@@ -3167,7 +3187,8 @@ void loop() {
         const room = payload.room;
         currentConfigRoom = room;
 
-        const slug = room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        // Keep generated firmware topics aligned with the persisted server slug.
+        const slug = room.api_slug || room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
         document.getElementById("configModalTitle").textContent = `Setup Firmware: ${room.nama_tempat}`;
         const cmdUrlEl = document.getElementById("cfgCommandsUrl");
