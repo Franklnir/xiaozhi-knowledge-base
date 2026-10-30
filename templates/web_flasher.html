@@ -25,6 +25,395 @@
     "priceCurrency": "IDR"
   }
 }
+
+    // ========================================================
+    // ── STEP-BY-STEP WIZARD CONTROLLER ──
+    // ========================================================
+    let currentWizardStep = 1;
+    let isFlashCompleted = false;
+    const WIZARD_STORAGE_KEY = 'xiaozhi_web_flasher_wizard_state_v1';
+
+    function isStepCompleted(step) {
+        if (step === 1) {
+            return (currentSourceMode === 'preset' || currentSourceMode === 'custom');
+        }
+        if (step === 2) {
+            return (selectedFileBuffer !== null && selectedFileBuffer.length > 0);
+        }
+        if (step === 3) {
+            return (esploader !== null && port !== null);
+        }
+        if (step === 4) {
+            return isFlashCompleted;
+        }
+        return false;
+    }
+
+    function validateStep(step) {
+        if (step === 1) {
+            if (currentSourceMode !== 'preset' && currentSourceMode !== 'custom') {
+                showWizardNotice('Silakan pilih salah satu sumber firmware (Preset Resmi atau Unggah File .bin).', 'warning');
+                return false;
+            }
+            return true;
+        }
+        if (step === 2) {
+            if (!selectedFileBuffer || selectedFileBuffer.length === 0) {
+                if (currentSourceMode === 'preset') {
+                    if (!userAuthStatus.authorized) {
+                        showWizardNotice('Preset ini memerlukan lisensi resmi. Masukkan Kode Lisensi Anda terlebih dahulu untuk membuka akses!', 'warning');
+                    } else {
+                        showWizardNotice('File firmware preset belum dimuat ke memori browser. Silakan klik tombol "⚡ Muat Preset Ini ke Flasher"!', 'warning');
+                    }
+                } else {
+                    showWizardNotice('File binary (.bin) belum dipilih. Silakan klik area dropzone untuk memilih file firmware .bin Anda!', 'warning');
+                }
+                return false;
+            }
+            return true;
+        }
+        if (step === 3) {
+            if (!esploader || !port) {
+                showWizardNotice('Port serial COM ESP32 belum terhubung. Silakan klik tombol "🔌 Pilih & Hubungkan Port COM" terlebih dahulu!', 'warning');
+                return false;
+            }
+            return true;
+        }
+        return true;
+    }
+
+    function updateStepperUI() {
+        for (let s = 1; s <= 4; s++) {
+            const item = document.getElementById('stepperStep' + s);
+            const icon = document.getElementById('stepperIcon' + s);
+            const line = document.getElementById('stepperLine' + s);
+
+            if (!item || !icon) continue;
+
+            const isDone = isStepCompleted(s);
+            const isActive = (s === currentWizardStep);
+
+            item.classList.remove('is-active', 'is-completed', 'is-pending');
+
+            if (isActive) {
+                item.classList.add('is-active');
+            } else if (isDone) {
+                item.classList.add('is-completed');
+            } else {
+                item.classList.add('is-pending');
+            }
+
+            // Set icon: checkmark if completed, else step number
+            if (isDone) {
+                icon.innerHTML = '✓';
+            } else {
+                icon.textContent = s;
+            }
+
+            // Connecting lines
+            if (line) {
+                if (isDone) {
+                    line.classList.add('is-completed');
+                } else {
+                    line.classList.remove('is-completed');
+                }
+            }
+        }
+    }
+
+    function showWizardNotice(msg, type = 'warning') {
+        const banner = document.getElementById('wizardAlert');
+        const icon = document.getElementById('wizardAlertIcon');
+        const text = document.getElementById('wizardAlertMsg');
+        if (!banner || !text) return;
+
+        banner.className = 'wizard-notice-banner ' + (type === 'success' ? 'wizard-notice-success' : (type === 'info' ? 'wizard-notice-info' : 'wizard-notice-warning'));
+        if (icon) {
+            icon.textContent = type === 'success' ? '✅' : (type === 'info' ? 'ℹ️' : '⚠️');
+        }
+        text.textContent = msg;
+        banner.style.display = 'flex';
+
+        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    window.dismissWizardAlert = function() {
+        const banner = document.getElementById('wizardAlert');
+        if (banner) banner.style.display = 'none';
+    };
+
+    window.goToStep = function(targetStep, validate = true) {
+        if (targetStep < 1) targetStep = 1;
+        if (targetStep > 4) targetStep = 4;
+
+        if (validate && targetStep > currentWizardStep) {
+            for (let s = currentWizardStep; s < targetStep; s++) {
+                if (!validateStep(s)) {
+                    return;
+                }
+            }
+        }
+
+        // Hide all step panels, show target
+        for (let s = 1; s <= 4; s++) {
+            const pan = document.getElementById('wizardPanel' + s);
+            if (pan) {
+                if (s === targetStep) {
+                    pan.classList.add('is-active');
+                } else {
+                    pan.classList.remove('is-active');
+                }
+            }
+        }
+
+        currentWizardStep = targetStep;
+
+        if (targetStep === 4) {
+            renderReviewChecklist();
+        }
+
+        updateStepperUI();
+        dismissWizardAlert();
+        saveWizardState();
+    };
+
+    window.nextWizardStep = function() {
+        goToStep(currentWizardStep + 1, true);
+    };
+
+    window.prevWizardStep = function() {
+        goToStep(currentWizardStep - 1, false);
+    };
+
+    window.selectSourceMode = function(mode) {
+        if (mode === 'preset') {
+            if (!userAuthStatus.isLoggedIn) {
+                alert('🔒 Preset Berlisensi: Anda harus masuk ke akun terlebih dahulu.');
+                window.location.href = '/login?next=/web-flasher';
+                return;
+            }
+        }
+        setWizardSourceMode(mode, true);
+    };
+
+    function setWizardSourceMode(mode, save = true) {
+        currentSourceMode = mode;
+        const cardPreset = document.getElementById('cardSourcePreset');
+        const cardCustom = document.getElementById('cardSourceCustom');
+        const radioPreset = document.getElementById('radioPreset');
+        const radioCustom = document.getElementById('radioCustom');
+        const tabBtnPreset = document.getElementById('tabBtnPreset');
+        const tabBtnCustom = document.getElementById('tabBtnCustom');
+        const panelPreset = document.getElementById('panelPreset');
+        const panelCustom = document.getElementById('panelCustom');
+        const badge = document.getElementById('sourceBadge');
+
+        if (mode === 'preset') {
+            if (cardPreset) cardPreset.classList.add('is-selected');
+            if (cardCustom) cardCustom.classList.remove('is-selected');
+            if (radioPreset) radioPreset.classList.add('is-checked');
+            if (radioCustom) radioCustom.classList.remove('is-checked');
+            if (tabBtnPreset) tabBtnPreset.classList.add('active');
+            if (tabBtnCustom) tabBtnCustom.classList.remove('active');
+            if (panelPreset) panelPreset.style.display = 'block';
+            if (panelCustom) panelCustom.style.display = 'none';
+            if (badge) {
+                badge.textContent = userAuthStatus.authorized ? '🔓 Official Preset' : '🔒 Locked Preset';
+                badge.className = userAuthStatus.authorized ? 'app-chip app-chip-success' : 'app-chip app-chip-danger';
+            }
+        } else {
+            if (cardCustom) cardCustom.classList.add('is-selected');
+            if (cardPreset) cardPreset.classList.remove('is-selected');
+            if (radioCustom) radioCustom.classList.add('is-checked');
+            if (radioPreset) radioPreset.classList.remove('is-checked');
+            if (tabBtnCustom) tabBtnCustom.classList.add('active');
+            if (tabBtnPreset) tabBtnPreset.classList.remove('active');
+            if (panelCustom) panelCustom.style.display = 'block';
+            if (panelPreset) panelPreset.style.display = 'none';
+            if (badge) {
+                badge.textContent = 'Custom Upload';
+                badge.className = 'app-chip app-chip-neutral';
+            }
+        }
+
+        updateStepperUI();
+        if (save) saveWizardState();
+    }
+
+    // Keep legacy switchSourceMode mapped
+    window.switchSourceMode = function(mode) {
+        selectSourceMode(mode);
+    };
+
+    function renderReviewChecklist() {
+        const elFw = document.getElementById('reviewFirmwareSummary');
+        const elChip = document.getElementById('reviewChipSummary');
+        const elOffset = document.getElementById('reviewOffsetSummary');
+        const elBaud = document.getElementById('reviewBaudSummary');
+        const elOpts = document.getElementById('reviewOptionsSummary');
+
+        if (elFw) {
+            if (currentSourceMode === 'preset') {
+                const pTitle = document.getElementById('lblPresetTitle')?.textContent || currentPresetId;
+                const pVer = currentSelectedVersion || 'v001';
+                const sizeMb = selectedFileBuffer ? (selectedFileBuffer.length / (1024*1024)).toFixed(2) + ' MB' : '';
+                elFw.innerHTML = `<strong>Preset:</strong> ${pTitle} [${pVer}] ${sizeMb ? '(' + sizeMb + ')' : ''} <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Siap di Memori ✅</span>`;
+            } else {
+                const fn = selectedFileName?.textContent || 'File Kustom .bin';
+                const sz = selectedFileSize?.textContent || '';
+                elFw.innerHTML = `<strong>File Binary:</strong> ${fn} ${sz ? '(' + sz + ')' : ''} <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Siap di Memori ✅</span>`;
+            }
+        }
+
+        if (elChip) {
+            if (esploader && port) {
+                const cModel = chipModel?.textContent || 'ESP32';
+                const cDev = chipUsbInfo?.textContent || 'Port Serial';
+                const cMac = chipMac?.textContent || '-';
+                elChip.innerHTML = `<strong>Microcontroller:</strong> ${cModel} via ${cDev} (MAC: ${cMac}) <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Terhubung ✅</span>`;
+            } else {
+                elChip.innerHTML = `<span style="color:#dc2626;"><strong>Port Serial:</strong> Belum Terhubung ❌</span>`;
+            }
+        }
+
+        if (elOffset) {
+            const off = offsetPreset?.disabled ? '0x0' : (offsetPreset?.value === 'custom' ? offsetInput?.value : offsetPreset?.value) || '0x0';
+            elOffset.innerHTML = `<strong>Alamat Offset:</strong> <code>${off}</code> ${off === '0x0' ? '(Full Factory Merged)' : '(App)'} <span class="app-chip app-chip-info" style="font-size:10px; margin-left:4px;">Tervalidasi ✅</span>`;
+        }
+
+        if (elBaud) {
+            const b = baudrateSelect?.value || '230400';
+            elBaud.innerHTML = `<strong>Kecepatan Baud:</strong> ${parseInt(b, 10).toLocaleString()} bps <span class="app-chip app-chip-neutral" style="font-size:10px; margin-left:4px;">Stabil ✅</span>`;
+        }
+
+        if (elOpts) {
+            const rst = chkAutoReset?.checked ? 'Ya (Reboot otomatis)' : 'Tidak';
+            const ers = chkEraseAll?.checked ? 'Ya (Hapus flash)' : 'Tidak';
+            elOpts.innerHTML = `<strong>Auto-Reset:</strong> ${rst} • <strong>Erase All:</strong> ${ers}`;
+        }
+    }
+
+    // ── LOCALSTORAGE PERSISTENCE ──
+    // CRITICAL SECURITY RULE: NEVER STORE CLAIM CODES IN LOCALSTORAGE
+    function saveWizardState() {
+        try {
+            const state = {
+                currentStep: currentWizardStep,
+                sourceMode: currentSourceMode,
+                presetId: currentPresetId,
+                presetVersion: currentSelectedVersion,
+                offsetPreset: offsetPreset ? offsetPreset.value : '0x0',
+                offsetInput: offsetInput ? offsetInput.value : '0x0',
+                baudrate: baudrateSelect ? baudrateSelect.value : '230400',
+                autoReset: chkAutoReset ? chkAutoReset.checked : true,
+                eraseAll: chkEraseAll ? chkEraseAll.checked : false,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+            console.warn('Gagal menyimpan wizard state ke localStorage:', e);
+        }
+    }
+
+    async function restoreWizardState() {
+        try {
+            const raw = localStorage.getItem(WIZARD_STORAGE_KEY);
+            if (!raw) {
+                // Default initial mode
+                const defaultMode = (PRESETS_CACHE && PRESETS_CACHE.length > 0 && userAuthStatus.isLoggedIn) ? 'preset' : 'preset';
+                setWizardSourceMode(defaultMode, false);
+                updateStepperUI();
+                return;
+            }
+
+            const state = JSON.parse(raw);
+            if (!state || typeof state !== 'object') {
+                updateStepperUI();
+                return;
+            }
+
+            // 1. Restore Source Mode
+            if (state.sourceMode === 'preset' || state.sourceMode === 'custom') {
+                setWizardSourceMode(state.sourceMode, false);
+            }
+
+            // 2. Restore Preset ID & Version
+            if (state.presetId && state.presetId !== currentPresetId) {
+                const sel = document.getElementById('userPresetSelect');
+                if (sel) {
+                    sel.value = state.presetId;
+                    await window.onUserPresetChange(state.presetId);
+                }
+            }
+            if (state.presetVersion) {
+                const vSel = document.getElementById('userPresetVersionSelect');
+                if (vSel) {
+                    vSel.value = state.presetVersion;
+                    window.onUserPresetVersionChange(state.presetVersion);
+                }
+            }
+
+            // 3. Restore Options
+            if (baudrateSelect && state.baudrate) {
+                baudrateSelect.value = state.baudrate;
+            }
+            if (chkAutoReset && typeof state.autoReset === 'boolean') {
+                chkAutoReset.checked = state.autoReset;
+            }
+            if (chkEraseAll && typeof state.eraseAll === 'boolean') {
+                chkEraseAll.checked = state.eraseAll;
+            }
+            if (offsetPreset && state.offsetPreset) {
+                offsetPreset.value = state.offsetPreset;
+                if (window.handleOffsetChange) window.handleOffsetChange(state.offsetPreset);
+            }
+            if (offsetInput && state.offsetInput) {
+                offsetInput.value = state.offsetInput;
+            }
+
+            // 4. Target Step Restoration
+            let targetStep = parseInt(state.currentStep, 10) || 1;
+            if (targetStep < 1) targetStep = 1;
+            if (targetStep > 4) targetStep = 4;
+
+            // In preset mode, if authorized, auto-load preset buffer on restore
+            if (state.sourceMode === 'preset' && targetStep >= 2 && userAuthStatus.authorized) {
+                try {
+                    await window.loadOfficialPreset();
+                } catch (e) {
+                    console.warn('Auto restore preset buffer:', e);
+                }
+            }
+
+            // For custom binary upload mode, File buffers cannot be stored in browser localStorage
+            if (state.sourceMode === 'custom' && targetStep > 2 && !selectedFileBuffer) {
+                targetStep = 2;
+                showWizardNotice('Sesi Anda dipulihkan. Demi keamanan browser, silakan pilih kembali file binary (.bin) Anda.', 'info');
+            }
+
+            // For Step 3 or 4: Web Serial ports are closed on page reload by browser security
+            if (targetStep >= 3 && !port) {
+                targetStep = 3;
+                showWizardNotice('Sesi Anda dipulihkan. Silakan hubungkan kembali port COM ESP32 Anda untuk melanjutkan.', 'info');
+            }
+
+            goToStep(targetStep, false);
+        } catch (e) {
+            console.warn('Gagal memulihkan wizard state:', e);
+            updateStepperUI();
+        }
+    }
+
+    // Attach persistence change listeners to inputs
+    if (baudrateSelect) baudrateSelect.addEventListener('change', () => { saveWizardState(); updateStepperUI(); });
+    if (chkAutoReset) chkAutoReset.addEventListener('change', () => { saveWizardState(); });
+    if (chkEraseAll) chkEraseAll.addEventListener('change', () => { saveWizardState(); });
+    if (offsetPreset) offsetPreset.addEventListener('change', () => { saveWizardState(); });
+    if (offsetInput) offsetInput.addEventListener('input', () => { saveWizardState(); });
+
+    // Initialize wizard on page load
+    restoreWizardState();
+
 </script>
 <style>
     .flasher-grid {
@@ -226,6 +615,317 @@
         border: 1px solid #1e293b;
         letter-spacing: 0.3px;
     }
+
+    /* ======================================================== */
+    /* STEP-BY-STEP WIZARD & STEPPER STYLES                     */
+    /* ======================================================== */
+    .flasher-stepper-container {
+        background: var(--app-surface);
+        border: 1.5px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 14px 20px;
+        margin-bottom: 22px;
+        box-shadow: var(--app-shadow, 0 1px 3px rgba(0,0,0,0.05));
+    }
+    :root[data-theme="neo"] .flasher-stepper-container {
+        border: 2px solid #111;
+        box-shadow: 4px 4px 0 #111;
+        background: #ffffff;
+    }
+    :root[data-theme="dark"] .flasher-stepper-container {
+        background: var(--app-surface);
+        border-color: var(--app-border-strong);
+    }
+    .flasher-stepper {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .stepper-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        user-select: none;
+        transition: all 0.2s ease;
+        padding: 6px 12px;
+        border-radius: var(--app-radius);
+        flex: 1;
+    }
+    .stepper-item:hover {
+        background: var(--app-surface-muted);
+    }
+    .stepper-icon-wrap {
+        position: relative;
+        flex-shrink: 0;
+    }
+    .stepper-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 13.5px;
+        border: 2px solid var(--app-border-strong);
+        background: var(--app-surface-muted);
+        color: var(--app-muted);
+        transition: all 0.25s ease;
+    }
+    :root[data-theme="neo"] .stepper-icon {
+        border: 2px solid #111;
+    }
+    .stepper-item.is-active .stepper-icon {
+        background: #ffe600;
+        color: #111;
+        border-color: #111;
+        box-shadow: 2px 2px 0 #111;
+        transform: scale(1.06);
+    }
+    :root[data-theme="dark"] .stepper-item.is-active .stepper-icon {
+        background: #facc15;
+        color: #111;
+        border-color: #facc15;
+        box-shadow: 0 0 12px rgba(250, 204, 21, 0.4);
+    }
+    .stepper-item.is-completed .stepper-icon {
+        background: #10b981 !important;
+        color: #ffffff !important;
+        border-color: #059669 !important;
+        box-shadow: 2px 2px 0 rgba(5, 150, 105, 0.4);
+    }
+    :root[data-theme="neo"] .stepper-item.is-completed .stepper-icon {
+        border-color: #111 !important;
+        box-shadow: 2px 2px 0 #111;
+    }
+    .stepper-meta {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+    .stepper-step-num {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--app-muted);
+    }
+    .stepper-item.is-active .stepper-step-num {
+        color: var(--app-accent, #059669);
+        font-weight: 900;
+    }
+    .stepper-item.is-completed .stepper-step-num {
+        color: #059669;
+    }
+    .stepper-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--app-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .stepper-item.is-pending .stepper-title {
+        color: var(--app-muted);
+        font-weight: 600;
+    }
+    .stepper-line {
+        flex: 0 0 24px;
+        height: 3px;
+        background: var(--app-border-strong);
+        border-radius: 2px;
+        transition: background 0.25s ease;
+    }
+    .stepper-line.is-completed {
+        background: #10b981;
+    }
+    :root[data-theme="neo"] .stepper-line {
+        background: #e2e8f0;
+    }
+    :root[data-theme="neo"] .stepper-line.is-completed {
+        background: #111;
+    }
+    @media (max-width: 900px) {
+        .stepper-meta {
+            display: none;
+        }
+        .stepper-item {
+            justify-content: center;
+            flex: 0 0 auto;
+            padding: 4px;
+        }
+        .stepper-line {
+            flex: 1;
+            min-width: 15px;
+        }
+    }
+
+    /* Wizard Panels */
+    .wizard-step-panel {
+        display: none;
+    }
+    .wizard-step-panel.is-active {
+        display: block;
+        animation: fadeInStepPanel 0.22s ease-in-out;
+    }
+    @keyframes fadeInStepPanel {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .wizard-nav-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1.5px dashed var(--app-border);
+        flex-wrap: wrap;
+    }
+
+    .wizard-notice-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 11px 16px;
+        border-radius: var(--app-radius);
+        margin-bottom: 18px;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.45;
+        box-shadow: var(--app-shadow, 0 1px 3px rgba(0,0,0,0.05));
+    }
+    .wizard-notice-warning {
+        background: #fef3c7;
+        border: 1.5px solid #d97706;
+        color: #92400e;
+    }
+    .wizard-notice-success {
+        background: #ecfdf5;
+        border: 1.5px solid #10b981;
+        color: #065f46;
+    }
+    .wizard-notice-info {
+        background: #eff6ff;
+        border: 1.5px solid #3b82f6;
+        color: #1e40af;
+    }
+    :root[data-theme="neo"] .wizard-notice-banner {
+        border: 2px solid #111;
+        box-shadow: 3px 3px 0 #111;
+    }
+
+    /* Step 1 Source Selection Option Cards */
+    .source-option-card {
+        border: 2px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 16px 18px;
+        background: var(--app-surface);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+    .source-option-card:hover {
+        border-color: var(--app-accent, #059669);
+        background: var(--app-surface-muted);
+    }
+    .source-option-card.is-selected {
+        border-color: #111111 !important;
+        background: #fffde7 !important;
+        box-shadow: 3.5px 3.5px 0 #111111;
+    }
+    :root[data-theme="neo"] .source-option-card {
+        border: 2.5px solid #111;
+    }
+    :root[data-theme="neo"] .source-option-card.is-selected {
+        border: 2.5px solid #111 !important;
+        background: #ffe600 !important;
+        box-shadow: 4px 4px 0 #111;
+    }
+    :root[data-theme="dark"] .source-option-card {
+        background: var(--app-surface);
+        border-color: var(--app-border);
+    }
+    :root[data-theme="dark"] .source-option-card:hover {
+        background: rgba(255, 255, 255, 0.03);
+        border-color: var(--app-border-strong);
+    }
+    :root[data-theme="dark"] .source-option-card.is-selected {
+        background: rgba(250, 204, 21, 0.1) !important;
+        border-color: #facc15 !important;
+        box-shadow: 0 0 16px rgba(250, 204, 21, 0.25);
+    }
+
+    .source-radio-indicator {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid var(--app-border-strong);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--app-surface);
+        flex-shrink: 0;
+        margin-top: 2px;
+        transition: all 0.2s ease;
+    }
+    .source-radio-indicator.is-checked {
+        border-color: #111;
+        background: #ffe600;
+    }
+    :root[data-theme="dark"] .source-radio-indicator.is-checked {
+        border-color: #facc15;
+        background: #facc15;
+    }
+    .source-radio-indicator .radio-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: transparent;
+        transition: all 0.2s ease;
+    }
+    .source-radio-indicator.is-checked .radio-dot {
+        background: #111;
+    }
+    :root[data-theme="neo"] .source-radio-indicator {
+        border: 2px solid #111;
+    }
+
+    /* Pre-Flash Checklist */
+    .review-checklist {
+        display: grid;
+        gap: 10px;
+        background: var(--app-surface-muted);
+        border: 1.5px solid var(--app-border-strong);
+        border-radius: var(--app-radius);
+        padding: 14px;
+        margin-bottom: 16px;
+        font-size: 12.5px;
+    }
+    :root[data-theme="neo"] .review-checklist {
+        border: 2px solid #111;
+        box-shadow: 3px 3px 0 #111;
+        background: #ffffff;
+    }
+    .review-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 6px;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
 </style>
 
 <div class="app-page">
@@ -263,300 +963,507 @@
         </div>
     </header>
 
+    <!-- ======================================================== -->
+    <!-- STEP-BY-STEP PROGRESS STEPPER WIZARD                     -->
+    <!-- ======================================================== -->
+    <div class="flasher-stepper-container">
+        <div class="flasher-stepper" id="flasherStepper">
+            <!-- Step 1 -->
+            <div class="stepper-item is-active" id="stepperStep1" onclick="goToStep(1)">
+                <div class="stepper-icon-wrap">
+                    <div class="stepper-icon" id="stepperIcon1">1</div>
+                </div>
+                <div class="stepper-meta">
+                    <span class="stepper-step-num">LANGKAH 1</span>
+                    <span class="stepper-title">Sumber Firmware</span>
+                </div>
+            </div>
+            <div class="stepper-line" id="stepperLine1"></div>
+
+            <!-- Step 2 -->
+            <div class="stepper-item" id="stepperStep2" onclick="goToStep(2)">
+                <div class="stepper-icon-wrap">
+                    <div class="stepper-icon" id="stepperIcon2">2</div>
+                </div>
+                <div class="stepper-meta">
+                    <span class="stepper-step-num">LANGKAH 2</span>
+                    <span class="stepper-title">Pilih &amp; Muat Versi</span>
+                </div>
+            </div>
+            <div class="stepper-line" id="stepperLine2"></div>
+
+            <!-- Step 3 -->
+            <div class="stepper-item" id="stepperStep3" onclick="goToStep(3)">
+                <div class="stepper-icon-wrap">
+                    <div class="stepper-icon" id="stepperIcon3">3</div>
+                </div>
+                <div class="stepper-meta">
+                    <span class="stepper-step-num">LANGKAH 3</span>
+                    <span class="stepper-title">Koneksi Hardware</span>
+                </div>
+            </div>
+            <div class="stepper-line" id="stepperLine3"></div>
+
+            <!-- Step 4 -->
+            <div class="stepper-item" id="stepperStep4" onclick="goToStep(4)">
+                <div class="stepper-icon-wrap">
+                    <div class="stepper-icon" id="stepperIcon4">4</div>
+                </div>
+                <div class="stepper-meta">
+                    <span class="stepper-step-num">LANGKAH 4</span>
+                    <span class="stepper-title">Eksekusi Flash</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wizard Alert / Notification Banner -->
+    <div id="wizardAlert" class="wizard-notice-banner wizard-notice-warning" style="display:none;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span id="wizardAlertIcon" style="font-size:18px;">⚠️</span>
+            <span id="wizardAlertMsg"></span>
+        </div>
+        <button type="button" onclick="dismissWizardAlert()" style="background:none; border:none; cursor:pointer; font-size:18px; color:inherit; font-weight:bold; line-height:1;">&times;</button>
+    </div>
+
+
     <div class="flasher-grid">
-        <!-- LEFT COLUMN: CONTROLS & SETTINGS -->
+        <!-- LEFT COLUMN: WIZARD STEP-BY-STEP CONTROLS -->
         <div style="display: grid; gap: 20px;">
 
-            <!-- Step 1: Connect Serial Port -->
-            <div class="app-card">
-                <div class="app-card-header">
-                    <div>
-                        <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                            <span>🔌</span> 1. Koneksi Port Serial (COM)
-                        </h2>
-                        <p class="app-section-subtitle">Sambungkan kabel data USB ESP32 ke Komputer PC atau Laptop.</p>
+            <!-- ============================================== -->
+            <!-- WIZARD STEP 1: PILIH SUMBER FIRMWARE           -->
+            <!-- ============================================== -->
+            <div class="wizard-step-panel is-active" id="wizardPanel1">
+                <div class="app-card">
+                    <div class="app-card-header">
+                        <div>
+                            <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                                <span>🎯</span> 1. Sumber Firmware
+                            </h2>
+                            <p class="app-section-subtitle">Tentukan apakah Anda ingin menggunakan Firmware Resmi Terintegrasi (Preset) atau mengunggah binary kustom (.bin).</p>
+                        </div>
+                        <span class="app-chip app-chip-info" style="font-size:11px;">Langkah 1 dari 4</span>
                     </div>
-                    <span class="app-chip app-chip-info" style="font-size:11px;">Web Serial API</span>
-                </div>
 
-                <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-                    <button type="button" id="btnConnect" class="app-button app-button-primary" style="flex:1; justify-content:center; cursor:pointer;">
-                        <span>🔌</span> Pilih &amp; Hubungkan Port COM
-                    </button>
-                    <button type="button" id="btnDisconnect" class="app-button app-button-danger" style="display:none; justify-content:center; cursor:pointer;">
-                        <span>❌</span> Putuskan
-                    </button>
-                    <div style="min-width:140px;">
-                        <select id="baudrateSelect" class="app-input" style="padding:7px 10px; font-size:12px; font-weight:700;">
-                            <option value="230400" selected>230,400 bps (Stabil & Cepat - Direkomendasikan)</option>
-                            <option value="115200">115,200 bps (Paling Aman / Anti-Noise)</option>
-                            <option value="460800">460,800 bps (Cepat)</option>
-                            <option value="921600">921,600 bps (Ultra Cepat)</option>
-                        </select>
-                    </div>
-                </div>
+                    <div style="display:grid; gap:12px; margin-top:6px;">
+                        <!-- Option A: Preset Resmi -->
+                        <div class="source-option-card is-selected" id="cardSourcePreset" onclick="selectSourceMode('preset')">
+                            <div style="font-size:28px;">🎯</div>
+                            <div style="flex:1;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <strong style="font-size:14.5px; color:var(--app-text);">Preset Resmi Xiaozhi (Berlisensi)</strong>
+                                    <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">DIREKOMENDASIKAN</span>
+                                </div>
+                                <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0; line-height:1.45;">
+                                    Firmware resmi siap pakai (ESP32-S3 &amp; ESP32-C3). Dilengkapi bootloader pabrik, partisi OTA, font layar &amp; aset suara. Pembaruan versi otomatis dan verifikasi keamanan SHA-256.
+                                </p>
+                            </div>
+                            <div class="source-radio-indicator is-checked" id="radioPreset">
+                                <span class="radio-dot"></span>
+                            </div>
+                        </div>
 
-                <!-- Live USB Plugged/Detected Indicator -->
-                <div id="usbPlugNotice" style="display:none; margin-top:12px; padding:10px 14px; background:#ecfdf5; border:1.5px solid #10b981; border-radius:var(--app-radius); font-size:12.5px; color:#065f46; font-weight:700; align-items:center; gap:8px;">
-                    <span style="font-size:16px;">🔌</span>
-                    <span id="usbPlugNoticeText">Perangkat USB terdeteksi! Silakan klik "Pilih &amp; Hubungkan Port COM".</span>
-                </div>
+                        <!-- Option B: Custom Binary -->
+                        <div class="source-option-card" id="cardSourceCustom" onclick="selectSourceMode('custom')">
+                            <div style="font-size:28px;">📁</div>
+                            <div style="flex:1;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <strong style="font-size:14.5px; color:var(--app-text);">Unggah File Firmware Sendiri (.bin)</strong>
+                                    <span class="app-chip app-chip-neutral" style="font-size:10.5px; font-weight:800;">KUSTOM / DEV</span>
+                                </div>
+                                <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0; line-height:1.45;">
+                                    Untuk pengembang atau build mandiri (PlatformIO, ESP-IDF, Arduino IDE). Anda dapat menentukan offset alamat flash secara fleksibel (0x0 / 0x20000).
+                                </p>
+                            </div>
+                            <div class="source-radio-indicator" id="radioCustom">
+                                <span class="radio-dot"></span>
+                            </div>
+                        </div>
+                    </div>
 
-                <!-- Disconnected Notice & Driver Helpers -->
-                <div id="connNotice" style="margin-top:14px; padding:12px 14px; background:var(--app-surface-muted); border:1px dashed var(--app-border-strong); border-radius:var(--app-radius); font-size:12px; color:var(--app-muted); line-height:1.5;">
-                    💡 <strong>Tips Deteksi Port (PC / Laptop):</strong>
-                    <ul style="margin:4px 0 0; padding-left:18px; display:grid; gap:4px;">
-                        <li><strong>💻 Port COM tidak muncul di daftar pop-up?</strong> Pastikan kabel USB adalah <strong>kabel data</strong> (bukan hanya charger 2 pin), atau unduh driver USB: <a href="https://www.wch.cn/downloads/CH341SER_EXE.html" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CH340 / CH9102 ↗</a> atau <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CP210x ↗</a>.</li>
-                        <li><strong>🔧 Mode Bootloader:</strong> Jika port gagal sync/koneksi, tahan tombol <strong>BOOT (GPIO 0)</strong> di board ESP32, tekan tombol <strong>RST/EN</strong> 1x, lalu lepas tombol BOOT sebelum klik tombol Hubungkan.</li>
-                    </ul>
-                </div>
-
-                <!-- Connected Hardware Details -->
-                <div id="chipInfoBox" class="flasher-chip-info-grid" style="display:none;">
-                    <div class="chip-info-item">
-                        <span>Model Chip ESP32:</span>
-                        <span id="chipModel" style="color:var(--app-accent, #059669); font-weight:800;">-</span>
-                    </div>
-                    <div class="chip-info-item">
-                        <span>Port &amp; Bridge USB:</span>
-                        <span id="chipUsbInfo" style="color:var(--app-accent, #059669); font-weight:800;">-</span>
-                    </div>
-                    <div class="chip-info-item">
-                        <span>MAC Address:</span>
-                        <span id="chipMac" style="font-family:monospace;">-</span>
-                    </div>
-                    <div class="chip-info-item">
-                        <span>Fitur Hardware:</span>
-                        <span id="chipFeatures">-</span>
-                    </div>
-                    <div class="chip-info-item">
-                        <span>Frekuensi Kristal:</span>
-                        <span id="chipCrystal">-</span>
+                    <div class="wizard-nav-bar">
+                        <div></div>
+                        <button type="button" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:10px 18px; font-size:13px; cursor:pointer;">
+                            <span>Lanjut ke Langkah 2: Konfigurasi Firmware</span> <span>➔</span>
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Step 2: Firmware File Selection (Preset vs Custom Upload) -->
-            <div class="app-card">
-                <div class="app-card-header">
-                    <div>
-                        <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                            <span>💾</span> 2. File Firmware (.bin)
-                        </h2>
-                        <p class="app-section-subtitle">Pilih sumber firmware: Unggah file sendiri atau gunakan Preset Resmi.</p>
-                    </div>
-                    <span id="sourceBadge" class="app-chip app-chip-neutral" style="font-size:11px;">Custom Upload</span>
-                </div>
-
-                <!-- Switcher Tabs (Hemat Ruang & Gated by Admin Approval) -->
-                <div style="display:flex; gap:8px; margin-bottom:14px;">
-                    <button type="button" id="tabBtnCustom" class="source-tab-btn active" onclick="switchSourceMode('custom')">
-                        <span>📁</span> Unggah File Firmware (.bin)
-                    </button>
-                    <button type="button" id="tabBtnPreset" class="source-tab-btn" onclick="switchSourceMode('preset')">
-                        <span>🎯</span> Preset Firmware (ESP32-S3)
-                    </button>
-                </div>
-
-                <!-- TAB 1: CUSTOM UPLOAD VIEW (DEFAULT) -->
-                <div id="panelCustom">
-                    <div class="flasher-dropzone" id="dropzone" onclick="document.getElementById('firmwareFileInput').click()">
-                        <input type="file" id="firmwareFileInput" accept=".bin" style="display:none;">
-                        <div style="font-size:28px; margin-bottom:6px;">📁</div>
-                        <div style="font-size:13.5px; font-weight:750; color:var(--app-text);" id="filePromptText">
-                            Klik untuk memilih file kustom (.bin) atau seret ke sini
+            <!-- ============================================== -->
+            <!-- WIZARD STEP 2: KONFIGURASI FIRMWARE & VERSI    -->
+            <!-- ============================================== -->
+            <div class="wizard-step-panel" id="wizardPanel2">
+                <div class="app-card">
+                    <div class="app-card-header">
+                        <div>
+                            <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                                <span>💾</span> 2. Pilih &amp; Muat Firmware
+                            </h2>
+                            <p class="app-section-subtitle">Tentukan varian board, versi firmware yang ingin di-flash, dan muat file ke memori browser.</p>
                         </div>
-                        <p style="font-size:11.5px; color:var(--app-muted); margin-top:4px;" id="fileSubText">
-                            Mendukung Application Binary (<code>0x20000</code>) atau Full Factory Merged (<code>0x0</code>).
-                        </p>
+                        <span id="sourceBadge" class="app-chip app-chip-neutral" style="font-size:11px;">Custom Upload</span>
                     </div>
-                </div>
 
-                <!-- TAB 2: OFFICIAL PRESET VIEW (ADMIN APPROVED / CLAIM CODE, FLASH ONLY) -->
-                <div id="panelPreset" style="display:none;">
-                    <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:16px;">
-                        
-                        <!-- Dropdown Pemilihan Preset jika ada > 1 -->
-                        {% if presets and presets|length > 1 %}
-                        <div style="margin-bottom:12px;">
-                            <label style="font-size:12px; font-weight:800; color:var(--app-text); display:block; margin-bottom:4px;">
-                                🎯 Pilih Preset Firmware:
+                    <!-- Mini Tabs in Step 2 to allow fast switching without going back to step 1 -->
+                    <div style="display:flex; gap:8px; margin-bottom:14px;">
+                        <button type="button" id="tabBtnPreset" class="source-tab-btn" onclick="selectSourceMode('preset')">
+                            <span>🎯</span> Preset Resmi Berlisensi
+                        </button>
+                        <button type="button" id="tabBtnCustom" class="source-tab-btn active" onclick="selectSourceMode('custom')">
+                            <span>📁</span> Unggah File Firmware (.bin)
+                        </button>
+                    </div>
+
+                    <!-- TAB 1: CUSTOM UPLOAD VIEW -->
+                    <div id="panelCustom">
+                        <div class="flasher-dropzone" id="dropzone" onclick="document.getElementById('firmwareFileInput').click()">
+                            <input type="file" id="firmwareFileInput" accept=".bin" style="display:none;">
+                            <div style="font-size:28px; margin-bottom:6px;">📁</div>
+                            <div style="font-size:13.5px; font-weight:750; color:var(--app-text);" id="filePromptText">
+                                Klik untuk memilih file kustom (.bin) atau seret ke sini
+                            </div>
+                            <p style="font-size:11.5px; color:var(--app-muted); margin-top:4px;" id="fileSubText">
+                                Mendukung Application Binary (<code>0x20000</code>) atau Full Factory Merged (<code>0x0</code>).
+                            </p>
+                        </div>
+
+                        <!-- Flash Offset Selector for Custom Upload -->
+                        <div style="margin-top:14px; background:var(--app-surface-muted); border:1.5px solid var(--app-border); border-radius:var(--app-radius); padding:12px 14px;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:var(--app-text); margin-bottom:4px;">
+                                Alamat Offset Flash:
                             </label>
-                            <select id="userPresetSelect" class="app-input" onchange="onUserPresetChange(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px;">
-                                {% for p in presets %}
-                                <option value="{{ p.id }}" data-title="{{ p.title }}" data-chip="{{ p.chip }}" data-offset="{{ p.offset }}" data-desc="{{ p.description }}" data-activever="{{ p.active_version }}" data-size="{{ (p.size_bytes / (1024*1024))|round(2) if p.size_bytes else '0' }}" {% if preset_status and preset_status.preset and preset_status.preset.id == p.id %}selected{% endif %}>
-                                    {{ p.title }} ({{ p.chip }} • {{ p.active_version }})
-                                </option>
-                                {% endfor %}
+                            <select id="offsetPreset" class="app-input" onchange="handleOffsetChange(this.value)">
+                                <option value="0x0" selected>0x0 (Full Factory Merged - Board Baru Kosong)</option>
+                                <option value="0x20000">0x20000 (Aplikasi Saja / Update OTA)</option>
+                                <option value="0x10000">0x10000 (Standar Arduino App)</option>
+                                <option value="custom">Offset Kustom...</option>
                             </select>
+                            <input type="text" id="offsetInput" class="app-input" value="0x0" style="display:none; margin-top:6px;" placeholder="Contoh: 0x0">
                         </div>
-                        {% endif %}
+                    </div>
 
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
-                            <div>
-                                <strong id="presetCardTitle" style="font-size:14.5px; color:var(--app-text); display:flex; align-items:center; gap:6px;">
-                                    <span>🎯</span> <span id="lblPresetTitle">{{ preset_status.preset.title if preset_status and preset_status.preset else 'ESP32-S3 N16R8 / CAM Full Factory' }}</span>
-                                </strong>
-                                <span id="lblPresetDesc" style="font-size:11.5px; color:var(--app-muted); display:block; margin-top:2px;">
-                                    {{ preset_status.preset.description if preset_status and preset_status.preset else 'Binary komersial resmi • Bootloader, Partisi, OTA, Voice App, Aset UI & Audio.' }}
-                                </span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                <span class="app-chip app-chip-neutral" id="lblPresetVersion" style="font-size:11px; font-weight:900;">
-                                    Versi: {{ preset_status.active_version if preset_status and preset_status.active_version else 'v001' }}
-                                </span>
-                                <span class="app-chip app-chip-success" id="lblPresetOffset" style="font-size:10.5px; font-weight:800;">
-                                    Offset {{ preset_status.preset.offset if preset_status and preset_status.preset else '0x0' }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- PILIHAN VERSI PRESET (Bisa pilih versi lama maupun terbaru dengan aman) -->
-                        <div id="presetVersionSection" style="margin: 12px 0; background: var(--app-surface); border: 1.5px solid var(--app-border-strong); border-radius: var(--app-radius); padding: 12px 14px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
-                                <label for="userPresetVersionSelect" style="font-size:12px; font-weight:800; color:var(--app-text); display:flex; align-items:center; gap:6px; margin:0;">
-                                    <span>🏷️</span> Pilih Versi Firmware Preset:
+                    <!-- TAB 2: OFFICIAL PRESET VIEW -->
+                    <div id="panelPreset" style="display:none;">
+                        <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:16px;">
+                            <!-- Dropdown Pemilihan Preset jika ada > 1 -->
+                            {% if presets and presets|length > 1 %}
+                            <div style="margin-bottom:12px;">
+                                <label style="font-size:12px; font-weight:800; color:var(--app-text); display:block; margin-bottom:4px;">
+                                    🎯 Pilih Varian Board Preset:
                                 </label>
-                                <div id="versionStatusPill" class="app-chip app-chip-success" style="font-size:10.5px; font-weight:850;">
-                                    Versi Aktif (Rekomendasi)
-                                </div>
-                            </div>
-
-                            <select id="userPresetVersionSelect" class="app-input" onchange="onUserPresetVersionChange(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px; font-weight:700;">
-                                {% if preset_status and preset_status.preset and preset_status.preset.versions %}
-                                    {% for v in preset_status.preset.versions %}
-                                    <option value="{{ v.version }}" {% if v.version == preset_status.active_version %}selected{% endif %}>
-                                        {{ v.version }} {% if v.version == preset_status.active_version %}(Versi Utama / Aktif){% else %}(Versi Sebelumnya / Lama){% endif %}{% if v.changelog %} • {{ v.changelog[:40] }}{% endif %}
+                                <select id="userPresetSelect" class="app-input" onchange="onUserPresetChange(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                                    {% for p in presets %}
+                                    <option value="{{ p.id }}" data-title="{{ p.title }}" data-chip="{{ p.chip }}" data-offset="{{ p.offset }}" data-desc="{{ p.description }}" data-activever="{{ p.active_version }}" data-size="{{ (p.size_bytes / (1024*1024))|round(2) if p.size_bytes else '0' }}" {% if preset_status and preset_status.preset and preset_status.preset.id == p.id %}selected{% endif %}>
+                                        {{ p.title }} ({{ p.chip }} • {{ p.active_version }})
                                     </option>
                                     {% endfor %}
-                                {% else %}
-                                    <option value="{{ preset_status.active_version if preset_status else 'v001' }}">
-                                        {{ preset_status.active_version if preset_status else 'v001' }} (Versi Utama / Aktif)
-                                    </option>
-                                {% endif %}
-                            </select>
+                                </select>
+                            </div>
+                            {% endif %}
 
-                            <!-- Informasi Detail Versi yang Dipilih -->
-                            <div id="versionDetailBox" style="margin-top:10px; padding:10px; background:var(--app-surface-muted); border-radius:6px; border:1px solid var(--app-border); font-size:11.5px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:4px;">
-                                    <strong style="color:var(--app-text);" id="verDetailFilename">
-                                        {{ preset_status.preset.versions[0].filename if preset_status and preset_status.preset and preset_status.preset.versions else 'firmware.bin' }}
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+                                <div>
+                                    <strong id="presetCardTitle" style="font-size:14.5px; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                                        <span>🎯</span> <span id="lblPresetTitle">{{ preset_status.preset.title if preset_status and preset_status.preset else 'ESP32-S3 N16R8 / CAM Full Factory' }}</span>
                                     </strong>
-                                    <span style="color:var(--app-muted); font-size:11px;" id="verDetailDate">
-                                        {{ preset_status.preset.versions[0].uploaded_at[:10] if preset_status and preset_status.preset and preset_status.preset.versions and preset_status.preset.versions[0].uploaded_at else '' }}
+                                    <span id="lblPresetDesc" style="font-size:11.5px; color:var(--app-muted); display:block; margin-top:2px;">
+                                        {{ preset_status.preset.description if preset_status and preset_status.preset else 'Binary komersial resmi • Bootloader, Partisi, OTA, Voice App, Aset UI & Audio.' }}
                                     </span>
                                 </div>
-                                <div style="color:var(--app-muted); margin-bottom:6px; line-height:1.4;" id="verDetailChangelog">
-                                    📝 {{ preset_status.preset.versions[0].changelog if preset_status and preset_status.preset and preset_status.preset.versions else 'Rilis firmware resmi' }}
-                                </div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; font-size:11px; border-top:1px dashed var(--app-border); padding-top:6px;">
-                                    <span id="verDetailSize">
-                                        Ukuran: {{ ((preset_status.preset.versions[0].size_bytes if preset_status and preset_status.preset and preset_status.preset.versions else 0) / (1024*1024))|round(2) }} MB
+                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <span class="app-chip app-chip-neutral" id="lblPresetVersion" style="font-size:11px; font-weight:900;">
+                                        Versi: {{ preset_status.active_version if preset_status and preset_status.active_version else 'v001' }}
                                     </span>
-                                    <span style="color:var(--app-accent, #059669); font-weight:750;" id="verDetailSecurity">
-                                        🛡️ Terverifikasi SHA-256 • Enkripsi AES-256
+                                    <span class="app-chip app-chip-success" id="lblPresetOffset" style="font-size:10.5px; font-weight:800;">
+                                        Offset {{ preset_status.preset.offset if preset_status and preset_status.preset else '0x0' }}
                                     </span>
                                 </div>
                             </div>
 
-                            <!-- Notifikasi Edukatif Saat Memilih Versi Lama -->
-                            <div id="olderVersionAlert" style="display:none; margin-top:8px; padding:8px 10px; background:rgba(234, 179, 8, 0.1); border:1px solid rgba(234, 179, 8, 0.35); border-radius:6px; font-size:11.5px; color:var(--app-text); line-height:1.4;">
-                                ⚠️ <strong>Catatan Versi Lama:</strong> Anda memilih versi firmware terdahulu (<span id="alertVersionName" style="font-weight:bold;">v001</span>). Firmware ini tetap aman, kompatibel, dan stabil untuk di-flash ke microcontroller ESP32 Anda.
-                            </div>
-                        </div>
+                            <!-- PILIHAN VERSI PRESET -->
+                            <div id="presetVersionSection" style="margin: 12px 0; background: var(--app-surface); border: 1.5px solid var(--app-border-strong); border-radius: var(--app-radius); padding: 12px 14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+                                    <label for="userPresetVersionSelect" style="font-size:12px; font-weight:800; color:var(--app-text); display:flex; align-items:center; gap:6px; margin:0;">
+                                        <span>🏷️</span> Pilih Versi Firmware Preset:
+                                    </label>
+                                    <div id="versionStatusPill" class="app-chip app-chip-success" style="font-size:10.5px; font-weight:850;">
+                                        Versi Aktif (Rekomendasi)
+                                    </div>
+                                </div>
 
-                        <!-- Status & Action Box: DUA KONDISI (GEMBOK TERBUKA vs GEMBOK TERKUNCI) -->
-                        <div style="padding-top:10px; border-top:1px solid var(--app-border);">
-                            <!-- KONDISI 1: GEMBOK TERBUKA 🔓 -->
-                            <div id="boxPresetUnlocked" style="{% if not preset_status or not preset_status.authorized %}display:none;{% endif %}">
-                                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                                    <div>
-                                        <span class="app-chip app-chip-success" style="font-size:11px; font-weight:850;">
-                                            {% if user and user.role == 'admin' %}🛡️ ADMINISTRATOR RESMI (AKSES PENUH){% else %}🔓 GEMBOK TERBUKA • LISENSI RESMI AKTIF{% endif %}
-                                        </span>
-                                        <span style="font-size:11px; color:var(--app-muted); display:block; margin-top:3px;">
-                                            ⚡ Lisensi resmi aktif. Anda bebas memilih versi mana pun (versi lama maupun terbaru) untuk di-flash secara aman.
+                                <select id="userPresetVersionSelect" class="app-input" onchange="onUserPresetVersionChange(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px; font-weight:700;">
+                                    {% if preset_status and preset_status.preset and preset_status.preset.versions %}
+                                        {% for v in preset_status.preset.versions %}
+                                        <option value="{{ v.version }}" {% if v.version == preset_status.active_version %}selected{% endif %}>
+                                            {{ v.version }} {% if v.version == preset_status.active_version %}(Versi Utama / Aktif){% else %}(Versi Sebelumnya / Lama){% endif %}{% if v.changelog %} • {{ v.changelog[:40] }}{% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    {% else %}
+                                        <option value="{{ preset_status.active_version if preset_status else 'v001' }}">
+                                            {{ preset_status.active_version if preset_status else 'v001' }} (Versi Utama / Aktif)
+                                        </option>
+                                    {% endif %}
+                                </select>
+
+                                <!-- Informasi Detail Versi -->
+                                <div id="versionDetailBox" style="margin-top:10px; padding:10px; background:var(--app-surface-muted); border-radius:6px; border:1px solid var(--app-border); font-size:11.5px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:4px;">
+                                        <strong style="color:var(--app-text);" id="verDetailFilename">
+                                            {{ preset_status.preset.versions[0].filename if preset_status and preset_status.preset and preset_status.preset.versions else 'firmware.bin' }}
+                                        </strong>
+                                        <span style="color:var(--app-muted); font-size:11px;" id="verDetailDate">
+                                            {{ preset_status.preset.versions[0].uploaded_at[:10] if preset_status and preset_status.preset and preset_status.preset.versions and preset_status.preset.versions[0].uploaded_at else '' }}
                                         </span>
                                     </div>
-                                    <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:7px 16px;">
-                                        ⚡ Muat Preset Ini ke Flasher
-                                    </button>
+                                    <div style="color:var(--app-muted); margin-bottom:6px; line-height:1.4;" id="verDetailChangelog">
+                                        📝 {{ preset_status.preset.versions[0].changelog if preset_status and preset_status.preset and preset_status.preset.versions else 'Rilis firmware resmi' }}
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; font-size:11px; border-top:1px dashed var(--app-border); padding-top:6px;">
+                                        <span id="verDetailSize">
+                                            Ukuran: {{ ((preset_status.preset.versions[0].size_bytes if preset_status and preset_status.preset and preset_status.preset.versions else 0) / (1024*1024))|round(2) }} MB
+                                        </span>
+                                        <span style="color:var(--app-accent, #059669); font-weight:750;" id="verDetailSecurity">
+                                            🛡️ Terverifikasi SHA-256 • Enkripsi AES-256
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div id="olderVersionAlert" style="display:none; margin-top:8px; padding:8px 10px; background:rgba(234, 179, 8, 0.1); border:1px solid rgba(234, 179, 8, 0.35); border-radius:6px; font-size:11.5px; color:var(--app-text); line-height:1.4;">
+                                    ⚠️ <strong>Catatan Versi Lama:</strong> Anda memilih versi firmware terdahulu (<span id="alertVersionName" style="font-weight:bold;">v001</span>). Firmware ini tetap aman, kompatibel, dan stabil untuk di-flash ke microcontroller ESP32 Anda.
                                 </div>
                             </div>
 
-                            <!-- KONDISI 2: GEMBOK TERKUNCI 🔒 -->
-                            <div id="boxPresetLocked" style="{% if preset_status and preset_status.authorized %}display:none;{% endif %} background:rgba(220,38,38,0.05); border:1.5px solid rgba(220,38,38,0.25); border-radius:var(--app-radius); padding:12px 14px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-                                    <span class="app-chip app-chip-danger" style="font-size:11px; font-weight:900;">
-                                        🔒 GEMBOK TERKUNCI • LISENSI DIPERLUKAN
-                                    </span>
-                                    <span style="font-size:11px; color:var(--app-muted);">
-                                        Tersedia: <strong>{{ preset_status.active_version if preset_status else 'v001' }}</strong>
-                                    </span>
+                            <!-- Status Box: KONDISI 1 (GEMBOK TERBUKA) vs KONDISI 2 (GEMBOK TERKUNCI) -->
+                            <div style="padding-top:10px; border-top:1px solid var(--app-border);">
+                                <!-- KONDISI 1: GEMBOK TERBUKA 🔓 -->
+                                <div id="boxPresetUnlocked" style="{% if not preset_status or not preset_status.authorized %}display:none;{% endif %}">
+                                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                                        <div>
+                                            <span class="app-chip app-chip-success" style="font-size:11px; font-weight:850;">
+                                                {% if user and user.role == 'admin' %}🛡️ ADMINISTRATOR RESMI (AKSES PENUH){% else %}🔓 GEMBOK TERBUKA • LISENSI RESMI AKTIF{% endif %}
+                                            </span>
+                                            <span style="font-size:11px; color:var(--app-muted); display:block; margin-top:3px;">
+                                                ⚡ Lisensi aktif. Klik tombol di kanan untuk memuat binary versi terpilih ke memori browser.
+                                            </span>
+                                        </div>
+                                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                            <button type="button" onclick="openGuideModal()" class="app-button app-button-secondary app-button-small" style="font-weight:750; font-size:11.5px;">
+                                                📖 Skema Pin &amp; Buku Panduan
+                                            </button>
+                                            <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:7px 16px;">
+                                                ⚡ Muat Preset Ini ke Flasher
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <p style="font-size:12px; color:var(--app-text); margin:0 0 10px; line-height:1.5;">
-                                    Masukkan <strong>Kode Lisensi Sekali Pakai</strong> yang Anda peroleh dari pembelian kit atau Admin untuk langsung membuka akses firmware dan update otomatis:
-                                </p>
-                                <form onsubmit="submitInlineClaimCode(event)" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
-                                    <input type="text" id="inlineClaimCodeInput" placeholder="Ketik Kode: XZ-PRESET-XXXX-YYYY" class="app-input" style="flex:1; min-width:200px; padding:7px 10px; font-size:12.5px; text-transform:uppercase; font-family:monospace; font-weight:bold;" required>
-                                    <button type="submit" id="btnSubmitInlineClaim" class="app-button app-button-primary" style="font-weight:850; font-size:12px; padding:7px 14px; white-space:nowrap;">
-                                        🔓 Buka Kunci dengan Kode
-                                    </button>
-                                </form>
-                                <div style="font-size:11.5px; color:var(--app-muted); padding-top:4px; line-height:1.4;">
-                                    ℹ️ Hubungi Admin untuk mendapatkan Kode Lisensi atau melalui paket pembelian kit resmi.
+
+                                <!-- KONDISI 2: GEMBOK TERKUNCI 🔒 -->
+                                <div id="boxPresetLocked" style="{% if preset_status and preset_status.authorized %}display:none;{% endif %} background:rgba(220,38,38,0.05); border:1.5px solid rgba(220,38,38,0.25); border-radius:var(--app-radius); padding:12px 14px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                                        <span class="app-chip app-chip-danger" style="font-size:11px; font-weight:900;">
+                                            🔒 GEMBOK TERKUNCI • LISENSI DIPERLUKAN
+                                        </span>
+                                        <span style="font-size:11px; color:var(--app-muted);">
+                                            Tersedia: <strong>{{ preset_status.active_version if preset_status else 'v001' }}</strong>
+                                        </span>
+                                    </div>
+                                    <p style="font-size:12px; color:var(--app-text); margin:0 0 10px; line-height:1.5;">
+                                        Masukkan <strong>Kode Lisensi Sekali Pakai</strong> yang Anda peroleh dari pembelian kit atau Admin untuk langsung membuka akses firmware dan update otomatis:
+                                    </p>
+                                    <form onsubmit="submitInlineClaimCode(event)" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+                                        <input type="text" id="inlineClaimCodeInput" placeholder="Ketik Kode: XZ-PRESET-XXXX-YYYY" class="app-input" style="flex:1; min-width:200px; padding:7px 10px; font-size:12.5px; text-transform:uppercase; font-family:monospace; font-weight:bold;" required autocomplete="off">
+                                        <button type="submit" id="btnSubmitInlineClaim" class="app-button app-button-primary" style="font-weight:850; font-size:12px; padding:7px 14px; white-space:nowrap;">
+                                            🔓 Buka Kunci dengan Kode
+                                        </button>
+                                    </form>
+                                    <div style="font-size:11.5px; color:var(--app-muted); padding-top:4px; line-height:1.4;">
+                                        ℹ️ Hubungi Admin untuk mendapatkan Kode Lisensi atau melalui paket pembelian kit resmi.
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Active File Info Display -->
-                <div id="selectedFileInfo" style="display:none; margin-top:12px; padding:12px 14px; background:rgba(5,150,105,0.08); border:1.5px solid var(--app-accent, #059669); border-radius:var(--app-radius);">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <strong id="selectedFileName" style="font-size:13.5px; color:var(--app-text);">-</strong>
-                            <span id="selectedFileSize" style="display:block; font-size:11.5px; color:var(--app-muted); margin-top:2px;">-</span>
+                    <!-- Active File Info Display -->
+                    <div id="selectedFileInfo" style="display:none; margin-top:14px; padding:12px 14px; background:rgba(5,150,105,0.08); border:1.5px solid var(--app-accent, #059669); border-radius:var(--app-radius);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <div>
+                                <strong id="selectedFileName" style="font-size:13.5px; color:var(--app-text);">-</strong>
+                                <span id="selectedFileSize" style="display:block; font-size:11.5px; color:var(--app-muted); margin-top:2px;">-</span>
+                            </div>
+                            <button type="button" class="app-button app-button-small app-button-danger" onclick="clearSelectedFile()">Ganti File</button>
                         </div>
-                        <button type="button" class="app-button app-button-small app-button-danger" onclick="clearSelectedFile()">Ganti File</button>
                     </div>
-                </div>
 
-                <!-- Flash Offset & Options -->
-                <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-                    <div>
-                        <label style="display:block; font-size:12px; font-weight:700; color:var(--app-text); margin-bottom:4px;">
-                            Alamat Offset Flash:
-                        </label>
-                        <select id="offsetPreset" class="app-input" onchange="handleOffsetChange(this.value)">
-                            <option value="0x0" selected>0x0 (Full Factory Merged - Board Baru Kosong)</option>
-                            <option value="0x20000">0x20000 (Aplikasi Saja / Update OTA)</option>
-                            <option value="0x10000">0x10000 (Standar Arduino App)</option>
-                            <option value="custom">Offset Kustom...</option>
-                        </select>
-                        <input type="text" id="offsetInput" class="app-input" value="0x0" style="display:none; margin-top:6px;" placeholder="Contoh: 0x0">
-                    </div>
-                    <div>
-                        <label style="display:block; font-size:12px; font-weight:700; color:var(--app-text); margin-bottom:4px;">
-                            Opsi Flashing:
-                        </label>
-                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer; margin-top:6px;">
-                            <input type="checkbox" id="chkAutoReset" checked style="accent-color:var(--app-accent, #059669);">
-                            <span>Reset chip otomatis setelah selesai</span>
-                        </label>
-                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer; margin-top:6px;">
-                            <input type="checkbox" id="chkEraseAll" style="accent-color:var(--app-accent, #059669);">
-                            <span>Hapus seluruh flash (Erase All)</span>
-                        </label>
+                    <div class="wizard-nav-bar">
+                        <button type="button" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                            <span>⬅</span> <span>Kembali ke Langkah 1</span>
+                        </button>
+                        <button type="button" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
+                            <span>Lanjut ke Langkah 3: Koneksi Hardware</span> <span>➔</span>
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Step 3: Flash Action Button -->
-            <div class="app-card" style="padding:16px;">
-                <button type="button" id="btnFlash" class="app-button app-button-success" style="width:100%; padding:14px; font-size:15px; font-weight:850; justify-content:center; letter-spacing:0.3px;" disabled>
-                    <span>⚡</span> Mulai Flash ke ESP32
-                </button>
+            <!-- ============================================== -->
+            <!-- WIZARD STEP 3: KONEKSI HARDWARE (COM)          -->
+            <!-- ============================================== -->
+            <div class="wizard-step-panel" id="wizardPanel3">
+                <div class="app-card">
+                    <div class="app-card-header">
+                        <div>
+                            <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                                <span>🔌</span> 3. Koneksi Hardware (COM)
+                            </h2>
+                            <p class="app-section-subtitle">Sambungkan kabel data USB ESP32 ke PC / Laptop dan hubungkan port serial.</p>
+                        </div>
+                        <span class="app-chip app-chip-info" style="font-size:11px;">Web Serial API</span>
+                    </div>
+
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                        <button type="button" id="btnConnect" class="app-button app-button-primary" style="flex:1; justify-content:center; cursor:pointer; font-weight:850; padding:10px;">
+                            <span>🔌</span> Pilih &amp; Hubungkan Port COM
+                        </button>
+                        <button type="button" id="btnDisconnect" class="app-button app-button-danger" style="display:none; justify-content:center; cursor:pointer; font-weight:850; padding:10px;">
+                            <span>❌</span> Putuskan
+                        </button>
+                        <div style="min-width:140px;">
+                            <select id="baudrateSelect" class="app-input" style="padding:8px 10px; font-size:12px; font-weight:700;">
+                                <option value="230400" selected>230,400 bps (Stabil &amp; Cepat - Rekomendasi)</option>
+                                <option value="115200">115,200 bps (Paling Aman / Anti-Noise)</option>
+                                <option value="460800">460,800 bps (Cepat)</option>
+                                <option value="921600">921,600 bps (Ultra Cepat)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Live USB Plugged/Detected Indicator -->
+                    <div id="usbPlugNotice" style="display:none; margin-top:12px; padding:10px 14px; background:#ecfdf5; border:1.5px solid #10b981; border-radius:var(--app-radius); font-size:12.5px; color:#065f46; font-weight:700; align-items:center; gap:8px;">
+                        <span style="font-size:16px;">🔌</span>
+                        <span id="usbPlugNoticeText">Perangkat USB terdeteksi! Silakan klik "Pilih &amp; Hubungkan Port COM".</span>
+                    </div>
+
+                    <!-- Connected Hardware Details -->
+                    <div id="chipInfoBox" class="flasher-chip-info-grid" style="display:none;">
+                        <div class="chip-info-item">
+                            <span>Model Chip ESP32:</span>
+                            <span id="chipModel" style="color:var(--app-accent, #059669); font-weight:800;">-</span>
+                        </div>
+                        <div class="chip-info-item">
+                            <span>Port &amp; Bridge USB:</span>
+                            <span id="chipUsbInfo" style="color:var(--app-accent, #059669); font-weight:800;">-</span>
+                        </div>
+                        <div class="chip-info-item">
+                            <span>MAC Address:</span>
+                            <span id="chipMac" style="font-family:monospace;">-</span>
+                        </div>
+                        <div class="chip-info-item">
+                            <span>Fitur Hardware:</span>
+                            <span id="chipFeatures">-</span>
+                        </div>
+                        <div class="chip-info-item">
+                            <span>Frekuensi Kristal:</span>
+                            <span id="chipCrystal">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Flashing Options -->
+                    <div style="margin-top:14px; padding:12px 14px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <strong style="font-size:12px; color:var(--app-text); display:block; margin-bottom:8px;">Opsi Flashing:</strong>
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer;">
+                                <input type="checkbox" id="chkAutoReset" checked style="accent-color:var(--app-accent, #059669);">
+                                <span>Reset chip otomatis setelah selesai flash</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer;">
+                                <input type="checkbox" id="chkEraseAll" style="accent-color:var(--app-accent, #059669);">
+                                <span>Hapus seluruh chip flash (Erase All - Factory Clean)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Disconnected Notice & Driver Helpers -->
+                    <div id="connNotice" style="margin-top:14px; padding:12px 14px; background:var(--app-surface-muted); border:1px dashed var(--app-border-strong); border-radius:var(--app-radius); font-size:12px; color:var(--app-muted); line-height:1.5;">
+                        💡 <strong>Tips Deteksi Port (PC / Laptop):</strong>
+                        <ul style="margin:4px 0 0; padding-left:18px; display:grid; gap:4px;">
+                            <li><strong>💻 Port COM tidak muncul di pop-up?</strong> Pastikan menggunakan <strong>kabel data USB</strong> asli, atau instal driver: <a href="https://www.wch.cn/downloads/CH341SER_EXE.html" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CH340 / CH9102 ↗</a> atau <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CP210x ↗</a>.</li>
+                            <li><strong>🔧 Mode Bootloader:</strong> Jika port timeout saat sync, tahan tombol <strong>BOOT (GPIO 0)</strong> di ESP32, tekan tombol <strong>RST/EN</strong> 1x, lalu lepas tombol BOOT sebelum mengklik Hubungkan.</li>
+                        </ul>
+                    </div>
+
+                    <div class="wizard-nav-bar">
+                        <button type="button" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                            <span>⬅</span> <span>Kembali ke Langkah 2</span>
+                        </button>
+                        <button type="button" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
+                            <span>Lanjut ke Langkah 4: Eksekusi Flash</span> <span>➔</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- WIZARD STEP 4: REVIEW & EKSEKUSI FLASH         -->
+            <!-- ============================================== -->
+            <div class="wizard-step-panel" id="wizardPanel4">
+                <div class="app-card">
+                    <div class="app-card-header">
+                        <div>
+                            <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
+                                <span>⚡</span> 4. Review &amp; Eksekusi Flash
+                            </h2>
+                            <p class="app-section-subtitle">Periksa ringkasan kesiapan sebelum memulai proses flashing firmware ke ESP32.</p>
+                        </div>
+                        <span class="app-chip app-chip-success" style="font-size:11px; font-weight:800;">Langkah Terakhir</span>
+                    </div>
+
+                    <!-- Pre-Flash Checklist Summary -->
+                    <div class="review-checklist" id="reviewChecklist">
+                        <div class="review-item">
+                            <span style="color:var(--app-muted); font-weight:700;">💾 Sumber &amp; Firmware:</span>
+                            <span id="reviewFirmwareSummary" style="font-weight:800; color:var(--app-text);">-</span>
+                        </div>
+                        <div class="review-item">
+                            <span style="color:var(--app-muted); font-weight:700;">🔌 Port COM &amp; Microcontroller:</span>
+                            <span id="reviewChipSummary" style="font-weight:800; color:var(--app-text);">-</span>
+                        </div>
+                        <div class="review-item">
+                            <span style="color:var(--app-muted); font-weight:700;">📍 Alamat Offset Flash:</span>
+                            <span id="reviewOffsetSummary" style="font-weight:800; color:var(--app-text);">-</span>
+                        </div>
+                        <div class="review-item">
+                            <span style="color:var(--app-muted); font-weight:700;">⚡ Kecepatan Flashing:</span>
+                            <span id="reviewBaudSummary" style="font-weight:800; color:var(--app-text);">-</span>
+                        </div>
+                        <div class="review-item">
+                            <span style="color:var(--app-muted); font-weight:700;">⚙️ Konfigurasi Tambahan:</span>
+                            <span id="reviewOptionsSummary" style="font-weight:700; color:var(--app-text);">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Flash Action Button -->
+                    <div style="margin-top:6px;">
+                        <button type="button" id="btnFlash" class="app-button app-button-success" style="width:100%; padding:14px; font-size:15px; font-weight:850; justify-content:center; letter-spacing:0.3px;" disabled>
+                            <span>⚡</span> Mulai Flash ke ESP32
+                        </button>
+                    </div>
+
+                    <p style="font-size:11.5px; color:var(--app-muted); margin-top:10px; line-height:1.45;">
+                        💡 <strong>Info:</strong> Selama proses flashing berjalan, layar monitor otomatis dijaga tetap menyala (Keep-Awake aktif) dan progress bar realtime di kolom kanan akan bergerak hingga 100%. Jangan mencabut kabel USB sampai selesai.
+                    </p>
+
+                    <div class="wizard-nav-bar">
+                        <button type="button" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                            <span>⬅</span> <span>Kembali ke Pengaturan Hardware</span>
+                        </button>
+                        <button type="button" class="app-button app-button-ghost" onclick="goToStep(1)" style="font-weight:750; font-size:12px; cursor:pointer;">
+                            <span>🔄 Mulai dari Langkah 1</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1483,6 +2390,11 @@
 
             logToConsole(`[OK] Preset ${presetFn} (versi ${firmwareVer}) siap di memori (${buffer.byteLength.toLocaleString()} bytes). Offset dikunci ke ${customOffset}. Verifikasi integritas aman!`);
             updateFlashButtonState();
+            if (typeof updateStepperUI === 'function') updateStepperUI();
+            if (typeof saveWizardState === 'function') saveWizardState();
+            if (typeof showWizardNotice === 'function') {
+                showWizardNotice(`✅ Preset resmi '${currentPresetId}' versi ${firmwareVer} siap di memori browser. Silakan lanjut ke Langkah 3!`, 'success');
+            }
 
             if (btn) {
                 btn.disabled = false;
@@ -1527,6 +2439,8 @@
             btnLoad.classList.remove('app-button-ghost');
         }
         updateFlashButtonState();
+        if (typeof updateStepperUI === 'function') updateStepperUI();
+        if (typeof saveWizardState === 'function') saveWizardState();
         logToConsole('[INFO] File firmware dibatalkan.');
     };
 
@@ -1556,6 +2470,11 @@
                 logToConsole(`[INFO] File '${file.name}' berukuran ${mb} MB. Offset diset ke 0x20000 (Aplikasi Saja).`);
             }
             updateFlashButtonState();
+            if (typeof updateStepperUI === 'function') updateStepperUI();
+            if (typeof saveWizardState === 'function') saveWizardState();
+            if (typeof showWizardNotice === 'function') {
+                showWizardNotice(`✅ File '${file.name}' siap di memori browser. Silakan lanjut ke Langkah 3!`, 'success');
+            }
         };
         reader.readAsArrayBuffer(file);
     }
@@ -1644,6 +2563,15 @@
 
             progressStatusText.textContent = `Port terhubung (${chip} - ${dev}). Pilih firmware untuk memulai flashing.`;
             updateFlashButtonState();
+            if (typeof updateStepperUI === 'function') updateStepperUI();
+            if (typeof saveWizardState === 'function') saveWizardState();
+            if (typeof showWizardNotice === 'function') {
+                if (currentSourceMode === 'preset' && currentPresetId === 'esp32s3_cam' && !chip.toUpperCase().includes('ESP32-S3')) {
+                    showWizardNotice(`⚠️ Perhatian: Preset terpilih adalah untuk ESP32-S3, namun chip yang terdeteksi adalah ${chip}. Pastikan tipe board sesuai!`, 'warning');
+                } else {
+                    showWizardNotice(`✅ Perangkat ${chip} berhasil terhubung! Silakan lanjut ke Langkah 4 untuk flashing.`, 'success');
+                }
+            }
 
         } catch (err) {
             logToConsole(`[ERROR] Gagal menghubungkan port: ${err.message}`);
@@ -1676,6 +2604,8 @@
         if (chipUsbInfo) chipUsbInfo.textContent = '-';
         progressStatusText.textContent = 'Port diputuskan.';
         updateFlashButtonState();
+        if (typeof updateStepperUI === 'function') updateStepperUI();
+        if (typeof saveWizardState === 'function') saveWizardState();
         logToConsole('[INFO] Port serial diputuskan.');
     });
 
@@ -1774,6 +2704,12 @@
             logToConsole('============================================================');
             logToConsole('[SUKSES] Seluruh data firmware berhasil ditulis ke ESP32!');
             logToConsole('============================================================');
+            isFlashCompleted = true;
+            if (typeof updateStepperUI === 'function') updateStepperUI();
+            if (typeof saveWizardState === 'function') saveWizardState();
+            if (typeof showWizardNotice === 'function') {
+                showWizardNotice('🎉 Flashing Sukses 100%! Seluruh binary firmware berhasil ditulis ke ESP32.', 'success');
+            }
 
             const postFlashPort = port;
 
