@@ -627,7 +627,7 @@
         <div>
             <p class="app-eyebrow">Hardware Flashing Tool</p>
             <h1 class="app-title">⚡ Web Serial Flasher ESP32</h1>
-            <p class="app-subtitle">Flash firmware binary langsung ke peranti ESP32 via peramban Web Serial API tanpa perlu instalasi driver atau tools Python.</p>
+            <p class="app-subtitle">Flash firmware binary resmi atau kustom ke peranti ESP32 langsung dari peramban.</p>
             <div style="display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap;">
                 <span class="app-chip app-chip-success" style="font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
                     <span>💻</span> PC / Laptop Browser Ready
@@ -733,24 +733,24 @@
                     <div class="app-card-header">
                         <div>
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                                <span>🎯</span> 1. Pilih Sumber Firmware
+                                <span>🎯</span> 1. Sumber Firmware
                             </h2>
-                            <p class="app-section-subtitle">Langkah 1 dari 5: Tentukan metode firmware yang ingin Anda gunakan.</p>
+                            <p class="app-section-subtitle">Pilih metode firmware yang ingin Anda gunakan.</p>
                         </div>
                         <span class="app-chip app-chip-info" style="font-size:11px;">Step 1 / 5</span>
                     </div>
 
-                    <div style="display:grid; gap:12px; margin-top:6px;">
+                    <div style="display:grid; gap:12px; margin-top:8px;">
                         <!-- Option A: Preset Resmi -->
-                        <div class="source-option-card is-selected" id="cardSourcePreset" onclick="selectSourceMode('preset')">
-                            <div style="font-size:28px;">🎯</div>
+                        <div class="source-option-card is-selected" id="cardSourcePreset" onclick="selectSourceMode('preset')" style="padding:16px;">
+                            <div style="font-size:30px;">🎯</div>
                             <div style="flex:1;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
-                                    <strong style="font-size:14.5px; color:var(--app-text);">Preset Resmi Xiaozhi (Berlisensi)</strong>
-                                    <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">DIREKOMENDASIKAN</span>
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                                    <strong style="font-size:14.5px; color:var(--app-text);">Preset Resmi Xiaozhi</strong>
+                                    <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">REKOMENDASI</span>
                                 </div>
                                 <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0; line-height:1.45;">
-                                    Firmware resmi siap pakai (ESP32-S3 &amp; ESP32-C3). Dilengkapi bootloader pabrik, partisi OTA, font layar &amp; aset suara. Offset memori diatur 100% otomatis oleh sistem.
+                                    Firmware resmi terintegrasi (ESP32-S3 &amp; C3) siap pakai dengan bootloader otomatis.
                                 </p>
                             </div>
                             <div class="source-radio-indicator is-checked" id="radioPreset">
@@ -759,15 +759,15 @@
                         </div>
 
                         <!-- Option B: Custom Binary -->
-                        <div class="source-option-card" id="cardSourceCustom" onclick="selectSourceMode('custom')">
-                            <div style="font-size:28px;">📁</div>
+                        <div class="source-option-card" id="cardSourceCustom" onclick="selectSourceMode('custom')" style="padding:16px;">
+                            <div style="font-size:30px;">📁</div>
                             <div style="flex:1;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
-                                    <strong style="font-size:14.5px; color:var(--app-text);">Unggah File Firmware Sendiri (.bin)</strong>
-                                    <span class="app-chip app-chip-neutral" style="font-size:10.5px; font-weight:800;">KUSTOM / DEV</span>
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                                    <strong style="font-size:14.5px; color:var(--app-text);">Unggah File Firmware (.bin)</strong>
+                                    <span class="app-chip app-chip-neutral" style="font-size:10.5px; font-weight:800;">KUSTOM</span>
                                 </div>
                                 <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0; line-height:1.45;">
-                                    Untuk pengembang atau build mandiri (PlatformIO, ESP-IDF, Arduino IDE). Anda dapat menentukan offset alamat flash secara fleksibel pada langkah selanjutnya.
+                                    Flash file binary mandiri hasil build sendiri (PlatformIO, ESP-IDF, Arduino).
                                 </p>
                             </div>
                             <div class="source-radio-indicator" id="radioCustom">
@@ -778,8 +778,8 @@
 
                     <div class="wizard-nav-bar">
                         <div></div>
-                        <button type="button" id="btnNextToStep2" class="app-button app-button-primary" onclick="goToStep(2)" style="font-weight:850; padding:10px 18px; font-size:13px; cursor:pointer;">
-                            <span>Lanjut ke Step 2: Tentukan Target Firmware</span> <span>➔</span>
+                        <button type="button" id="btnNextToStep2" class="app-button app-button-primary" onclick="goToStep(2)" style="font-weight:850; padding:10px 20px; font-size:13px; cursor:pointer;">
+                            <span>Lanjut ke Step 2</span> <span>➔</span>
                         </button>
                     </div>
                 </div>
@@ -793,36 +793,28 @@
                     <div class="app-card-header">
                         <div>
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                                <span>📦</span> <span id="panel2TitleText">2. Tentukan Target Firmware</span>
+                                <span>📦</span> <span id="panel2TitleText">2. Pilih Board Microcontroller</span>
                             </h2>
-                            <p class="app-section-subtitle" id="panel2SubtitleText">Langkah 2 dari 5: Pilih varian hardware microcontroller Anda.</p>
+                            <p class="app-section-subtitle" id="panel2SubtitleText">Tentukan jenis microcontroller ESP32 Anda.</p>
                         </div>
                         <span class="app-chip app-chip-info" style="font-size:11px;">Step 2 / 5</span>
                     </div>
 
                     <!-- 2A: Preset View: Pilih Varian Board -->
                     <div id="step2PresetView">
-                        <label style="font-size:12.5px; font-weight:800; color:var(--app-text); display:block; margin-bottom:8px;">
-                            🎯 Pilih Salah Satu Varian Board Microcontroller:
-                        </label>
-
-                        <div style="display:grid; gap:10px;">
+                        <div style="display:grid; gap:10px; margin-top:8px;">
                             {% if presets %}
                                 {% for p in presets %}
-                                <div class="source-option-card preset-board-card {% if loop.first %}is-selected{% endif %}" id="cardBoard_{{ p.id }}" onclick="selectPreset('{{ p.id }}')">
+                                <div class="source-option-card preset-board-card {% if loop.first %}is-selected{% endif %}" id="cardBoard_{{ p.id }}" onclick="selectPreset('{{ p.id }}')" style="padding:14px;">
                                     <div style="font-size:26px;">{% if 's3' in p.chip.lower() %}⚡{% else %}📻{% endif %}</div>
                                     <div style="flex:1;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
                                             <strong style="font-size:14px; color:var(--app-text);">{{ p.title }}</strong>
                                             <span class="app-chip app-chip-info" style="font-size:10.5px; font-weight:800;">{{ p.chip }}</span>
                                         </div>
-                                        <p style="font-size:11.5px; color:var(--app-muted); margin:4px 0 0; line-height:1.4;">
-                                            {{ p.description or 'Firmware komersial resmi Xiaozhi.' }}
+                                        <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0; line-height:1.4;">
+                                            {{ p.description or 'Firmware resmi Xiaozhi.' }}
                                         </p>
-                                        <div style="display:flex; align-items:center; gap:6px; margin-top:6px; font-size:11px;">
-                                            <span class="app-chip app-chip-neutral" style="font-size:10px;">Versi Aktif: {{ p.active_version }}</span>
-                                            <span class="app-chip app-chip-success" style="font-size:10px;">Offset Otomatis: {{ p.offset or '0x0' }}</span>
-                                        </div>
                                     </div>
                                     <div class="source-radio-indicator {% if loop.first %}is-checked{% endif %}" id="radioBoard_{{ p.id }}">
                                         <span class="radio-dot"></span>
@@ -830,14 +822,11 @@
                                 </div>
                                 {% endfor %}
                             {% else %}
-                                <div class="source-option-card is-selected" id="cardBoard_esp32s3_cam" onclick="selectPreset('esp32s3_cam')">
+                                <div class="source-option-card is-selected" id="cardBoard_esp32s3_cam" onclick="selectPreset('esp32s3_cam')" style="padding:14px;">
                                     <div style="font-size:26px;">⚡</div>
                                     <div style="flex:1;">
                                         <strong style="font-size:14px; color:var(--app-text);">ESP32-S3 N16R8 / CAM Full Factory</strong>
-                                        <p style="font-size:11.5px; color:var(--app-muted); margin:4px 0 0;">Chip ESP32-S3 • Layar ST7789 TFT SPI • Kamera OV2640 / OV5640</p>
-                                        <div style="margin-top:4px;">
-                                            <span class="app-chip app-chip-success" style="font-size:10px;">Offset Otomatis: 0x0</span>
-                                        </div>
+                                        <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0;">Chip ESP32-S3 • Layar ST7789 TFT SPI</p>
                                     </div>
                                     <div class="source-radio-indicator is-checked" id="radioBoard_esp32s3_cam">
                                         <span class="radio-dot"></span>
@@ -862,23 +851,19 @@
 
                     <!-- 2B: Custom View: Unggah File .bin -->
                     <div id="step2CustomView" style="display:none;">
-                        <label style="font-size:12.5px; font-weight:800; color:var(--app-text); display:block; margin-bottom:8px;">
-                            📁 Unggah File Binary Firmware (.bin) Anda:
-                        </label>
-                        <div class="flasher-dropzone" id="dropzone" onclick="document.getElementById('firmwareFileInput').click()">
+                        <div class="flasher-dropzone" id="dropzone" onclick="document.getElementById('firmwareFileInput').click()" style="margin-top:8px; padding:28px 20px;">
                             <input type="file" id="firmwareFileInput" accept=".bin" style="display:none;">
                             <div style="font-size:32px; margin-bottom:6px;">📁</div>
                             <div style="font-size:13.5px; font-weight:750; color:var(--app-text);" id="filePromptText">
-                                Klik untuk memilih file kustom (.bin) atau seret ke sini
+                                Pilih file firmware (.bin) atau seret ke sini
                             </div>
                             <p style="font-size:11.5px; color:var(--app-muted); margin-top:4px;" id="fileSubText">
                                 Mendukung Application Binary atau Full Factory Merged (0x0).
                             </p>
                         </div>
 
-                        <!-- Active File Info Display -->
                         <div id="selectedFileInfo" style="display:none; margin-top:12px; padding:12px 14px; background:rgba(5,150,105,0.08); border:1.5px solid var(--app-accent, #059669); border-radius:var(--app-radius);">
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                                 <div>
                                     <strong id="selectedFileName" style="font-size:13.5px; color:var(--app-text);">-</strong>
                                     <span id="selectedFileSize" style="display:block; font-size:11.5px; color:var(--app-muted); margin-top:2px;">-</span>
@@ -890,10 +875,10 @@
 
                     <div class="wizard-nav-bar">
                         <button type="button" id="btnPrevToStep1" class="app-button app-button-secondary" onclick="goToStep(1)" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
-                            <span>⬅</span> <span>Kembali ke Step 1</span>
+                            <span>⬅</span> <span>Kembali</span>
                         </button>
-                        <button type="button" id="btnNextToStep3" class="app-button app-button-primary" onclick="goToStep(3)" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
-                            <span>Lanjut ke Step 3: Muat Firmware</span> <span>➔</span>
+                        <button type="button" id="btnNextToStep3" class="app-button app-button-primary" onclick="goToStep(3)" style="font-weight:850; padding:9px 20px; font-size:12.5px; cursor:pointer;">
+                            <span>Lanjut ke Step 3</span> <span>➔</span>
                         </button>
                     </div>
                 </div>
@@ -907,9 +892,9 @@
                     <div class="app-card-header">
                         <div>
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                                <span>⚙️</span> <span id="panel3TitleText">3. Konfigurasi Versi &amp; Memori</span>
+                                <span>⚙️</span> <span id="panel3TitleText">3. Versi &amp; Muat Firmware</span>
                             </h2>
-                            <p class="app-section-subtitle" id="panel3SubtitleText">Langkah 3 dari 5: Tentukan versi rilis firmware resmi dan muat ke memori browser (offset diatur otomatis).</p>
+                            <p class="app-section-subtitle" id="panel3SubtitleText">Siapkan binary firmware resmi ke memori browser.</p>
                         </div>
                         <span class="app-chip app-chip-info" style="font-size:11px;">Step 3 / 5</span>
                     </div>
@@ -919,9 +904,9 @@
                         <!-- Active Selected Board Header -->
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 14px; background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); margin-bottom:12px; flex-wrap:wrap;">
                             <div>
-                                <span style="font-size:11px; color:var(--app-muted); font-weight:700; text-transform:uppercase;">Varian Board Terpilih:</span>
+                                <span style="font-size:11px; color:var(--app-muted); font-weight:700; text-transform:uppercase;">Varian Terpilih:</span>
                                 <strong id="lblPresetTitle" style="font-size:13.5px; color:var(--app-text); display:block;">ESP32-S3 CAM Full Factory</strong>
-                                <span id="lblPresetDesc" style="font-size:11px; color:var(--app-muted); display:none;"></span>
+                                <span id="lblPresetDesc" style="display:none;"></span>
                             </div>
                             <div style="display:flex; gap:6px; align-items:center;">
                                 <span class="app-chip app-chip-neutral" id="lblPresetVersion" style="font-size:11px; font-weight:900;">Versi: v001</span>
@@ -929,96 +914,63 @@
                             </div>
                         </div>
 
-                        <!-- Version Selector -->
+                        <!-- Version Selector (Clean) -->
                         <div id="presetVersionSection" style="margin-bottom: 12px; background: var(--app-surface); border: 1.5px solid var(--app-border-strong); border-radius: var(--app-radius); padding: 12px 14px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
-                                <label for="userPresetVersionSelect" style="font-size:12px; font-weight:800; color:var(--app-text); display:flex; align-items:center; gap:6px; margin:0;">
-                                    <span>🏷️</span> Pilih Versi Rilis Firmware:
-                                </label>
-                                <div id="versionStatusPill" class="app-chip app-chip-success" style="font-size:10.5px; font-weight:850;">
-                                    Versi Aktif (Rekomendasi)
-                                </div>
-                            </div>
-
-                            <select id="userPresetVersionSelect" class="app-input" onchange="onUserPresetVersionChange(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px; font-weight:700;">
+                            <label for="userPresetVersionSelect" style="font-size:12px; font-weight:800; color:var(--app-text); display:block; margin-bottom:6px;">
+                                🏷️ Versi Rilis Firmware:
+                            </label>
+                            <select id="userPresetVersionSelect" class="app-input" onchange="onUserPresetVersionChange(this.value)" style="width:100%; font-size:12.5px; padding:8px 10px; font-weight:700;">
                                 {% if preset_status and preset_status.preset and preset_status.preset.versions %}
                                     {% for v in preset_status.preset.versions %}
                                     <option value="{{ v.version }}" {% if v.version == preset_status.active_version %}selected{% endif %}>
-                                        {{ v.version }} {% if v.version == preset_status.active_version %}(Versi Utama / Aktif){% else %}(Versi Sebelumnya / Lama){% endif %}{% if v.changelog %} • {{ v.changelog[:40] }}{% endif %}
+                                        {{ v.version }} {% if v.version == preset_status.active_version %}(Rekomendasi / Utama){% else %}(Versi Lama){% endif %}{% if v.changelog %} • {{ v.changelog[:35] }}{% endif %}
                                     </option>
                                     {% endfor %}
                                 {% else %}
                                     <option value="{{ preset_status.active_version if preset_status else 'v001' }}">
-                                        {{ preset_status.active_version if preset_status else 'v001' }} (Versi Utama / Aktif)
+                                        {{ preset_status.active_version if preset_status else 'v001' }} (Rekomendasi / Utama)
                                     </option>
                                 {% endif %}
                             </select>
-
-                            <!-- Informasi Detail Versi -->
-                            <div id="versionDetailBox" style="margin-top:10px; padding:10px; background:var(--app-surface-muted); border-radius:6px; border:1px solid var(--app-border); font-size:11.5px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:4px;">
-                                    <strong style="color:var(--app-text);" id="verDetailFilename">firmware.bin</strong>
-                                    <span style="color:var(--app-muted); font-size:11px;" id="verDetailDate"></span>
-                                </div>
-                                <div style="color:var(--app-muted); margin-bottom:6px; line-height:1.4;" id="verDetailChangelog">
-                                    📝 Rilis firmware resmi (Offset diatur otomatis ke 0x0 Full Factory Merged)
-                                </div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; font-size:11px; border-top:1px dashed var(--app-border); padding-top:6px;">
-                                    <span id="verDetailSize">Ukuran: 0 MB</span>
-                                    <span style="color:var(--app-accent, #059669); font-weight:750;" id="verDetailSecurity">
-                                        🛡️ Terverifikasi SHA-256 • Enkripsi AES-256
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div id="olderVersionAlert" style="display:none; margin-top:8px; padding:8px 10px; background:rgba(234, 179, 8, 0.1); border:1px solid rgba(234, 179, 8, 0.35); border-radius:6px; font-size:11.5px; color:var(--app-text); line-height:1.4;">
-                                ⚠️ <strong>Catatan Versi Lama:</strong> Anda memilih versi terdahulu (<span id="alertVersionName" style="font-weight:bold;">v001</span>). Stabil dan aman untuk di-flash.
+                            <div id="versionDetailBox" style="margin-top:8px; display:flex; justify-content:space-between; align-items:center; font-size:11.5px; color:var(--app-muted);">
+                                <span id="verDetailFilename">firmware.bin</span>
+                                <span id="verDetailSize">Ukuran: 0 MB</span>
                             </div>
                         </div>
 
-                        <!-- Status Box: GEMBOK TERBUKA vs GEMBOK TERKUNCI -->
-                        <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:14px;">
+                        <!-- Status Box: Gembok Terbuka vs Terkunci -->
+                        <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:12px 14px;">
                             <!-- KONDISI 1: GEMBOK TERBUKA 🔓 -->
                             <div id="boxPresetUnlocked" style="{% if not preset_status or not preset_status.authorized %}display:none;{% endif %}">
                                 <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                                    <div>
-                                        <span class="app-chip app-chip-success" style="font-size:11px; font-weight:850;">
-                                            {% if user and user.role == 'admin' %}🛡️ ADMINISTRATOR RESMI (AKSES PENUH){% else %}🔓 GEMBOK TERBUKA • LISENSI RESMI AKTIF{% endif %}
-                                        </span>
-                                        <span style="font-size:11px; color:var(--app-muted); display:block; margin-top:3px;">
-                                            ⚡ Lisensi aktif. Klik tombol di kanan untuk memuat binary versi terpilih ke memori browser.
-                                        </span>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <span style="font-size:20px;">🔓</span>
+                                        <div>
+                                            <strong style="font-size:13px; color:var(--app-text); display:block;">Lisensi Resmi Aktif</strong>
+                                            <span style="font-size:11.5px; color:var(--app-muted);">Akses terbuka. Klik tombol di kanan untuk memuat binary.</span>
+                                        </div>
                                     </div>
-                                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                                        <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:7px 16px;">
-                                            ⚡ Muat Preset Ini ke Flasher
-                                        </button>
-                                    </div>
+                                    <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:8px 16px;">
+                                        ⚡ Muat Preset Ini ke Flasher
+                                    </button>
                                 </div>
                             </div>
 
                             <!-- KONDISI 2: GEMBOK TERKUNCI 🔒 -->
-                            <div id="boxPresetLocked" style="{% if preset_status and preset_status.authorized %}display:none;{% endif %} background:rgba(220,38,38,0.05); border:1.5px solid rgba(220,38,38,0.25); border-radius:var(--app-radius); padding:12px 14px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-                                    <span class="app-chip app-chip-danger" style="font-size:11px; font-weight:900;">
-                                        🔒 GEMBOK TERKUNCI • LISENSI DIPERLUKAN
-                                    </span>
-                                    <span style="font-size:11px; color:var(--app-muted);">
-                                        Tersedia: <strong>{{ preset_status.active_version if preset_status else 'v001' }}</strong>
-                                    </span>
+                            <div id="boxPresetLocked" style="{% if preset_status and preset_status.authorized %}display:none;{% endif %}">
+                                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                                    <span style="font-size:20px;">🔒</span>
+                                    <div>
+                                        <strong style="font-size:13px; color:#dc2626; display:block;">Gembok Terkunci • Lisensi Diperlukan</strong>
+                                        <span style="font-size:11.5px; color:var(--app-muted);">Masukkan Kode Lisensi Anda untuk membuka akses firmware:</span>
+                                    </div>
                                 </div>
-                                <p style="font-size:12px; color:var(--app-text); margin:0 0 10px; line-height:1.5;">
-                                    Masukkan <strong>Kode Lisensi Sekali Pakai</strong> yang Anda peroleh untuk membuka akses firmware:
-                                </p>
-                                <form onsubmit="submitInlineClaimCode(event)" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
-                                    <input type="text" id="inlineClaimCodeInput" placeholder="Ketik Kode: XZ-PRESET-XXXX-YYYY" class="app-input" style="flex:1; min-width:200px; padding:7px 10px; font-size:12.5px; text-transform:uppercase; font-family:monospace; font-weight:bold;" required autocomplete="off">
-                                    <button type="submit" id="btnSubmitInlineClaim" class="app-button app-button-primary" style="font-weight:850; font-size:12px; padding:7px 14px; white-space:nowrap;">
+                                <form onsubmit="submitInlineClaimCode(event)" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+                                    <input type="text" id="inlineClaimCodeInput" placeholder="Contoh: XZ-PRESET-XXXX-YYYY" class="app-input" style="flex:1; min-width:200px; padding:8px 12px; font-size:12.5px; text-transform:uppercase; font-family:monospace; font-weight:bold;" required autocomplete="off">
+                                    <button type="submit" id="btnSubmitInlineClaim" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:8px 16px; white-space:nowrap;">
                                         🔓 Buka Kunci
                                     </button>
                                 </form>
-                                <div style="font-size:11.5px; color:var(--app-muted); padding-top:4px; line-height:1.4;">
-                                    ℹ️ Hubungi Admin untuk mendapatkan Kode Lisensi atau melalui paket pembelian kit resmi.
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1026,19 +978,16 @@
                     <!-- 3B: Custom Flash Offset View -->
                     <div id="step3CustomView" style="display:none;">
                         <label style="font-size:12.5px; font-weight:800; color:var(--app-text); display:block; margin-bottom:8px;">
-                            📍 Pilih Alamat Offset Flash Microcontroller:
+                            📍 Alamat Offset Flash:
                         </label>
-                        <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:14px;">
+                        <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:12px 14px;">
                             <select id="offsetPreset" class="app-input" onchange="handleOffsetChange(this.value)" style="width:100%; font-size:12.5px; padding:8px 10px; font-weight:700;">
-                                <option value="0x0" selected>0x0 (Full Factory Merged - Board Baru Kosong)</option>
+                                <option value="0x0" selected>0x0 (Full Factory Merged - Board Kosong)</option>
                                 <option value="0x20000">0x20000 (Aplikasi Saja / Update OTA)</option>
                                 <option value="0x10000">0x10000 (Standar Arduino App)</option>
                                 <option value="custom">Offset Kustom...</option>
                             </select>
                             <input type="text" id="offsetInput" class="app-input" value="0x0" style="display:none; margin-top:8px;" placeholder="Contoh: 0x0">
-                            <p style="font-size:11.5px; color:var(--app-muted); margin:8px 0 0; line-height:1.45;">
-                                💡 Gunakan offset <strong>0x0</strong> jika file firmware Anda berisi bootloader, partisi table, dan app sekaligus. Gunakan <strong>0x20000</strong> jika hanya partisi aplikasi.
-                            </p>
                         </div>
                     </div>
 
@@ -1049,10 +998,10 @@
 
                     <div class="wizard-nav-bar">
                         <button type="button" id="btnPrevToStep2" class="app-button app-button-secondary" onclick="goToStep(2)" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
-                            <span>⬅</span> <span>Kembali ke Step 2</span>
+                            <span>⬅</span> <span>Kembali</span>
                         </button>
-                        <button type="button" id="btnNextToStep4" class="app-button app-button-primary" onclick="goToStep(4)" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
-                            <span>Lanjut ke Step 4: Koneksi Hardware</span> <span>➔</span>
+                        <button type="button" id="btnNextToStep4" class="app-button app-button-primary" onclick="goToStep(4)" style="font-weight:850; padding:9px 20px; font-size:12.5px; cursor:pointer;">
+                            <span>Lanjut ke Step 4</span> <span>➔</span>
                         </button>
                     </div>
                 </div>
@@ -1068,22 +1017,22 @@
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
                                 <span>🔌</span> 4. Koneksi Hardware (COM)
                             </h2>
-                            <p class="app-section-subtitle">Langkah 4 dari 5: Sambungkan microcontroller ESP32 ke PC / Laptop via kabel USB dan hubungkan port serial.</p>
+                            <p class="app-section-subtitle">Sambungkan kabel USB ESP32 ke komputer dan hubungkan port serial.</p>
                         </div>
                         <span class="app-chip app-chip-info" style="font-size:11px;">Step 4 / 5</span>
                     </div>
 
-                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-                        <button type="button" id="btnConnect" class="app-button app-button-primary" style="flex:1; justify-content:center; cursor:pointer; font-weight:850; padding:10px;">
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:8px;">
+                        <button type="button" id="btnConnect" class="app-button app-button-primary" style="flex:1; justify-content:center; cursor:pointer; font-weight:850; padding:11px;">
                             <span>🔌</span> Pilih &amp; Hubungkan Port COM
                         </button>
-                        <button type="button" id="btnDisconnect" class="app-button app-button-danger" style="display:none; justify-content:center; cursor:pointer; font-weight:850; padding:10px;">
+                        <button type="button" id="btnDisconnect" class="app-button app-button-danger" style="display:none; justify-content:center; cursor:pointer; font-weight:850; padding:11px;">
                             <span>❌</span> Putuskan
                         </button>
                         <div style="min-width:140px;">
                             <select id="baudrateSelect" class="app-input" style="padding:8px 10px; font-size:12px; font-weight:700;">
-                                <option value="230400" selected>230,400 bps (Stabil &amp; Cepat - Rekomendasi)</option>
-                                <option value="115200">115,200 bps (Paling Aman / Anti-Noise)</option>
+                                <option value="230400" selected>230,400 bps (Stabil &amp; Cepat)</option>
+                                <option value="115200">115,200 bps (Paling Aman)</option>
                                 <option value="460800">460,800 bps (Cepat)</option>
                                 <option value="921600">921,600 bps (Ultra Cepat)</option>
                             </select>
@@ -1093,17 +1042,17 @@
                     <!-- Live USB Plugged/Detected Indicator -->
                     <div id="usbPlugNotice" style="display:none; margin-top:12px; padding:10px 14px; background:#ecfdf5; border:1.5px solid #10b981; border-radius:var(--app-radius); font-size:12.5px; color:#065f46; font-weight:700; align-items:center; gap:8px;">
                         <span style="font-size:16px;">🔌</span>
-                        <span id="usbPlugNoticeText">Perangkat USB terdeteksi! Silakan klik "Pilih &amp; Hubungkan Port COM".</span>
+                        <span id="usbPlugNoticeText">Perangkat USB terdeteksi! Klik "Pilih &amp; Hubungkan Port COM".</span>
                     </div>
 
                     <!-- Connected Hardware Details -->
-                    <div id="chipInfoBox" class="flasher-chip-info-grid" style="display:none;">
+                    <div id="chipInfoBox" class="flasher-chip-info-grid" style="display:none; margin-top:12px;">
                         <div class="chip-info-item">
                             <span>Model Chip ESP32:</span>
                             <span id="chipModel" style="color:var(--app-accent, #059669); font-weight:800;">-</span>
                         </div>
                         <div class="chip-info-item">
-                            <span>Port &amp; Bridge USB:</span>
+                            <span>Port &amp; Bridge:</span>
                             <span id="chipUsbInfo" style="color:var(--app-accent, #059669); font-weight:800;">-</span>
                         </div>
                         <div class="chip-info-item">
@@ -1111,18 +1060,17 @@
                             <span id="chipMac" style="font-family:monospace;">-</span>
                         </div>
                         <div class="chip-info-item">
-                            <span>Fitur Hardware:</span>
+                            <span>Fitur:</span>
                             <span id="chipFeatures">-</span>
                         </div>
                         <div class="chip-info-item">
-                            <span>Frekuensi Kristal:</span>
+                            <span>Kristal:</span>
                             <span id="chipCrystal">-</span>
                         </div>
                     </div>
 
                     <!-- Flashing Options -->
-                    <div style="margin-top:14px; padding:12px 14px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius);">
-                        <strong style="font-size:12px; color:var(--app-text); display:block; margin-bottom:8px;">Opsi Flashing:</strong>
+                    <div style="margin-top:12px; padding:10px 14px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius);">
                         <div style="display:flex; flex-direction:column; gap:6px;">
                             <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer;">
                                 <input type="checkbox" id="chkAutoReset" checked style="accent-color:var(--app-accent, #059669);">
@@ -1135,21 +1083,26 @@
                         </div>
                     </div>
 
-                    <!-- Disconnected Notice & Driver Helpers -->
-                    <div id="connNotice" style="margin-top:14px; padding:12px 14px; background:var(--app-surface-muted); border:1px dashed var(--app-border-strong); border-radius:var(--app-radius); font-size:12px; color:var(--app-muted); line-height:1.5;">
-                        💡 <strong>Tips Deteksi Port (PC / Laptop):</strong>
-                        <ul style="margin:4px 0 0; padding-left:18px; display:grid; gap:4px;">
-                            <li><strong>💻 Port COM tidak muncul di pop-up?</strong> Pastikan menggunakan <strong>kabel data USB</strong> asli, atau instal driver: <a href="https://www.wch.cn/downloads/CH341SER_EXE.html" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CH340 / CH9102 ↗</a> atau <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener" style="color:var(--app-primary, #047857); font-weight:700; text-decoration:underline;">Driver CP210x ↗</a>.</li>
-                            <li><strong>🔧 Mode Bootloader:</strong> Jika port timeout saat sync, tahan tombol <strong>BOOT (GPIO 0)</strong> di ESP32, tekan tombol <strong>RST/EN</strong> 1x, lalu lepas tombol BOOT sebelum mengklik Hubungkan.</li>
-                        </ul>
-                    </div>
+                    <!-- Collapsible Driver Helper (Clean, Not in the way) -->
+                    <details style="margin-top:12px; font-size:12px; color:var(--app-muted);">
+                        <summary style="cursor:pointer; font-weight:700; color:var(--app-primary, #047857);">
+                            💡 Port COM tidak muncul di komputer Anda? Klik di sini untuk bantuan driver
+                        </summary>
+                        <div style="margin-top:8px; padding:10px 12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); line-height:1.5;">
+                            <ul style="margin:0; padding-left:18px; display:grid; gap:4px;">
+                                <li>Gunakan kabel data USB asli (bukan kabel charger biasa).</li>
+                                <li>Unduh driver USB bridge: <a href="https://www.wch.cn/downloads/CH341SER_EXE.html" target="_blank" rel="noopener" style="text-decoration:underline; font-weight:700;">Driver CH340 / CH9102 ↗</a> atau <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener" style="text-decoration:underline; font-weight:700;">Driver CP210x ↗</a>.</li>
+                                <li>Jika port timeout saat sync, tahan tombol <strong>BOOT</strong> di board, tekan <strong>RST</strong> 1x, lalu lepas tombol BOOT.</li>
+                            </ul>
+                        </div>
+                    </details>
 
                     <div class="wizard-nav-bar">
                         <button type="button" id="btnPrevToStep3" class="app-button app-button-secondary" onclick="goToStep(3)" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
-                            <span>⬅</span> <span>Kembali ke Step 3</span>
+                            <span>⬅</span> <span>Kembali</span>
                         </button>
-                        <button type="button" id="btnNextToStep5" class="app-button app-button-primary" onclick="goToStep(5)" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
-                            <span>Lanjut ke Step 5: Review &amp; Flash</span> <span>➔</span>
+                        <button type="button" id="btnNextToStep5" class="app-button app-button-primary" onclick="goToStep(5)" style="font-weight:850; padding:9px 20px; font-size:12.5px; cursor:pointer;">
+                            <span>Lanjut ke Step 5</span> <span>➔</span>
                         </button>
                     </div>
                 </div>
@@ -1163,15 +1116,15 @@
                     <div class="app-card-header">
                         <div>
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                                <span>⚡</span> 5. Review Kesiapan &amp; Eksekusi Flash
+                                <span>⚡</span> 5. Review &amp; Eksekusi Flash
                             </h2>
-                            <p class="app-section-subtitle">Langkah 5 dari 5: Periksa ringkasan jawaban Step 1 sampai 4 sebelum memulai penulisan firmware ke chip ESP32.</p>
+                            <p class="app-section-subtitle">Periksa ringkasan konfigurasi sebelum menulis firmware ke ESP32.</p>
                         </div>
                         <span class="app-chip app-chip-success" style="font-size:11px; font-weight:800;">Langkah Terakhir</span>
                     </div>
 
                     <!-- Pre-Flash Checklist Summary -->
-                    <div class="review-checklist" id="reviewChecklist">
+                    <div class="review-checklist" id="reviewChecklist" style="margin-top:8px;">
                         <div class="review-item">
                             <span style="color:var(--app-muted); font-weight:700;">💾 Sumber &amp; Varian:</span>
                             <span id="reviewFirmwareSummary" style="font-weight:800; color:var(--app-text);">-</span>
@@ -1181,11 +1134,11 @@
                             <span id="reviewVersionSummary" style="font-weight:800; color:var(--app-text);">-</span>
                         </div>
                         <div class="review-item">
-                            <span style="color:var(--app-muted); font-weight:700;">🔌 Port COM &amp; Microcontroller:</span>
+                            <span style="color:var(--app-muted); font-weight:700;">🔌 Port COM ESP32:</span>
                             <span id="reviewChipSummary" style="font-weight:800; color:var(--app-text);">-</span>
                         </div>
                         <div class="review-item">
-                            <span style="color:var(--app-muted); font-weight:700;">📍 Alamat Offset Flash:</span>
+                            <span style="color:var(--app-muted); font-weight:700;">📍 Alamat Offset:</span>
                             <span id="reviewOffsetSummary" style="font-weight:800; color:var(--app-text);">-</span>
                         </div>
                         <div class="review-item">
@@ -1193,28 +1146,24 @@
                             <span id="reviewBaudSummary" style="font-weight:800; color:var(--app-text);">-</span>
                         </div>
                         <div class="review-item">
-                            <span style="color:var(--app-muted); font-weight:700;">⚙️ Konfigurasi Tambahan:</span>
+                            <span style="color:var(--app-muted); font-weight:700;">⚙️ Opsi Tambahan:</span>
                             <span id="reviewOptionsSummary" style="font-weight:700; color:var(--app-text);">-</span>
                         </div>
                     </div>
 
                     <!-- Flash Action Button -->
-                    <div style="margin-top:6px;">
-                        <button type="button" id="btnFlash" class="app-button app-button-success" style="width:100%; padding:14px; font-size:15px; font-weight:850; justify-content:center; letter-spacing:0.3px;" disabled>
+                    <div style="margin-top:14px;">
+                        <button type="button" id="btnFlash" class="app-button app-button-success" style="width:100%; padding:14px; font-size:15px; font-weight:850; justify-content:center; letter-spacing:0.3px; cursor:pointer;" disabled>
                             <span>⚡</span> Mulai Flash ke ESP32
                         </button>
                     </div>
 
-                    <p style="font-size:11.5px; color:var(--app-muted); margin-top:10px; line-height:1.45;">
-                        💡 <strong>Info:</strong> Selama proses flashing berjalan, layar monitor otomatis dijaga tetap menyala (Keep-Awake aktif) dan progress bar realtime di kolom kanan akan bergerak hingga 100%. Jangan mencabut kabel USB sampai selesai.
-                    </p>
-
                     <div class="wizard-nav-bar">
                         <button type="button" id="btnPrevToStep4" class="app-button app-button-secondary" onclick="goToStep(4)" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
-                            <span>⬅</span> <span>Kembali ke Step 4 (Hardware)</span>
+                            <span>⬅</span> <span>Kembali</span>
                         </button>
                         <button type="button" id="btnResetWizard" class="app-button app-button-ghost" onclick="goToStep(1)" style="font-weight:750; font-size:12px; cursor:pointer;">
-                            <span>🔄 Mulai dari Step 1</span>
+                            <span>🔄 Mulai dari Awal</span>
                         </button>
                     </div>
                 </div>
@@ -1284,10 +1233,7 @@
                 </div>
 
                 <!-- Terminal Console Screen -->
-                <div class="flasher-console" id="consoleLog">Xiaozhi ESP32 Web Flasher &amp; Serial Monitor siap.
-• Klik 'Pilih &amp; Hubungkan Port COM' di sebelah kiri untuk Flashing Firmware.
-• Atau klik '▶️ Buka Serial Monitor' di atas untuk memantau log ESP32 yang tercolok secara langsung (115200 bps).
-</div>
+                <div class="flasher-console" id="consoleLog">Xiaozhi ESP32 Web Flasher siap. Sambungkan port COM untuk memulai.</div>
 
                 <!-- Terminal Bottom Options & Command Input -->
                 <div style="margin-top:10px; display:grid; gap:8px;">
@@ -1312,18 +1258,7 @@
                 </div>
             </div>
 
-            <!-- Quick Tips Card -->
-            <div class="app-card" style="font-size:12.5px; color:var(--app-muted); line-height:1.6;">
-                <div style="font-weight:800; color:var(--app-text); margin-bottom:8px; font-size:13px; display:flex; align-items:center; gap:6px;">
-                    <span>💡</span> Tips Flashing Board Baru:
-                </div>
-                <ul style="padding-left:18px; margin:0; display:grid; gap:4px;">
-                    <li>Gunakan <strong>Preset Resmi (ESP32-S3)</strong> dengan offset <strong>0x0</strong> untuk peranti yang masih baru.</li>
-                    <li><strong>💻 Peramban:</strong> Gunakan peramban Chromium di PC/Laptop (Google Chrome, Microsoft Edge, Opera, Brave).</li>
-                    <li>Pastikan kabel USB mendukung transfer data (bukan sekadar kabel charging biasa).</li>
-                    <li>Panduan lengkap pinout layar/audio dapat dibuka lewat tombol panduan di dalam panel Preset.</li>
-                </ul>
-            </div>
+
         </div>
     </div>
 </div>
