@@ -2496,7 +2496,7 @@ void loop() {
 
     // Service MQTT first so serial input or other work cannot starve keepalive packets.
     if (mqttClient.connected() && !mqttClient.loop()) {
-        Serial.printf("[MQTT] Loop terputus (state=%d); reconnect akan dicoba.\n", mqttClient.state());
+        Serial.printf("[MQTT] Loop terputus (state=%d); reconnect akan dicoba.\\n", mqttClient.state());
     }
 
     handleSerialInput();
