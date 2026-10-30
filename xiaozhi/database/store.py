@@ -3442,6 +3442,41 @@ class HFJsonStore:
 
     # ── Relay Rooms (stub for HFJsonStore) ─────────────────────────────────
 
+    def record_mqtt_gateway_event(self, event: Dict[str, Any]) -> None:
+        with self._lock:
+            data = self._load()
+            event_type = str(event.get("event_type") or "unknown")[:64]
+            severity = str(event.get("severity") or "info")[:16]
+            connected = bool(event.get("connected", False))
+            detail = str(event.get("detail") or "")[:2000]
+            record = {
+                "event_type": event_type,
+                "severity": severity,
+                "connected": connected,
+                "broker_url": str(event.get("broker_url") or "")[:255],
+                "detail": detail,
+                "slug": str(event.get("slug") or "")[:100],
+                "topic": str(event.get("topic") or "")[:255],
+                "cmd_id": str(event.get("cmd_id") or "")[:128],
+                "created_at": utc_now(),
+            }
+            status = data.setdefault("mqtt_gateway_status", {})
+            status.update({
+                "connected": connected,
+                "broker_url": record["broker_url"],
+                "last_event_type": event_type,
+                "last_detail": detail,
+                "updated_at": record["created_at"],
+            })
+            if severity == "error":
+                status["last_error"] = detail
+            elif event_type == "broker_connected":
+                status["last_error"] = ""
+            events = data.setdefault("mqtt_gateway_events", [])
+            events.append(record)
+            data["mqtt_gateway_events"] = events[-500:]
+            self._commit(data, "Record MQTT gateway event")
+
     def list_relay_rooms(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._lock:
             data = self._load()

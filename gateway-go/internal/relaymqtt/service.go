@@ -81,12 +81,14 @@ func (s *RelayMQTTService) Start(ctx context.Context) error {
 			s.connected = false
 			s.mu.Unlock()
 			log.Printf("[MQTT] Gagal memasang subscription relay: %v; memutus koneksi untuk mencoba ulang", err)
+			go s.reportEvent("broker_connect_failed", false, err.Error(), "", "", "")
 			c.Disconnect(250)
 			return
 		}
 		s.mu.Lock()
 		s.connected = true
 		s.mu.Unlock()
+		go s.reportEvent("broker_connected", true, "Gateway tersambung ke broker MQTT.", "", "", "")
 
 		if s.sseHub != nil {
 			s.sseHub.Broadcast("mqtt", "Gateway terhubung ke Eclipse Mosquitto Broker", map[string]any{"broker": broker})
@@ -99,6 +101,7 @@ func (s *RelayMQTTService) Start(ctx context.Context) error {
 		s.mu.Unlock()
 
 		log.Printf("[MQTT] Koneksi ke Mosquitto terputus: %v. Mencoba rekoneksi otomatis...", err)
+		go s.reportEvent("broker_connection_lost", false, err.Error(), "", "", "")
 		if s.sseHub != nil {
 			s.sseHub.Broadcast("mqtt", fmt.Sprintf("Koneksi Mosquitto terputus: %v", err), nil)
 		}
@@ -106,13 +109,16 @@ func (s *RelayMQTTService) Start(ctx context.Context) error {
 
 	client := mqtt.NewClient(opts)
 	s.client = client
+	s.reportEvent("broker_connecting", false, "Gateway sedang mencoba tersambung ke broker MQTT.", "", "", "")
 
 	token := client.Connect()
 	go func() {
 		if !token.WaitTimeout(10 * time.Second) {
 			log.Printf("[MQTT] Timeout koneksi awal ke Mosquitto: %s (akan mencoba ulang otomatis)", broker)
+			s.reportEvent("broker_connect_timeout", false, "Timeout saat koneksi awal ke broker MQTT.", "", "", "")
 		} else if token.Error() != nil {
 			log.Printf("[MQTT] Warning: Gagal koneksi awal ke Mosquitto: %v. (Akan auto-reconnect di background)", token.Error())
+			s.reportEvent("broker_connect_failed", false, token.Error().Error(), "", "", "")
 		}
 	}()
 
@@ -221,6 +227,11 @@ func (s *RelayMQTTService) handleAvailabilityMessage(topic string, avail string)
 
 	logMsg := fmt.Sprintf("[LWT] Perangkat '%s' sekarang %s", room.NamaTempat, strings.ToUpper(avail))
 	log.Printf("[MQTT] %s", logMsg)
+	eventType := "device_offline"
+	if isOnline {
+		eventType = "device_online"
+	}
+	go s.reportEvent(eventType, s.isConnected(), logMsg, slug, topic, "")
 
 	if s.sseHub != nil {
 		s.sseHub.Broadcast("relay_availability", logMsg, map[string]any{
@@ -246,6 +257,7 @@ func (s *RelayMQTTService) handleErrorMessage(topic string, payload []byte) {
 	}
 
 	log.Printf("[MQTT ERROR] Perangkat %s melaporkan error: [%s] %s (Relay %d)", slug, errMsg.ErrorCode, errMsg.Detail, errMsg.Relay)
+	go s.reportEvent("device_error", s.isConnected(), fmt.Sprintf("%s: %s (relay %d)", errMsg.ErrorCode, errMsg.Detail, errMsg.Relay), slug, topic, errMsg.CmdID)
 	if s.sseHub != nil {
 		s.sseHub.Broadcast("relay_error", fmt.Sprintf("Error pada %s: %s", slug, errMsg.Detail), map[string]any{
 			"slug":       slug,
@@ -258,14 +270,24 @@ func (s *RelayMQTTService) handleErrorMessage(topic string, payload []byte) {
 }
 
 // PublishCommand sends action to ESP32: xiaozhi/relay/{slug}/set
-func (s *RelayMQTTService) PublishCommand(slug string, relayNum int, action string, cmdID string) error {
+func (s *RelayMQTTService) PublishCommand(slug string, relayNum int, action string, cmdID string, deviceLastSeenAt *time.Time) error {
 	s.mu.RLock()
 	client := s.client
 	connected := s.connected
 	s.mu.RUnlock()
 
 	if !connected || client == nil {
-		return fmt.Errorf("MQTT broker belum terhubung")
+		err := fmt.Errorf("MQTT broker belum terhubung")
+		go s.reportEvent("broker_publish_failed", false, err.Error(), slug, fmt.Sprintf("xiaozhi/relay/%s/set", slug), cmdID)
+		return err
+	}
+	if deviceLastSeenAt == nil || time.Since(*deviceLastSeenAt) > 45*time.Second {
+		detail := fmt.Sprintf("Perangkat ESP32 %s tidak terlihat dalam 45 detik terakhir; perintah tidak dikirim.", slug)
+		if deviceLastSeenAt != nil {
+			detail = fmt.Sprintf("Perangkat ESP32 %s terakhir terlihat %s; perintah tidak dikirim.", slug, deviceLastSeenAt.Format(time.RFC3339))
+		}
+		go s.reportEvent("device_offline", true, detail, slug, fmt.Sprintf("xiaozhi/relay/%s/set", slug), cmdID)
+		return fmt.Errorf("%s", detail)
 	}
 
 	if cmdID == "" {
@@ -287,14 +309,62 @@ func (s *RelayMQTTService) PublishCommand(slug string, relayNum int, action stri
 
 	token := client.Publish(topic, 1, false, data)
 	if !token.WaitTimeout(3 * time.Second) {
-		return fmt.Errorf("timeout publish MQTT ke %s", topic)
+		err := fmt.Errorf("timeout publish MQTT ke %s", topic)
+		go s.reportEvent("broker_publish_failed", true, err.Error(), slug, topic, cmdID)
+		return err
 	}
 	if token.Error() != nil {
-		return fmt.Errorf("gagal publish MQTT: %w", token.Error())
+		err := fmt.Errorf("gagal publish MQTT: %w", token.Error())
+		go s.reportEvent("broker_publish_failed", true, err.Error(), slug, topic, cmdID)
+		return err
 	}
 
 	log.Printf("[MQTT PUBLISH] %s -> %s", topic, string(data))
 	return nil
+}
+
+func (s *RelayMQTTService) isConnected() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.connected
+}
+
+func (s *RelayMQTTService) reportEvent(eventType string, connected bool, detail, slug, topic, cmdID string) {
+	if s.cfg.PythonBackendURL == "" {
+		return
+	}
+	targetURL := fmt.Sprintf("%s/api/internal/mqtt/event", strings.TrimRight(s.cfg.PythonBackendURL, "/"))
+	bodyData, err := json.Marshal(map[string]any{
+		"event_type": eventType,
+		"connected":  connected,
+		"broker_url": s.cfg.MQTTBrokerURL,
+		"detail":     detail,
+		"slug":       slug,
+		"topic":      topic,
+		"cmd_id":     cmdID,
+	})
+	if err != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(bodyData))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if s.cfg.InternalAPIKey != "" {
+		req.Header.Set("X-Gateway-Internal-Key", s.cfg.InternalAPIKey)
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		log.Printf("[MQTT] Gagal menyimpan event %s ke database: %v", eventType, err)
+		return
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		log.Printf("[MQTT] Penyimpanan event %s ditolak backend (HTTP %d)", eventType, resp.StatusCode)
+	}
 }
 
 func (s *RelayMQTTService) notifyPython(ownerID, roomID int64, roomName string, relays []store.RelayDeviceInfo, connected bool) {

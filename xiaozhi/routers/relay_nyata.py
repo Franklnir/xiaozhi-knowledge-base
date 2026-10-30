@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import secrets
 import time
+from urllib.parse import urlsplit
 import zipfile
 from typing import Any, Dict
 
@@ -100,16 +101,19 @@ def real_relay_page_payload(owner_id: int) -> Dict[str, Any]:
     return {"rooms": rooms}
 
 
-def _forward_mqtt_command(slug: str, relay_number: int, command: str, cmd_id: str, device_token: str) -> bool:
+def _forward_mqtt_command(slug: str, relay_number: int, command: str, cmd_id: str, device_token: str) -> tuple[bool, str]:
     import json
     import os
+    import urllib.error
     import urllib.request
     
     clean_slug = (slug or "").strip().lower()
     if not clean_slug:
-        return False
+        return False, "Slug perangkat tidak tersedia."
     if not device_token:
-        return False
+        return False, "Token perangkat tidak tersedia."
+
+    last_error = "Gateway tidak merespons. Periksa koneksi gateway MQTT."
         
     base_urls = [
         os.getenv("GATEWAY_URL", "").rstrip("/"),
@@ -139,10 +143,19 @@ def _forward_mqtt_command(slug: str, relay_number: int, command: str, cmd_id: st
             )
             with urllib.request.urlopen(req, timeout=1.5) as resp:
                 if 200 <= resp.status < 300:
-                    return True
-        except Exception:
-            continue
-    return False
+                    return True, ""
+                last_error = f"Gateway menolak perintah (HTTP {resp.status})."
+        except urllib.error.HTTPError as exc:
+            try:
+                response_data = json.loads(exc.read().decode("utf-8", errors="replace"))
+                last_error = str(response_data.get("detail") or f"Gateway menolak perintah (HTTP {exc.code}).")
+            except Exception:
+                last_error = f"Gateway menolak perintah (HTTP {exc.code})."
+        except urllib.error.URLError as exc:
+            last_error = f"Gateway tidak dapat dijangkau: {exc.reason}"
+        except Exception as exc:
+            last_error = f"Gagal menghubungi gateway ({type(exc).__name__})."
+    return False, last_error
 
 
 def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, source: str = "web_ui", wait_for_ack: bool = None) -> dict:
@@ -157,12 +170,13 @@ def control_real_relay(owner_id: int, room: dict, relay: dict, command: str, sou
     cmd_id = f"cmd_{int(time.time() * 1000)}_{relay_num}"
 
     # 1. Forward instant command to Go Gateway -> Mosquitto MQTT: xiaozhi/relay/{slug}/set
-    if not _forward_mqtt_command(slug, relay_num, target_status, cmd_id, str(room.get("api_token") or "")):
+    sent, send_error = _forward_mqtt_command(slug, relay_num, target_status, cmd_id, str(room.get("api_token") or ""))
+    if not sent:
         return {
             "success": False,
             "pending": False,
             "validated": False,
-            "message": "Gateway belum berhasil mengirim perintah lewat MQTT. Periksa koneksi gateway/broker, lalu coba lagi.",
+            "message": send_error or "Gateway belum berhasil mengirim perintah lewat MQTT.",
             "room": room.get("nama_tempat", ""),
             "relay": relay.get("nama_relay", ""),
             "current_status": current_status,
@@ -260,6 +274,7 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
     rooms = store.list_relay_rooms(owner_id)
     count = 0
     failed_count = 0
+    first_failure = ""
     expected_relays = []
     import time
     for room in rooms:
@@ -268,8 +283,11 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
             relay_num = int(relay.get("relay_number", 1))
             current_status = str(relay.get("status", "OFF")).upper()
             cmd_id = f"cmd_{int(time.time() * 1000)}_{relay_num}"
-            if not _forward_mqtt_command(slug, relay_num, target_status, cmd_id, str(room.get("api_token") or "")):
+            sent, send_error = _forward_mqtt_command(slug, relay_num, target_status, cmd_id, str(room.get("api_token") or ""))
+            if not sent:
                 failed_count += 1
+                if not first_failure:
+                    first_failure = send_error
                 continue
             count += 1
             expected_relays.append((int(room["id"]), relay_num))
@@ -318,7 +336,7 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
                 "success": failed_count == 0,
                 "pending": False,
                 "validated": failed_count == 0,
-                "message": f"{count} relay terkonfirmasi fisik {status_word}. " + (f"{failed_count} perintah gagal dikirim melalui MQTT." if failed_count else f"Seluruh relay berhasil {action_word}."),
+                "message": f"{count} relay terkonfirmasi fisik {status_word}. " + (f"{failed_count} perintah gagal dikirim melalui MQTT. {first_failure}" if failed_count else f"Seluruh relay berhasil {action_word}."),
                 "count": count,
                 "failed_count": failed_count,
                 "desired_status": target_status,
@@ -329,7 +347,7 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
                 "success": False,
                 "pending": True,
                 "validated": False,
-                "message": f"Perintah {action_word} terkirim ke {count} relay, {failed_count} gagal dikirim, dan sebagian perangkat belum memberikan konfirmasi fisik.",
+                "message": f"Perintah {action_word} terkirim ke {count} relay, {failed_count} gagal dikirim, dan sebagian perangkat belum memberikan konfirmasi fisik. {first_failure}",
                 "count": count,
                 "failed_count": failed_count,
                 "desired_status": target_status,
@@ -339,7 +357,7 @@ def control_all_real_relays(owner_id: int, command: str, source: str = "web_ui",
     return {
         "success": failed_count == 0,
         "pending": count > 0,
-        "message": f"Perintah {target_status} terkirim ke {count} relay; {failed_count} gagal dikirim melalui MQTT.",
+        "message": f"Perintah {target_status} terkirim ke {count} relay; {failed_count} gagal dikirim melalui MQTT. {first_failure}".strip(),
         "count": count,
         "failed_count": failed_count,
         "desired_status": target_status,
@@ -908,6 +926,76 @@ async def internal_relay_broadcast(request: Request):
     return {"success": True}
 
 
+@router.post("/api/internal/mqtt/event")
+async def internal_mqtt_gateway_event(request: Request):
+    """Persist gateway MQTT connection and device diagnostic events."""
+    internal_key = _gateway_internal_key()
+    supplied_key = request.headers.get("X-Gateway-Internal-Key", "")
+    if not internal_key or not supplied_key or not hmac.compare_digest(supplied_key, internal_key):
+        raise HTTPException(status_code=401, detail="Akses internal ditolak.")
+
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "detail": "JSON tidak valid"}, status_code=400)
+    if not isinstance(data, dict):
+        return JSONResponse({"success": False, "detail": "Payload harus berupa objek JSON."}, status_code=400)
+
+    event_type = str(data.get("event_type") or "").strip().lower()
+    allowed_events = {
+        "broker_connecting",
+        "broker_connected",
+        "broker_connection_lost",
+        "broker_connect_timeout",
+        "broker_connect_failed",
+        "broker_publish_failed",
+        "device_online",
+        "device_offline",
+        "device_error",
+    }
+    if event_type not in allowed_events:
+        return JSONResponse({"success": False, "detail": "Jenis event MQTT tidak dikenal."}, status_code=400)
+
+    raw_broker = str(data.get("broker_url") or "")
+    broker_url = ""
+    try:
+        parsed_broker = urlsplit(raw_broker)
+        if parsed_broker.hostname:
+            host = parsed_broker.hostname
+            if ":" in host:
+                host = f"[{host}]"
+            if parsed_broker.port:
+                host = f"{host}:{parsed_broker.port}"
+            broker_url = f"{parsed_broker.scheme}://{host}"[:255]
+    except ValueError:
+        pass
+
+    error_events = {
+        "broker_connection_lost",
+        "broker_connect_timeout",
+        "broker_connect_failed",
+        "broker_publish_failed",
+        "device_error",
+    }
+    severity = "error" if event_type in error_events else ("warning" if event_type == "device_offline" else "info")
+    event = {
+        "event_type": event_type,
+        "severity": severity,
+        "connected": bool(data.get("connected", False)),
+        "broker_url": broker_url,
+        "detail": str(data.get("detail") or "")[:2000],
+        "slug": str(data.get("slug") or "")[:100],
+        "topic": str(data.get("topic") or "")[:255],
+        "cmd_id": str(data.get("cmd_id") or "")[:128],
+    }
+    try:
+        get_store().record_mqtt_gateway_event(event)
+    except Exception:
+        return JSONResponse({"success": False, "detail": "Gagal menyimpan event MQTT."}, status_code=500)
+
+    return {"success": True}
+
+
 @router.api_route("/api/relay-nyata/{room_id}/download-project-zip", methods=["GET", "POST"])
 async def download_arduino_project_zip(room_id: int, request: Request):
     """
@@ -932,10 +1020,11 @@ async def download_arduino_project_zip(room_id: int, request: Request):
             body = {}
 
     code = body.get("code", "")
-    board_name = body.get("board", "ESP32-S3 N16R8")
+    board_name = body.get("board", "ESP32-C3 (RISC-V)")
     room_name = room.get("nama_tempat", "Smart_Home")
-    clean_slug = re.sub(r'[^a-zA-Z0-9_]+', '_', room_name).strip('_') or f"Room_{room_id}"
-    folder_name = f"{clean_slug}_ESP32_Relay"
+    folder_slug = re.sub(r'[^a-zA-Z0-9_]+', '_', room_name).strip('_') or f"Room_{room_id}"
+    topic_slug = slugify_topic_part(str(room.get("api_slug") or room_name))
+    folder_name = f"{folder_slug}_ESP32_Relay"
 
     if not code:
         board_lower = board_name.lower()
@@ -991,10 +1080,10 @@ const int   MQTT_PORT     = 1883;
 const char* CLIENT_ID     = "{room.get('api_client_id', 'esp32_relay')}";
 const char* DEVICE_TOKEN  = "{room.get('api_token', '')}";
 
-const char* TOPIC_COMMAND      = "xiaozhi/relay/{clean_slug.lower()}/set";
-const char* TOPIC_STATE        = "xiaozhi/relay/{clean_slug.lower()}/state";
-const char* TOPIC_AVAILABILITY = "xiaozhi/relay/{clean_slug.lower()}/availability";
-const char* TOPIC_ERROR        = "xiaozhi/relay/{clean_slug.lower()}/err";
+const char* TOPIC_COMMAND      = "xiaozhi/relay/{topic_slug}/set";
+const char* TOPIC_STATE        = "xiaozhi/relay/{topic_slug}/state";
+const char* TOPIC_AVAILABILITY = "xiaozhi/relay/{topic_slug}/availability";
+const char* TOPIC_ERROR        = "xiaozhi/relay/{topic_slug}/err";
 
 // ============================================================
 // 3. KONFIGURASI PIN RELAY {board_name}
@@ -1145,6 +1234,10 @@ void connectWiFi() {{
 
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
+    #if defined(ESP32)
+    // Keep Wi-Fi power save disabled in both simulator and hardware modes to protect MQTT keepalive.
+    WiFi.setSleep(false);
+    #endif
     WiFi.disconnect(true, true);
     delay(100);
 
@@ -1159,7 +1252,6 @@ void connectWiFi() {{
     }};
     esp_wifi_set_country(&country);
 
-    WiFi.setSleep(false);
     WiFi.setTxPower(WIFI_POWER_18_5dBm);
     #endif
 
@@ -1304,6 +1396,7 @@ void handleSerialInput() {{
 
 void setup() {{
     Serial.begin(115200);
+    Serial.setTimeout(50);
 
     // Sinkronisasi port USB CDC Serial
     unsigned long startSerial = millis();
@@ -1330,7 +1423,7 @@ void setup() {{
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
     mqttClient.setCallback(mqttCallback);
     mqttClient.setBufferSize(512);
-    mqttClient.setKeepAlive(60);
+    mqttClient.setKeepAlive(30);
 
     if (WiFi.status() == WL_CONNECTED) {{
         reconnectMQTT();
@@ -1341,6 +1434,11 @@ void setup() {{
 
 void loop() {{
     unsigned long now = millis();
+
+    // Service MQTT first so serial input or other work cannot starve keepalive packets.
+    if (mqttClient.connected() && !mqttClient.loop()) {{
+        Serial.printf("[MQTT] Loop terputus (state=%d); reconnect akan dicoba.\\n", mqttClient.state());
+    }}
 
     handleSerialInput();
 
@@ -1369,8 +1467,6 @@ void loop() {{
             reconnectMQTT();
         }}
     }} else {{
-        mqttClient.loop();
-
         // Heartbeat berkala tiap 15 detik (menjaga NAT router firewall tetap terbuka 24/7)
         if (now - lastHeartbeat >= 15000) {{
             lastHeartbeat = now;
@@ -1449,7 +1545,7 @@ dengan website https://xiaozhiscig.biz.id/relay-nyata
     zip_buffer.seek(0)
     zip_bytes = zip_buffer.getvalue()
 
-    filename = f"{clean_slug}_esp32_relay_complete.zip"
+    filename = f"{folder_slug}_esp32_relay_complete.zip"
     return Response(
         content=zip_bytes,
         media_type="application/zip",

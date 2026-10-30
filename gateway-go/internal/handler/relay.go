@@ -318,9 +318,9 @@ func (h *RelayHandler) HandlePostControl(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "detail": "Layanan MQTT belum tersedia."})
 		return
 	}
-	if err := h.mqttService.PublishCommand(slug, payload.Relay, cmdClean, payload.CmdID); err != nil {
+	if err := h.mqttService.PublishCommand(slug, payload.Relay, cmdClean, payload.CmdID, room.DeviceLastSeenAt); err != nil {
 		log.Printf("[RELAY] Gagal publish MQTT ke %s: %v", slug, err)
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "detail": "Perintah gagal dikirim melalui MQTT. Coba lagi setelah gateway terhubung."})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"success": false, "detail": err.Error()})
 		return
 	}
 

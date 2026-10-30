@@ -13,6 +13,8 @@ def empty_database() -> Dict[str, Any]:
         "xiaozhi_tokens": [],
         "chat_history": [],
         "relay_rooms": [],
+        "mqtt_gateway_status": {},
+        "mqtt_gateway_events": [],
         "audio_queue": [],
         "registered_devices": [],
         "feature_settings": [],
@@ -26,10 +28,12 @@ def normalize_database(data: Dict[str, Any]) -> Dict[str, Any]:
         data = empty_database()
     data.setdefault("version", 1)
     data.setdefault("next_ids", {})
-    for bucket in ("users", "materials", "categories", "xiaozhi_tokens", "chat_history", "relay_rooms", "audio_queue", "registered_devices", "feature_settings", "user_limits", "user_persona"):
+    for bucket in ("users", "materials", "categories", "xiaozhi_tokens", "chat_history", "relay_rooms", "mqtt_gateway_events", "audio_queue", "registered_devices", "feature_settings", "user_limits", "user_persona"):
         data.setdefault(bucket, [])
         if not isinstance(data[bucket], list):
             data[bucket] = []
+    if not isinstance(data.get("mqtt_gateway_status"), dict):
+        data["mqtt_gateway_status"] = {}
     for user in data["users"]:
         role = str(user.get("role") or "user").lower()
         user["role"] = "admin" if role == "admin" else "user"

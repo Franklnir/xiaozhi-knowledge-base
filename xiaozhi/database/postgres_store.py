@@ -387,6 +387,33 @@ class PostgresStore:
                         );
                         CREATE INDEX IF NOT EXISTS idx_relay_device_room ON relay_devices(room_id);
                         ALTER TABLE relay_rooms ADD COLUMN IF NOT EXISTS device_last_seen_at TIMESTAMPTZ;
+
+                        CREATE TABLE IF NOT EXISTS mqtt_gateway_status (
+                            service VARCHAR(64) PRIMARY KEY,
+                            connected BOOLEAN NOT NULL DEFAULT FALSE,
+                            broker_url TEXT NOT NULL DEFAULT '',
+                            last_event_type VARCHAR(64) NOT NULL DEFAULT '',
+                            last_detail TEXT NOT NULL DEFAULT '',
+                            last_error TEXT NOT NULL DEFAULT '',
+                            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        );
+                        CREATE TABLE IF NOT EXISTS mqtt_gateway_events (
+                            id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                            service VARCHAR(64) NOT NULL DEFAULT 'relay-gateway',
+                            event_type VARCHAR(64) NOT NULL,
+                            severity VARCHAR(16) NOT NULL DEFAULT 'info',
+                            connected BOOLEAN NOT NULL DEFAULT FALSE,
+                            broker_url TEXT NOT NULL DEFAULT '',
+                            detail TEXT NOT NULL DEFAULT '',
+                            slug VARCHAR(100) NOT NULL DEFAULT '',
+                            topic VARCHAR(255) NOT NULL DEFAULT '',
+                            cmd_id VARCHAR(128) NOT NULL DEFAULT '',
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_mqtt_gateway_events_created
+                            ON mqtt_gateway_events(created_at DESC);
+                        CREATE INDEX IF NOT EXISTS idx_mqtt_gateway_events_type_created
+                            ON mqtt_gateway_events(event_type, created_at DESC);
                     """)
 
                     # 8. Audio Queue
@@ -2393,6 +2420,49 @@ class PostgresStore:
         return affected
 
     # ── Relay Rooms & Devices ──────────────────────────────────────────────
+
+    def record_mqtt_gateway_event(self, event: Dict[str, Any]) -> None:
+        event_type = str(event.get("event_type") or "unknown")[:64]
+        severity = str(event.get("severity") or "info")[:16]
+        connected = bool(event.get("connected", False))
+        broker_url = str(event.get("broker_url") or "")[:255]
+        detail = str(event.get("detail") or "")[:2000]
+        slug = str(event.get("slug") or "")[:100]
+        topic = str(event.get("topic") or "")[:255]
+        cmd_id = str(event.get("cmd_id") or "")[:128]
+
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO mqtt_gateway_status (
+                        service, connected, broker_url, last_event_type, last_detail, last_error, updated_at
+                    ) VALUES ('relay-gateway', %s, %s, %s, %s,
+                        CASE WHEN %s = 'error' THEN %s ELSE '' END, CURRENT_TIMESTAMP)
+                    ON CONFLICT (service) DO UPDATE SET
+                        connected = EXCLUDED.connected,
+                        broker_url = EXCLUDED.broker_url,
+                        last_event_type = EXCLUDED.last_event_type,
+                        last_detail = EXCLUDED.last_detail,
+                        last_error = CASE
+                            WHEN EXCLUDED.last_error <> '' THEN EXCLUDED.last_error
+                            WHEN EXCLUDED.last_event_type = 'broker_connected' THEN ''
+                            ELSE mqtt_gateway_status.last_error
+                        END,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (connected, broker_url, event_type, detail, severity, detail),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO mqtt_gateway_events (
+                        event_type, severity, connected, broker_url, detail, slug, topic, cmd_id
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (event_type, severity, connected, broker_url, detail, slug, topic, cmd_id),
+                )
+                cur.execute("DELETE FROM mqtt_gateway_events WHERE created_at < CURRENT_TIMESTAMP - INTERVAL '90 days'")
+            conn.commit()
 
     def list_relay_rooms(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:

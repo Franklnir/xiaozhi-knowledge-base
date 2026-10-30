@@ -207,6 +207,34 @@ class SQLiteStore:
             CREATE INDEX IF NOT EXISTS idx_relay_device_room ON relay_devices(room_id);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_relay_room_num ON relay_devices(room_id, relay_number);
 
+            -- MQTT gateway's latest connection state and a bounded diagnostic history.
+            CREATE TABLE IF NOT EXISTS mqtt_gateway_status (
+                service TEXT PRIMARY KEY,
+                connected INTEGER NOT NULL DEFAULT 0,
+                broker_url TEXT NOT NULL DEFAULT '',
+                last_event_type TEXT NOT NULL DEFAULT '',
+                last_detail TEXT NOT NULL DEFAULT '',
+                last_error TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS mqtt_gateway_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                service TEXT NOT NULL DEFAULT 'relay-gateway',
+                event_type TEXT NOT NULL,
+                severity TEXT NOT NULL DEFAULT 'info',
+                connected INTEGER NOT NULL DEFAULT 0,
+                broker_url TEXT NOT NULL DEFAULT '',
+                detail TEXT NOT NULL DEFAULT '',
+                slug TEXT NOT NULL DEFAULT '',
+                topic TEXT NOT NULL DEFAULT '',
+                cmd_id TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_mqtt_gateway_events_created
+                ON mqtt_gateway_events(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_mqtt_gateway_events_type_created
+                ON mqtt_gateway_events(event_type, created_at DESC);
+
             -- Audio queue
             CREATE TABLE IF NOT EXISTS audio_queue (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2045,6 +2073,47 @@ class SQLiteStore:
             }
 
     # ── Relay Rooms ────────────────────────────────────────────────────────
+
+    def record_mqtt_gateway_event(self, event: Dict[str, Any]) -> None:
+        event_type = str(event.get("event_type") or "unknown")[:64]
+        severity = str(event.get("severity") or "info")[:16]
+        connected = 1 if bool(event.get("connected", False)) else 0
+        broker_url = str(event.get("broker_url") or "")[:255]
+        detail = str(event.get("detail") or "")[:2000]
+        slug = str(event.get("slug") or "")[:100]
+        topic = str(event.get("topic") or "")[:255]
+        cmd_id = str(event.get("cmd_id") or "")[:128]
+        now = utc_now()
+        conn = self._get_conn()
+        conn.execute(
+            """
+            INSERT INTO mqtt_gateway_status (
+                service, connected, broker_url, last_event_type, last_detail, last_error, updated_at
+            ) VALUES ('relay-gateway', ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(service) DO UPDATE SET
+                connected = excluded.connected,
+                broker_url = excluded.broker_url,
+                last_event_type = excluded.last_event_type,
+                last_detail = excluded.last_detail,
+                last_error = CASE
+                    WHEN excluded.last_error <> '' THEN excluded.last_error
+                    WHEN excluded.last_event_type = 'broker_connected' THEN ''
+                    ELSE mqtt_gateway_status.last_error
+                END,
+                updated_at = excluded.updated_at
+            """,
+            (connected, broker_url, event_type, detail, detail if severity == "error" else "", now),
+        )
+        conn.execute(
+            """
+            INSERT INTO mqtt_gateway_events (
+                event_type, severity, connected, broker_url, detail, slug, topic, cmd_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (event_type, severity, connected, broker_url, detail, slug, topic, cmd_id, now),
+        )
+        conn.execute("DELETE FROM mqtt_gateway_events WHERE julianday(created_at) < julianday('now', '-90 days')")
+        conn.commit()
 
     def list_relay_rooms(self, owner_id: int) -> List[Dict[str, Any]]:
         conn = self._get_conn()
