@@ -65,6 +65,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: irsyad
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 2612 }}
           command_timeout: 25m
           timeout: 60s
           script: |
