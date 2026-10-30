@@ -25,395 +25,6 @@
     "priceCurrency": "IDR"
   }
 }
-
-    // ========================================================
-    // ── STEP-BY-STEP WIZARD CONTROLLER ──
-    // ========================================================
-    let currentWizardStep = 1;
-    let isFlashCompleted = false;
-    const WIZARD_STORAGE_KEY = 'xiaozhi_web_flasher_wizard_state_v1';
-
-    function isStepCompleted(step) {
-        if (step === 1) {
-            return (currentSourceMode === 'preset' || currentSourceMode === 'custom');
-        }
-        if (step === 2) {
-            return (selectedFileBuffer !== null && selectedFileBuffer.length > 0);
-        }
-        if (step === 3) {
-            return (esploader !== null && port !== null);
-        }
-        if (step === 4) {
-            return isFlashCompleted;
-        }
-        return false;
-    }
-
-    function validateStep(step) {
-        if (step === 1) {
-            if (currentSourceMode !== 'preset' && currentSourceMode !== 'custom') {
-                showWizardNotice('Silakan pilih salah satu sumber firmware (Preset Resmi atau Unggah File .bin).', 'warning');
-                return false;
-            }
-            return true;
-        }
-        if (step === 2) {
-            if (!selectedFileBuffer || selectedFileBuffer.length === 0) {
-                if (currentSourceMode === 'preset') {
-                    if (!userAuthStatus.authorized) {
-                        showWizardNotice('Preset ini memerlukan lisensi resmi. Masukkan Kode Lisensi Anda terlebih dahulu untuk membuka akses!', 'warning');
-                    } else {
-                        showWizardNotice('File firmware preset belum dimuat ke memori browser. Silakan klik tombol "⚡ Muat Preset Ini ke Flasher"!', 'warning');
-                    }
-                } else {
-                    showWizardNotice('File binary (.bin) belum dipilih. Silakan klik area dropzone untuk memilih file firmware .bin Anda!', 'warning');
-                }
-                return false;
-            }
-            return true;
-        }
-        if (step === 3) {
-            if (!esploader || !port) {
-                showWizardNotice('Port serial COM ESP32 belum terhubung. Silakan klik tombol "🔌 Pilih & Hubungkan Port COM" terlebih dahulu!', 'warning');
-                return false;
-            }
-            return true;
-        }
-        return true;
-    }
-
-    function updateStepperUI() {
-        for (let s = 1; s <= 4; s++) {
-            const item = document.getElementById('stepperStep' + s);
-            const icon = document.getElementById('stepperIcon' + s);
-            const line = document.getElementById('stepperLine' + s);
-
-            if (!item || !icon) continue;
-
-            const isDone = isStepCompleted(s);
-            const isActive = (s === currentWizardStep);
-
-            item.classList.remove('is-active', 'is-completed', 'is-pending');
-
-            if (isActive) {
-                item.classList.add('is-active');
-            } else if (isDone) {
-                item.classList.add('is-completed');
-            } else {
-                item.classList.add('is-pending');
-            }
-
-            // Set icon: checkmark if completed, else step number
-            if (isDone) {
-                icon.innerHTML = '✓';
-            } else {
-                icon.textContent = s;
-            }
-
-            // Connecting lines
-            if (line) {
-                if (isDone) {
-                    line.classList.add('is-completed');
-                } else {
-                    line.classList.remove('is-completed');
-                }
-            }
-        }
-    }
-
-    function showWizardNotice(msg, type = 'warning') {
-        const banner = document.getElementById('wizardAlert');
-        const icon = document.getElementById('wizardAlertIcon');
-        const text = document.getElementById('wizardAlertMsg');
-        if (!banner || !text) return;
-
-        banner.className = 'wizard-notice-banner ' + (type === 'success' ? 'wizard-notice-success' : (type === 'info' ? 'wizard-notice-info' : 'wizard-notice-warning'));
-        if (icon) {
-            icon.textContent = type === 'success' ? '✅' : (type === 'info' ? 'ℹ️' : '⚠️');
-        }
-        text.textContent = msg;
-        banner.style.display = 'flex';
-
-        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    window.dismissWizardAlert = function() {
-        const banner = document.getElementById('wizardAlert');
-        if (banner) banner.style.display = 'none';
-    };
-
-    window.goToStep = function(targetStep, validate = true) {
-        if (targetStep < 1) targetStep = 1;
-        if (targetStep > 4) targetStep = 4;
-
-        if (validate && targetStep > currentWizardStep) {
-            for (let s = currentWizardStep; s < targetStep; s++) {
-                if (!validateStep(s)) {
-                    return;
-                }
-            }
-        }
-
-        // Hide all step panels, show target
-        for (let s = 1; s <= 4; s++) {
-            const pan = document.getElementById('wizardPanel' + s);
-            if (pan) {
-                if (s === targetStep) {
-                    pan.classList.add('is-active');
-                } else {
-                    pan.classList.remove('is-active');
-                }
-            }
-        }
-
-        currentWizardStep = targetStep;
-
-        if (targetStep === 4) {
-            renderReviewChecklist();
-        }
-
-        updateStepperUI();
-        dismissWizardAlert();
-        saveWizardState();
-    };
-
-    window.nextWizardStep = function() {
-        goToStep(currentWizardStep + 1, true);
-    };
-
-    window.prevWizardStep = function() {
-        goToStep(currentWizardStep - 1, false);
-    };
-
-    window.selectSourceMode = function(mode) {
-        if (mode === 'preset') {
-            if (!userAuthStatus.isLoggedIn) {
-                alert('🔒 Preset Berlisensi: Anda harus masuk ke akun terlebih dahulu.');
-                window.location.href = '/login?next=/web-flasher';
-                return;
-            }
-        }
-        setWizardSourceMode(mode, true);
-    };
-
-    function setWizardSourceMode(mode, save = true) {
-        currentSourceMode = mode;
-        const cardPreset = document.getElementById('cardSourcePreset');
-        const cardCustom = document.getElementById('cardSourceCustom');
-        const radioPreset = document.getElementById('radioPreset');
-        const radioCustom = document.getElementById('radioCustom');
-        const tabBtnPreset = document.getElementById('tabBtnPreset');
-        const tabBtnCustom = document.getElementById('tabBtnCustom');
-        const panelPreset = document.getElementById('panelPreset');
-        const panelCustom = document.getElementById('panelCustom');
-        const badge = document.getElementById('sourceBadge');
-
-        if (mode === 'preset') {
-            if (cardPreset) cardPreset.classList.add('is-selected');
-            if (cardCustom) cardCustom.classList.remove('is-selected');
-            if (radioPreset) radioPreset.classList.add('is-checked');
-            if (radioCustom) radioCustom.classList.remove('is-checked');
-            if (tabBtnPreset) tabBtnPreset.classList.add('active');
-            if (tabBtnCustom) tabBtnCustom.classList.remove('active');
-            if (panelPreset) panelPreset.style.display = 'block';
-            if (panelCustom) panelCustom.style.display = 'none';
-            if (badge) {
-                badge.textContent = userAuthStatus.authorized ? '🔓 Official Preset' : '🔒 Locked Preset';
-                badge.className = userAuthStatus.authorized ? 'app-chip app-chip-success' : 'app-chip app-chip-danger';
-            }
-        } else {
-            if (cardCustom) cardCustom.classList.add('is-selected');
-            if (cardPreset) cardPreset.classList.remove('is-selected');
-            if (radioCustom) radioCustom.classList.add('is-checked');
-            if (radioPreset) radioPreset.classList.remove('is-checked');
-            if (tabBtnCustom) tabBtnCustom.classList.add('active');
-            if (tabBtnPreset) tabBtnPreset.classList.remove('active');
-            if (panelCustom) panelCustom.style.display = 'block';
-            if (panelPreset) panelPreset.style.display = 'none';
-            if (badge) {
-                badge.textContent = 'Custom Upload';
-                badge.className = 'app-chip app-chip-neutral';
-            }
-        }
-
-        updateStepperUI();
-        if (save) saveWizardState();
-    }
-
-    // Keep legacy switchSourceMode mapped
-    window.switchSourceMode = function(mode) {
-        selectSourceMode(mode);
-    };
-
-    function renderReviewChecklist() {
-        const elFw = document.getElementById('reviewFirmwareSummary');
-        const elChip = document.getElementById('reviewChipSummary');
-        const elOffset = document.getElementById('reviewOffsetSummary');
-        const elBaud = document.getElementById('reviewBaudSummary');
-        const elOpts = document.getElementById('reviewOptionsSummary');
-
-        if (elFw) {
-            if (currentSourceMode === 'preset') {
-                const pTitle = document.getElementById('lblPresetTitle')?.textContent || currentPresetId;
-                const pVer = currentSelectedVersion || 'v001';
-                const sizeMb = selectedFileBuffer ? (selectedFileBuffer.length / (1024*1024)).toFixed(2) + ' MB' : '';
-                elFw.innerHTML = `<strong>Preset:</strong> ${pTitle} [${pVer}] ${sizeMb ? '(' + sizeMb + ')' : ''} <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Siap di Memori ✅</span>`;
-            } else {
-                const fn = selectedFileName?.textContent || 'File Kustom .bin';
-                const sz = selectedFileSize?.textContent || '';
-                elFw.innerHTML = `<strong>File Binary:</strong> ${fn} ${sz ? '(' + sz + ')' : ''} <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Siap di Memori ✅</span>`;
-            }
-        }
-
-        if (elChip) {
-            if (esploader && port) {
-                const cModel = chipModel?.textContent || 'ESP32';
-                const cDev = chipUsbInfo?.textContent || 'Port Serial';
-                const cMac = chipMac?.textContent || '-';
-                elChip.innerHTML = `<strong>Microcontroller:</strong> ${cModel} via ${cDev} (MAC: ${cMac}) <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Terhubung ✅</span>`;
-            } else {
-                elChip.innerHTML = `<span style="color:#dc2626;"><strong>Port Serial:</strong> Belum Terhubung ❌</span>`;
-            }
-        }
-
-        if (elOffset) {
-            const off = offsetPreset?.disabled ? '0x0' : (offsetPreset?.value === 'custom' ? offsetInput?.value : offsetPreset?.value) || '0x0';
-            elOffset.innerHTML = `<strong>Alamat Offset:</strong> <code>${off}</code> ${off === '0x0' ? '(Full Factory Merged)' : '(App)'} <span class="app-chip app-chip-info" style="font-size:10px; margin-left:4px;">Tervalidasi ✅</span>`;
-        }
-
-        if (elBaud) {
-            const b = baudrateSelect?.value || '230400';
-            elBaud.innerHTML = `<strong>Kecepatan Baud:</strong> ${parseInt(b, 10).toLocaleString()} bps <span class="app-chip app-chip-neutral" style="font-size:10px; margin-left:4px;">Stabil ✅</span>`;
-        }
-
-        if (elOpts) {
-            const rst = chkAutoReset?.checked ? 'Ya (Reboot otomatis)' : 'Tidak';
-            const ers = chkEraseAll?.checked ? 'Ya (Hapus flash)' : 'Tidak';
-            elOpts.innerHTML = `<strong>Auto-Reset:</strong> ${rst} • <strong>Erase All:</strong> ${ers}`;
-        }
-    }
-
-    // ── LOCALSTORAGE PERSISTENCE ──
-    // CRITICAL SECURITY RULE: NEVER STORE CLAIM CODES IN LOCALSTORAGE
-    function saveWizardState() {
-        try {
-            const state = {
-                currentStep: currentWizardStep,
-                sourceMode: currentSourceMode,
-                presetId: currentPresetId,
-                presetVersion: currentSelectedVersion,
-                offsetPreset: offsetPreset ? offsetPreset.value : '0x0',
-                offsetInput: offsetInput ? offsetInput.value : '0x0',
-                baudrate: baudrateSelect ? baudrateSelect.value : '230400',
-                autoReset: chkAutoReset ? chkAutoReset.checked : true,
-                eraseAll: chkEraseAll ? chkEraseAll.checked : false,
-                timestamp: Date.now()
-            };
-            localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(state));
-        } catch (e) {
-            console.warn('Gagal menyimpan wizard state ke localStorage:', e);
-        }
-    }
-
-    async function restoreWizardState() {
-        try {
-            const raw = localStorage.getItem(WIZARD_STORAGE_KEY);
-            if (!raw) {
-                // Default initial mode
-                const defaultMode = (PRESETS_CACHE && PRESETS_CACHE.length > 0 && userAuthStatus.isLoggedIn) ? 'preset' : 'preset';
-                setWizardSourceMode(defaultMode, false);
-                updateStepperUI();
-                return;
-            }
-
-            const state = JSON.parse(raw);
-            if (!state || typeof state !== 'object') {
-                updateStepperUI();
-                return;
-            }
-
-            // 1. Restore Source Mode
-            if (state.sourceMode === 'preset' || state.sourceMode === 'custom') {
-                setWizardSourceMode(state.sourceMode, false);
-            }
-
-            // 2. Restore Preset ID & Version
-            if (state.presetId && state.presetId !== currentPresetId) {
-                const sel = document.getElementById('userPresetSelect');
-                if (sel) {
-                    sel.value = state.presetId;
-                    await window.onUserPresetChange(state.presetId);
-                }
-            }
-            if (state.presetVersion) {
-                const vSel = document.getElementById('userPresetVersionSelect');
-                if (vSel) {
-                    vSel.value = state.presetVersion;
-                    window.onUserPresetVersionChange(state.presetVersion);
-                }
-            }
-
-            // 3. Restore Options
-            if (baudrateSelect && state.baudrate) {
-                baudrateSelect.value = state.baudrate;
-            }
-            if (chkAutoReset && typeof state.autoReset === 'boolean') {
-                chkAutoReset.checked = state.autoReset;
-            }
-            if (chkEraseAll && typeof state.eraseAll === 'boolean') {
-                chkEraseAll.checked = state.eraseAll;
-            }
-            if (offsetPreset && state.offsetPreset) {
-                offsetPreset.value = state.offsetPreset;
-                if (window.handleOffsetChange) window.handleOffsetChange(state.offsetPreset);
-            }
-            if (offsetInput && state.offsetInput) {
-                offsetInput.value = state.offsetInput;
-            }
-
-            // 4. Target Step Restoration
-            let targetStep = parseInt(state.currentStep, 10) || 1;
-            if (targetStep < 1) targetStep = 1;
-            if (targetStep > 4) targetStep = 4;
-
-            // In preset mode, if authorized, auto-load preset buffer on restore
-            if (state.sourceMode === 'preset' && targetStep >= 2 && userAuthStatus.authorized) {
-                try {
-                    await window.loadOfficialPreset();
-                } catch (e) {
-                    console.warn('Auto restore preset buffer:', e);
-                }
-            }
-
-            // For custom binary upload mode, File buffers cannot be stored in browser localStorage
-            if (state.sourceMode === 'custom' && targetStep > 2 && !selectedFileBuffer) {
-                targetStep = 2;
-                showWizardNotice('Sesi Anda dipulihkan. Demi keamanan browser, silakan pilih kembali file binary (.bin) Anda.', 'info');
-            }
-
-            // For Step 3 or 4: Web Serial ports are closed on page reload by browser security
-            if (targetStep >= 3 && !port) {
-                targetStep = 3;
-                showWizardNotice('Sesi Anda dipulihkan. Silakan hubungkan kembali port COM ESP32 Anda untuk melanjutkan.', 'info');
-            }
-
-            goToStep(targetStep, false);
-        } catch (e) {
-            console.warn('Gagal memulihkan wizard state:', e);
-            updateStepperUI();
-        }
-    }
-
-    // Attach persistence change listeners to inputs
-    if (baudrateSelect) baudrateSelect.addEventListener('change', () => { saveWizardState(); updateStepperUI(); });
-    if (chkAutoReset) chkAutoReset.addEventListener('change', () => { saveWizardState(); });
-    if (chkEraseAll) chkEraseAll.addEventListener('change', () => { saveWizardState(); });
-    if (offsetPreset) offsetPreset.addEventListener('change', () => { saveWizardState(); });
-    if (offsetInput) offsetInput.addEventListener('input', () => { saveWizardState(); });
-
-    // Initialize wizard on page load
-    restoreWizardState();
-
 </script>
 <style>
     .flasher-grid {
@@ -928,6 +539,46 @@
 
 </style>
 
+<script>
+    // Global fallback bridge so buttons work instantly even before module finishes loading
+    window._wizardQueue = [];
+    window.goToStep = function(step, val) {
+        if (typeof window._realGoToStep === 'function') {
+            window._realGoToStep(step, val);
+        } else {
+            window._wizardQueue.push(['goToStep', step, val]);
+        }
+    };
+    window.nextWizardStep = function() {
+        if (typeof window._realNextWizardStep === 'function') {
+            window._realNextWizardStep();
+        } else {
+            window._wizardQueue.push(['nextWizardStep']);
+        }
+    };
+    window.prevWizardStep = function() {
+        if (typeof window._realPrevWizardStep === 'function') {
+            window._realPrevWizardStep();
+        } else {
+            window._wizardQueue.push(['prevWizardStep']);
+        }
+    };
+    window.selectSourceMode = function(mode) {
+        if (typeof window._realSelectSourceMode === 'function') {
+            window._realSelectSourceMode(mode);
+        } else {
+            window._wizardQueue.push(['selectSourceMode', mode]);
+        }
+    };
+    window.switchSourceMode = function(mode) {
+        window.selectSourceMode(mode);
+    };
+    window.dismissWizardAlert = function() {
+        const b = document.getElementById('wizardAlert');
+        if (b) b.style.display = 'none';
+    };
+</script>
+
 <div class="app-page">
     <!-- Notice if inside Hugging Face Spaces iframe -->
     <div id="iframeNotice" style="display:none; margin-bottom:16px; padding:12px 16px; background:#fef3c7; border:2px solid #b45309; border-radius:var(--app-radius); color:#92400e; font-size:13px; font-weight:700; align-items:center; justify-content:space-between; gap:12px; box-shadow:var(--app-shadow);">
@@ -1084,7 +735,7 @@
 
                     <div class="wizard-nav-bar">
                         <div></div>
-                        <button type="button" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:10px 18px; font-size:13px; cursor:pointer;">
+                        <button type="button" id="btnNextToStep2" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:10px 18px; font-size:13px; cursor:pointer;">
                             <span>Lanjut ke Langkah 2: Konfigurasi Firmware</span> <span>➔</span>
                         </button>
                     </div>
@@ -1298,10 +949,10 @@
                     </div>
 
                     <div class="wizard-nav-bar">
-                        <button type="button" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                        <button type="button" id="btnPrevToStep1" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
                             <span>⬅</span> <span>Kembali ke Langkah 1</span>
                         </button>
-                        <button type="button" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
+                        <button type="button" id="btnNextToStep3" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
                             <span>Lanjut ke Langkah 3: Koneksi Hardware</span> <span>➔</span>
                         </button>
                     </div>
@@ -1395,10 +1046,10 @@
                     </div>
 
                     <div class="wizard-nav-bar">
-                        <button type="button" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                        <button type="button" id="btnPrevToStep1" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
                             <span>⬅</span> <span>Kembali ke Langkah 2</span>
                         </button>
-                        <button type="button" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
+                        <button type="button" id="btnNextToStep3" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
                             <span>Lanjut ke Langkah 4: Eksekusi Flash</span> <span>➔</span>
                         </button>
                     </div>
@@ -1456,10 +1107,10 @@
                     </p>
 
                     <div class="wizard-nav-bar">
-                        <button type="button" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                        <button type="button" id="btnPrevToStep1" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
                             <span>⬅</span> <span>Kembali ke Pengaturan Hardware</span>
                         </button>
-                        <button type="button" class="app-button app-button-ghost" onclick="goToStep(1)" style="font-weight:750; font-size:12px; cursor:pointer;">
+                        <button type="button" id="btnResetWizard" class="app-button app-button-ghost" onclick="goToStep(1)" style="font-weight:750; font-size:12px; cursor:pointer;">
                             <span>🔄 Mulai dari Langkah 1</span>
                         </button>
                     </div>
@@ -3096,6 +2747,415 @@
             }
         }).catch(() => {});
     }
+
+
+
+    // ========================================================
+    // ── STEP-BY-STEP WIZARD CONTROLLER (INSIDE MODULE) ──
+    // ========================================================
+    let currentWizardStep = 1;
+    let isFlashCompleted = false;
+    const WIZARD_STORAGE_KEY = 'xiaozhi_web_flasher_wizard_state_v1';
+
+    function isStepCompleted(step) {
+        if (step === 1) {
+            return (currentSourceMode === 'preset' || currentSourceMode === 'custom');
+        }
+        if (step === 2) {
+            return (selectedFileBuffer !== null && selectedFileBuffer.length > 0);
+        }
+        if (step === 3) {
+            return (esploader !== null && port !== null);
+        }
+        if (step === 4) {
+            return isFlashCompleted;
+        }
+        return false;
+    }
+
+    function validateStep(step) {
+        if (step === 1) {
+            if (currentSourceMode !== 'preset' && currentSourceMode !== 'custom') {
+                showWizardNotice('Silakan pilih salah satu sumber firmware (Preset Resmi atau Unggah File .bin).', 'warning');
+                return false;
+            }
+            return true;
+        }
+        if (step === 2) {
+            if (!selectedFileBuffer || selectedFileBuffer.length === 0) {
+                if (currentSourceMode === 'preset') {
+                    if (!userAuthStatus.authorized) {
+                        showWizardNotice('Preset ini memerlukan lisensi resmi. Masukkan Kode Lisensi Anda terlebih dahulu untuk membuka akses!', 'warning');
+                    } else {
+                        showWizardNotice('File firmware preset belum dimuat ke memori browser. Silakan klik tombol "⚡ Muat Preset Ini ke Flasher"!', 'warning');
+                    }
+                } else {
+                    showWizardNotice('File binary (.bin) belum dipilih. Silakan klik area dropzone untuk memilih file firmware .bin Anda!', 'warning');
+                }
+                return false;
+            }
+            return true;
+        }
+        if (step === 3) {
+            if (!esploader || !port) {
+                showWizardNotice('Port serial COM ESP32 belum terhubung. Silakan klik tombol "🔌 Pilih & Hubungkan Port COM" terlebih dahulu!', 'warning');
+                return false;
+            }
+            return true;
+        }
+        return true;
+    }
+
+    function updateStepperUI() {
+        for (let s = 1; s <= 4; s++) {
+            const item = document.getElementById('stepperStep' + s);
+            const icon = document.getElementById('stepperIcon' + s);
+            const line = document.getElementById('stepperLine' + s);
+
+            if (!item || !icon) continue;
+
+            const isDone = isStepCompleted(s);
+            const isActive = (s === currentWizardStep);
+
+            item.classList.remove('is-active', 'is-completed', 'is-pending');
+
+            if (isActive) {
+                item.classList.add('is-active');
+            } else if (isDone) {
+                item.classList.add('is-completed');
+            } else {
+                item.classList.add('is-pending');
+            }
+
+            // Set icon: checkmark if completed, else step number
+            if (isDone) {
+                icon.innerHTML = '✓';
+            } else {
+                icon.textContent = s;
+            }
+
+            // Connecting lines
+            if (line) {
+                if (isDone) {
+                    line.classList.add('is-completed');
+                } else {
+                    line.classList.remove('is-completed');
+                }
+            }
+        }
+    }
+
+    function showWizardNotice(msg, type = 'warning') {
+        const banner = document.getElementById('wizardAlert');
+        const icon = document.getElementById('wizardAlertIcon');
+        const text = document.getElementById('wizardAlertMsg');
+        if (!banner || !text) return;
+
+        banner.className = 'wizard-notice-banner ' + (type === 'success' ? 'wizard-notice-success' : (type === 'info' ? 'wizard-notice-info' : 'wizard-notice-warning'));
+        if (icon) {
+            icon.textContent = type === 'success' ? '✅' : (type === 'info' ? 'ℹ️' : '⚠️');
+        }
+        text.textContent = msg;
+        banner.style.display = 'flex';
+
+        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function dismissWizardAlert() {
+        const banner = document.getElementById('wizardAlert');
+        if (banner) banner.style.display = 'none';
+    }
+
+    function goToStep(targetStep, validate = true) {
+        if (targetStep < 1) targetStep = 1;
+        if (targetStep > 4) targetStep = 4;
+
+        if (validate && targetStep > currentWizardStep) {
+            for (let s = currentWizardStep; s < targetStep; s++) {
+                if (!validateStep(s)) {
+                    return;
+                }
+            }
+        }
+
+        // Hide all step panels, show target
+        for (let s = 1; s <= 4; s++) {
+            const pan = document.getElementById('wizardPanel' + s);
+            if (pan) {
+                if (s === targetStep) {
+                    pan.classList.add('is-active');
+                } else {
+                    pan.classList.remove('is-active');
+                }
+            }
+        }
+
+        currentWizardStep = targetStep;
+
+        if (targetStep === 4) {
+            renderReviewChecklist();
+        }
+
+        updateStepperUI();
+        dismissWizardAlert();
+        saveWizardState();
+    }
+
+    function nextWizardStep() {
+        goToStep(currentWizardStep + 1, true);
+    }
+
+    function prevWizardStep() {
+        goToStep(currentWizardStep - 1, false);
+    }
+
+    function selectSourceMode(mode) {
+        if (mode === 'preset') {
+            if (!userAuthStatus.isLoggedIn) {
+                alert('🔒 Preset Berlisensi: Anda harus masuk ke akun terlebih dahulu.');
+                window.location.href = '/login?next=/web-flasher';
+                return;
+            }
+        }
+        setWizardSourceMode(mode, true);
+    }
+
+    function setWizardSourceMode(mode, save = true) {
+        currentSourceMode = mode;
+        const cardPreset = document.getElementById('cardSourcePreset');
+        const cardCustom = document.getElementById('cardSourceCustom');
+        const radioPreset = document.getElementById('radioPreset');
+        const radioCustom = document.getElementById('radioCustom');
+        const tabBtnPreset = document.getElementById('tabBtnPreset');
+        const tabBtnCustom = document.getElementById('tabBtnCustom');
+        const panelPreset = document.getElementById('panelPreset');
+        const panelCustom = document.getElementById('panelCustom');
+        const badge = document.getElementById('sourceBadge');
+
+        if (mode === 'preset') {
+            if (cardPreset) cardPreset.classList.add('is-selected');
+            if (cardCustom) cardCustom.classList.remove('is-selected');
+            if (radioPreset) radioPreset.classList.add('is-checked');
+            if (radioCustom) radioCustom.classList.remove('is-checked');
+            if (tabBtnPreset) tabBtnPreset.classList.add('active');
+            if (tabBtnCustom) tabBtnCustom.classList.remove('active');
+            if (panelPreset) panelPreset.style.display = 'block';
+            if (panelCustom) panelCustom.style.display = 'none';
+            if (badge) {
+                badge.textContent = userAuthStatus.authorized ? '🔓 Official Preset' : '🔒 Locked Preset';
+                badge.className = userAuthStatus.authorized ? 'app-chip app-chip-success' : 'app-chip app-chip-danger';
+            }
+        } else {
+            if (cardCustom) cardCustom.classList.add('is-selected');
+            if (cardPreset) cardPreset.classList.remove('is-selected');
+            if (radioCustom) radioCustom.classList.add('is-checked');
+            if (radioPreset) radioPreset.classList.remove('is-checked');
+            if (tabBtnCustom) tabBtnCustom.classList.add('active');
+            if (tabBtnPreset) tabBtnPreset.classList.remove('active');
+            if (panelCustom) panelCustom.style.display = 'block';
+            if (panelPreset) panelPreset.style.display = 'none';
+            if (badge) {
+                badge.textContent = 'Custom Upload';
+                badge.className = 'app-chip app-chip-neutral';
+            }
+        }
+
+        updateStepperUI();
+        if (save) saveWizardState();
+    }
+
+    function renderReviewChecklist() {
+        const elFw = document.getElementById('reviewFirmwareSummary');
+        const elChip = document.getElementById('reviewChipSummary');
+        const elOffset = document.getElementById('reviewOffsetSummary');
+        const elBaud = document.getElementById('reviewBaudSummary');
+        const elOpts = document.getElementById('reviewOptionsSummary');
+
+        if (elFw) {
+            if (currentSourceMode === 'preset') {
+                const pTitle = document.getElementById('lblPresetTitle')?.textContent || currentPresetId;
+                const pVer = currentSelectedVersion || 'v001';
+                const sizeMb = selectedFileBuffer ? (selectedFileBuffer.length / (1024*1024)).toFixed(2) + ' MB' : '';
+                elFw.innerHTML = `<strong>Preset:</strong> ${pTitle} [${pVer}] ${sizeMb ? '(' + sizeMb + ')' : ''} <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Siap di Memori ✅</span>`;
+            } else {
+                const fn = selectedFileName?.textContent || 'File Kustom .bin';
+                const sz = selectedFileSize?.textContent || '';
+                elFw.innerHTML = `<strong>File Binary:</strong> ${fn} ${sz ? '(' + sz + ')' : ''} <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Siap di Memori ✅</span>`;
+            }
+        }
+
+        if (elChip) {
+            if (esploader && port) {
+                const cModel = chipModel?.textContent || 'ESP32';
+                const cDev = chipUsbInfo?.textContent || 'Port Serial';
+                const cMac = chipMac?.textContent || '-';
+                elChip.innerHTML = `<strong>Microcontroller:</strong> ${cModel} via ${cDev} (MAC: ${cMac}) <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Terhubung ✅</span>`;
+            } else {
+                elChip.innerHTML = `<span style="color:#dc2626;"><strong>Port Serial:</strong> Belum Terhubung ❌</span>`;
+            }
+        }
+
+        if (elOffset) {
+            const off = offsetPreset?.disabled ? '0x0' : (offsetPreset?.value === 'custom' ? offsetInput?.value : offsetPreset?.value) || '0x0';
+            elOffset.innerHTML = `<strong>Alamat Offset:</strong> <code>${off}</code> ${off === '0x0' ? '(Full Factory Merged)' : '(App)'} <span class="app-chip app-chip-info" style="font-size:10px; margin-left:4px;">Tervalidasi ✅</span>`;
+        }
+
+        if (elBaud) {
+            const b = baudrateSelect?.value || '230400';
+            elBaud.innerHTML = `<strong>Kecepatan Baud:</strong> ${parseInt(b, 10).toLocaleString()} bps <span class="app-chip app-chip-neutral" style="font-size:10px; margin-left:4px;">Stabil ✅</span>`;
+        }
+
+        if (elOpts) {
+            const rst = chkAutoReset?.checked ? 'Ya (Reboot otomatis)' : 'Tidak';
+            const ers = chkEraseAll?.checked ? 'Ya (Hapus flash)' : 'Tidak';
+            elOpts.innerHTML = `<strong>Auto-Reset:</strong> ${rst} • <strong>Erase All:</strong> ${ers}`;
+        }
+    }
+
+    // ── LOCALSTORAGE PERSISTENCE ──
+    // CRITICAL SECURITY RULE: NEVER STORE CLAIM CODES IN LOCALSTORAGE
+    function saveWizardState() {
+        try {
+            const state = {
+                currentStep: currentWizardStep,
+                sourceMode: currentSourceMode,
+                presetId: currentPresetId,
+                presetVersion: currentSelectedVersion,
+                offsetPreset: offsetPreset ? offsetPreset.value : '0x0',
+                offsetInput: offsetInput ? offsetInput.value : '0x0',
+                baudrate: baudrateSelect ? baudrateSelect.value : '230400',
+                autoReset: chkAutoReset ? chkAutoReset.checked : true,
+                eraseAll: chkEraseAll ? chkEraseAll.checked : false,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+            console.warn('Gagal menyimpan wizard state ke localStorage:', e);
+        }
+    }
+
+    async function restoreWizardState() {
+        try {
+            const raw = localStorage.getItem(WIZARD_STORAGE_KEY);
+            if (!raw) {
+                // Default initial mode: if presets available, default to preset mode
+                const defaultMode = (PRESETS_CACHE && PRESETS_CACHE.length > 0) ? 'preset' : 'preset';
+                setWizardSourceMode(defaultMode, false);
+                updateStepperUI();
+                return;
+            }
+
+            const state = JSON.parse(raw);
+            if (!state || typeof state !== 'object') {
+                updateStepperUI();
+                return;
+            }
+
+            // 1. Restore Source Mode
+            if (state.sourceMode === 'preset' || state.sourceMode === 'custom') {
+                setWizardSourceMode(state.sourceMode, false);
+            }
+
+            // 2. Restore Preset ID & Version
+            if (state.presetId && state.presetId !== currentPresetId) {
+                const sel = document.getElementById('userPresetSelect');
+                if (sel) {
+                    sel.value = state.presetId;
+                    await window.onUserPresetChange(state.presetId);
+                }
+            }
+            if (state.presetVersion) {
+                const vSel = document.getElementById('userPresetVersionSelect');
+                if (vSel) {
+                    vSel.value = state.presetVersion;
+                    window.onUserPresetVersionChange(state.presetVersion);
+                }
+            }
+
+            // 3. Restore Options
+            if (baudrateSelect && state.baudrate) {
+                baudrateSelect.value = state.baudrate;
+            }
+            if (chkAutoReset && typeof state.autoReset === 'boolean') {
+                chkAutoReset.checked = state.autoReset;
+            }
+            if (chkEraseAll && typeof state.eraseAll === 'boolean') {
+                chkEraseAll.checked = state.eraseAll;
+            }
+            if (offsetPreset && state.offsetPreset) {
+                offsetPreset.value = state.offsetPreset;
+                if (window.handleOffsetChange) window.handleOffsetChange(state.offsetPreset);
+            }
+            if (offsetInput && state.offsetInput) {
+                offsetInput.value = state.offsetInput;
+            }
+
+            // 4. Target Step Restoration
+            let targetStep = parseInt(state.currentStep, 10) || 1;
+            if (targetStep < 1) targetStep = 1;
+            if (targetStep > 4) targetStep = 4;
+
+            // In preset mode, if authorized, auto-load preset buffer on restore
+            if (state.sourceMode === 'preset' && targetStep >= 2 && userAuthStatus.authorized) {
+                try {
+                    await window.loadOfficialPreset();
+                } catch (e) {
+                    console.warn('Auto restore preset buffer:', e);
+                }
+            }
+
+            // For custom binary upload mode, File buffers cannot be stored in browser localStorage
+            if (state.sourceMode === 'custom' && targetStep > 2 && !selectedFileBuffer) {
+                targetStep = 2;
+                showWizardNotice('Sesi Anda dipulihkan. Demi keamanan browser, silakan pilih kembali file binary (.bin) Anda.', 'info');
+            }
+
+            // For Step 3 or 4: Web Serial ports are closed on page reload by browser security
+            if (targetStep >= 3 && !port) {
+                targetStep = 3;
+                showWizardNotice('Sesi Anda dipulihkan. Silakan hubungkan kembali port COM ESP32 Anda untuk melanjutkan.', 'info');
+            }
+
+            goToStep(targetStep, false);
+        } catch (e) {
+            console.warn('Gagal memulihkan wizard state:', e);
+            updateStepperUI();
+        }
+    }
+
+    // EXPOSE TO GLOBAL WINDOW OBJECT
+    window.goToStep = goToStep;
+    window.nextWizardStep = nextWizardStep;
+    window.prevWizardStep = prevWizardStep;
+    window.selectSourceMode = selectSourceMode;
+    window.setWizardSourceMode = setWizardSourceMode;
+    window.dismissWizardAlert = dismissWizardAlert;
+    window.switchSourceMode = selectSourceMode;
+    window.updateStepperUI = updateStepperUI;
+    window.saveWizardState = saveWizardState;
+    window.showWizardNotice = showWizardNotice;
+
+    // Attach persistence change listeners to inputs
+    if (baudrateSelect) baudrateSelect.addEventListener('change', () => { saveWizardState(); updateStepperUI(); });
+    if (chkAutoReset) chkAutoReset.addEventListener('change', () => { saveWizardState(); });
+    if (chkEraseAll) chkEraseAll.addEventListener('change', () => { saveWizardState(); });
+    if (offsetPreset) offsetPreset.addEventListener('change', () => { saveWizardState(); });
+    if (offsetInput) offsetInput.addEventListener('input', () => { saveWizardState(); });
+
+    // Attach direct DOM event listeners to wizard step items and option cards
+    for (let s = 1; s <= 4; s++) {
+        const item = document.getElementById('stepperStep' + s);
+        if (item) {
+            item.addEventListener('click', () => goToStep(s, true));
+        }
+    }
+    const cardPresetEl = document.getElementById('cardSourcePreset');
+    if (cardPresetEl) cardPresetEl.addEventListener('click', () => selectSourceMode('preset'));
+    const cardCustomEl = document.getElementById('cardSourceCustom');
+    if (cardCustomEl) cardCustomEl.addEventListener('click', () => selectSourceMode('custom'));
+
+    // Initialize wizard on page load
+    restoreWizardState();
 
 </script>
 {% endblock %}
