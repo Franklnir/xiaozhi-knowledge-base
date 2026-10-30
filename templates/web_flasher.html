@@ -632,7 +632,7 @@
                     <div class="stepper-icon" id="stepperIcon1">1</div>
                 </div>
                 <div class="stepper-meta">
-                    <span class="stepper-step-num">SOAL 1</span>
+                    <span class="stepper-step-num">STEP 1</span>
                     <span class="stepper-title">Sumber Firmware</span>
                 </div>
             </div>
@@ -644,7 +644,7 @@
                     <div class="stepper-icon" id="stepperIcon2">2</div>
                 </div>
                 <div class="stepper-meta">
-                    <span class="stepper-step-num">SOAL 2</span>
+                    <span class="stepper-step-num">STEP 2</span>
                     <span class="stepper-title" id="stepperTitle2">Varian / File</span>
                 </div>
             </div>
@@ -656,8 +656,8 @@
                     <div class="stepper-icon" id="stepperIcon3">3</div>
                 </div>
                 <div class="stepper-meta">
-                    <span class="stepper-step-num">SOAL 3</span>
-                    <span class="stepper-title" id="stepperTitle3">Versi / Offset</span>
+                    <span class="stepper-step-num">STEP 3</span>
+                    <span class="stepper-title" id="stepperTitle3">Versi &amp; Muat</span>
                 </div>
             </div>
             <div class="stepper-line" id="stepperLine3"></div>
@@ -668,7 +668,7 @@
                     <div class="stepper-icon" id="stepperIcon4">4</div>
                 </div>
                 <div class="stepper-meta">
-                    <span class="stepper-step-num">SOAL 4</span>
+                    <span class="stepper-step-num">STEP 4</span>
                     <span class="stepper-title">Koneksi Hardware</span>
                 </div>
             </div>
@@ -680,7 +680,7 @@
                     <div class="stepper-icon" id="stepperIcon5">5</div>
                 </div>
                 <div class="stepper-meta">
-                    <span class="stepper-step-num">FINAL</span>
+                    <span class="stepper-step-num">STEP 5</span>
                     <span class="stepper-title">Review &amp; Flash</span>
                 </div>
             </div>
@@ -698,11 +698,11 @@
 
 
     <div class="flasher-grid">
-        <!-- LEFT COLUMN: 5-STEP QUIZ WIZARD CONTROLS -->
+        <!-- LEFT COLUMN: 5-STEP WIZARD CONTROLS -->
         <div style="display: grid; gap: 20px;">
 
             <!-- ============================================== -->
-            <!-- SOAL 1: PILIH SUMBER FIRMWARE                  -->
+            <!-- STEP 1: PILIH SUMBER FIRMWARE                  -->
             <!-- ============================================== -->
             <div class="wizard-step-panel is-active" id="wizardPanel1">
                 <div class="app-card">
@@ -711,9 +711,9 @@
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
                                 <span>🎯</span> 1. Pilih Sumber Firmware
                             </h2>
-                            <p class="app-section-subtitle">Soal 1 dari 5: Tentukan metode firmware yang ingin Anda gunakan.</p>
+                            <p class="app-section-subtitle">Langkah 1 dari 5: Tentukan metode firmware yang ingin Anda gunakan.</p>
                         </div>
-                        <span class="app-chip app-chip-info" style="font-size:11px;">Soal 1 / 5</span>
+                        <span class="app-chip app-chip-info" style="font-size:11px;">Step 1 / 5</span>
                     </div>
 
                     <div style="display:grid; gap:12px; margin-top:6px;">
@@ -726,7 +726,7 @@
                                     <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">DIREKOMENDASIKAN</span>
                                 </div>
                                 <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0; line-height:1.45;">
-                                    Firmware resmi siap pakai (ESP32-S3 &amp; ESP32-C3). Dilengkapi bootloader pabrik, partisi OTA, font layar &amp; aset suara. Pembaruan versi otomatis dan verifikasi keamanan SHA-256.
+                                    Firmware resmi siap pakai (ESP32-S3 &amp; ESP32-C3). Dilengkapi bootloader pabrik, partisi OTA, font layar &amp; aset suara. Offset memori diatur 100% otomatis oleh sistem.
                                 </p>
                             </div>
                             <div class="source-radio-indicator is-checked" id="radioPreset">
@@ -743,7 +743,7 @@
                                     <span class="app-chip app-chip-neutral" style="font-size:10.5px; font-weight:800;">KUSTOM / DEV</span>
                                 </div>
                                 <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0; line-height:1.45;">
-                                    Untuk pengembang atau build mandiri (PlatformIO, ESP-IDF, Arduino IDE). Anda dapat menentukan offset alamat flash secara fleksibel pada soal berikutnya.
+                                    Untuk pengembang atau build mandiri (PlatformIO, ESP-IDF, Arduino IDE). Anda dapat menentukan offset alamat flash secara fleksibel pada langkah selanjutnya.
                                 </p>
                             </div>
                             <div class="source-radio-indicator" id="radioCustom">
@@ -754,15 +754,15 @@
 
                     <div class="wizard-nav-bar">
                         <div></div>
-                        <button type="button" id="btnNextToStep2" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:10px 18px; font-size:13px; cursor:pointer;">
-                            <span>Lanjut ke Soal 2: Tentukan Target Firmware</span> <span>➔</span>
+                        <button type="button" id="btnNextToStep2" class="app-button app-button-primary" onclick="goToStep(2)" style="font-weight:850; padding:10px 18px; font-size:13px; cursor:pointer;">
+                            <span>Lanjut ke Step 2: Tentukan Target Firmware</span> <span>➔</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <!-- ============================================== -->
-            <!-- SOAL 2: TENTUKAN TARGET FIRMWARE               -->
+            <!-- STEP 2: TENTUKAN TARGET FIRMWARE               -->
             <!-- ============================================== -->
             <div class="wizard-step-panel" id="wizardPanel2">
                 <div class="app-card">
@@ -771,9 +771,9 @@
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
                                 <span>📦</span> <span id="panel2TitleText">2. Tentukan Target Firmware</span>
                             </h2>
-                            <p class="app-section-subtitle" id="panel2SubtitleText">Soal 2 dari 5: Pilih varian hardware microcontroller Anda.</p>
+                            <p class="app-section-subtitle" id="panel2SubtitleText">Langkah 2 dari 5: Pilih varian hardware microcontroller Anda.</p>
                         </div>
-                        <span class="app-chip app-chip-info" style="font-size:11px;">Soal 2 / 5</span>
+                        <span class="app-chip app-chip-info" style="font-size:11px;">Step 2 / 5</span>
                     </div>
 
                     <!-- 2A: Preset View: Pilih Varian Board -->
@@ -797,7 +797,7 @@
                                         </p>
                                         <div style="display:flex; align-items:center; gap:6px; margin-top:6px; font-size:11px;">
                                             <span class="app-chip app-chip-neutral" style="font-size:10px;">Versi Aktif: {{ p.active_version }}</span>
-                                            <span class="app-chip app-chip-success" style="font-size:10px;">Offset {{ p.offset }}</span>
+                                            <span class="app-chip app-chip-success" style="font-size:10px;">Offset Otomatis: {{ p.offset or '0x0' }}</span>
                                         </div>
                                     </div>
                                     <div class="source-radio-indicator {% if loop.first %}is-checked{% endif %}" id="radioBoard_{{ p.id }}">
@@ -811,6 +811,9 @@
                                     <div style="flex:1;">
                                         <strong style="font-size:14px; color:var(--app-text);">ESP32-S3 N16R8 / CAM Full Factory</strong>
                                         <p style="font-size:11.5px; color:var(--app-muted); margin:4px 0 0;">Chip ESP32-S3 • Layar ST7789 TFT SPI • Kamera OV2640 / OV5640</p>
+                                        <div style="margin-top:4px;">
+                                            <span class="app-chip app-chip-success" style="font-size:10px;">Offset Otomatis: 0x0</span>
+                                        </div>
                                     </div>
                                     <div class="source-radio-indicator is-checked" id="radioBoard_esp32s3_cam">
                                         <span class="radio-dot"></span>
@@ -862,29 +865,29 @@
                     </div>
 
                     <div class="wizard-nav-bar">
-                        <button type="button" id="btnPrevToStep1" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
-                            <span>⬅</span> <span>Kembali ke Soal 1</span>
+                        <button type="button" id="btnPrevToStep1" class="app-button app-button-secondary" onclick="goToStep(1)" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                            <span>⬅</span> <span>Kembali ke Step 1</span>
                         </button>
-                        <button type="button" id="btnNextToStep3" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
-                            <span>Lanjut ke Soal 3: Konfigurasi Parameter</span> <span>➔</span>
+                        <button type="button" id="btnNextToStep3" class="app-button app-button-primary" onclick="goToStep(3)" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
+                            <span>Lanjut ke Step 3: Muat Firmware</span> <span>➔</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <!-- ============================================== -->
-            <!-- SOAL 3: KONFIGURASI PARAMETER & MUAT MEMORI    -->
+            <!-- STEP 3: KONFIGURASI PARAMETER & MUAT MEMORI    -->
             <!-- ============================================== -->
             <div class="wizard-step-panel" id="wizardPanel3">
                 <div class="app-card">
                     <div class="app-card-header">
                         <div>
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                                <span>⚙️</span> <span id="panel3TitleText">3. Konfigurasi Parameter &amp; Memori</span>
+                                <span>⚙️</span> <span id="panel3TitleText">3. Konfigurasi Versi &amp; Memori</span>
                             </h2>
-                            <p class="app-section-subtitle" id="panel3SubtitleText">Soal 3 dari 5: Tentukan versi rilis firmware dan muat ke memori browser.</p>
+                            <p class="app-section-subtitle" id="panel3SubtitleText">Langkah 3 dari 5: Tentukan versi rilis firmware resmi dan muat ke memori browser (offset diatur otomatis).</p>
                         </div>
-                        <span class="app-chip app-chip-info" style="font-size:11px;">Soal 3 / 5</span>
+                        <span class="app-chip app-chip-info" style="font-size:11px;">Step 3 / 5</span>
                     </div>
 
                     <!-- 3A: Preset Version & License Box -->
@@ -898,7 +901,7 @@
                             </div>
                             <div style="display:flex; gap:6px; align-items:center;">
                                 <span class="app-chip app-chip-neutral" id="lblPresetVersion" style="font-size:11px; font-weight:900;">Versi: v001</span>
-                                <span class="app-chip app-chip-success" id="lblPresetOffset" style="font-size:10.5px; font-weight:800;">Offset 0x0</span>
+                                <span class="app-chip app-chip-success" id="lblPresetOffset" style="font-size:10.5px; font-weight:800;">Offset Otomatis: 0x0</span>
                             </div>
                         </div>
 
@@ -920,7 +923,7 @@
                                         {{ v.version }} {% if v.version == preset_status.active_version %}(Versi Utama / Aktif){% else %}(Versi Sebelumnya / Lama){% endif %}{% if v.changelog %} • {{ v.changelog[:40] }}{% endif %}
                                     </option>
                                     {% endfor %}
-                                daylight{% else %}
+                                {% else %}
                                     <option value="{{ preset_status.active_version if preset_status else 'v001' }}">
                                         {{ preset_status.active_version if preset_status else 'v001' }} (Versi Utama / Aktif)
                                     </option>
@@ -934,7 +937,7 @@
                                     <span style="color:var(--app-muted); font-size:11px;" id="verDetailDate"></span>
                                 </div>
                                 <div style="color:var(--app-muted); margin-bottom:6px; line-height:1.4;" id="verDetailChangelog">
-                                    📝 Rilis firmware resmi
+                                    📝 Rilis firmware resmi (Offset diatur otomatis ke 0x0 Full Factory Merged)
                                 </div>
                                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; font-size:11px; border-top:1px dashed var(--app-border); padding-top:6px;">
                                     <span id="verDetailSize">Ukuran: 0 MB</span>
@@ -963,9 +966,6 @@
                                         </span>
                                     </div>
                                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                                        <button type="button" onclick="openGuideModal()" class="app-button app-button-secondary app-button-small" style="font-weight:750; font-size:11.5px;">
-                                            📖 Skema Pin
-                                        </button>
                                         <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:7px 16px;">
                                             ⚡ Muat Preset Ini ke Flasher
                                         </button>
@@ -1024,18 +1024,18 @@
                     </div>
 
                     <div class="wizard-nav-bar">
-                        <button type="button" id="btnPrevToStep2" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
-                            <span>⬅</span> <span>Kembali ke Soal 2</span>
+                        <button type="button" id="btnPrevToStep2" class="app-button app-button-secondary" onclick="goToStep(2)" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                            <span>⬅</span> <span>Kembali ke Step 2</span>
                         </button>
-                        <button type="button" id="btnNextToStep4" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
-                            <span>Lanjut ke Soal 4: Koneksi Hardware</span> <span>➔</span>
+                        <button type="button" id="btnNextToStep4" class="app-button app-button-primary" onclick="goToStep(4)" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
+                            <span>Lanjut ke Step 4: Koneksi Hardware</span> <span>➔</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <!-- ============================================== -->
-            <!-- SOAL 4: KONEKSI HARDWARE (COM)                 -->
+            <!-- STEP 4: KONEKSI HARDWARE (COM)                 -->
             <!-- ============================================== -->
             <div class="wizard-step-panel" id="wizardPanel4">
                 <div class="app-card">
@@ -1044,9 +1044,9 @@
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
                                 <span>🔌</span> 4. Koneksi Hardware (COM)
                             </h2>
-                            <p class="app-section-subtitle">Soal 4 dari 5: Sambungkan microcontroller ESP32 ke PC / Laptop via kabel USB dan hubungkan port serial.</p>
+                            <p class="app-section-subtitle">Langkah 4 dari 5: Sambungkan microcontroller ESP32 ke PC / Laptop via kabel USB dan hubungkan port serial.</p>
                         </div>
-                        <span class="app-chip app-chip-info" style="font-size:11px;">Soal 4 / 5</span>
+                        <span class="app-chip app-chip-info" style="font-size:11px;">Step 4 / 5</span>
                     </div>
 
                     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
@@ -1121,18 +1121,18 @@
                     </div>
 
                     <div class="wizard-nav-bar">
-                        <button type="button" id="btnPrevToStep3" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
-                            <span>⬅</span> <span>Kembali ke Soal 3</span>
+                        <button type="button" id="btnPrevToStep3" class="app-button app-button-secondary" onclick="goToStep(3)" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                            <span>⬅</span> <span>Kembali ke Step 3</span>
                         </button>
-                        <button type="button" id="btnNextToStep5" class="app-button app-button-primary" onclick="nextWizardStep()" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
-                            <span>Lanjut ke Soal 5: Review &amp; Flash</span> <span>➔</span>
+                        <button type="button" id="btnNextToStep5" class="app-button app-button-primary" onclick="goToStep(5)" style="font-weight:850; padding:9px 18px; font-size:12.5px; cursor:pointer;">
+                            <span>Lanjut ke Step 5: Review &amp; Flash</span> <span>➔</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <!-- ============================================== -->
-            <!-- SOAL 5: REVIEW KESIAPAN & EKSEKUSI FLASH       -->
+            <!-- STEP 5: REVIEW KESIAPAN & EKSEKUSI FLASH       -->
             <!-- ============================================== -->
             <div class="wizard-step-panel" id="wizardPanel5">
                 <div class="app-card">
@@ -1141,7 +1141,7 @@
                             <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
                                 <span>⚡</span> 5. Review Kesiapan &amp; Eksekusi Flash
                             </h2>
-                            <p class="app-section-subtitle">Final: Periksa ringkasan jawaban soal 1 sampai 4 sebelum memulai penulisan firmware ke chip ESP32.</p>
+                            <p class="app-section-subtitle">Langkah 5 dari 5: Periksa ringkasan jawaban Step 1 sampai 4 sebelum memulai penulisan firmware ke chip ESP32.</p>
                         </div>
                         <span class="app-chip app-chip-success" style="font-size:11px; font-weight:800;">Langkah Terakhir</span>
                     </div>
@@ -1186,11 +1186,11 @@
                     </p>
 
                     <div class="wizard-nav-bar">
-                        <button type="button" id="btnPrevToStep4" class="app-button app-button-secondary" onclick="prevWizardStep()" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
-                            <span>⬅</span> <span>Kembali ke Soal 4 (Hardware)</span>
+                        <button type="button" id="btnPrevToStep4" class="app-button app-button-secondary" onclick="goToStep(4)" style="font-weight:750; padding:9px 16px; font-size:12.5px; cursor:pointer;">
+                            <span>⬅</span> <span>Kembali ke Step 4 (Hardware)</span>
                         </button>
                         <button type="button" id="btnResetWizard" class="app-button app-button-ghost" onclick="goToStep(1)" style="font-weight:750; font-size:12px; cursor:pointer;">
-                            <span>🔄 Mulai dari Soal 1</span>
+                            <span>🔄 Mulai dari Step 1</span>
                         </button>
                     </div>
                 </div>
@@ -1714,7 +1714,7 @@
             if (elT) elT.textContent = t;
             if (elD) elD.textContent = d;
             if (elV) elV.textContent = 'Versi: ' + v;
-            if (elO) elO.textContent = 'Offset ' + o;
+            if (elO) elO.textContent = 'Offset Otomatis: ' + o;
         }
 
         let cachedPreset = PRESETS_CACHE.find(p => p.id === presetId);
@@ -2830,10 +2830,11 @@
 
 
     // ========================================================
-    // ── 5-STEP QUIZ WIZARD CONTROLLER (1 STEP = 1 QUESTION) ──
+    // ── 5-STEP WIZARD CONTROLLER (1 STEP = 1 ACTION) ──
     // ========================================================
     let currentWizardStep = 1;
     let isFlashCompleted = false;
+    let lastStepNavTime = 0;
     const WIZARD_STORAGE_KEY = 'xiaozhi_web_flasher_quiz_v2';
 
     function isStepCompleted(step) {
@@ -2949,7 +2950,7 @@
             if (selectedFileBuffer && selectedFileBuffer.length > 0) {
                 bStatus.className = 'wizard-notice-banner wizard-notice-success';
                 const mb = (selectedFileBuffer.length / (1024*1024)).toFixed(2);
-                bStatus.innerHTML = `<span>✅ Binary firmware siap di memori (${mb} MB). Silakan lanjut ke Soal 4!</span>`;
+                bStatus.innerHTML = `<span>✅ Binary firmware siap di memori (${mb} MB, offset otomatis 0x0). Silakan lanjut ke Step 4!</span>`;
             } else {
                 bStatus.className = 'wizard-notice-banner wizard-notice-warning';
                 bStatus.innerHTML = '<span>⚠️ Binary firmware belum dimuat. Klik tombol "⚡ Muat Preset Ini ke Flasher" di atas.</span>';
@@ -2983,6 +2984,13 @@
     function goToStep(targetStep, validate = true) {
         if (targetStep < 1) targetStep = 1;
         if (targetStep > 5) targetStep = 5;
+
+        // Anti-bounce debounce: prevent rapid duplicate calls within 200ms
+        const now = Date.now();
+        if (now - lastStepNavTime < 200 && targetStep === currentWizardStep) {
+            return;
+        }
+        lastStepNavTime = now;
 
         if (validate && targetStep > currentWizardStep) {
             for (let s = currentWizardStep; s < targetStep; s++) {
@@ -3063,9 +3071,9 @@
             if (s3Custom) s3Custom.style.display = 'none';
 
             if (p2Title) p2Title.textContent = '2. Pilih Varian Board Microcontroller';
-            if (p2Sub) p2Sub.textContent = 'Soal 2 dari 5: Pilih varian hardware microcontroller Anda.';
+            if (p2Sub) p2Sub.textContent = 'Langkah 2 dari 5: Pilih varian hardware microcontroller Anda.';
             if (p3Title) p3Title.textContent = '3. Konfigurasi Versi & Memori';
-            if (p3Sub) p3Sub.textContent = 'Soal 3 dari 5: Tentukan versi rilis firmware dan muat ke memori browser.';
+            if (p3Sub) p3Sub.textContent = 'Langkah 3 dari 5: Tentukan versi rilis firmware resmi dan muat ke memori browser (offset diatur otomatis).';
         } else {
             if (cardCustom) cardCustom.classList.add('is-selected');
             if (cardPreset) cardPreset.classList.remove('is-selected');
@@ -3078,9 +3086,9 @@
             if (s3Custom) s3Custom.style.display = 'block';
 
             if (p2Title) p2Title.textContent = '2. Unggah File Binary (.bin)';
-            if (p2Sub) p2Sub.textContent = 'Soal 2 dari 5: Unggah file binary firmware (.bin) Anda.';
+            if (p2Sub) p2Sub.textContent = 'Langkah 2 dari 5: Unggah file binary firmware (.bin) Anda.';
             if (p3Title) p3Title.textContent = '3. Tentukan Alamat Offset Flash';
-            if (p3Sub) p3Sub.textContent = 'Soal 3 dari 5: Tentukan alamat offset memori flash microcontroller.';
+            if (p3Sub) p3Sub.textContent = 'Langkah 3 dari 5: Tentukan alamat offset memori flash microcontroller.';
         }
 
         updateStepperUI();
@@ -3155,8 +3163,12 @@
         }
 
         if (elOffset) {
-            const off = offsetPreset?.disabled ? '0x0' : (offsetPreset?.value === 'custom' ? offsetInput?.value : offsetPreset?.value) || '0x0';
-            elOffset.innerHTML = `<strong>Alamat Offset:</strong> <code>${off}</code> ${off === '0x0' ? '(Full Factory Merged)' : '(App)'} <span class="app-chip app-chip-info" style="font-size:10px; margin-left:4px;">Tervalidasi ✅</span>`;
+            if (currentSourceMode === 'preset') {
+                elOffset.innerHTML = `<strong>Alamat Offset:</strong> <code>0x0</code> (Otomatis dari Preset Resmi) <span class="app-chip app-chip-success" style="font-size:10px; margin-left:4px;">Otomatis ✅</span>`;
+            } else {
+                const off = offsetPreset?.disabled ? '0x0' : (offsetPreset?.value === 'custom' ? offsetInput?.value : offsetPreset?.value) || '0x0';
+                elOffset.innerHTML = `<strong>Alamat Offset:</strong> <code>${off}</code> ${off === '0x0' ? '(Full Factory Merged)' : '(Aplikasi)'} <span class="app-chip app-chip-info" style="font-size:10px; margin-left:4px;">Tervalidasi ✅</span>`;
+            }
         }
 
         if (elBaud) {
@@ -3295,26 +3307,6 @@
     window.saveWizardState = saveWizardState;
     window.showWizardNotice = showWizardNotice;
 
-    // Attach DOM event listeners to all nav buttons
-    const btnN2 = document.getElementById('btnNextToStep2');
-    if (btnN2) btnN2.addEventListener('click', (e) => { e.preventDefault(); nextWizardStep(); });
-    const btnP1 = document.getElementById('btnPrevToStep1');
-    if (btnP1) btnP1.addEventListener('click', (e) => { e.preventDefault(); prevWizardStep(); });
-    const btnN3 = document.getElementById('btnNextToStep3');
-    if (btnN3) btnN3.addEventListener('click', (e) => { e.preventDefault(); nextWizardStep(); });
-    const btnP2 = document.getElementById('btnPrevToStep2');
-    if (btnP2) btnP2.addEventListener('click', (e) => { e.preventDefault(); prevWizardStep(); });
-    const btnN4 = document.getElementById('btnNextToStep4');
-    if (btnN4) btnN4.addEventListener('click', (e) => { e.preventDefault(); nextWizardStep(); });
-    const btnP3 = document.getElementById('btnPrevToStep3');
-    if (btnP3) btnP3.addEventListener('click', (e) => { e.preventDefault(); prevWizardStep(); });
-    const btnN5 = document.getElementById('btnNextToStep5');
-    if (btnN5) btnN5.addEventListener('click', (e) => { e.preventDefault(); nextWizardStep(); });
-    const btnP4 = document.getElementById('btnPrevToStep4');
-    if (btnP4) btnP4.addEventListener('click', (e) => { e.preventDefault(); prevWizardStep(); });
-    const btnR = document.getElementById('btnResetWizard');
-    if (btnR) btnR.addEventListener('click', (e) => { e.preventDefault(); goToStep(1); });
-
     // Flush any clicks queued before module finished loading
     if (window._wizardQueue && window._wizardQueue.length > 0) {
         const q = window._wizardQueue.slice();
@@ -3334,18 +3326,6 @@
     if (chkEraseAll) chkEraseAll.addEventListener('change', () => { saveWizardState(); });
     if (offsetPreset) offsetPreset.addEventListener('change', () => { saveWizardState(); });
     if (offsetInput) offsetInput.addEventListener('input', () => { saveWizardState(); });
-
-    // Attach direct DOM event listeners to wizard step items and option cards
-    for (let s = 1; s <= 5; s++) {
-        const item = document.getElementById('stepperStep' + s);
-        if (item) {
-            item.addEventListener('click', () => goToStep(s, true));
-        }
-    }
-    const cardPresetEl = document.getElementById('cardSourcePreset');
-    if (cardPresetEl) cardPresetEl.addEventListener('click', () => selectSourceMode('preset'));
-    const cardCustomEl = document.getElementById('cardSourceCustom');
-    if (cardCustomEl) cardCustomEl.addEventListener('click', () => selectSourceMode('custom'));
 
     // Initialize wizard on page load
     restoreWizardState();
