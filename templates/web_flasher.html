@@ -540,7 +540,7 @@
 </style>
 
 <script>
-    // Global fallback bridge so quiz buttons work instantly even before module finishes loading
+    // Global fallback bridge with Centered Overlay Modal support
     window._wizardQueue = [];
     window.goToStep = function(step, val) {
         if (typeof window._realGoToStep === 'function') {
@@ -580,7 +580,31 @@
     window.switchSourceMode = function(mode) {
         window.selectSourceMode(mode);
     };
+    window.showOverlayNotice = function(title, message, type, callback) {
+        if (typeof window._realShowOverlayNotice === 'function') {
+            window._realShowOverlayNotice(title, message, type, callback);
+        } else {
+            const modal = document.getElementById('overlayNoticeModal');
+            if (modal) {
+                const titleEl = document.getElementById('overlayNoticeTitle');
+                const msgEl = document.getElementById('overlayNoticeMsg');
+                if (titleEl) titleEl.textContent = title;
+                if (msgEl) msgEl.innerHTML = message;
+                modal.style.display = 'flex';
+            }
+        }
+    };
+    window.closeOverlayNotice = function() {
+        const modal = document.getElementById('overlayNoticeModal');
+        if (modal) modal.style.display = 'none';
+        if (typeof window._overlayNoticeCallback === 'function') {
+            const cb = window._overlayNoticeCallback;
+            window._overlayNoticeCallback = null;
+            cb();
+        }
+    };
     window.dismissWizardAlert = function() {
+        window.closeOverlayNotice();
         const b = document.getElementById('wizardAlert');
         if (b) b.style.display = 'none';
     };
@@ -1305,6 +1329,30 @@
 </div>
 
 <!-- ======================================================== -->
+<!-- ======================================================== -->
+<!-- MODAL: OVERLAY NOTIFIKASI DI TENGAH LAYAR (WIZARD)       -->
+<!-- ======================================================== -->
+<div id="overlayNoticeModal" class="mcp-blocking-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="overlayNoticeTitle">
+    <div class="mcp-blocking-box" style="max-width:440px; padding:28px 22px 22px; text-align:center; border-radius:18px;">
+        <div id="overlayNoticeIconWrap" style="width:68px; height:68px; border-radius:50%; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; font-size:32px; box-shadow:0 0 20px rgba(220,38,38,0.25); background:rgba(220,38,38,0.12); border:2px solid #dc2626;">
+            <span id="overlayNoticeIcon">🔒</span>
+        </div>
+        
+        <h3 id="overlayNoticeTitle" style="font-size:17.5px; font-weight:850; margin:0 0 10px; color:var(--app-text); letter-spacing:-0.2px;">
+            Akses Lisensi Terkunci
+        </h3>
+        <p id="overlayNoticeMsg" style="font-size:13px; color:var(--app-muted); margin:0 0 22px; line-height:1.55;">
+            Firmware preset ini terkunci dan memerlukan lisensi resmi.
+        </p>
+
+        <div style="display:flex; gap:10px; justify-content:center;">
+            <button type="button" id="btnOverlayNoticeClose" class="app-button app-button-primary" onclick="closeOverlayNotice()" style="width:100%; justify-content:center; padding:11px; font-weight:850; font-size:13.5px; cursor:pointer;">
+                OK, Mengerti
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: PERINGATAN BUTUH PERIZINAN ADMIN (PRESET GATING)  -->
 <!-- ======================================================== -->
 <div id="permissionModal" class="mcp-blocking-overlay" style="display:none;" role="dialog">
@@ -1678,11 +1726,20 @@
             });
             const data = await resp.json();
             if (resp.ok && data.success) {
-                alert(data.message || 'Selamat! Lisensi preset berhasil diaktifkan.');
-                window.location.reload();
+                showOverlayNotice(
+                    '🔓 Gembok Terbuka!',
+                    '<strong>Selamat!</strong> Lisensi preset resmi berhasil diaktifkan.<br><br>Halaman akan dimuat ulang untuk memperbarui hak akses Anda.',
+                    'success',
+                    () => { window.location.reload(); }
+                );
+                setTimeout(() => { window.location.reload(); }, 2000);
             } else {
-                const reqIdNote = data.request_id ? ('\n[ID Request: ' + data.request_id + ']') : '';
-                alert((data.message || 'Gagal mengklaim kode lisensi. Periksa kembali kode Anda.') + reqIdNote);
+                const reqIdNote = data.request_id ? ('<br><small style="color:var(--app-muted);">[ID Request: ' + data.request_id + ']</small>') : '';
+                showOverlayNotice(
+                    '🔒 Klaim Lisensi Gagal',
+                    (data.message || 'Kode lisensi tidak valid atau sudah kadaluarsa.') + reqIdNote,
+                    'locked'
+                );
                 if (btnEl) {
                     btnEl.disabled = false;
                     btnEl.textContent = originalText || '🔓 Buka Kunci';
@@ -2082,7 +2139,15 @@
 
             if (!resp.ok) {
                 if (resp.status === 403 || resp.status === 401) {
-                    alert('⚠️ Akses Terbatas: Anda belum memiliki izin lisensi untuk menggunakan preset ini. Silakan masukkan kode lisensi atau minta izin ke Admin.');
+                    showOverlayNotice(
+                        '🔒 Akses Lisensi Terkunci',
+                        'Anda belum memiliki izin lisensi aktif untuk mengunduh preset resmi ini.<br><br>Silakan masukkan <strong>Kode Lisensi</strong> Anda pada kolom input di Step 3 untuk membuka akses.',
+                        'locked',
+                        () => {
+                            const inp = document.getElementById('inlineClaimCodeInput');
+                            if (inp) { inp.focus(); inp.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                        }
+                    );
                     throw new Error('Akses lisensi belum disetujui Admin.');
                 }
                 const errJson = await resp.json().catch(() => ({}));
@@ -2830,12 +2895,99 @@
 
 
     // ========================================================
-    // ── 5-STEP WIZARD CONTROLLER (1 STEP = 1 ACTION) ──
+    // ── 5-STEP WIZARD CONTROLLER WITH CENTERED OVERLAY MODAL ──
     // ========================================================
     let currentWizardStep = 1;
     let isFlashCompleted = false;
     let lastStepNavTime = 0;
     const WIZARD_STORAGE_KEY = 'xiaozhi_web_flasher_quiz_v2';
+
+    // ── CENTERED MODAL OVERLAY NOTIFICATION SYSTEM ──
+    function showOverlayNotice(title, message, type = 'warning', callback = null) {
+        const modal = document.getElementById('overlayNoticeModal');
+        const iconWrap = document.getElementById('overlayNoticeIconWrap');
+        const icon = document.getElementById('overlayNoticeIcon');
+        const titleEl = document.getElementById('overlayNoticeTitle');
+        const msgEl = document.getElementById('overlayNoticeMsg');
+        const btn = document.getElementById('btnOverlayNoticeClose');
+        if (!modal) return;
+
+        window._overlayNoticeCallback = callback;
+
+        if (titleEl) titleEl.textContent = title;
+        if (msgEl) msgEl.innerHTML = message;
+
+        if (type === 'locked' || type === 'lock') {
+            if (iconWrap) {
+                iconWrap.style.background = 'rgba(220, 38, 38, 0.12)';
+                iconWrap.style.borderColor = '#dc2626';
+                iconWrap.style.boxShadow = '0 0 20px rgba(220, 38, 38, 0.25)';
+            }
+            if (icon) icon.textContent = '🔒';
+            if (titleEl) titleEl.style.color = '#dc2626';
+            if (btn) {
+                btn.className = 'app-button app-button-primary';
+                btn.textContent = 'Tutup & Masukkan Kode Lisensi';
+            }
+        } else if (type === 'success') {
+            if (iconWrap) {
+                iconWrap.style.background = 'rgba(16, 185, 129, 0.12)';
+                iconWrap.style.borderColor = '#10b981';
+                iconWrap.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.25)';
+            }
+            if (icon) icon.textContent = '✅';
+            if (titleEl) titleEl.style.color = '#059669';
+            if (btn) {
+                btn.className = 'app-button app-button-success';
+                btn.textContent = 'Selesai';
+            }
+        } else if (type === 'info') {
+            if (iconWrap) {
+                iconWrap.style.background = 'rgba(59, 130, 246, 0.12)';
+                iconWrap.style.borderColor = '#3b82f6';
+                iconWrap.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.25)';
+            }
+            if (icon) icon.textContent = 'ℹ️';
+            if (titleEl) titleEl.style.color = 'var(--app-text)';
+            if (btn) {
+                btn.className = 'app-button app-button-primary';
+                btn.textContent = 'OK, Mengerti';
+            }
+        } else { // warning
+            if (iconWrap) {
+                iconWrap.style.background = 'rgba(234, 179, 8, 0.12)';
+                iconWrap.style.borderColor = '#eab308';
+                iconWrap.style.boxShadow = '0 0 20px rgba(234, 179, 8, 0.25)';
+            }
+            if (icon) icon.textContent = '⚠️';
+            if (titleEl) titleEl.style.color = 'var(--app-text)';
+            if (btn) {
+                btn.className = 'app-button app-button-primary';
+                btn.textContent = 'OK, Mengerti';
+            }
+        }
+
+        modal.style.display = 'flex';
+    }
+
+    function closeOverlayNotice() {
+        const modal = document.getElementById('overlayNoticeModal');
+        if (modal) modal.style.display = 'none';
+        if (typeof window._overlayNoticeCallback === 'function') {
+            const cb = window._overlayNoticeCallback;
+            window._overlayNoticeCallback = null;
+            cb();
+        }
+    }
+
+    function showWizardNotice(msg, type = 'warning', title = null) {
+        let t = 'Pemberitahuan Flasher';
+        if (type === 'locked' || type === 'lock') t = '🔒 Akses Lisensi Terkunci';
+        else if (type === 'warning') t = '⚠️ Langkah Belum Lengkap';
+        else if (type === 'info') t = 'ℹ️ Informasi Langkah';
+        else if (type === 'success') t = '✅ Berhasil';
+        showOverlayNotice(title || t, msg, type);
+    }
 
     function isStepCompleted(step) {
         if (step === 1) {
@@ -2846,7 +2998,9 @@
             return (selectedFileBuffer !== null && selectedFileBuffer.length > 0);
         }
         if (step === 3) {
-            if (currentSourceMode === 'preset') return (selectedFileBuffer !== null && selectedFileBuffer.length > 0);
+            if (currentSourceMode === 'preset') {
+                return (userAuthStatus.authorized && selectedFileBuffer !== null && selectedFileBuffer.length > 0);
+            }
             const off = offsetPreset ? (offsetPreset.value === 'custom' ? offsetInput.value : offsetPreset.value) : '0x0';
             return !!off;
         }
@@ -2859,18 +3013,40 @@
         return false;
     }
 
+    // STRICT VALIDATION GUARDS (GEMBOK TERKUNCI = TIDAK BISA LANJUT STEP BERIKUTNYA)
     function validateStep(step) {
         if (step === 1) {
             if (currentSourceMode !== 'preset' && currentSourceMode !== 'custom') {
-                showWizardNotice('Silakan pilih salah satu sumber firmware (Preset Resmi atau Unggah File .bin).', 'warning');
+                showOverlayNotice(
+                    '🎯 Pilih Sumber Firmware',
+                    'Silakan tentukan salah satu opsi sumber firmware (<strong>Preset Resmi</strong> atau <strong>Unggah File .bin</strong>) sebelum melanjutkan.',
+                    'warning'
+                );
                 return false;
             }
             return true;
         }
         if (step === 2) {
-            if (currentSourceMode === 'custom') {
+            if (currentSourceMode === 'preset') {
+                if (!currentPresetId) {
+                    showOverlayNotice(
+                        '📦 Pilih Varian Board',
+                        'Silakan pilih salah satu varian hardware microcontroller Anda sebelum melanjutkan.',
+                        'warning'
+                    );
+                    return false;
+                }
+            } else {
                 if (!selectedFileBuffer || selectedFileBuffer.length === 0) {
-                    showWizardNotice('File binary (.bin) belum dipilih. Silakan klik dropzone untuk memilih file firmware .bin Anda!', 'warning');
+                    showOverlayNotice(
+                        '📁 File Binary Belum Dipilih',
+                        'File firmware (.bin) belum dipilih.<br><br>Silakan klik dropzone atau seret file binary (.bin) Anda ke area yang tersedia.',
+                        'warning',
+                        () => {
+                            const dz = document.getElementById('dropzone');
+                            if (dz) dz.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    );
                     return false;
                 }
             }
@@ -2878,12 +3054,37 @@
         }
         if (step === 3) {
             if (currentSourceMode === 'preset') {
+                // 1. GEMBOK TERKUNCI CHECK (CRITICAL: CANNOT PROCEED IF LOCKED)
+                if (!userAuthStatus.authorized) {
+                    showOverlayNotice(
+                        '🔒 Akses Lisensi Terkunci',
+                        'Firmware preset resmi ini <strong>masih terkunci</strong> dan memerlukan lisensi aktif.<br><br>Silakan masukkan <strong>Kode Lisensi</strong> Anda pada kolom di bawah lalu klik <strong>"🔓 Buka Kunci"</strong> sebelum dapat melanjutkan ke step berikutnya!',
+                        'locked',
+                        () => {
+                            const inp = document.getElementById('inlineClaimCodeInput');
+                            if (inp) {
+                                inp.focus();
+                                inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }
+                    );
+                    return false;
+                }
+
+                // 2. BUFFER CHECK
                 if (!selectedFileBuffer || selectedFileBuffer.length === 0) {
-                    if (!userAuthStatus.authorized) {
-                        showWizardNotice('Preset ini memerlukan lisensi resmi. Masukkan Kode Lisensi Anda terlebih dahulu untuk membuka akses!', 'warning');
-                    } else {
-                        showWizardNotice('File firmware preset belum dimuat ke memori browser. Silakan klik tombol "⚡ Muat Preset Ini ke Flasher"!', 'warning');
-                    }
+                    showOverlayNotice(
+                        '⚡ Firmware Belum Dimuat',
+                        'Binary firmware resmi belum dimuat ke memori browser.<br><br>Silakan klik tombol <strong>"⚡ Muat Preset Ini ke Flasher"</strong> terlebih dahulu.',
+                        'warning',
+                        () => {
+                            const btn = document.getElementById('btnLoadPreset');
+                            if (btn) {
+                                btn.focus();
+                                btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }
+                    );
                     return false;
                 }
             }
@@ -2891,7 +3092,15 @@
         }
         if (step === 4) {
             if (!esploader || !port) {
-                showWizardNotice('Port serial COM ESP32 belum terhubung. Silakan klik tombol "🔌 Pilih & Hubungkan Port COM" terlebih dahulu!', 'warning');
+                showOverlayNotice(
+                    '🔌 Port COM Belum Terhubung',
+                    'Microcontroller ESP32 belum terhubung ke browser via port serial COM.<br><br>Pastikan kabel USB terpasang ke komputer dan klik tombol <strong>"🔌 Pilih & Hubungkan Port COM"</strong>.',
+                    'warning',
+                    () => {
+                        const btn = document.getElementById('btnConnect');
+                        if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                );
                 return false;
             }
             return true;
@@ -2951,34 +3160,20 @@
                 bStatus.className = 'wizard-notice-banner wizard-notice-success';
                 const mb = (selectedFileBuffer.length / (1024*1024)).toFixed(2);
                 bStatus.innerHTML = `<span>✅ Binary firmware siap di memori (${mb} MB, offset otomatis 0x0). Silakan lanjut ke Step 4!</span>`;
+            } else if (!userAuthStatus.authorized) {
+                bStatus.className = 'wizard-notice-banner wizard-notice-danger';
+                bStatus.innerHTML = '<span>🔒 Gembok terkunci. Masukkan kode lisensi Anda untuk membuka akses firmware.</span>';
             } else {
                 bStatus.className = 'wizard-notice-banner wizard-notice-warning';
-                bStatus.innerHTML = '<span>⚠️ Binary firmware belum dimuat. Klik tombol "⚡ Muat Preset Ini ke Flasher" di atas.</span>';
+                bStatus.innerHTML = '<span>⚠️ Lisensi aktif. Klik tombol "⚡ Muat Preset Ini ke Flasher" di atas untuk menyiapkan firmware.</span>';
             }
         } else if (bStatus) {
             bStatus.style.display = 'none';
         }
     }
 
-    function showWizardNotice(msg, type = 'warning') {
-        const banner = document.getElementById('wizardAlert');
-        const icon = document.getElementById('wizardAlertIcon');
-        const text = document.getElementById('wizardAlertMsg');
-        if (!banner || !text) return;
-
-        banner.className = 'wizard-notice-banner ' + (type === 'success' ? 'wizard-notice-success' : (type === 'info' ? 'wizard-notice-info' : 'wizard-notice-warning'));
-        if (icon) {
-            icon.textContent = type === 'success' ? '✅' : (type === 'info' ? 'ℹ️' : '⚠️');
-        }
-        text.textContent = msg;
-        banner.style.display = 'flex';
-
-        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
     function dismissWizardAlert() {
-        const banner = document.getElementById('wizardAlert');
-        if (banner) banner.style.display = 'none';
+        closeOverlayNotice();
     }
 
     function goToStep(targetStep, validate = true) {
@@ -3019,7 +3214,6 @@
         }
 
         updateStepperUI();
-        dismissWizardAlert();
         saveWizardState();
     }
 
@@ -3034,8 +3228,14 @@
     function selectSourceMode(mode) {
         if (mode === 'preset') {
             if (!userAuthStatus.isLoggedIn) {
-                alert('🔒 Preset Berlisensi: Anda harus masuk ke akun terlebih dahulu.');
-                window.location.href = '/login?next=/web-flasher';
+                showOverlayNotice(
+                    '🔒 Masuk ke Akun Diperlukan',
+                    'Untuk menggunakan <strong>Preset Resmi Berlisensi</strong>, Anda harus masuk ke akun Anda terlebih dahulu.',
+                    'info',
+                    () => {
+                        window.location.href = '/login?next=/web-flasher';
+                    }
+                );
                 return;
             }
         }
@@ -3273,13 +3473,13 @@
             // For custom binary upload mode, File buffers cannot be stored in browser localStorage
             if (state.sourceMode === 'custom' && targetStep > 2 && !selectedFileBuffer) {
                 targetStep = 2;
-                showWizardNotice('Sesi Anda dipulihkan. Demi keamanan browser, silakan pilih kembali file binary (.bin) Anda.', 'info');
+                showOverlayNotice('Sesi Dipulihkan', 'Sesi Anda dipulihkan. Demi keamanan browser, silakan pilih kembali file binary (.bin) Anda.', 'info');
             }
 
             // For Step 4 or 5: Web Serial ports are closed on page reload by browser security
             if (targetStep >= 4 && !port) {
                 targetStep = 4;
-                showWizardNotice('Sesi Anda dipulihkan. Silakan hubungkan kembali port COM ESP32 Anda untuk melanjutkan.', 'info');
+                showOverlayNotice('Sesi Dipulihkan', 'Sesi Anda dipulihkan. Silakan hubungkan kembali port COM ESP32 Anda untuk melanjutkan.', 'info');
             }
 
             goToStep(targetStep, false);
@@ -3295,6 +3495,9 @@
     window._realPrevWizardStep = prevWizardStep;
     window._realSelectSourceMode = selectSourceMode;
     window._realSelectPreset = selectPreset;
+    window._realShowOverlayNotice = showOverlayNotice;
+    window.showOverlayNotice = showOverlayNotice;
+    window.closeOverlayNotice = closeOverlayNotice;
     window.goToStep = goToStep;
     window.nextWizardStep = nextWizardStep;
     window.prevWizardStep = prevWizardStep;
