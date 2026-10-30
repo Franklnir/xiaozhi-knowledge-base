@@ -81,6 +81,76 @@ def _get_aesgcm(secret: Optional[str] = None) -> AESGCM:
     return AESGCM(key)
 
 
+def _migrate_granted_users_data(data: Dict[str, Any]) -> bool:
+    """
+    Memastikan struktur granted_users mendukung multi-preset per user,
+    serta memulihkan lisensi yang pernah diklaim sebelumnya (agar tidak hilang akibat bug single-preset lama).
+    Dijalankan 1 kali saat migrasi schema_version < 2.
+    """
+    if data.get("_schema_version", 0) >= 2:
+        return False
+
+    changed = True
+    data["_schema_version"] = 2
+
+    granted = data.setdefault("granted_users", {})
+    if not isinstance(granted, dict):
+        granted = {}
+        data["granted_users"] = granted
+
+    # 1. Pastikan setiap user entry memiliki dictionary 'presets'
+    for uname, uentry in list(granted.items()):
+        if not isinstance(uentry, dict):
+            continue
+        presets_map = uentry.setdefault("presets", {})
+        if "preset_id" in uentry and uentry["preset_id"] not in presets_map:
+            pid = str(uentry["preset_id"]).strip()
+            if pid:
+                presets_map[pid] = {
+                    "granted_by": uentry.get("granted_by", "system"),
+                    "granted_at": uentry.get("granted_at", ""),
+                    "request_id": uentry.get("request_id", "legacy_init"),
+                }
+
+    # 2. Replay all used claim_codes to restore any lost claims for users who claimed multiple presets
+    for c in data.get("claim_codes", []):
+        if c.get("is_used") and c.get("claimed_by"):
+            uname = str(c["claimed_by"]).strip().lower()
+            pid = str(c.get("preset_id", "esp32s3_cam")).strip()
+            if not uname or not pid:
+                continue
+            uentry = granted.setdefault(uname, {})
+            presets_map = uentry.setdefault("presets", {})
+            if pid not in presets_map:
+                presets_map[pid] = {
+                    "granted_by": f"code:{c.get('code')}",
+                    "granted_at": c.get("claimed_at", ""),
+                    "request_id": f"restore_{c.get('id', 'code')}",
+                }
+                uentry["preset_id"] = pid
+                uentry["last_updated"] = c.get("claimed_at", "")
+
+    # 3. Replay all approved requests
+    for r in data.get("requests", []):
+        if r.get("status") == "APPROVED" and r.get("username"):
+            uname = str(r["username"]).strip().lower()
+            pid = str(r.get("preset_id", "esp32s3_cam")).strip()
+            if not uname or not pid:
+                continue
+            uentry = granted.setdefault(uname, {})
+            presets_map = uentry.setdefault("presets", {})
+            if pid not in presets_map:
+                presets_map[pid] = {
+                    "granted_by": r.get("reviewed_by", "admin"),
+                    "granted_at": r.get("reviewed_at", ""),
+                    "request_id": f"restore_req_{r.get('id', 'req')}",
+                }
+                uentry["preset_id"] = pid
+                uentry["last_updated"] = r.get("reviewed_at", "")
+
+    return changed
+
+
 def _load_data() -> Dict[str, Any]:
     data_file = _get_data_file()
     if not data_file.exists():
@@ -106,6 +176,11 @@ def _load_data() -> Dict[str, Any]:
                         data["presets"][k] = v
             if "claim_codes" not in data:
                 data["claim_codes"] = []
+            
+            # Migrasi data otomatis untuk mendukung multi-preset
+            if _migrate_granted_users_data(data):
+                _save_data(data)
+
             return data
     except Exception as e:
         logger.error(f"Gagal memuat preset_flasher_access.json: {e}")
@@ -120,11 +195,25 @@ def _load_data() -> Dict[str, Any]:
 def _save_data(data: Dict[str, Any]) -> None:
     data_file = _get_data_file()
     data_file.parent.mkdir(parents=True, exist_ok=True)
-    temp_file = data_file.with_suffix(".tmp")
+    temp_file = data_file.with_suffix(f".tmp.{secrets.token_hex(4)}")
     try:
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        temp_file.replace(data_file)
+        try:
+            os.replace(temp_file, data_file)
+        except (PermissionError, OSError):
+            import time
+            time.sleep(0.05)
+            try:
+                os.replace(temp_file, data_file)
+            except Exception:
+                with open(data_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                if temp_file.exists():
+                    try:
+                        temp_file.unlink()
+                    except Exception:
+                        pass
     except Exception as e:
         logger.error(f"Gagal menyimpan preset_flasher_access.json: {e}")
         if temp_file.exists():
@@ -530,18 +619,28 @@ def generate_claim_code(
     return code_record
 
 
-def redeem_claim_code(raw_code: str, user: Dict[str, Any]) -> Dict[str, Any]:
+def redeem_claim_code(raw_code: str, user: Dict[str, Any], request_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Klaim kode lisensi sekali pakai.
-    Jika kode valid dan belum pernah dipakai, langsung berikan izin akses ke user
-    dan tandai kode sebagai HANGUS/TERPAKAI (tidak bisa dipakai lagi).
+    Klaim kode lisensi sekali pakai dengan pelacakan request_id.
+    Mendukung multi-preset: klaim firmware S3 tidak akan menghilangkan C3, dan sebaliknya.
     """
+    trace_id = request_id or f"req_claim_{secrets.token_hex(6)}"
     if not user:
-        return {"success": False, "message": "Silakan login terlebih dahulu untuk mengklaim kode lisensi."}
+        return {
+            "success": False,
+            "request_id": trace_id,
+            "error_code": "AUTH_REQUIRED",
+            "message": "Silakan login terlebih dahulu untuk mengklaim kode lisensi.",
+        }
 
     clean_code = str(raw_code or "").strip().upper()
     if not clean_code:
-        return {"success": False, "message": "Kode lisensi tidak boleh kosong."}
+        return {
+            "success": False,
+            "request_id": trace_id,
+            "error_code": "EMPTY_CODE",
+            "message": "Kode lisensi tidak boleh kosong.",
+        }
 
     username = str(user.get("username") or "").lower()
     uid = int(user.get("id", 0))
@@ -557,16 +656,22 @@ def redeem_claim_code(raw_code: str, user: Dict[str, Any]) -> Dict[str, Any]:
             break
 
     if not matched:
+        logger.warning(f"[{trace_id}] Klaim gagal oleh '{username}': Kode '{clean_code}' tidak ditemukan.")
         return {
             "success": False,
+            "request_id": trace_id,
+            "error_code": "INVALID_CODE",
             "message": "Kode lisensi tidak valid atau salah ketik. Periksa kembali format kode Anda.",
         }
 
     if matched.get("is_used"):
         claimed_by = matched.get("claimed_by", "pengguna lain")
         claimed_at = str(matched.get("claimed_at") or "")[:10]
+        logger.warning(f"[{trace_id}] Klaim ditolak untuk '{username}': Kode '{clean_code}' sudah pernah dipakai oleh '{claimed_by}' pada {claimed_at}.")
         return {
             "success": False,
+            "request_id": trace_id,
+            "error_code": "CODE_ALREADY_USED",
             "message": f"Ditolak: Kode lisensi ini sudah pernah diklaim oleh '{claimed_by}' pada {claimed_at}. 1 kode hanya dapat digunakan 1 kali.",
         }
 
@@ -575,24 +680,39 @@ def redeem_claim_code(raw_code: str, user: Dict[str, Any]) -> Dict[str, Any]:
     matched["claimed_by"] = username
     matched["claimed_user_id"] = uid
     matched["claimed_at"] = now_iso
+    matched["claim_request_id"] = trace_id
 
     preset_id = matched.get("preset_id", "esp32s3_cam")
 
-    # Berikan hak akses ke granted_users
+    # Berikan hak akses ke granted_users secara multi-preset (TIDAK MENGHAPUS PRESET LAIN!)
     granted = data.setdefault("granted_users", {})
-    granted[username] = {
-        "preset_id": preset_id,
+    user_entry = granted.setdefault(username, {})
+    presets_map = user_entry.setdefault("presets", {})
+    if "preset_id" in user_entry and user_entry["preset_id"] not in presets_map:
+        old_pid = user_entry["preset_id"]
+        presets_map[old_pid] = {
+            "granted_by": user_entry.get("granted_by", "legacy"),
+            "granted_at": user_entry.get("granted_at", now_iso),
+            "request_id": user_entry.get("request_id", trace_id),
+        }
+
+    presets_map[preset_id] = {
         "granted_by": f"code:{clean_code}",
         "granted_at": now_iso,
+        "request_id": trace_id,
     }
+    user_entry["preset_id"] = preset_id
+    user_entry["last_updated"] = now_iso
 
     _save_data(data)
-    logger.info(f"User '{username}' berhasil mengklaim kode '{clean_code}' untuk preset '{preset_id}'.")
+    logger.info(f"[{trace_id}] User '{username}' berhasil mengklaim kode '{clean_code}' untuk preset '{preset_id}'. Presets aktif: {list(presets_map.keys())}")
 
     return {
         "success": True,
+        "request_id": trace_id,
         "message": f"🎉 Selamat! Kode lisensi valid. Akses resmi ke preset '{preset_id}' kini terbuka 🔓.",
         "preset_id": preset_id,
+        "active_presets": list(presets_map.keys()),
     }
 
 
@@ -636,12 +756,16 @@ def is_user_authorized(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3
     username = str(user.get("username") or "").lower()
     data = _load_data()
 
-    # Cek tabel granted_users (akses langsung dari admin atau melalui klaim kode lisensi)
+    # Cek tabel granted_users dengan multi-preset check
     granted = data.get("granted_users", {})
     if username in granted:
         user_grant = granted[username]
-        if user_grant.get("preset_id") in (preset_id, "all"):
-            return True
+        if isinstance(user_grant, dict):
+            presets_map = user_grant.get("presets")
+            if isinstance(presets_map, dict):
+                return bool(preset_id in presets_map or "all" in presets_map)
+            # Fallback legacy format check (hanya jika presets_map belum ada)
+            return bool(user_grant.get("preset_id") in (preset_id, "all"))
 
     return False
 
@@ -671,9 +795,7 @@ def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_ca
             "message": "Akses Penuh Administrator Resmi",
         }
 
-    username = str(user.get("username") or "").lower()
-    granted = data.get("granted_users", {})
-    if username in granted and granted[username].get("preset_id") in (preset_id, "all"):
+    if is_user_authorized(user, preset_id):
         return {
             "authorized": True,
             "status": "APPROVED",
@@ -692,9 +814,11 @@ def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_ca
 
 
 def request_access(user: Dict[str, Any], preset_id: str = "esp32s3_cam", note: str = "") -> Dict[str, Any]:
+    req_trace = f"req_access_{secrets.token_hex(5)}"
     if is_user_authorized(user, preset_id):
         return {
             "success": True,
+            "request_id": req_trace,
             "status": "ALREADY_AUTHORIZED",
             "message": "Anda sudah memiliki akses penuh ke preset ini.",
         }
@@ -707,6 +831,7 @@ def request_access(user: Dict[str, Any], preset_id: str = "esp32s3_cam", note: s
         if int(req.get("user_id", 0)) == uid and req.get("preset_id") == preset_id and req.get("status") == "PENDING":
             return {
                 "success": True,
+                "request_id": req.get("id", req_trace),
                 "status": "PENDING",
                 "message": "Permintaan Anda sebelumnya sudah berada dalam antrean review Admin.",
             }
@@ -727,6 +852,7 @@ def request_access(user: Dict[str, Any], preset_id: str = "esp32s3_cam", note: s
     }
     data["requests"].insert(0, new_req)
     _save_data(data)
+    logger.info(f"[{req_id}] User '{username}' mengajukan izin preset '{preset_id}'.")
     return {
         "success": True,
         "status": "PENDING",
@@ -747,17 +873,30 @@ def approve_request(request_id: str, admin_user: Dict[str, Any]) -> bool:
             req["reviewed_by"] = admin_name
             req["reviewed_at"] = now_iso
             username = str(req.get("username") or "").lower()
+            preset_id = req.get("preset_id", "esp32s3_cam")
             if username:
-                data.setdefault("granted_users", {})[username] = {
-                    "preset_id": req.get("preset_id", "esp32s3_cam"),
+                granted = data.setdefault("granted_users", {})
+                user_entry = granted.setdefault(username, {})
+                presets_map = user_entry.setdefault("presets", {})
+                if "preset_id" in user_entry and user_entry["preset_id"] not in presets_map:
+                    old_pid = user_entry["preset_id"]
+                    presets_map[old_pid] = {
+                        "granted_by": user_entry.get("granted_by", "legacy"),
+                        "granted_at": user_entry.get("granted_at", now_iso),
+                    }
+                presets_map[preset_id] = {
                     "granted_by": admin_name,
                     "granted_at": now_iso,
+                    "request_id": request_id,
                 }
+                user_entry["preset_id"] = preset_id
+                user_entry["last_updated"] = now_iso
             found = True
             break
 
     if found:
         _save_data(data)
+        logger.info(f"Admin '{admin_name}' menyetujui request '{request_id}' untuk preset '{preset_id}' user '{username}'.")
     return found
 
 
@@ -774,54 +913,104 @@ def reject_request(request_id: str, admin_user: Dict[str, Any], reason: str = ""
             req["reviewed_at"] = now_iso
             req["rejection_reason"] = reason.strip() or "Ditolak oleh admin."
             username = str(req.get("username") or "").lower()
+            preset_id = req.get("preset_id", "esp32s3_cam")
             if username in data.get("granted_users", {}):
-                del data["granted_users"][username]
+                user_entry = data["granted_users"][username]
+                if isinstance(user_entry, dict) and "presets" in user_entry:
+                    user_entry["presets"].pop(preset_id, None)
+                    if not user_entry["presets"]:
+                        del data["granted_users"][username]
+                elif user_entry.get("preset_id") == preset_id:
+                    del data["granted_users"][username]
             found = True
             break
 
     if found:
         _save_data(data)
+        logger.info(f"Admin '{admin_name}' menolak request '{request_id}' untuk user '{username}'.")
     return found
 
 
-def grant_access_direct(username: str, admin_user: Dict[str, Any], preset_id: str = "esp32s3_cam") -> bool:
+def grant_access_direct(username: str, admin_user: Dict[str, Any], preset_id: str = "esp32s3_cam", request_id: Optional[str] = None) -> bool:
     username = username.strip().lower()
     if not username:
         return False
+    trace_id = request_id or f"req_direct_{secrets.token_hex(6)}"
     data = _load_data()
     admin_name = str(admin_user.get("username") or "admin")
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    data.setdefault("granted_users", {})[username] = {
-        "preset_id": preset_id,
+    granted = data.setdefault("granted_users", {})
+    user_entry = granted.setdefault(username, {})
+    presets_map = user_entry.setdefault("presets", {})
+    if "preset_id" in user_entry and user_entry["preset_id"] not in presets_map:
+        old_pid = user_entry["preset_id"]
+        presets_map[old_pid] = {
+            "granted_by": user_entry.get("granted_by", "legacy"),
+            "granted_at": user_entry.get("granted_at", now_iso),
+            "request_id": user_entry.get("request_id", trace_id),
+        }
+
+    presets_map[preset_id] = {
         "granted_by": admin_name,
         "granted_at": now_iso,
+        "request_id": trace_id,
     }
+    user_entry["preset_id"] = preset_id
+    user_entry["last_updated"] = now_iso
+
     for req in data.get("requests", []):
         if str(req.get("username") or "").lower() == username and req.get("preset_id") == preset_id:
             req["status"] = "APPROVED"
             req["reviewed_by"] = admin_name
             req["reviewed_at"] = now_iso
+            req["request_id"] = trace_id
 
     _save_data(data)
+    logger.info(f"[{trace_id}] Admin '{admin_name}' memberikan akses preset '{preset_id}' ke '{username}'. Total presets: {list(presets_map.keys())}")
     return True
 
 
-def revoke_access(username: str, admin_user: Dict[str, Any], preset_id: str = "esp32s3_cam") -> bool:
+def revoke_access(username: str, admin_user: Dict[str, Any], preset_id: str = "esp32s3_cam", request_id: Optional[str] = None) -> bool:
     username = username.strip().lower()
+    trace_id = request_id or f"req_revoke_{secrets.token_hex(6)}"
     data = _load_data()
     changed = False
-    if username in data.get("granted_users", {}):
-        del data["granted_users"][username]
-        changed = True
+    admin_name = str(admin_user.get("username") or "admin")
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    granted = data.get("granted_users", {})
+    if username in granted:
+        user_entry = granted[username]
+        if isinstance(user_entry, dict) and "presets" in user_entry:
+            presets_map = user_entry["presets"]
+            if preset_id == "all":
+                del granted[username]
+                changed = True
+            elif preset_id in presets_map:
+                del presets_map[preset_id]
+                changed = True
+                if not presets_map:
+                    del granted[username]
+                else:
+                    user_entry["preset_id"] = next(iter(presets_map.keys()))
+        else:
+            legacy_pid = user_entry.get("preset_id")
+            if preset_id in (legacy_pid, "all"):
+                del granted[username]
+                changed = True
 
     for req in data.get("requests", []):
-        if str(req.get("username") or "").lower() == username and req.get("preset_id") == preset_id:
+        if str(req.get("username") or "").lower() == username and (preset_id == "all" or req.get("preset_id") == preset_id):
             req["status"] = "REVOKED"
+            req["reviewed_by"] = admin_name
+            req["reviewed_at"] = now_iso
+            req["request_id"] = trace_id
             changed = True
 
     if changed:
         _save_data(data)
+        logger.info(f"[{trace_id}] Admin '{admin_name}' mencabut akses preset '{preset_id}' untuk user '{username}'.")
     return changed
 
 
@@ -832,7 +1021,38 @@ def list_all_requests() -> List[Dict[str, Any]]:
 
 def list_granted_users() -> Dict[str, Any]:
     data = _load_data()
-    return data.get("granted_users", {})
+    raw_granted = data.get("granted_users", {})
+    result = {}
+    for username, udata in raw_granted.items():
+        if not isinstance(udata, dict):
+            continue
+        presets_map = udata.get("presets")
+        presets_list = []
+        if isinstance(presets_map, dict):
+            for pid, pmeta in presets_map.items():
+                presets_list.append({
+                    "preset_id": pid,
+                    "granted_by": pmeta.get("granted_by", ""),
+                    "granted_at": pmeta.get("granted_at", ""),
+                    "request_id": pmeta.get("request_id", ""),
+                })
+        elif udata.get("preset_id"):
+            presets_list.append({
+                "preset_id": udata["preset_id"],
+                "granted_by": udata.get("granted_by", ""),
+                "granted_at": udata.get("granted_at", ""),
+                "request_id": udata.get("request_id", ""),
+            })
+
+        first_pid = presets_list[0]["preset_id"] if presets_list else udata.get("preset_id", "esp32s3_cam")
+        result[username] = {
+            "preset_id": first_pid,
+            "presets_list": presets_list,
+            "presets_count": len(presets_list),
+            "granted_by": udata.get("granted_by", ""),
+            "granted_at": udata.get("granted_at", ""),
+        }
+    return result
 
 
 def get_preset_version_binary(

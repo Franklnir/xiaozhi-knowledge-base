@@ -324,16 +324,29 @@
     </div>
 
     {% if preset_granted %}
-    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+    <div style="display:flex; flex-wrap:wrap; gap:10px;">
         {% for uname, g in preset_granted.items() %}
         <div style="display:inline-flex; align-items:center; gap:8px; padding:6px 12px; background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); font-size:12.5px;">
             <span style="font-weight:800; color:var(--app-text);">👤 {{ uname }}</span>
-            <span class="app-chip app-chip-neutral" style="font-size:10.5px; padding:2px 6px;">{{ g.preset_id }}</span>
-            <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
-                <input type="hidden" name="username" value="{{ uname }}">
-                <input type="hidden" name="preset_id" value="{{ g.preset_id }}">
-                <button type="submit" title="Cabut Akses (Status Kembali Terkunci)" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:16px; padding:0 2px; line-height:1;" onclick="return confirm('Cabut akses preset untuk {{ uname }}? Pengguna tidak akan dapat mengakses update firmware lagi.')">&times;</button>
-            </form>
+            {% if g.presets_list %}
+                {% for p in g.presets_list %}
+                <span class="app-chip app-chip-neutral" style="font-size:10.5px; padding:2px 6px; display:inline-flex; align-items:center; gap:4px;">
+                    {{ p.preset_id }}
+                    <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
+                        <input type="hidden" name="username" value="{{ uname }}">
+                        <input type="hidden" name="preset_id" value="{{ p.preset_id }}">
+                        <button type="submit" title="Cabut Akses ({{ p.preset_id }})" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:14px; padding:0 2px; line-height:1;" onclick="return confirm('Cabut akses preset {{ p.preset_id }} untuk {{ uname }}?')">&times;</button>
+                    </form>
+                </span>
+                {% endfor %}
+            {% else %}
+                <span class="app-chip app-chip-neutral" style="font-size:10.5px; padding:2px 6px;">{{ g.preset_id }}</span>
+                <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
+                    <input type="hidden" name="username" value="{{ uname }}">
+                    <input type="hidden" name="preset_id" value="{{ g.preset_id }}">
+                    <button type="submit" title="Cabut Akses" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:16px; padding:0 2px; line-height:1;" onclick="return confirm('Cabut akses preset untuk {{ uname }}?')">&times;</button>
+                </form>
+            {% endif %}
         </div>
         {% endfor %}
     </div>

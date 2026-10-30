@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 import re
+import secrets
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -544,14 +546,23 @@ async def get_preset_status_api(request: Request, preset_id: str):
 @router.post("/api/v1/flasher/preset/claim")
 async def claim_preset_code_api(request: Request):
     user = get_current_user(request)
+    trace_id = request.headers.get("X-Request-Id") or f"req_claim_{secrets.token_hex(6)}"
     if not user:
-        raise HTTPException(status_code=401, detail="Silakan masuk terlebih dahulu untuk mengklaim kode lisensi.")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "success": False,
+                "request_id": trace_id,
+                "error_code": "UNAUTHORIZED",
+                "message": "Silakan masuk terlebih dahulu untuk mengklaim kode lisensi."
+            }
+        )
     try:
         body = await request.json()
         code = str(body.get("code") or "").strip()
     except Exception:
         code = ""
-    res = redeem_claim_code(code, user)
+    res = redeem_claim_code(code, user, request_id=trace_id)
     return res
 
 

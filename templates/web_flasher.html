@@ -1044,7 +1044,8 @@
                 alert(data.message || 'Selamat! Lisensi preset berhasil diaktifkan.');
                 window.location.reload();
             } else {
-                alert(data.message || 'Gagal mengklaim kode lisensi. Periksa kembali kode Anda.');
+                const reqIdNote = data.request_id ? ('\n[ID Request: ' + data.request_id + ']') : '';
+                alert((data.message || 'Gagal mengklaim kode lisensi. Periksa kembali kode Anda.') + reqIdNote);
                 if (btnEl) {
                     btnEl.disabled = false;
                     btnEl.textContent = originalText || '🔓 Buka Kunci';
