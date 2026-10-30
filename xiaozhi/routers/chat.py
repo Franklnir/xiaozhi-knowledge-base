@@ -630,6 +630,22 @@ async def documentation_page(request: Request):
     )
 
 
+@router.get("/app-chronos", response_class=HTMLResponse)
+@router.get("/chronos", response_class=HTMLResponse)
+async def app_chronos_page(request: Request):
+    user = get_current_user(request)
+    return render(
+        request,
+        "app_chronos.html",
+        {
+            "user": user,
+            "page": "app_chronos",
+            "active_page": "app_chronos",
+            "mcp_required": False,
+        },
+    )
+
+
 @router.get("/profil", response_class=HTMLResponse)
 async def profile_page(request: Request, mode: Optional[str] = "profile", sub: Optional[str] = "products"):
     user = get_current_user(request)

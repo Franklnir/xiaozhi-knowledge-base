@@ -1884,8 +1884,9 @@
 {% set is_admin_page = (page.startswith('admin') or (request and request.url.path.startswith('/admin'))) %}
 {% set is_doc_page = (page in ['documentation', 'dokumentasi'] or (request and (request.url.path.startswith('/dokumentasi') or request.url.path.startswith('/documentation')))) %}
 {% set is_flasher_page = (page in ['web_flasher', 'flasher'] or (request and request.url.path.startswith('/web-flasher'))) %}
+{% set is_chronos_page = (page in ['app_chronos', 'chronos'] or (request and (request.url.path.startswith('/app-chronos') or request.url.path.startswith('/chronos')))) %}
 {% set is_auth_page = (page in ['login', 'register', 'forgot_password', 'reset_password'] or (request and (request.url.path.startswith('/login') or request.url.path.startswith('/register') or request.url.path.startswith('/logout') or request.url.path.startswith('/auth/')))) %}
-{% set show_mcp_block_overlay = (user and user.role != 'admin' and not mcp_connected and not is_doc_page and not is_flasher_page and not is_auth_page) %}
+{% set show_mcp_block_overlay = (user and user.role != 'admin' and not mcp_connected and not is_doc_page and not is_flasher_page and not is_chronos_page and not is_auth_page) %}
 <body class="{% if is_admin_page %}is-admin-page{% endif %}">
     <!-- PWA Mobile Install Banner Overlay -->
     <aside id="pwaInstallBanner" class="pwa-install-banner" aria-label="Instal Aplikasi Xiaozhi" style="display:none;">
@@ -2284,10 +2285,16 @@
             </a>
 
             <div class="app-sidebar-section">Aplikasi Mobile</div>
-            <a href="javascript:void(0)" onclick="window.openMobileAppModal()" class="app-sidebar-link" style="color: #047857; font-weight: 800;">
-                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="3"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span>
-                <span>Aplikasi Android</span>
-                <span class="app-chip app-chip-small" style="font-size:10px; padding:2px 7px; background:#10b981; color:#fff; font-weight:900; border-radius:10px; margin-left:auto;">APK</span>
+            <a href="/app-chronos" class="app-sidebar-link {% if page == 'app_chronos' or active_page == 'app_chronos' %}is-active{% endif %}" style="color: #047857; font-weight: 800;">
+                <span class="app-sidebar-link-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="7"></circle>
+                        <polyline points="12 9 12 12 13.5 13.5"></polyline>
+                        <path d="M16.51 17.35l-.35 3.83a2 2 0 0 1-2 1.82H9.83a2 2 0 0 1-2-1.82l-.35-3.83m.01-10.7l.35-3.83A2 2 0 0 1 9.83 1h4.35a2 2 0 0 1 2 1.82l.35 3.83"></path>
+                    </svg>
+                </span>
+                <span>App Chronos</span>
+                <span class="app-chip app-chip-small" style="font-size:10px; padding:2px 7px; background:#10b981; color:#fff; font-weight:900; border-radius:10px; margin-left:auto;">APP</span>
             </a>
 
 
@@ -2759,19 +2766,29 @@
             <div style="padding:24px 28px;">
                 <!-- Header Badge -->
                 <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:#d1fae5; color:#065f46; border:2px solid #047857; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:12px;">
-                    <span>📱</span> APLIKASI ANDROID RESMI
+                    <span>⌚</span> APLIKASI RESMI APP CHRONOS
                 </div>
 
                 <div style="display:flex; flex-wrap:wrap; gap:24px; align-items:center;">
                     <!-- Left Column: App Description & Features -->
                     <div style="flex:1 1 300px;">
                         <h2 style="font-size:22px; font-weight:900; color:var(--app-text); margin:0 0 8px; line-height:1.25; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <span>Unduh Xiaozhi & ESPBridge Mobile</span>
-                            <span style="font-size:11.5px; font-weight:900; background:#047857; color:#fff; padding:3px 9px; border-radius:6px; border:1.5px solid #111; box-shadow:1.5px 1.5px 0 #111;">v1.4.6 (Terbaru)</span>
+                            <span>Unduh App Chronos Companion</span>
+                            <span style="font-size:11.5px; font-weight:900; background:#047857; color:#fff; padding:3px 9px; border-radius:6px; border:1.5px solid #111; box-shadow:1.5px 1.5px 0 #111;">v1.4.8 (Terbaru)</span>
                         </h2>
-                        <p style="font-size:13px; line-height:1.55; color:var(--app-muted); margin:0 0 16px;">
-                            Bawa asisten suara cerdas, kontrol perangkat IoT ESP32 via Bluetooth Low Energy (BLE), dan 63 Tools MCP langsung di ponsel Anda.
+                        <p style="font-size:13px; line-height:1.55; color:var(--app-muted); margin:0 0 12px;">
+                            Aplikasi pendamping cerdas via Bluetooth Low Energy (BLE) untuk sinkronisasi jam, cuaca realtime, notifikasi panggilan/chat HP, dan kontrol media pada ESP32.
                         </p>
+
+                        <!-- PEMBERITAHUAN LISENSI RESMI -->
+                        <div style="background:#fff1f2; border:2px solid #e11d48; border-radius:10px; padding:10px 14px; margin-bottom:14px; box-shadow:2px 2px 0 #111;">
+                            <div style="display:flex; align-items:center; gap:6px; color:#be123c; font-size:12px; font-weight:900; margin-bottom:3px;">
+                                <span>⚠️</span> PERHATIAN: DUKUNGAN LISENSI FIRMWARE
+                            </div>
+                            <p style="font-size:11.5px; line-height:1.5; color:#881337; margin:0;">
+                                Aplikasi <strong>App Chronos</strong> ini <strong>HANYA support untuk firmware berlisensi resmi xiaozhiscig.biz.id</strong>. Fitur sinkronisasi BLE tidak akan aktif pada firmware tanpa lisensi.
+                            </p>
+                        </div>
 
                         <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
                             <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--app-text);">
@@ -2794,6 +2811,9 @@
                             </a>
                             <a href="/download/app.zip" download="espbridge-xiaozhi-v1.4.8.zip" class="app-button" style="background:#0284c7; color:#fff; font-size:12.5px; font-weight:800; padding:9px 14px; border:2px solid #111; box-shadow:2.5px 2.5px 0 #111; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:10px;">
                                 <span>📦</span> Unduh File ZIP Anti-Macet (~33 MB)
+                            </a>
+                            <a href="/app-chronos" class="app-button" style="background:var(--app-surface); color:var(--app-text); font-size:12px; font-weight:800; padding:9px 14px; border:2px solid #111; box-shadow:2.5px 2.5px 0 #111; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:10px;">
+                                <span>📖</span> Buka Halaman Lengkap & Panduan App Chronos
                             </a>
                             <div style="font-size:10.5px; line-height:1.4; color:var(--app-muted); background:var(--app-surface-soft, #f1f5f9); border:1px dashed var(--app-border, #cbd5e1); border-radius:8px; padding:6px 10px;">
                                 💡 <strong>Info:</strong> Jika Chrome/Brave di HP Anda berhenti di 100% (stuck verifikasi browser), silakan pilih <strong>Unduh File ZIP</strong> (buka/ekstrak lalu pasang APK langsung).
