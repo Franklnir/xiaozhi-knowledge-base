@@ -5,6 +5,7 @@ from xiaozhi.services.preset_approval_service import (
     list_presets,
     save_or_update_preset,
     set_active_preset_version,
+    delete_preset_version,
     generate_claim_code,
     list_claim_codes,
     delete_claim_code,
@@ -14,6 +15,7 @@ from fastapi import APIRouter, Request, Form, Query, HTTPException, status, Uplo
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from xiaozhi.dependencies import render, require_admin, redirect_with_message, get_store, validate_csrf
+from xiaozhi.core.security import verify_password
 from typing import Optional
 from xiaozhi.marketplace.deps import get_approval_service, get_wallet_service, get_marketplace_repo, get_product_service
 
@@ -155,6 +157,37 @@ async def admin_set_active_version_action(request: Request, preset_id: str, vers
     except Exception as exc:
         logger.exception("Error changing active preset version")
         return redirect_with_message("/admin/firmware/approvals", f"Gagal mengubah versi aktif: {str(exc)}")
+
+
+@router.post("/presets/{preset_id}/versions/{version}/delete")
+async def admin_delete_preset_version_action(
+    request: Request,
+    preset_id: str,
+    version: str,
+    password: str = Form(...),
+    csrf_token: str = Form(...),
+):
+    user = require_admin(request)
+    validate_csrf(request, csrf_token, user)
+    if not password or len(password) > 128:
+        return redirect_with_message("/admin/firmware/approvals", "Password admin wajib diisi dengan benar untuk menghapus versi.")
+
+    try:
+        admin_record = get_store().get_user_by_username(str(user.get("username") or ""))
+        password_hash = str((admin_record or {}).get("password_hash") or "")
+        if not password_hash or not verify_password(password, password_hash):
+            return redirect_with_message("/admin/firmware/approvals", "Password admin salah. Versi tidak dihapus.")
+
+        updated = delete_preset_version(preset_id, version, user)
+        return redirect_with_message(
+            "/admin/firmware/approvals",
+            f"Versi '{version}' dari preset '{updated.get('title', preset_id)}' berhasil dihapus.",
+        )
+    except ValueError as exc:
+        return redirect_with_message("/admin/firmware/approvals", f"Gagal menghapus versi: {exc}")
+    except Exception:
+        logger.exception("Error deleting preset firmware version")
+        return redirect_with_message("/admin/firmware/approvals", "Gagal menghapus versi karena terjadi kesalahan sistem.")
 
 
 @router.post("/claim-codes/generate")

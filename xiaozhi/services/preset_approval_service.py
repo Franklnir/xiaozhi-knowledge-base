@@ -280,6 +280,64 @@ def set_active_preset_version(
     return existing
 
 
+def delete_preset_version(
+    preset_id: str,
+    version: str,
+    admin_user: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Remove one release from a preset and its private object storage."""
+    clean_id = _clean_slug(preset_id)
+    target_version = str(version or "").strip()
+    if not clean_id or not target_version:
+        raise ValueError("ID preset atau versi tidak valid.")
+
+    data = _load_data()
+    presets = data.get("presets", {})
+    preset = presets.get(clean_id)
+    if not preset:
+        raise ValueError(f"Preset '{clean_id}' tidak ditemukan.")
+
+    versions = preset.get("versions", [])
+    removed = next(
+        (item for item in versions if str(item.get("version", "")).lower() == target_version.lower()),
+        None,
+    )
+    if not removed:
+        raise ValueError(f"Versi '{target_version}' tidak ditemukan pada preset '{clean_id}'.")
+
+    bucket = str(removed.get("storage_bucket") or "local-private")
+    storage_key = str(removed.get("storage_key") or "")
+    # The factory preset's original encrypted image ships with the application.
+    # Keep that deployment asset intact; uploaded releases use firmware_presets/ keys.
+    if storage_key.replace("\\", "/").startswith("firmware_presets/"):
+        storage_service.delete_encrypted_preset(bucket, storage_key)
+
+    remaining = [item for item in versions if item is not removed]
+    preset["versions"] = remaining
+    if str(preset.get("active_version", "")).lower() == str(removed.get("version", "")).lower():
+        if remaining:
+            def version_number(item: Dict[str, Any]) -> int:
+                match = re.search(r"(\d+)", str(item.get("version", "")))
+                return int(match.group(1)) if match else 0
+
+            active = max(remaining, key=version_number)
+            preset["active_version"] = active.get("version")
+            preset["filename"] = active.get("filename", "")
+            preset["size_bytes"] = active.get("size_bytes", 0)
+        else:
+            preset["active_version"] = ""
+            preset["filename"] = ""
+            preset["size_bytes"] = 0
+
+    admin_name = str((admin_user or {}).get("username") or "admin")
+    preset["updated_at"] = datetime.now(timezone.utc).isoformat()
+    preset["updated_by"] = admin_name
+    presets[clean_id] = preset
+    _save_data(data)
+    logger.info("Admin '%s' menghapus versi '%s' dari preset '%s'.", admin_name, removed.get("version"), clean_id)
+    return preset
+
+
 def _clean_slug(text: str) -> str:
     cleaned = re.sub(r"[^a-zA-Z0-9_]+", "_", text.strip().lower())
     return re.sub(r"_+", "_", cleaned).strip("_")

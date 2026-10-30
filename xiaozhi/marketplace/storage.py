@@ -386,6 +386,24 @@ class StorageService:
 
         return bucket_name, storage_key
 
+    def delete_encrypted_preset(self, bucket_name: str, storage_key: str) -> None:
+        """Delete one encrypted preset release from private storage."""
+        key = str(storage_key or "").strip().replace("\\", "/")
+        parts = key.split("/")
+        if len(parts) != 3 or parts[0] != "firmware_presets" or any(part in ("", ".", "..") for part in parts):
+            raise ValueError("Lokasi file preset tidak valid untuk dihapus.")
+
+        s3 = self._get_s3()
+        if self.has_s3 and bucket_name != "local-private":
+            if not s3:
+                raise RuntimeError("Koneksi Object Storage tidak tersedia; versi tidak dihapus.")
+            s3.delete_object(Bucket=bucket_name, Key=key)
+            return
+
+        local_target = LOCAL_STORAGE_DIR / "private" / "presets" / parts[1] / parts[2]
+        if local_target.exists() and local_target.is_file():
+            local_target.unlink()
+
     def get_encrypted_preset_bytes(self, bucket_name: str, storage_key: str) -> bytes:
         """
         Fetches encrypted preset bytes from S3 or local storage fallback.

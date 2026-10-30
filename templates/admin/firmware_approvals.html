@@ -164,6 +164,7 @@
                                     <span style="color:var(--app-muted); font-size:11px;">{{ v.uploaded_at[:16].replace('T', ' ') if v.uploaded_at else '' }}</span>
                                     {% if v.version != p.active_version %}
                                     <form method="POST" action="/admin/firmware/presets/{{ p.id }}/set-active-version" style="display:inline; margin:0;" onsubmit="return confirm('Jadikan versi {{ v.version }} sebagai versi aktif default untuk pengguna?')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                         <input type="hidden" name="version" value="{{ v.version }}">
                                         <button type="submit" class="app-button app-button-secondary app-button-small" style="font-size:10.5px; padding:2px 8px; font-weight:800;">
                                             🔄 Jadikan Versi Aktif
@@ -172,6 +173,12 @@
                                     {% endif %}
                                 </div>
                             </div>
+                            <form method="POST" action="/admin/firmware/presets/{{ p.id }}/versions/{{ v.version }}/delete" style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:6px; margin-top:7px;" onsubmit="return confirm('Hapus versi {{ v.version }} dari preset ini? Password admin akan divalidasi sebelum penghapusan.')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <label for="delete-password-{{ p.id }}-{{ loop.index }}" style="font-size:10.5px; color:var(--app-muted);">Password admin:</label>
+                                <input id="delete-password-{{ p.id }}-{{ loop.index }}" type="password" name="password" required maxlength="128" autocomplete="current-password" placeholder="Masukkan password" class="app-input" style="width:155px; padding:3px 7px; font-size:10.5px;">
+                                <button type="submit" class="app-button app-button-danger app-button-small" style="font-size:10.5px; padding:3px 8px; font-weight:800;">Hapus versi</button>
+                            </form>
                             <div style="color:var(--app-muted); margin-top:4px; font-size:11px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
                                 <span>📝 {{ v.changelog or 'Tanpa catatan rilis' }}</span>
                                 <span>{{ (v.size_bytes / (1024*1024))|round(2) }} MB • SHA: <code style="font-size:10px;">{{ v.sha256[:12] if v.sha256 else '-' }}...</code></span>
