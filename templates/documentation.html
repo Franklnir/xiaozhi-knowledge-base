@@ -357,18 +357,252 @@
 
     <!-- Tabs -->
     <div class="doc-tabs">
-        <button class="doc-tab active" onclick="switchTab('hardware')">ESP32-S3 N16R8 Pinout &amp; Cara Penggunaan</button>
-        <button class="doc-tab" onclick="switchTab('hardware-c3')">ESP32-C3 Pinout &amp; Cara Penggunaan</button>
-        <button class="doc-tab" onclick="switchTab('mcp')">MCP Setup</button>
+        <button class="doc-tab active" onclick="switchTab('quickstart')">🚀 Alur Cepat (0-100)</button>
+        <button class="doc-tab" onclick="switchTab('hardware')">⚡ Pinout ESP32-S3 &amp; Layar</button>
+        <button class="doc-tab" onclick="switchTab('hardware-c3')">🔌 Pinout ESP32-C3</button>
+        <button class="doc-tab" onclick="switchTab('mcp')">🛠️ MCP Setup &amp; Slot</button>
         <button class="doc-tab" onclick="switchTab('youtube')">🎵 Musik &amp; Playlist</button>
-        <button class="doc-tab" onclick="switchTab('smarthome')">Smart Home</button>
-        <button class="doc-tab" onclick="switchTab('tools')">Tools MCP</button>
-        <button class="doc-tab" onclick="switchTab('knowledge')">Knowledge Base</button>
-        <button class="doc-tab" onclick="switchTab('faq')">FAQ</button>
+        <button class="doc-tab" onclick="switchTab('smarthome')">🏠 Smart Home</button>
+        <button class="doc-tab" onclick="switchTab('tools')">📚 Tools MCP</button>
+        <button class="doc-tab" onclick="switchTab('knowledge')">💡 Knowledge Base</button>
+        <button class="doc-tab" onclick="switchTab('faq')">❓ FAQ</button>
     </div>
 
-    <!-- ESP32-S3 N16R8 Pinout & Cara Penggunaan Tab -->
-    <div id="tab-hardware" class="doc-tab-content active">
+    <!-- ======================================================== -->
+    <!-- TAB 1: 🚀 ALUR CEPAT MULAI DARI NOL (PANDUAN 5 LANGKAH)   -->
+    <!-- ======================================================== -->
+    <div id="tab-quickstart" class="doc-tab-content active">
+        <div class="app-card">
+            <div class="doc-section">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:12px;">
+                    <div>
+                        <div class="doc-section-title" style="margin-bottom:6px;">
+                            <span>🚀</span> Alur Cepat Mulai Dari Nol (Zero to Hero)
+                        </div>
+                        <div style="font-size:13.5px; color:var(--app-muted); line-height:1.6;">
+                            Panduan berurutan untuk pengguna baru. Dari board ESP32 kosong hingga asisten suara XiaoZhi aktif 100% dengan otak lokal di <strong>xiaozhiscig.biz.id</strong>.
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="app-chip app-chip-success" style="font-size:11.5px; font-weight:800; padding:6px 12px;">
+                            ✨ 5 Langkah Praktis
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Visual Roadmap Indicator -->
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin:16px 0 28px; padding:14px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#2563eb; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex-shrink:0;">1</div>
+                        <div>
+                            <div style="font-size:11px; font-weight:800; color:#2563eb; text-transform:uppercase;">Langkah 1</div>
+                            <div style="font-size:12px; font-weight:700; color:var(--app-text);">Flash Firmware</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#d97706; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex-shrink:0;">2</div>
+                        <div>
+                            <div style="font-size:11px; font-weight:800; color:#d97706; text-transform:uppercase;">Langkah 2</div>
+                            <div style="font-size:12px; font-weight:700; color:var(--app-text);">Setup Wi-Fi</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#7c3aed; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex-shrink:0;">3</div>
+                        <div>
+                            <div style="font-size:11px; font-weight:800; color:#7c3aed; text-transform:uppercase;">Langkah 3</div>
+                            <div style="font-size:12px; font-weight:700; color:var(--app-text);">Pairing 6 Digit</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#0284c7; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex-shrink:0;">4</div>
+                        <div>
+                            <div style="font-size:11px; font-weight:800; color:#0284c7; text-transform:uppercase;">Langkah 4</div>
+                            <div style="font-size:12px; font-weight:700; color:var(--app-text);">Salin MCP</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#059669; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex-shrink:0;">5</div>
+                        <div>
+                            <div style="font-size:11px; font-weight:800; color:#059669; text-transform:uppercase;">Langkah 5</div>
+                            <div style="font-size:12px; font-weight:700; color:var(--app-text);">Aktif di Server</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================== -->
+                <!-- KARTU LANGKAH 1 (BIRU INDIGO / PC FLASHER)     -->
+                <!-- ============================================== -->
+                <div style="border:1.5px solid #3b82f6; border-left:6px solid #2563eb; background:rgba(59, 130, 246, 0.03); border-radius:var(--app-radius); padding:20px; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:#2563eb; color:#fff; font-weight:850; font-size:15px;">1</span>
+                            <h3 style="margin:0; font-size:16.5px; font-weight:800; color:var(--app-text);">Langkah 1: Flash Firmware Resmi ke ESP32</h3>
+                        </div>
+                        <span style="background:rgba(37, 99, 235, 0.12); color:#2563eb; border:1px solid #3b82f6; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:999px;">
+                            💻 Dilakukan di PC / Laptop
+                        </span>
+                    </div>
+
+                    <div style="font-size:13px; color:var(--app-muted); line-height:1.65; margin-bottom:14px;">
+                        Hubungkan board ESP32 Anda ke komputer menggunakan kabel data USB Type-C yang mendukung transfer data (bukan sekadar kabel casan).
+                    </div>
+
+                    <ol style="margin:0 0 16px 20px; padding:0; font-size:13px; color:var(--app-text); line-height:1.7;">
+                        <li>Buka menu <strong>Web Serial Flasher</strong> di tab browser Google Chrome, Microsoft Edge, Opera, atau Brave.</li>
+                        <li>Pilih opsi <strong>Preset Resmi</strong> (misal <em>ESP32-S3 N16R8</em> atau <em>ESP32-C3</em>).</li>
+                        <li>Klik tombol hitam <strong>"Pilih &amp; Hubungkan Port COM"</strong>, lalu pilih port USB ESP32 Anda (<em>Espressif USB JTAG/CDC</em>).</li>
+                        <li>Klik tombol <strong>"Mulai Flash Firmware"</strong> dan tunggu hingga progress mencapai 100%.</li>
+                    </ol>
+
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <a href="/web-flasher" class="app-button app-button-primary" style="font-size:12.5px; padding:8px 16px; text-decoration:none;">
+                            <span style="display:inline-flex; align-items:center; gap:6px;">⚡ Buka Web Serial Flasher</span>
+                        </a>
+                        <span style="font-size:12px; color:var(--app-muted);">💡 Tidak butuh install Python atau driver tambahan!</span>
+                    </div>
+                </div>
+
+                <!-- ============================================== -->
+                <!-- KARTU LANGKAH 2 (AMBER / ORANYE - WIFI PORTAL) -->
+                <!-- ============================================== -->
+                <div style="border:1.5px solid #f59e0b; border-left:6px solid #d97706; background:rgba(245, 158, 11, 0.03); border-radius:var(--app-radius); padding:20px; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:#d97706; color:#fff; font-weight:850; font-size:15px;">2</span>
+                            <h3 style="margin:0; font-size:16.5px; font-weight:850; color:var(--app-text);">Langkah 2: Hubungkan &amp; Konfigurasi Wi-Fi Rumah</h3>
+                        </div>
+                        <span style="background:rgba(217, 119, 6, 0.12); color:#d97706; border:1px solid #f59e0b; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:999px;">
+                            📱 Dilakukan di HP / Smartphone
+                        </span>
+                    </div>
+
+                    <div style="font-size:13px; color:var(--app-muted); line-height:1.65; margin-bottom:14px;">
+                        Setelah firmware berhasil terpasang, ESP32 akan menyala dan memancarkan sinyal hotspot mandiri agar Anda dapat memasukkan kata sandi Wi-Fi rumah.
+                    </div>
+
+                    <ol style="margin:0 0 16px 20px; padding:0; font-size:13px; color:var(--app-text); line-height:1.7;">
+                        <li>Buka pengaturan Wi-Fi di HP atau Laptop Anda, lalu sambungkan ke jaringan bernama <strong>XiaoZhi-XXXX</strong> atau <strong>Xichi-Setup</strong> (tanpa kata sandi).</li>
+                        <li>Buka peramban (Chrome / Safari) lalu kunjungi alamat: <strong>http://192.168.4.1</strong>.</li>
+                        <li>Pada tab <strong>Jaringan Wi-Fi</strong>, pilih nama router Wi-Fi rumah Anda (wajib frekuensi <strong>2.4 GHz</strong>) dan ketik kata sandinya.</li>
+                        <li>Pada tab <strong>Pengaturan Hardware</strong>, tentukan tipe modul layar Anda (misal <em>ST7789 240x280</em> atau <em>Tanpa Layar / Headless</em>).</li>
+                        <li>Klik <strong>Simpan Konfigurasi</strong>. ESP32 otomatis me-restart dan tersambung ke internet rumah Anda.</li>
+                    </ol>
+
+                    <div style="background:rgba(217, 119, 6, 0.08); border:1px solid rgba(217, 119, 6, 0.25); border-radius:8px; padding:10px 14px; font-size:12px; color:#92400e;">
+                        ⚠️ <strong>Peringatan Wi-Fi:</strong> Chip ESP32 hanya mendukung sinyal <strong>2.4 GHz</strong>. Jangan sambungkan ke jaringan 5 GHz.
+                    </div>
+                </div>
+
+                <!-- ============================================== -->
+                <!-- KARTU LANGKAH 3 (UNGU VIOLET / XIAOZHI.ME)    -->
+                <!-- ============================================== -->
+                <div style="border:1.5px solid #8b5cf6; border-left:6px solid #7c3aed; background:rgba(139, 92, 246, 0.03); border-radius:var(--app-radius); padding:20px; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:#7c3aed; color:#fff; font-weight:850; font-size:15px;">3</span>
+                            <h3 style="margin:0; font-size:16.5px; font-weight:850; color:var(--app-text);">Langkah 3: Ambil Kode 6 Digit &amp; Hubungkan di xiaozhi.me</h3>
+                        </div>
+                        <span style="background:rgba(124, 58, 237, 0.12); color:#7c3aed; border:1px solid #8b5cf6; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:999px;">
+                            ☁️ Di Website xiaozhi.me
+                        </span>
+                    </div>
+
+                    <div style="font-size:13px; color:var(--app-muted); line-height:1.65; margin-bottom:14px;">
+                        Begitu ESP32 berhasil terhubung ke router internet rumah Anda, perangkat akan meminta aktivasi pairing dari server cloud resmi Xiaozhi.
+                    </div>
+
+                    <ol style="margin:0 0 16px 20px; padding:0; font-size:13px; color:var(--app-text); line-height:1.7;">
+                        <li>Perhatikan layar LCD board Anda atau dengarkan speaker: ESP32 akan menampilkan/menyebutkan <strong>Kode Pairing 6 Digit</strong> (contoh: <code>A8B2C9</code>).</li>
+                        <li>Buka peramban baru dan masuk ke situs resmi pusat: <strong><a href="https://xiaozhi.me" target="_blank" rel="noopener noreferrer" style="color:#7c3aed; font-weight:700;">https://xiaozhi.me</a></strong>.</li>
+                        <li>Masuk (Login) ke akun Anda, lalu klik menu <strong>Device / Tambah Perangkat Baru</strong>.</li>
+                        <li>Ketik <strong>Kode 6 Digit</strong> yang muncul di perangkat Anda, lalu klik konfirmasi untuk mendaftarkan board.</li>
+                    </ol>
+
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <a href="https://xiaozhi.me" target="_blank" rel="noopener noreferrer" class="app-button" style="font-size:12.5px; padding:8px 16px; text-decoration:none; background:#7c3aed; color:#fff; border-color:#6d28d9;">
+                            <span style="display:inline-flex; align-items:center; gap:6px;">🌐 Buka Situs xiaozhi.me</span>
+                        </a>
+                        <span style="font-size:12px; color:var(--app-muted);">Board ESP32 Anda kini telah terdaftar resmi di server Xiaozhi.</span>
+                    </div>
+                </div>
+
+                <!-- ============================================== -->
+                <!-- KARTU LANGKAH 4 (CYAN / SKY - SALIN TOKEN MCP) -->
+                <!-- ============================================== -->
+                <div style="border:1.5px solid #06b6d4; border-left:6px solid #0284c7; background:rgba(6, 182, 212, 0.03); border-radius:var(--app-radius); padding:20px; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:#0284c7; color:#fff; font-weight:850; font-size:15px;">4</span>
+                            <h3 style="margin:0; font-size:16.5px; font-weight:850; color:var(--app-text);">Langkah 4: Salin URL / Token WebSocket MCP</h3>
+                        </div>
+                        <span style="background:rgba(2, 132, 199, 0.12); color:#0284c7; border:1px solid #06b6d4; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:999px;">
+                            📋 Dari Dashboard xiaozhi.me
+                        </span>
+                    </div>
+
+                    <div style="font-size:13px; color:var(--app-muted); line-height:1.65; margin-bottom:14px;">
+                        Untuk menyambungkan XiaoZhi ke fitur-fitur lokal (Musik YouTube, Smart Home, Memori Percakapan, dan 66 Tools), Anda perlu mengambil alamat endpoint MCP peranti:
+                    </div>
+
+                    <ol style="margin:0 0 16px 20px; padding:0; font-size:13px; color:var(--app-text); line-height:1.7;">
+                        <li>Di dashboard <strong>xiaozhi.me</strong>, klik perangkat ESP32 Anda yang baru saja ditambahkan.</li>
+                        <li>Buka tab menu <strong>Integrasi / Pengaturan Lanjutan / MCP Endpoint</strong> (*Model Context Protocol*).</li>
+                        <li>Anda akan menemukan alamat URL WebSocket atau Token koneksi, formatnya menyerupai contoh berikut:</li>
+                    </ol>
+
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:8px; padding:12px 16px; font-family:ui-monospace, monospace; font-size:12.5px; color:#0284c7; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; overflow-x:auto;">
+                        <span>wss://api.xiaozhi.me/v1/mcp/ws?token=xxxxxxxxxxxxxxxx</span>
+                        <span class="app-chip app-chip-neutral" style="font-size:11px; white-space:nowrap;">Contoh Endpoint</span>
+                    </div>
+
+                    <div style="font-size:12.5px; color:var(--app-muted);">
+                        👉 Klik tombol <strong>Salin (Copy)</strong> pada URL atau Token tersebut untuk dipasang pada server Anda di Langkah 5.
+                    </div>
+                </div>
+
+                <!-- ============================================== -->
+                <!-- KARTU LANGKAH 5 (EMERALD / HIJAU - AKTIF DI BIZ) -->
+                <!-- ============================================== -->
+                <div style="border:1.5px solid #10b981; border-left:6px solid #059669; background:rgba(16, 185, 129, 0.03); border-radius:var(--app-radius); padding:20px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:#059669; color:#fff; font-weight:850; font-size:15px;">5</span>
+                            <h3 style="margin:0; font-size:16.5px; font-weight:850; color:var(--app-text);">Langkah 5: Tempel &amp; Aktifkan di xiaozhiscig.biz.id</h3>
+                        </div>
+                        <span style="background:rgba(5, 150, 105, 0.12); color:#059669; border:1px solid #10b981; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:999px;">
+                            🚀 Website Ini Selesai 100%
+                        </span>
+                    </div>
+
+                    <div style="font-size:13px; color:var(--app-muted); line-height:1.65; margin-bottom:14px;">
+                        Langkah terakhir untuk mengaktifkan seluruh integrasi cerdas XiaoZhi di server Anda sendiri:
+                    </div>
+
+                    <ol style="margin:0 0 16px 20px; padding:0; font-size:13px; color:var(--app-text); line-height:1.7;">
+                        <li>Buka menu <strong>Integrasi MCP / Matrix Slot</strong> pada website ini (atau klik menu <strong>Slot MCP</strong> di sidebar kiri).</li>
+                        <li>Pilih slot yang ingin digunakan (misal <strong>Slot 1</strong>).</li>
+                        <li>Tempelkan (*Paste*) URL / Token MCP yang Anda salin dari Langkah 4 ke dalam kolom input.</li>
+                        <li>Klik tombol <strong>"Hubungkan Sekarang"</strong>.</li>
+                        <li>Animasi radar akan berputar dan status berubah menjadi <strong style="color:#059669;">🟢 Berhasil Terhubung ke XiaoZhi!</strong>.</li>
+                    </ol>
+
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px;">
+                        <a href="/mcp" class="app-button app-button-success" style="font-size:12.5px; padding:9px 18px; text-decoration:none;">
+                            <span style="display:inline-flex; align-items:center; gap:6px;">🚀 Buka Pengaturan MCP Slot</span>
+                        </a>
+                        <span style="font-size:12px; color:var(--app-muted);">
+                            🎉 <strong>Selamat!</strong> XiaoZhi Anda kini sudah aktif penuh dan siap diajak berbicara, menyetel lagu YouTube, dan mengendalikan perangkat pintar.
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: ESP32-S3 N16R8 Pinout & Cara Penggunaan Tab        -->
+    <!-- ======================================================== -->
+    <div id="tab-hardware" class="doc-tab-content">
         <div class="app-card">
             <div class="doc-section">
                 <div class="doc-section-title">
@@ -1113,10 +1347,41 @@
                             <tr style="background:var(--app-surface-muted);">
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong>Sensor Pembaca Baterai</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;"><strong style="color:var(--app-brand);">GPIO 3 (ADC1 CH2)</strong></td>
-                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Tegangan baterai via pembagi tegangan (voltage divider 2x 100kΩ) ke ADC</td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">Tegangan baterai via pembagi tegangan (voltage divider 2x 100kΩ) ke ADC (Rasio 1:2)</td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Skema Rangkaian Pembagi Tegangan Baterai Opsional -->
+                <div class="doc-tip" style="margin-top:16px; background:var(--app-surface-muted); border:1.5px solid var(--app-border); border-left:4px solid #10b981; border-radius:var(--app-radius); padding:16px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
+                        <div style="font-size:13.5px; font-weight:800; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                            <span>🔋</span> Skema Rangkaian Sensor Pembaca Baterai (Voltage Divider ADC - Opsional)
+                        </div>
+                        <span class="app-chip app-chip-success" style="font-size:11px;">GPIO 3 (ADC1 CH2)</span>
+                    </div>
+                    <div style="font-size:12.5px; color:var(--app-muted); line-height:1.6; margin-bottom:12px;">
+                        Jika Anda ingin XiaoZhi bertenaga baterai portabel (LiPo / Li-ion 1S 3.7V - 4.2V) dan dapat mendeteksi persentase daya serta animasi baterai pada layar, pasang rangkaian pembagi tegangan 2 resistor <strong>100kΩ</strong> (toleransi 1%) berikut:
+                    </div>
+                    <pre style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:8px; padding:14px; font-family:ui-monospace, monospace; font-size:12.5px; line-height:1.45; color:var(--app-text); overflow-x:auto;">
+[ BAT + ] (Positif Baterai, maks 4.2V)
+    │
+   ┌┴┐
+   │ │  R1 (Resistor 100kΩ)
+   └┬┘
+    │
+    ├───────────────────────► Pin ADC ESP32 (GPIO 3)
+    │
+   ┌┴┐
+   │ │  R2 (Resistor 100kΩ)
+   └┬┘
+    │
+    └───────────────────────► GND ESP32 &amp; [ BAT - ] (Ground Baterai)
+                    </pre>
+                    <div style="font-size:12px; color:var(--app-muted); line-height:1.55; margin-top:10px;">
+                        💡 <strong>Cara Kerja:</strong> Rangkaian ini membagi tegangan baterai 4.2V menjadi 2.1V (aman di bawah batas maksimum ADC 3.3V ESP32). Firmware otomatis mengalikan kembali dengan faktor 2.0x sehingga pembacaan voltase dan persen baterai akurat. Anda juga bisa menanyakan status baterai via suara: <em>"Berapa sisa baterai sekarang?"</em>.
+                    </div>
                 </div>
             </div>
 

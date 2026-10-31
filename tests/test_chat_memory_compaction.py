@@ -119,3 +119,4 @@ def test_clear_chat_history_slot_isolation(tmp_path):
     assert len(store.list_chat_history(owner_id, slot_number=1, strict_slot=True)) == 1
     assert len(store.list_chat_history(owner_id, slot_number=2, strict_slot=True)) == 0
     assert len(store.list_chat_history(owner_id, slot_number=3, strict_slot=True)) == 1
+
