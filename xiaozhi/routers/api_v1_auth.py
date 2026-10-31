@@ -233,7 +233,7 @@ async def api_me(request: Request):
                 "id": user["id"],
                 "username": user["username"],
                 "role": role,
-                "ui_theme": user.get("ui_theme", "neo"),
+                "ui_theme": user.get("ui_theme", DEFAULT_UI_THEME),
                 "google_id": user.get("google_id"),
                 "google_email": user.get("google_email"),
                 "registered_with_google": user.get("registered_with_google", False),

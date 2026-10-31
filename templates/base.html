@@ -1,4 +1,4 @@
-{% set current_theme = user.ui_theme if user and user.ui_theme in ['default', 'dark', 'neo'] else 'neo' %}
+{% set current_theme = user.ui_theme if user and user.ui_theme in ['default', 'dark', 'neo'] else 'default' %}
 <!DOCTYPE html>
 <html lang="id" {% if current_theme != 'default' %}data-theme="{{ current_theme }}" {% endif %}>
 <head>
@@ -2345,9 +2345,9 @@
                 </div>
             </a>
             <select id="themeSelect" class="app-input" style="font-size:12px; padding:6px 8px; min-height:32px" aria-label="Tema">
+                <option value="default">Original</option>
                 <option value="neo">Neo Brutalism</option>
                 <option value="dark">Dark</option>
-                <option value="default">Original</option>
             </select>
             <a href="/logout" class="app-button app-button-small" style="justify-content:center">Keluar</a>
         </div>

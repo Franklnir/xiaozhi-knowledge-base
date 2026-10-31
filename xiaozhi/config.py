@@ -810,7 +810,7 @@ CSRF_MAX_AGE = 60 * 60 * 4
 
 # ── UI ─────────────────────────────────────────────────────────────────────
 UI_THEMES = {"default", "dark", "neo"}
-DEFAULT_UI_THEME = "neo"
+DEFAULT_UI_THEME = "default"
 
 # ── Production Detection ───────────────────────────────────────────────────
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production" or bool(os.getenv("SPACE_ID"))

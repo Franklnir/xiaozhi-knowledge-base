@@ -1084,7 +1084,7 @@
                     </div>
 
                     <!-- Collapsible Driver Helper (Clean, Not in the way) -->
-                    <details style="margin-top:12px; font-size:12px; color:var(--app-muted);">
+                    <details id="connNotice" style="margin-top:12px; font-size:12px; color:var(--app-muted);">
                         <summary style="cursor:pointer; font-weight:700; color:var(--app-primary, #047857);">
                             💡 Port COM tidak muncul di komputer Anda? Klik di sini untuk bantuan driver
                         </summary>
@@ -1608,19 +1608,23 @@
         const badge = document.getElementById('sourceBadge');
 
         if (mode === 'preset') {
-            btnPreset.classList.add('active');
-            btnCustom.classList.remove('active');
-            panelPreset.style.display = 'block';
-            panelCustom.style.display = 'none';
-            badge.textContent = userAuthStatus.authorized ? '🔓 Official Preset' : '🔒 Locked Preset';
-            badge.className = userAuthStatus.authorized ? 'app-chip app-chip-success' : 'app-chip app-chip-danger';
+            if (btnPreset) btnPreset.classList.add('active');
+            if (btnCustom) btnCustom.classList.remove('active');
+            if (panelPreset) panelPreset.style.display = 'block';
+            if (panelCustom) panelCustom.style.display = 'none';
+            if (badge) {
+                badge.textContent = userAuthStatus.authorized ? '🔓 Official Preset' : '🔒 Locked Preset';
+                badge.className = userAuthStatus.authorized ? 'app-chip app-chip-success' : 'app-chip app-chip-danger';
+            }
         } else {
-            btnCustom.classList.add('active');
-            btnPreset.classList.remove('active');
-            panelCustom.style.display = 'block';
-            panelPreset.style.display = 'none';
-            badge.textContent = 'Custom Upload';
-            badge.className = 'app-chip app-chip-neutral';
+            if (btnCustom) btnCustom.classList.add('active');
+            if (btnPreset) btnPreset.classList.remove('active');
+            if (panelCustom) panelCustom.style.display = 'block';
+            if (panelPreset) panelPreset.style.display = 'none';
+            if (badge) {
+                badge.textContent = 'Custom Upload';
+                badge.className = 'app-chip app-chip-neutral';
+            }
         }
     }
 
@@ -2225,13 +2229,61 @@
         });
     }
 
+    // Centralized UI State Manager: Menjamin konsistensi status terhubung / gagal
+    function setConnectionUIState(connected, chip = '', dev = '') {
+        if (connected) {
+            if (connStatusBadge) connStatusBadge.className = 'app-status-pill is-online';
+            if (connStatusText) connStatusText.textContent = `Terhubung: ${chip || 'ESP32'}`;
+            if (connNotice) connNotice.style.display = 'none';
+            if (usbPlugNotice) usbPlugNotice.style.display = 'none';
+            if (btnConnect) btnConnect.style.display = 'none';
+            if (btnDisconnect) btnDisconnect.style.display = 'inline-flex';
+            if (chipInfoBox) chipInfoBox.style.display = 'grid';
+
+            if (chipModel) chipModel.textContent = chip || 'ESP32';
+            if (chipUsbInfo) chipUsbInfo.textContent = dev || '-';
+            if (chipFeatures) chipFeatures.textContent = 'Wi-Fi, Bluetooth 5 (LE), Flash';
+            if (progressStatusText) progressStatusText.textContent = `Port terhubung (${chip || 'ESP32'} - ${dev || 'COM'}). Silakan lanjut ke Step 5.`;
+        } else {
+            if (connStatusBadge) connStatusBadge.className = 'app-status-pill is-offline';
+            if (connStatusText) connStatusText.textContent = 'Port Belum Terhubung';
+            if (connNotice) connNotice.style.display = 'block';
+            if (btnConnect) btnConnect.style.display = 'inline-flex';
+            if (btnDisconnect) btnDisconnect.style.display = 'none';
+            if (chipInfoBox) chipInfoBox.style.display = 'none';
+            if (chipUsbInfo) chipUsbInfo.textContent = '-';
+            if (chipModel) chipModel.textContent = '-';
+            if (chipMac) chipMac.textContent = '-';
+            if (chipCrystal) chipCrystal.textContent = '-';
+            if (progressStatusText) progressStatusText.textContent = 'Port belum terhubung.';
+        }
+        updateFlashButtonState();
+        if (typeof updateStepperUI === 'function') updateStepperUI();
+        if (typeof saveWizardState === 'function') saveWizardState();
+    }
+
     // Connect Web Serial Port (PC / Laptop Chromium)
     btnConnect.addEventListener('click', async () => {
-        // Jika Serial Monitor sedang aktif, hentikan terlebih dahulu agar port bisa dipakai esptool
+        if (isFlashing) return;
+
+        // 1. Jika Serial Monitor sedang aktif, hentikan terlebih dahulu agar port tidak terkunci
         if (isMonitoring) {
             await stopSerialMonitor(true);
             await new Promise(r => setTimeout(r, 100));
         }
+
+        // 2. Putuskan dan tutup port lama jika masih terbuka di memori
+        if (transport) {
+            try { await transport.disconnect(); } catch (e) {}
+            transport = null;
+        }
+        if (port) {
+            try {
+                if (port.readable || port.writable) await port.close();
+            } catch (e) {}
+            port = null;
+        }
+        esploader = null;
 
         const serialObj = getSerialApi();
         if (!serialObj || !serialObj.api) {
@@ -2241,7 +2293,19 @@
 
         try {
             logToConsole(`[INFO] Membuka dialog pemilih port serial (${serialObj.mode})...`);
-            port = await serialObj.api.requestPort({});
+            const selectedPort = await serialObj.api.requestPort({});
+            port = selectedPort;
+
+            // Jika port yang dipilih kebetulan sudah dalam status open, tutup dahulu secara aman
+            if (port && (port.readable || port.writable)) {
+                try {
+                    await port.close();
+                    await new Promise(r => setTimeout(r, 80));
+                } catch (closeErr) {
+                    console.warn('Port was open, close attempt result:', closeErr);
+                }
+            }
+
             const dev = identifyUsbDevice(port);
             logToConsole(`[INFO] Port dipilih oleh pengguna: ${dev}. Menginisialisasi transport...`);
 
@@ -2252,7 +2316,7 @@
             };
 
             transport = new Transport(port, true);
-            const baud = parseInt(baudrateSelect.value, 10) || 460800;
+            const baud = parseInt(baudrateSelect ? baudrateSelect.value : '230400', 10) || 230400;
 
             esploader = new ESPLoader({
                 transport: transport,
@@ -2266,45 +2330,53 @@
             const chip = await esploader.main();
             logToConsole(`[OK] Sukses terhubung ke chip: ${chip} via ${dev}`);
 
-            // Update UI state
-            connStatusBadge.className = 'app-status-pill is-online';
-            connStatusText.textContent = `Terhubung: ${chip}`;
-            connNotice.style.display = 'none';
-            if (usbPlugNotice) usbPlugNotice.style.display = 'none';
-            btnConnect.style.display = 'none';
-            btnDisconnect.style.display = 'inline-flex';
-            chipInfoBox.style.display = 'grid';
-
-            chipModel.textContent = chip;
-            if (chipUsbInfo) chipUsbInfo.textContent = dev;
+            // Baca MAC dan Crystal Freq tanpa memblokir kesuksesan koneksi
+            let macAddr = 'Tersedia';
+            let crystalFreq = '40 MHz';
             try {
-                const mac = await esploader.chip.readMac(esploader);
-                chipMac.textContent = mac || 'Tersedia';
-            } catch (e) {
-                chipMac.textContent = 'OK';
-            }
+                macAddr = (await esploader.chip.readMac(esploader)) || 'Tersedia';
+            } catch (e) {}
             try {
                 const crystal = await esploader.chip.getCrystalFreq(esploader);
-                chipCrystal.textContent = crystal ? `${crystal} MHz` : '40 MHz';
-            } catch (e) {
-                chipCrystal.textContent = '40 MHz';
-            }
-            chipFeatures.textContent = 'Wi-Fi, Bluetooth 5 (LE), Flash';
+                crystalFreq = crystal ? `${crystal} MHz` : '40 MHz';
+            } catch (e) {}
 
-            progressStatusText.textContent = `Port terhubung (${chip} - ${dev}). Pilih firmware untuk memulai flashing.`;
-            updateFlashButtonState();
-            if (typeof updateStepperUI === 'function') updateStepperUI();
-            if (typeof saveWizardState === 'function') saveWizardState();
+            if (chipMac) chipMac.textContent = macAddr;
+            if (chipCrystal) chipCrystal.textContent = crystalFreq;
+
+            // Update UI: Terhubung penuh & 100% konsisten
+            setConnectionUIState(true, chip, dev);
+
             if (typeof showWizardNotice === 'function') {
                 if (currentSourceMode === 'preset' && currentPresetId === 'esp32s3_cam' && !chip.toUpperCase().includes('ESP32-S3')) {
                     showWizardNotice(`⚠️ Perhatian: Preset terpilih adalah untuk ESP32-S3, namun chip yang terdeteksi adalah ${chip}. Pastikan tipe board sesuai!`, 'warning');
                 } else {
-                    showWizardNotice(`✅ Perangkat ${chip} berhasil terhubung! Silakan lanjut ke Langkah 4 untuk flashing.`, 'success');
+                    showWizardNotice(`✅ Perangkat ${chip} berhasil terhubung! Silakan klik "Lanjut ke Step 5" untuk memulai flashing.`, 'success');
                 }
             }
 
         } catch (err) {
             logToConsole(`[ERROR] Gagal menghubungkan port: ${err.message}`);
+
+            // Bersihkan resource port agar tidak terkunci pada percobaan berikutnya
+            if (transport) {
+                try { await transport.disconnect(); } catch (e) {}
+                transport = null;
+            }
+            if (port) {
+                try {
+                    if (port.readable || port.writable) await port.close();
+                } catch (e) {}
+                port = null;
+            }
+            esploader = null;
+
+            // KONSISTENSI STATUS: Jika gagal, status WAJIB offline & Step 4 tidak centang
+            setConnectionUIState(false);
+            if (progressStatusText) {
+                progressStatusText.textContent = 'Gagal menghubungkan port serial.';
+            }
+
             if (err.name === 'NotFoundError') {
                 logToConsole('[TIPS] Pemilihan port dibatalkan oleh pengguna.');
             } else {
@@ -2320,22 +2392,14 @@
         }
         try {
             if (transport) await transport.disconnect();
+            else if (port && (port.readable || port.writable)) await port.close();
         } catch (e) {}
         esploader = null;
         transport = null;
         port = null;
 
-        connStatusBadge.className = 'app-status-pill is-offline';
-        connStatusText.textContent = 'Port Belum Terhubung';
-        connNotice.style.display = 'block';
-        btnConnect.style.display = 'inline-flex';
-        btnDisconnect.style.display = 'none';
-        chipInfoBox.style.display = 'none';
-        if (chipUsbInfo) chipUsbInfo.textContent = '-';
-        progressStatusText.textContent = 'Port diputuskan.';
-        updateFlashButtonState();
-        if (typeof updateStepperUI === 'function') updateStepperUI();
-        if (typeof saveWizardState === 'function') saveWizardState();
+        setConnectionUIState(false);
+        if (progressStatusText) progressStatusText.textContent = 'Port diputuskan.';
         logToConsole('[INFO] Port serial diputuskan.');
     });
 
@@ -2458,15 +2522,10 @@
                 transport = null;
                 port = null;
 
-                if (connStatusBadge) {
-                    connStatusBadge.className = 'app-status-pill is-offline';
+                setConnectionUIState(false);
+                if (connStatusText) {
                     connStatusText.textContent = 'Port Dilepas (Firmware Berjalan)';
                 }
-                if (connNotice) connNotice.style.display = 'block';
-                if (btnConnect) btnConnect.style.display = 'inline-flex';
-                if (btnDisconnect) btnDisconnect.style.display = 'none';
-                if (chipInfoBox) chipInfoBox.style.display = 'none';
-                updateFlashButtonState();
 
                 // Cek opsi Auto-Monitor setelah Flash
                 const chkAutoMon = document.getElementById('chkAutoMonitorAfterFlash');

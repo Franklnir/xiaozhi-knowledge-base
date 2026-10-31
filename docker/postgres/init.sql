@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'user',
     session_version INT NOT NULL DEFAULT 1,
-    ui_theme VARCHAR(30) NOT NULL DEFAULT 'neo',
+    ui_theme VARCHAR(30) NOT NULL DEFAULT 'default',
     google_id VARCHAR(100),
     google_email VARCHAR(255),
     registered_with_google BOOLEAN NOT NULL DEFAULT FALSE,
