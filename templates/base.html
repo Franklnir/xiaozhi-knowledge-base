@@ -1,4 +1,4 @@
-{% set current_theme = user.ui_theme if user and user.ui_theme in ['default', 'dark', 'neo'] else 'default' %}
+{% set current_theme = user.ui_theme if user and user.ui_theme in ['default', 'dark', 'neo'] else 'neo' %}
 <!DOCTYPE html>
 <html lang="id" {% if current_theme != 'default' %}data-theme="{{ current_theme }}" {% endif %}>
 <head>
@@ -2534,8 +2534,8 @@
                 </div>
             </a>
             <select id="themeSelect" class="app-input" style="font-size:12px; padding:6px 8px; min-height:32px" aria-label="Tema">
-                <option value="default">Original</option>
                 <option value="neo">Neo Brutalism</option>
+                <option value="default">Original</option>
                 <option value="dark">Dark</option>
             </select>
             <a href="/logout" class="app-button app-button-small" style="justify-content:center">Keluar</a>
@@ -2820,7 +2820,7 @@
                 document.documentElement.dataset.theme = theme;
             }
 
-            select.value = validThemes.includes(initialTheme) ? initialTheme : "default";
+            select.value = validThemes.includes(initialTheme) ? initialTheme : "neo";
             select.addEventListener("change", async () => {
                 const theme = validThemes.includes(select.value) ? select.value : "default";
                 const prev = document.documentElement.dataset.theme || "default";

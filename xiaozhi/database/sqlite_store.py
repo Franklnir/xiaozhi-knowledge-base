@@ -82,7 +82,7 @@ class SQLiteStore:
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'user',
                 session_version INTEGER NOT NULL DEFAULT 1,
-                ui_theme TEXT NOT NULL DEFAULT 'default',
+                ui_theme TEXT NOT NULL DEFAULT 'neo',
                 created_at TEXT NOT NULL,
                 updated_at TEXT
             );

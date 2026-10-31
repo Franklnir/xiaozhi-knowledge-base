@@ -555,6 +555,25 @@
                         <span class="app-chip app-chip-neutral" style="font-size:11px; white-space:nowrap;">Contoh Endpoint</span>
                     </div>
 
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 16px; background:rgba(2, 132, 199, 0.08); border:1.5px dashed #0284c7; border-radius:10px; margin-bottom:14px;">
+                        <div style="flex:1; min-width:260px;">
+                            <div style="font-size:13px; font-weight:800; color:var(--app-text); margin-bottom:3px;">
+                                📖 Butuh panduan visual dengan tangkapan layar (screenshot)?
+                            </div>
+                            <div style="font-size:12px; color:var(--app-muted);">
+                                Buka tab MCP Setup &amp; Slot untuk melihat posisi persis tombol "+ Tambah Perangkat" dan tab "Integrasi MCP" di xiaozhi.me.
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button type="button" onclick="switchTab('mcp'); window.scrollTo({top:0, behavior:'smooth'});" class="app-button" style="background:#0284c7; color:#fff; border-color:#0369a1; font-size:12px; font-weight:800; padding:8px 14px; cursor:pointer;">
+                                <span>📖 Lihat Detail Panduan MCP Setup &amp; Slot</span>
+                            </button>
+                            <a href="/mcp" class="app-button app-button-secondary" style="font-size:12px; font-weight:800; padding:8px 14px; text-decoration:none;">
+                                <span>🚀 Buka Menu Matrix Slot MCP</span>
+                            </a>
+                        </div>
+                    </div>
+
                     <div style="font-size:12.5px; color:var(--app-muted);">
                         👉 Klik tombol <strong>Salin (Copy)</strong> pada URL atau Token tersebut untuk dipasang pada server Anda di Langkah 5.
                     </div>
@@ -586,13 +605,17 @@
                         <li>Animasi radar akan berputar dan status berubah menjadi <strong style="color:#059669;">🟢 Berhasil Terhubung ke XiaoZhi!</strong>.</li>
                     </ol>
 
-                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px;">
-                        <a href="/mcp" class="app-button app-button-success" style="font-size:12.5px; padding:9px 18px; text-decoration:none;">
-                            <span style="display:inline-flex; align-items:center; gap:6px;">🚀 Buka Pengaturan MCP Slot</span>
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px;">
+                        <a href="/mcp" class="app-button app-button-success" style="font-size:13px; font-weight:850; padding:10px 20px; text-decoration:none; box-shadow:0 3px 10px rgba(16, 185, 129, 0.3);">
+                            <span style="display:inline-flex; align-items:center; gap:6px;">🚀 Buka Pengaturan Matrix Slot MCP</span>
                         </a>
-                        <span style="font-size:12px; color:var(--app-muted);">
-                            🎉 <strong>Selamat!</strong> XiaoZhi Anda kini sudah aktif penuh dan siap diajak berbicara, menyetel lagu YouTube, dan mengendalikan perangkat pintar.
-                        </span>
+                        <button type="button" onclick="switchTab('mcp'); window.scrollTo({top:0, behavior:'smooth'});" class="app-button" style="font-size:12.5px; font-weight:800; padding:9px 18px; background:var(--app-surface); border:1.5px solid var(--app-border); color:var(--app-text); cursor:pointer;">
+                            <span style="display:inline-flex; align-items:center; gap:6px;">🛠️ Buka Tab Panduan Lengkap MCP</span>
+                        </button>
+                    </div>
+
+                    <div style="margin-top:12px; padding:10px 14px; background:rgba(16, 185, 129, 0.08); border-radius:8px; font-size:12.5px; color:var(--app-text);">
+                        🎉 <strong>Selamat!</strong> XiaoZhi Anda kini sudah aktif penuh dan siap diajak berbicara, memutar lagu YouTube Music, mengendalikan Smart Home relay, dan mengakses 66 Tools cerdas.
                     </div>
                 </div>
             </div>
@@ -2291,17 +2314,183 @@
         <div class="app-card">
             <div class="doc-section">
                 <div class="doc-section-title">
-                    <span>🏠</span> Smart Home Virtual
+                    <span>🏠</span> Panduan Lengkap Smart Home &amp; Relay Nyata XiaoZhi
                 </div>
                 <p class="doc-step-desc">
-                    Smart Home Virtual adalah simulasi kontrol perangkat rumah menggunakan relay virtual. 
-                    Kamu bisa mengontrol lampu, AC, alarm, dll melalui perintah suara.
+                    Xiaozhi Indonesia menyediakan dua mode ekosistem Smart Home yang dapat digunakan secara fleksibel:
+                    <strong>Smart Home Virtual</strong> (simulasi interaktif di web) dan <strong>Hardware Relay Nyata</strong> (modul relay fisik 24/7 berbasis MQTT &amp; ESP32 untuk mengontrol saklar lampu, pompa, dan peranti listrik riil).
                 </p>
+
+                <!-- Dual Mode Navigation Banner -->
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin:20px 0;">
+                    <div style="border:1.5px solid #0284c7; background:rgba(2, 132, 199, 0.04); border-radius:10px; padding:16px;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                            <span style="font-size:24px;">🎛️</span>
+                            <div>
+                                <h4 style="margin:0; font-size:15px; font-weight:800; color:var(--app-text);">Mode 1: Smart Home Virtual</h4>
+                                <span style="font-size:11.5px; color:#0284c7; font-weight:700;">Simulasi Web Interaktif</span>
+                            </div>
+                        </div>
+                        <p style="font-size:12.5px; color:var(--app-muted); line-height:1.6; margin:0 0 12px 0;">
+                            Simulasi saklar lampu &amp; perangkat rumah langsung di layar browser tanpa memerlukan hardware relay fisik. Sangat cocok untuk menguji perintah suara dan integrasi MCP.
+                        </p>
+                        <a href="/smarthome" class="app-button app-button-secondary" style="font-size:12px; font-weight:750; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                            <span>🎛️ Buka Smart Home Virtual</span>
+                        </a>
+                    </div>
+
+                    <div style="border:1.5px solid #10b981; background:rgba(16, 185, 129, 0.04); border-radius:10px; padding:16px;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                            <span style="font-size:24px;">⚡</span>
+                            <div>
+                                <h4 style="margin:0; font-size:15px; font-weight:800; color:var(--app-text);">Mode 2: Relay Nyata (Fisik 24/7)</h4>
+                                <span style="font-size:11.5px; color:#059669; font-weight:700;">Hardware Fisik Modul Relay Optocoupler</span>
+                            </div>
+                        </div>
+                        <p style="font-size:12.5px; color:var(--app-muted); line-height:1.6; margin:0 0 12px 0;">
+                            Kontrol modul relay optocoupler asli yang tersambung ke beban listrik riil (lampu 220V, pompa air, stopkontak, kipas) via broker MQTT latensi rendah.
+                        </p>
+                        <a href="/relay-nyata" class="app-button app-button-success" style="font-size:12px; font-weight:750; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                            <span>⚡ Buka Pengaturan Relay Nyata</span>
+                        </a>
+                    </div>
+                </div>
             </div>
 
-            <div class="doc-section">
+            <!-- SECTION A: SKEMA KABEL & PINOUT RELAY FISIK -->
+            <div class="doc-section" style="margin-top:24px;">
                 <div class="doc-section-title">
-                    <span>📋</span> Daftar Ruangan
+                    <span>🔌</span> Skema Pengkabelan Hardware Relay Fisik (ESP32 &amp; Optocoupler)
+                </div>
+                <div style="font-size:13px; color:var(--app-muted); line-height:1.6; margin-bottom:14px;">
+                    Modul relay yang umum digunakan adalah modul <strong>1, 2, 4, atau 8 Channel dengan Optocoupler Isolation</strong> (Active-LOW trigger). Berikut adalah cara menghubungkan board ESP32 Anda ke modul relay:
+                </div>
+
+                <div class="app-table-wrap" style="margin-bottom:16px;">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th>Pin Modul Relay</th>
+                                <th>Koneksi ke ESP32</th>
+                                <th>Keterangan / Fungsi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>VCC</strong></td>
+                                <td><span class="app-chip app-chip-warning" style="font-weight:700;">VIN / 5V ESP32</span></td>
+                                <td>Catu daya koil relay (5V DC dari USB atau adaptor eksternal).</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GND</strong></td>
+                                <td><span class="app-chip app-chip-neutral" style="font-weight:700;">GND ESP32</span></td>
+                                <td>Ground bersama antara modul relay dan board ESP32.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>IN 1</strong></td>
+                                <td><span class="app-chip app-chip-success" style="font-weight:700;">GPIO 4</span> (Default S3/C3/Classic)</td>
+                                <td>Sinyal kontrol Channel 1 (Lampu Ruang Tamu / Saklar 1).</td>
+                            </tr>
+                            <tr>
+                                <td><strong>IN 2</strong></td>
+                                <td><span class="app-chip app-chip-success" style="font-weight:700;">GPIO 5 (S3/C3) / GPIO 16 (Classic)</span></td>
+                                <td>Sinyal kontrol Channel 2 (Lampu Kamar / Saklar 2).</td>
+                            </tr>
+                            <tr>
+                                <td><strong>IN 3 &amp; IN 4</strong></td>
+                                <td><span class="app-chip app-chip-success" style="font-weight:700;">GPIO 6 &amp; GPIO 7 (S3) / GPIO 17 &amp; 18 (Classic)</span></td>
+                                <td>Sinyal kontrol Channel 3 &amp; Channel 4 (Dapur, Teras, dll).</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- DIAGRAM KABEL ASCII & TERMINAL AC 220V -->
+                <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:10px; padding:16px; margin-bottom:16px;">
+                    <div style="font-size:13px; font-weight:800; color:var(--app-text); margin-bottom:10px;">
+                        ⚡ Diagram Terminal Saklar Listrik PLN 220V (Beban Bebas):
+                    </div>
+                    <pre style="margin:0; font-family:ui-monospace, monospace; font-size:12px; color:var(--app-text); background:rgba(0,0,0,0.04); padding:12px; border-radius:8px; line-height:1.5; overflow-x:auto;">
+[ Fasa PLN (Live 220V) ] ──────────────────────┐
+                                                ▼
+                                         ┌──────────────┐
+                                         │  COM (Common)│
+                                         │   RELAY      │
+                                         │  NO (Norm.Op)│
+                                         └──────┬───────┘
+                                                │ (Kabel Fasa Terkontrol)
+                                                ▼
+                                         ┌──────────────┐
+                                         │  LAMPU /     │
+                                         │  BEBAN AC    │
+                                         └──────┬───────┘
+                                                │
+[ Netral PLN (Neutral) ] ───────────────────────┴─────────────────────────┘
+                    </pre>
+                    <div style="margin-top:10px; font-size:12px; color:var(--app-muted); line-height:1.6;">
+                        <strong>Prinsip Kerja Terminal:</strong><br>
+                        • <strong>COM (Common):</strong> Masukan kabel fasa utama dari stopkontak/PLN.<br>
+                        • <strong>NO (Normally Open):</strong> Sambungkan ke beban listrik. Dalam keadaan normal sirkuit terputus (lampu mati). Ketika relay dipicu ON oleh ESP32, kontak NO akan tersambung ke COM dan lampu menyala.<br>
+                        • <strong>NC (Normally Closed):</strong> Kontak tertutup saat relay mati (jarang digunakan untuk lampu rumah biasa).
+                    </div>
+                </div>
+
+                <div class="doc-tip" style="border-left-color:#ef4444; background:rgba(239, 68, 68, 0.05);">
+                    <strong style="color:#dc2626;">⚠️ PERINGATAN KESELAMATAN TEGANGAN TINGGI (220V AC):</strong><br>
+                    Arus listrik bolak-balik (AC) 220V dari PLN sangat berbahaya dan berisiko sengatan mematikan jika tersentuh. Selalu pastikan <strong>MCB / Sekring rumah dalam posisi OFF (Padam)</strong> saat merakit kabel ke terminal relay, dan gunakan isolasi pembungkus kabel atau box panel tertutup yang aman.
+                </div>
+            </div>
+
+            <!-- SECTION B: CARA SETUP RELAY NYATA 24/7 DENGAN ARDUINO ZIP -->
+            <div class="doc-section" style="margin-top:24px;">
+                <div class="doc-section-title">
+                    <span>⚡</span> Cara Setup &amp; Flash Firmware Relay Nyata (24/7 Non-Stop)
+                </div>
+                <div class="doc-step">
+                    <div class="doc-step-number">1</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Buka Menu Relay Nyata &amp; Tambah Ruangan</div>
+                        <div class="doc-step-desc">
+                            Masuk ke menu <a href="/relay-nyata" class="doc-link"><strong>Relay Nyata</strong></a> di sidebar. Klik <strong>"+ Tambah Ruangan / Device"</strong>, beri nama ruangan (misal: <em>Ruang Tamu</em>), dan tentukan jumlah relay (1 s/d 8 channel).
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">2</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Download Paket Project Arduino (1-Klik ZIP)</div>
+                        <div class="doc-step-desc">
+                            Pada kartu ruangan yang baru dibuat, klik tombol <strong>"📦 Download Project ZIP"</strong>. File ZIP ini sudah otomatis berisi sketch <code>xiaozhi_esp32_relay_24h.ino</code> dan file <code>xiaozhi_relay_config.h</code> yang telah terkonfigurasi dengan Client ID, Token Otentikasi, dan Topik MQTT unik ruangan Anda.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">3</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Isi Wi-Fi Rumah &amp; Flash via Arduino IDE</div>
+                        <div class="doc-step-desc">
+                            Ekstrak file ZIP, buka dengan <strong>Arduino IDE</strong>, masukkan nama Wi-Fi dan kata sandi rumah Anda pada baris <code>WIFI_SSID</code> &amp; <code>WIFI_PASSWORD</code>, lalu klik <strong>Upload</strong> ke board ESP32 Anda.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-number">4</div>
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Perangkat Otomatis Online 24/7</div>
+                        <div class="doc-step-desc">
+                            ESP32 akan otomatis tersambung ke broker MQTT resmi <code>mqtt.xiaozhiscig.biz.id</code> (Port 1883). Di dashboard web, status ruangan akan berubah menjadi <strong style="color:#059669;">🟢 Online (Tersambung)</strong> dengan indikator latensi real-time.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION C: DAFTAR RUANGAN SMART HOME VIRTUAL -->
+            <div class="doc-section" style="margin-top:24px;">
+                <div class="doc-section-title">
+                    <span>📋</span> Daftar Ruangan Default &amp; Channel Virtual
                 </div>
 
                 <div class="app-table-wrap">
@@ -2310,97 +2499,105 @@
                             <tr>
                                 <th>Channel</th>
                                 <th>Ruangan</th>
-                                <th>Perangkat</th>
-                                <th>Contoh Perintah</th>
+                                <th>Perangkat Terhubung</th>
+                                <th>Contoh Perintah Suara</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td>1</td>
+                                <td><strong>CH 1</strong></td>
                                 <td>Ruang Tamu</td>
-                                <td>Lampu utama</td>
-                                <td><em>"Nyalakan lampu ruang tamu"</em></td>
+                                <td>Lampu Utama</td>
+                                <td><em>"XiaoZhi, nyalakan lampu ruang tamu"</em></td>
                             </tr>
                             <tr>
-                                <td>2</td>
+                                <td><strong>CH 2</strong></td>
                                 <td>Dapur</td>
-                                <td>Lampu dapur</td>
-                                <td><em>"Matikan lampu dapur"</em></td>
+                                <td>Lampu &amp; Exhaust Fan</td>
+                                <td><em>"XiaoZhi, matikan lampu dapur"</em></td>
                             </tr>
                             <tr>
-                                <td>3</td>
+                                <td><strong>CH 3</strong></td>
                                 <td>Kamar Mandi</td>
-                                <td>Lampu kamar mandi</td>
-                                <td><em>"Nyalakan lampu kamar mandi"</em></td>
+                                <td>Lampu Kamar Mandi</td>
+                                <td><em>"XiaoZhi, nyalakan lampu kamar mandi"</em></td>
                             </tr>
                             <tr>
-                                <td>4</td>
+                                <td><strong>CH 4</strong></td>
                                 <td>Kamar Tidur Utama</td>
-                                <td>Lampu kamar utama</td>
-                                <td><em>"Matikan lampu kamar tidur"</em></td>
+                                <td>Lampu Tidur / Saklar 4</td>
+                                <td><em>"XiaoZhi, matikan lampu kamar tidur"</em></td>
                             </tr>
                             <tr>
-                                <td>5</td>
-                                <td>Teras</td>
-                                <td>Lampu teras</td>
-                                <td><em>"Nyalakan lampu teras"</em></td>
+                                <td><strong>CH 5</strong></td>
+                                <td>Teras Depan</td>
+                                <td>Lampu Sorot Teras</td>
+                                <td><em>"XiaoZhi, nyalakan lampu teras depan"</em></td>
                             </tr>
                             <tr>
-                                <td>6</td>
-                                <td>Basement</td>
-                                <td>Alarm</td>
-                                <td><em>"Nyalakan alarm"</em></td>
+                                <td><strong>CH 6</strong></td>
+                                <td>Garasi / Pagar</td>
+                                <td>Alarm / Pintu Garasi</td>
+                                <td><em>"XiaoZhi, nyalakan alarm garasi"</em></td>
                             </tr>
                             <tr>
-                                <td>7</td>
-                                <td>Kamar Tidur 2</td>
-                                <td>Lampu kamar kedua</td>
-                                <td><em>"Matikan lampu kamar 2"</em></td>
+                                <td><strong>CH 7</strong></td>
+                                <td>Kamar Anak / Kamar 2</td>
+                                <td>Lampu Meja Belajar</td>
+                                <td><em>"XiaoZhi, matikan lampu kamar dua"</em></td>
                             </tr>
                             <tr>
-                                <td>8</td>
-                                <td>Ruang AC</td>
-                                <td>AC</td>
-                                <td><em>"Nyalakan AC"</em></td>
+                                <td><strong>CH 8</strong></td>
+                                <td>Ruang Tamu / AC</td>
+                                <td>Saklar AC / Pendingin</td>
+                                <td><em>"XiaoZhi, hidupkan AC ruang tamu"</em></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <div class="doc-section">
+            <!-- SECTION D: CONTOH PERINTAH SUARA LENGKAP -->
+            <div class="doc-section" style="margin-top:24px;">
                 <div class="doc-section-title">
-                    <span>🎤</span> Contoh Perintah Suara
+                    <span>🎤</span> Ragam Contoh Perintah Suara (Voice Commands)
                 </div>
 
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-desc">
-                            <strong>Kontrol satu ruangan:</strong><br>
-                            <em>"Nyalakan lampu ruang tamu"</em><br>
-                            <em>"Matikan AC"</em><br>
-                            <em>"Hidupkan alarm"</em>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px;">
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:8px; padding:14px;">
+                        <div style="font-weight:750; font-size:13.5px; color:var(--app-text); margin-bottom:6px;">
+                            💡 Kontrol Saklar Tunggal:
                         </div>
+                        <ul style="margin:0 0 0 18px; padding:0; font-size:12.5px; color:var(--app-muted); line-height:1.7;">
+                            <li><em>"Nyalakan lampu ruang tamu"</em></li>
+                            <li><em>"Matikan lampu dapur"</em></li>
+                            <li><em>"Hidupkan lampu teras"</em></li>
+                            <li><em>"Padamkan saklar kamar tidur"</em></li>
+                        </ul>
                     </div>
-                </div>
 
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-desc">
-                            <strong>Kontrol semua perangkat:</strong><br>
-                            <em>"Nyalakan semua lampu"</em><br>
-                            <em>"Matikan semua perangkat"</em>
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:8px; padding:14px;">
+                        <div style="font-weight:750; font-size:13.5px; color:var(--app-text); margin-bottom:6px;">
+                            🏠 Kontrol Serentak (Grup):
                         </div>
+                        <ul style="margin:0 0 0 18px; padding:0; font-size:12.5px; color:var(--app-muted); line-height:1.7;">
+                            <li><em>"Nyalakan semua lampu rumah"</em></li>
+                            <li><em>"Matikan seluruh saklar"</em></li>
+                            <li><em>"Matikan semua perangkat"</em></li>
+                            <li><em>"Hidupkan semua relay"</em></li>
+                        </ul>
                     </div>
-                </div>
 
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-desc">
-                            <strong>Cek status:</strong><br>
-                            <em>"Status smarthome"</em><br>
-                            <em>"Lampu mana yang menyala?"</em>
+                    <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:8px; padding:14px;">
+                        <div style="font-weight:750; font-size:13.5px; color:var(--app-text); margin-bottom:6px;">
+                            🔍 Pengecekan Status:
                         </div>
+                        <ul style="margin:0 0 0 18px; padding:0; font-size:12.5px; color:var(--app-muted); line-height:1.7;">
+                            <li><em>"Bagaimana status smart home?"</em></li>
+                            <li><em>"Lampu mana saja yang sedang menyala?"</em></li>
+                            <li><em>"Apakah lampu teras menyala?"</em></li>
+                            <li><em>"Status saklar kamar tidur bagaimana?"</em></li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -3633,31 +3830,22 @@
                 </div>
             </div>
 
-            <!-- SECTION 2: MCP & KNOWLEDGE BASE -->
+            <!-- SECTION 2: PERANGKAT KERAS, FLASHING & WI-FI -->
             <div class="doc-section" style="margin-top: 32px;">
-                <div class="doc-section-title" style="border-bottom: 2px solid var(--app-border); padding-bottom: 8px;">
-                    <span>🔌</span> Koneksi MCP &amp; Pengetahuan Belajar
+                <div class="doc-section-title" style="color: #0284c7; border-bottom: 2px solid var(--app-border); padding-bottom: 8px;">
+                    <span>⚡</span> Hardware, Flashing &amp; Jaringan Wi-Fi
                 </div>
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Q: XiaoZhi tidak bisa membaca materi saya?</div>
+                        <div class="doc-step-title">Q: Mengapa muncul galat "Failed to open serial port" atau "Port is already open"?</div>
                         <div class="doc-step-desc">
-                            <strong>A:</strong> Pastikan koneksi MCP sudah <strong>Online</strong> di Dashboard. 
-                            Jika belum, ulangi langkah setup MCP dan verifikasi bahwa token telah disimpan dengan benar.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="doc-step">
-                    <div class="doc-step-content">
-                        <div class="doc-step-title">Q: Smart home tidak merespons perintah suara?</div>
-                        <div class="doc-step-desc">
-                            <strong>A:</strong> Pastikan:
-                            <ul style="margin:8px 0 0 20px; line-height: 1.8;">
-                                <li>MCP dalam status Online di Dashboard.</li>
-                                <li>Perintah suara menyebutkan nama ruangan atau nama saklar yang sesuai (misal: "Nyalakan lampu ruang tamu").</li>
-                                <li>Gunakan kata kerja yang jelas seperti "Nyalakan", "Hidupkan", atau "Matikan".</li>
+                            <strong>A:</strong> Galat ini terjadi karena port serial COM board ESP32 Anda sedang dikunci atau digunakan secara eksklusif oleh program lain. Cara mengatasinya:
+                            <ul style="margin:8px 0 0 20px; line-height:1.8;">
+                                <li>Tutup aplikasi seperti <strong>Arduino IDE Serial Monitor</strong>, <strong>Ultimaker Cura</strong>, <strong>PuTTY</strong>, <strong>PrusaSlicer</strong>, atau aplikasi 3D printer lainnya.</li>
+                                <li>Pastikan tidak ada tab peramban Chrome/Edge lain yang sedang membuka Web Flasher atau Web Serial.</li>
+                                <li>Cabut kabel USB ESP32 dari PC, tunggu 3 detik, lalu colokkan kembali ke port USB yang berbeda.</li>
+                                <li>Pastikan kabel USB yang digunakan adalah <strong>Kabel Data USB</strong> (memiliki 4 jalur kabel di dalamnya), bukan sekadar kabel charging murah yang hanya memiliki jalur daya tanpa jalur transfer data D+/D-.</li>
                             </ul>
                         </div>
                     </div>
@@ -3665,27 +3853,116 @@
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Q: Berapa banyak materi belajar yang bisa disimpan?</div>
+                        <div class="doc-step-title">Q: Mengapa ESP32 tidak bisa terhubung ke Wi-Fi rumah saya?</div>
                         <div class="doc-step-desc">
-                            <strong>A:</strong> Kapasitas penyimpanan tergantung batas paket yang ditetapkan pada akun Anda. 
-                            Hubungi admin jika Anda membutuhkan kuota tambahan atau kapasitas penyimpanan dokumen yang lebih besar.
+                            <strong>A:</strong> Chip ESP32 (S3, C3, maupun WROOM) <strong>hanya mendukung sinyal Wi-Fi 2.4 GHz</strong> dan tidak dapat membaca sinyal 5 GHz.
+                            <ul style="margin:8px 0 0 20px; line-height:1.8;">
+                                <li>Pastikan router Wi-Fi Anda memancarkan frekuensi <strong>2.4 GHz</strong>.</li>
+                                <li>Jika router Anda menggunakan mode <em>Dual-Band (Band Steering)</em> di mana nama SSID 2.4 GHz dan 5 GHz disatukan, coba pisahkan nama SSID 2.4 GHz (misal: <code>MyWiFi_2.4G</code>) pada halaman setelan router Anda.</li>
+                                <li>Pastikan sandi Wi-Fi tidak mengandung spasi di awal/akhir atau karakter non-ASCII yang tidak didukung.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Apakah ESP32-S3 N16R8 saya membutuhkan modul baterai?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Modul baterai bersifat <strong>opsional</strong>. ESP32-S3 dapat menyala normal cukup menggunakan kabel daya USB Type-C 5V. Namun jika Anda ingin menjadikannya speaker pintar portabel tanpa kabel, Anda bisa memasang baterai Li-Ion / Li-Po 3.7V (1S) dan rangkaian resistor pembagi tegangan (voltage divider 2x 100kΩ) ke <strong>Pin ADC GPIO 3</strong> untuk memonitor persentase baterai di layar peranti.
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- SECTION 3: SYSTEM & ACCOUNT -->
+            <!-- SECTION 3: MCP & KNOWLEDGE BASE -->
             <div class="doc-section" style="margin-top: 32px;">
                 <div class="doc-section-title" style="border-bottom: 2px solid var(--app-border); padding-bottom: 8px;">
-                    <span>🔒</span> Pengaturan &amp; Keamanan Akun
+                    <span>🔌</span> Integrasi MCP, Token &amp; Slot Matrix
                 </div>
 
                 <div class="doc-step">
                     <div class="doc-step-content">
-                        <div class="doc-step-title">Q: Bagaimana cara mengubah tema tampilan?</div>
+                        <div class="doc-step-title">Q: Di mana saya menemukan URL / Token WebSocket MCP di dashboard xiaozhi.me?</div>
                         <div class="doc-step-desc">
-                            <strong>A:</strong> Di sidebar menu bagian bawah, terdapat pilihan <strong>"Tema"</strong>. 
-                            Anda dapat memilih tema favorit: Neo Brutalism, Dark Mode, atau Original.
+                            <strong>A:</strong> Setelah mendaftarkan perangkat menggunakan 6 Digit Kode di <a href="https://xiaozhi.me" target="_blank" class="doc-link">xiaozhi.me</a>:
+                            <ol style="margin:8px 0 0 20px; line-height:1.8;">
+                                <li>Klik kartu peranti Anda di dashboard.</li>
+                                <li>Klik tombol <strong>"Konfigurasikan" (Configure)</strong>.</li>
+                                <li>Buka tab <strong>Integrasi / Pengaturan Lanjutan / MCP Endpoint</strong> (*Model Context Protocol* atau <em>模型上下文协议</em> jika bahasa Mandarin).</li>
+                                <li>Salin alamat URL berawalan <code>wss://api.xiaozhi.me/v1/mcp/ws?token=...</code> lalu tempelkan ke menu <a href="/mcp" class="doc-link"><strong>Slot MCP</strong></a> di server ini.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Bagaimana cara kerja Isolasi Slot Matrix &amp; Memori Percakapan?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Sistem kami menerapkan isolasi ketat antar slot (Multi-Tenant Slot Architecture). Setiap slot MCP memiliki session ID, memori semantik vektor percakapan, dan kredensial terenkripsi masing-masing. Riwayat percakapan tidak akan saling tertukar antar slot maupun antar pengguna lain.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: XiaoZhi tidak bisa membaca dokumen Knowledge Base saya?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Pastikan koneksi MCP berstatus <strong>Online</strong> (hijau) di Dashboard Slot MCP. Jika berstatus Terputus, klik tombol Reconnect atau perbarui token WebSocket MCP Anda dari xiaozhi.me.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 4: SMART HOME & RELAY NYATA -->
+            <div class="doc-section" style="margin-top: 32px;">
+                <div class="doc-section-title" style="color: #059669; border-bottom: 2px solid var(--app-border); padding-bottom: 8px;">
+                    <span>🏠</span> Smart Home &amp; Hardware Relay Nyata
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Apa perbedaan Smart Home Virtual dan Relay Nyata?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> 
+                            <ul style="margin:8px 0 0 20px; line-height:1.8;">
+                                <li><strong>Smart Home Virtual (<a href="/smarthome" class="doc-link">/smarthome</a>):</strong> Simulasi saklar software berbasis web. Digunakan untuk mencoba perintah suara AI tanpa membutuhkan kabel atau relay fisik.</li>
+                                <li><strong>Relay Nyata (<a href="/relay-nyata" class="doc-link">/relay-nyata</a>):</strong> Sistem IoT fisik menggunakan board ESP32 + modul relay optocoupler yang terhubung langsung ke saklar lampu rumah atau stopkontak PLN 220V dengan koneksi MQTT 24/7.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Mengapa saklar relay tidak merespons perintah suara saya?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Periksa hal-hal berikut:
+                            <ul style="margin:8px 0 0 20px; line-height:1.8;">
+                                <li>Pastikan status MCP Anda dalam kondisi <strong>Online</strong>.</li>
+                                <li>Pastikan menyebutkan nama ruangan atau saklar yang terdaftar (contoh: <em>"Nyalakan lampu ruang tamu"</em>, <em>"Matikan kipas dapur"</em>).</li>
+                                <li>Untuk Relay Nyata, pastikan status ruangan di halaman <code>/relay-nyata</code> berstatus <strong style="color:#059669;">🟢 Online</strong> dan ESP32 relay terhubung ke Wi-Fi.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 5: PENGATURAN TEMA & KEAMANAN AKUN -->
+            <div class="doc-section" style="margin-top: 32px;">
+                <div class="doc-section-title" style="border-bottom: 2px solid var(--app-border); padding-bottom: 8px;">
+                    <span>🔒</span> Tema Tampilan &amp; Keamanan Akun
+                </div>
+
+                <div class="doc-step">
+                    <div class="doc-step-content">
+                        <div class="doc-step-title">Q: Mengapa tema default tampilan sekarang menjadi Neo Brutalism dan bagaimana cara menggantinya?</div>
+                        <div class="doc-step-desc">
+                            <strong>A:</strong> Tema <strong>Neo Brutalism</strong> dijadikan tema default resmi sistem kami karena memiliki garis tepi tegas, kontras tinggi, dan estetika retro modern yang memudahkan navigasi panel IoT di berbagai kondisi layar.
+                            <p style="margin-top:8px;">
+                                Jika Anda lebih menyukai tema lain, Anda dapat menggantinya kapan saja melalui <strong>Menu Dropdown Tema di bagian bawah Sidebar</strong>. Tersedia 3 opsi tema: <strong>Neo Brutalism</strong>, <strong>Dark</strong>, dan <strong>Original</strong>. Pilihan tema Anda akan otomatis tersimpan di profil akun Anda.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -3710,8 +3987,7 @@
             </div>
         </div>
     </div>
-
-    </div>
+</div>
 
 <script>
     function switchTab(tabName) {
