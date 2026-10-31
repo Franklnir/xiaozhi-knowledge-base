@@ -237,7 +237,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                 const s = statusData.status;
                                 if (s.connected) {
                                     clearInterval(pollInterval);
-                                    mcpStatusIcon.textContent = "✅";
+                                    mcpStatusIcon.innerHTML = '<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
                                     mcpStatusText.textContent = "MCP Berhasil Terhubung! Mengalihkan ke Dashboard...";
                                     mcpProgressBar.style.width = "100%";
                                     mcpProgressBar.className = "h-full bg-emerald-600 transition-all duration-300";
@@ -256,7 +256,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             clearInterval(pollInterval);
                             connectMcpBtn.disabled = false;
                             connectMcpBtn.textContent = "Coba Hubungkan Ulang";
-                            mcpStatusIcon.textContent = "⚠️";
+                            mcpStatusIcon.innerHTML = '<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
                             mcpStatusText.textContent = "Belum terhubung. Pastikan URL WebSocket MCP benar lalu klik coba lagi.";
                         }
                     }, 1500);
@@ -264,13 +264,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 } else {
                     connectMcpBtn.disabled = false;
                     connectMcpBtn.textContent = "Hubungkan MCP Sekarang";
-                    mcpStatusIcon.textContent = "❌";
+                    mcpStatusIcon.innerHTML = '<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
                     mcpStatusText.textContent = saveResult.detail || "Gagal menyimpan endpoint.";
                 }
             } catch (err) {
                 connectMcpBtn.disabled = false;
                 connectMcpBtn.textContent = "Hubungkan MCP Sekarang";
-                mcpStatusIcon.textContent = "❌";
+                mcpStatusIcon.innerHTML = '<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
                 mcpStatusText.textContent = "Terjadi kesalahan: " + err.message;
             }
         });

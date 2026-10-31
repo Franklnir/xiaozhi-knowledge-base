@@ -361,12 +361,12 @@
                     <a href="/riwayat-chat?slot=all{% if active_date %}&date={{ active_date }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chat-type-tab {% if not selected_slot %}active{% endif %}" style="text-align:center;text-decoration:none;padding:5px 7px;font-size:11px;font-weight:700;" title="Tampilkan riwayat dari semua slot token gabungan">Semua</a>
                 </div>
                 <div class="chat-type-tabs" style="margin-top:4px;">
-                    <a href="/riwayat-chat?{% if selected_slot %}slot={{ selected_slot }}&{% endif %}" class="chat-type-tab {% if active_date == today_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;">📅 Hari Ini</a>
-                    <a href="/riwayat-chat?date=all{% if selected_slot %}&slot={{ selected_slot }}{% endif %}" class="chat-type-tab {% if not active_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;">🗓️ Semua Tanggal</a>
+                    <a href="/riwayat-chat?{% if selected_slot %}slot={{ selected_slot }}&{% endif %}" class="chat-type-tab {% if active_date == today_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Hari Ini</span></a>
+                    <a href="/riwayat-chat?date=all{% if selected_slot %}&slot={{ selected_slot }}{% endif %}" class="chat-type-tab {% if not active_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Semua Tanggal</span></a>
                 </div>
                 <div class="chat-type-tabs">
                     <button type="button" class="chat-type-tab active" data-type="all" onclick="setTypeFilter('all')">Semua</button>
-                    <button type="button" class="chat-type-tab" data-type="tool" onclick="setTypeFilter('tool')">⚡ Tool MCP</button>
+                    <button type="button" class="chat-type-tab" data-type="tool" onclick="setTypeFilter('tool')"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Tool MCP</span></button>
                 </div>
                 <div style="display:flex;gap:6px;margin-top:8px;">
                     <a href="/riwayat-chat?date=all{% if selected_slot %}&slot={{ selected_slot }}{% endif %}" class="app-button" style="flex:1;font-size:12px;padding:6px 8px;text-align:center;">Reset</a>
@@ -390,14 +390,14 @@
                 </div>
                 <div class="chat-thread-actions" id="threadActionButtons" style="display:none;">
                     <button type="button" class="app-button app-button-small" onclick="copyCurrentChat()" title="Salin seluruh isi percakapan">
-                        📋 Salin
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Salin
                     </button>
                 </div>
             </div>
             <div class="chat-thread-body" id="threadBody">
                 <div class="chat-empty">
                     <div>
-                        <div style="font-size:36px; margin-bottom:10px;">💬</div>
+                        <div style="display:flex; justify-content:center; margin-bottom:10px; color:var(--app-muted);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
                         <p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih Riwayat Chat</p>
                         <p class="mt-2 text-sm" style="color:var(--app-muted);">Pilih salah satu item di sidebar kiri untuk memeriksa prompt dan respon lengkap.</p>
                     </div>
@@ -522,7 +522,7 @@
                 html += '<span class="chat-item-title">' + E(previewTitle) + '</span>';
                 html += '<div class="chat-item-meta">';
                 html += '<span class="chat-item-badge" style="' + (isTool ? 'color:#9333ea;background:#f5d0fe;' : '') + '">' + E(kind(i)) + '</span>';
-                html += '<span class="chat-item-badge" style="background:#e0e7ff;color:#3730a3;font-weight:700;" title="' + E(devLabel + (i.device_mac ? ' (MAC: ' + i.device_mac + ')' : '')) + '">📟 ' + E(devLabel) + E(macShort) + '</span>';
+                html += '<span class="chat-item-badge" style="background:#e0e7ff;color:#3730a3;font-weight:700;" title="' + E(devLabel + (i.device_mac ? ' (MAC: ' + i.device_mac + ')' : '')) + '">' + E(devLabel) + E(macShort) + '</span>';
                 html += '<span>' + E(fmtShort(i.created_at)) + '</span>';
                 html += '</div>';
                 html += '</button>';
@@ -557,7 +557,7 @@
             document.getElementById("threadMeta").textContent = "Klik chat dari sidebar untuk melihat detail.";
             document.getElementById("threadBadge").textContent = "-";
             if (actions) actions.style.display = "none";
-            body.innerHTML = '<div class="chat-empty"><div><div style="font-size:36px;margin-bottom:10px;">💬</div><p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih Chat</p><p class="mt-2 text-sm" style="color:var(--app-muted);">Klik salah satu item di sidebar kiri.</p></div></div>';
+            body.innerHTML = '<div class="chat-empty"><div><div style="display:flex; justify-content:center; margin-bottom:10px; color:var(--app-muted);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih Chat</p><p class="mt-2 text-sm" style="color:var(--app-muted);">Klik salah satu item di sidebar kiri.</p></div></div>';
             return;
         }
 
@@ -565,11 +565,11 @@
         var fullTitle = item.user_message || item.xiaozhi_answer || item.tool_name || ("Chat #" + item.id);
         var slotNum = item.slot_number || 1;
         var devLabel = item.device_label || ('Slot ' + slotNum);
-        var macMeta = item.device_mac ? (" · 🔒 MAC: " + item.device_mac) : "";
+        var macMeta = item.device_mac ? (" · MAC: " + item.device_mac) : "";
         var reqMeta = item.request_id ? (" · Req ID: " + item.request_id) : "";
         document.getElementById("threadTitle").textContent = fullTitle;
         document.getElementById("threadBadge").textContent = kind(item);
-        document.getElementById("threadMeta").textContent = "ID #" + item.id + " · " + fmt(item.created_at) + (item.source ? " · Sumber: " + item.source : "") + " · 📟 " + devLabel + macMeta + reqMeta;
+        document.getElementById("threadMeta").textContent = "ID #" + item.id + " · " + fmt(item.created_at) + (item.source ? " · Sumber: " + item.source : "") + " · " + devLabel + macMeta + reqMeta;
 
         var m = "";
 
@@ -578,13 +578,13 @@
             m += '<div class="chat-msg">';
             m += '<div class="chat-bubble chat-bubble-user">';
             m += '<div class="chat-bubble-head">';
-            m += '<span class="chat-bubble-role">👤 User <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">📟 ' + E(devLabel) + (item.device_mac ? ' (' + E(item.device_mac) + ')' : '') + '</span></span>';
+            m += '<span class="chat-bubble-role">User <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">' + E(devLabel) + (item.device_mac ? ' (' + E(item.device_mac) + ')' : '') + '</span></span>';
             m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
             m += '</div>';
             m += '<div class="chat-bubble-body">' + E(item.user_message) + '</div>';
             m += '<div class="chat-bubble-foot">';
             m += '<span>Input Pengguna</span>';
-            m += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(item.user_message).replace(/`/g, '\\`') + '`)">📋 Salin Teks</button>';
+            m += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(item.user_message).replace(/`/g, '\\`') + '`)"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Salin Teks</button>';
             m += '</div>';
             m += '</div></div>';
         }
@@ -602,7 +602,7 @@
                 m += '<div class="chat-msg">';
                 m += '<div class="chat-bubble chat-bubble-tool">';
                 m += '<div class="chat-bubble-head">';
-                m += '<span class="chat-bubble-role">⚙️ Parameter Tool (' + E(item.tool_name || "Tool") + ')</span>';
+                m += '<span class="chat-bubble-role">Parameter Tool (' + E(item.tool_name || "Tool") + ')</span>';
                 m += '<span class="app-chip app-chip-small" style="font-size:10px;">Input Request</span>';
                 m += '</div>';
                 m += '<div class="chat-json-box">' + E(reqStr) + '</div>';
@@ -627,11 +627,11 @@
         }
 
         if (aiAnswer) {
-            var label = item.tool_name ? '🤖 Xiaozhi AI · Tool: ' + E(item.tool_name) : '🤖 Xiaozhi AI';
+            var label = item.tool_name ? 'Xiaozhi AI · Tool: ' + E(item.tool_name) : 'Xiaozhi AI';
             m += '<div class="chat-msg">';
             m += '<div class="chat-bubble chat-bubble-ai">';
             m += '<div class="chat-bubble-head">';
-            m += '<span class="chat-bubble-role">' + label + ' <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">📟 ' + E(devLabel) + '</span></span>';
+            m += '<span class="chat-bubble-role">' + label + ' <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">' + E(devLabel) + '</span></span>';
             m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
             m += '</div>';
             m += '<div class="chat-bubble-body">' + E(aiAnswer) + '</div>';
@@ -639,8 +639,8 @@
             if (rawResponseStr && rawResponseStr !== "{}" && rawResponseStr !== JSON.stringify(aiAnswer)) {
                 m += '<div style="margin-top:12px;padding:8px 12px;background:rgba(0,0,0,0.03);border:1px solid var(--app-border);border-radius:8px;">';
                 m += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-                m += '<button type="button" class="chat-collapse-toggle" onclick="toggleRawResponse(' + item.id + ')">🔍 Tampilkan Raw JSON Response ▾</button>';
-                m += '<button type="button" class="chat-collapse-toggle" style="color:var(--app-muted);font-size:11.5px;" onclick="copyRawResponse(' + item.id + ')">📋 Salin Raw JSON</button>';
+                m += '<button type="button" class="chat-collapse-toggle" onclick="toggleRawResponse(' + item.id + ')">Tampilkan Raw JSON Response ▾</button>';
+                m += '<button type="button" class="chat-collapse-toggle" style="color:var(--app-muted);font-size:11.5px;" onclick="copyRawResponse(' + item.id + ')"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Salin Raw JSON</button>';
                 m += '</div>';
                 m += '<div id="rawResponse-' + item.id + '" class="chat-json-box" style="display:none;margin-top:6px;">' + E(rawResponseStr) + '</div>';
                 m += '</div>';
@@ -648,14 +648,14 @@
 
             m += '<div class="chat-bubble-foot">';
             m += '<span>Respon Lengkap AI & MCP</span>';
-            m += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(aiAnswer).replace(/`/g, '\\`') + '`)">📋 Salin Jawaban</button>';
+            m += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(aiAnswer).replace(/`/g, '\\`') + '`)"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Salin Jawaban</button>';
             m += '</div>';
             m += '</div></div>';
         } else if (item.tool_name) {
             m += '<div class="chat-msg">';
             m += '<div class="chat-bubble chat-bubble-tool">';
             m += '<div class="chat-bubble-head">';
-            m += '<span class="chat-bubble-role">🔧 Eksekusi Tool: ' + E(item.tool_name) + '</span>';
+            m += '<span class="chat-bubble-role">Eksekusi Tool: ' + E(item.tool_name) + '</span>';
             m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
             m += '</div>';
             m += '<div class="chat-bubble-body">Tool berhasil dipanggil dan dieksekusi oleh sistem Xiaozhi.</div>';

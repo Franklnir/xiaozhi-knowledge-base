@@ -106,7 +106,7 @@
         gap: 4px;
     }
 
-    /* 🟢 1. ADMIN BUBBLE (Fresh Emerald Green, tidak pekat) */
+    /* 1. ADMIN BUBBLE */
     .msg-bubble-admin {
         background: #10b981 !important;
         color: #ffffff !important;
@@ -126,7 +126,7 @@
         border: 1px solid #34d399;
     }
 
-    /* 🟡 2. PESAN USER SENDIRI (Non-Admin: Yellow) */
+    /* 2. PESAN USER SENDIRI */
     .msg-bubble-me {
         background: #fde047 !important;
         color: #0f172a !important;
@@ -147,7 +147,7 @@
         border: 1px solid #ca8a04;
     }
 
-    /* ⚫ 3. PESAN USER LAIN (Non-Admin: Black / Deep Slate) */
+    /* 3. PESAN USER LAIN */
     .msg-bubble-other {
         background: #0f172a !important;
         color: #f8fafc !important;
@@ -168,7 +168,7 @@
         border: 1px solid #334155;
     }
 
-    /* ⚪ 4. REPLY QUOTE BOX (Abu-abu / Gray) */
+    /* 4. REPLY QUOTE BOX */
     .chat-reply-quote {
         border-radius: 8px;
         padding: 6px 10px;
@@ -377,10 +377,10 @@
                 <span id="wsStatusText">WebSocket Live</span>
             </span>
             <button type="button" onclick="scrollToBottom(true)" class="app-button app-button-small" title="Scroll ke Pesan Terbawah">
-                ⬇️ Pesan Terbaru
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg> Pesan Terbaru
             </button>
             <button type="button" onclick="refreshMessages()" class="app-button app-button-small" title="Muat Ulang Pesan">
-                🔄 Muat Ulang
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Muat Ulang
             </button>
         </div>
     </header>
@@ -390,7 +390,7 @@
         <!-- Header Bar -->
         <div class="chat-header-bar">
             <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:18px;">💬</span>
+                <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 <div>
                     <span style="font-weight:800; font-size:14.5px;">Obrolan Global</span>
                     <span id="chatCountSubtitle" style="font-size:12px; color:var(--app-muted); margin-left:8px;">
@@ -407,7 +407,7 @@
         <div class="chat-scroll-area" id="chatScrollArea">
             {% if not messages %}
             <div id="chatEmptyPlaceholder" style="text-align:center; padding:50px 20px; color:var(--app-muted);">
-                <div style="font-size:40px; margin-bottom:10px;">💬</div>
+                <div style="display:flex; justify-content:center; margin-bottom:10px; color:var(--app-muted);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
                 <h3 style="font-size:16px; font-weight:800; color:var(--app-text); margin-bottom:6px;">Belum Ada Obrolan</h3>
                 <p style="font-size:13px; max-width:400px; margin:0 auto;">
                     Jadilah yang pertama memulai percakapan di Ruang Chat Komunitas XiaoZhi! Ketik pesan di kolom bawah ini.
@@ -417,19 +417,17 @@
         </div>
 
         <!-- Floating Scroll Down Button -->
-        <button type="button" id="scrollDownBtn" class="scroll-down-btn" onclick="scrollToBottom(true)" title="Scroll ke bawah">
-            ⬇️
-        </button>
+        <button type="button" id="scrollDownBtn" class="scroll-down-btn" onclick="scrollToBottom(true)" title="Scroll ke bawah"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></button>
 
         <!-- Reply Active Banner -->
         <div id="replyActiveBanner" class="reply-active-banner" style="display:none;">
             <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
-                <span style="font-weight:800; color:#10b981;">↩️ Membalas #<span id="replyTargetId"></span></span>
+                <span style="font-weight:800; color:#10b981;"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg> Membalas #</span><span id="replyTargetId"></span></span>
                 <span id="replyTargetAuthor" style="font-weight:700;"></span>:
                 <span id="replyTargetPreview" style="white-space:nowrap; text-overflow:ellipsis; overflow:hidden; max-width:350px; opacity:0.85;"></span>
             </div>
             <button type="button" onclick="cancelReply()" style="background:transparent; border:none; cursor:pointer; font-size:14px; font-weight:800; color:#ef4444; padding:2px 6px;" title="Batalkan Balasan">
-                ✖️ Batal
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Batal
             </button>
         </div>
 
@@ -446,7 +444,7 @@
             />
             <button type="submit" id="chatSubmitBtn" class="chat-submit-btn">
                 <span>Kirim</span>
-                <span>🚀</span>
+                <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
         </form>
     </div>
@@ -605,7 +603,7 @@
             replyQuoteHtml = `
                 <div class="chat-reply-quote" onclick="scrollToMessage(${msg.reply_to.id})">
                     <div style="font-weight:800; font-size:11px; margin-bottom:2px; display:flex; align-items:center; gap:4px;">
-                        <span>↩️ #<b>${msg.reply_to.id}</b> ${rAuthor}${rAdmin}</span>
+                        <span><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg> #<b>${msg.reply_to.id}</b> ${rAuthor}${rAdmin}</span>
                     </div>
                     <div style="opacity:0.9; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:320px;">
                         ${rContent}
@@ -619,9 +617,7 @@
         let deleteBtnHtml = '';
         if (canDelete) {
             deleteBtnHtml = `
-                <button type="button" class="msg-action-btn" onclick="deleteMessage(${msg.id})" title="Hapus Pesan">
-                    🗑️
-                </button>
+                <button type="button" class="msg-action-btn" onclick="deleteMessage(${msg.id})" title="Hapus Pesan"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
             `;
         }
 
@@ -635,7 +631,7 @@
                     </div>
                     <div style="display:flex; align-items:center; gap:2px;">
                         <button type="button" class="msg-action-btn" onclick="setReplyTo(${msg.id}, '${escapeHtml(msg.username)}', '${escapeHtml(msg.role)}', '${encodeURIComponent(msg.content)}')" title="Balas Pesan">
-                            ↩️ Balas
+                            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg> Balas
                         </button>
                         ${deleteBtnHtml}
                     </div>
@@ -689,7 +685,7 @@
         if (!INITIAL_MESSAGES || INITIAL_MESSAGES.length === 0) {
             scrollArea.innerHTML = `
                 <div id="chatEmptyPlaceholder" style="text-align:center; padding:50px 20px; color:var(--app-muted);">
-                    <div style="font-size:40px; margin-bottom:10px;">💬</div>
+                    <div style="display:flex; justify-content:center; margin-bottom:10px; color:var(--app-muted);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
                     <h3 style="font-size:16px; font-weight:800; color:var(--app-text); margin-bottom:6px;">Belum Ada Obrolan</h3>
                     <p style="font-size:13px; max-width:400px; margin:0 auto;">
                         Jadilah yang pertama memulai percakapan di Ruang Chat Komunitas XiaoZhi! Ketik pesan di kolom bawah ini.

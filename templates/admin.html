@@ -227,7 +227,7 @@
                 ⭐ Akses Plus
             </a>
             <a href="/admin/activity-monitor" class="app-button" style="text-decoration:none; font-weight:800; font-size:12px; padding:6px 12px; background:#10b981; color:#fff; border:2px solid #111; box-shadow:2px 2px 0 #111;">
-                🎵 Monitor Aktivitas & Musik
+                <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Monitor Aktivitas &amp; Musik</span>
             </a>
             <div class="app-status-pill is-online">
                 <span class="app-status-dot"></span>
@@ -272,7 +272,7 @@
         </div>
         <a href="/admin/activity-monitor" class="app-stat-card" style="text-decoration:none; cursor:pointer; border-color:#0284c7; background:#f0f9ff; transition:transform 0.15s ease;" title="Buka Monitor Aktivitas Tools & Lagu YouTube">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <p class="app-stat-label" style="color:#0284c7; font-weight:800;">🔍 Log Harian</p>
+                <p class="app-stat-label" style="color:#0284c7; font-weight:800;"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Log Harian</span></p>
                 <span style="font-size:11.5px; color:#0369a1; font-weight:700;">Buka →</span>
             </div>
             <p class="app-stat-value" style="font-size:15px; font-weight:800; color:#0369a1; margin-top:2px;">
@@ -290,7 +290,7 @@
         </a>
         <a href="/admin/firmware/finance" class="app-stat-card" style="text-decoration:none; cursor:pointer; border-color:var(--app-brand); transition:transform 0.15s ease;" title="Buka Manajemen Transaksi & Keuangan Marketplace">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <p class="app-stat-label" style="color:var(--app-brand); font-weight:800;">💰 Marketplace</p>
+                <p class="app-stat-label" style="color:var(--app-brand); font-weight:800;"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> Marketplace</span></p>
                 <span style="font-size:11.5px; color:var(--app-muted); font-weight:700;">Lihat →</span>
             </div>
             <p class="app-stat-value" style="font-size:15px; font-weight:800; color:var(--app-text); margin-top:2px;">
@@ -303,14 +303,14 @@
     <section class="app-card" style="margin-bottom: 24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
             <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:20px">🎵</span>
+                <svg class="app-icon app-icon-md" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                 <h2 class="app-section-title" style="margin:0">YouTube Music Sedang Berjalan</h2>
                 <span id="activeStreamsBadge" class="app-chip app-chip-small {% if active_streams %}app-chip-success{% else %}app-chip-neutral{% endif %}">
                     {{ total_active_streams or 0 }} sedang memutar
                 </span>
             </div>
             <button type="button" onclick="pollActiveStreams()" class="app-button app-button-small" style="font-size:12px">
-                🔄 Refresh Stream
+                <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Refresh Stream</span>
             </button>
         </div>
 
@@ -322,7 +322,7 @@
                     {% if s.thumbnail_url %}
                     <img src="{{ s.thumbnail_url }}" alt="Thumbnail" style="width:60px;height:45px;border-radius:6px;object-fit:cover;flex-shrink:0;">
                     {% else %}
-                    <div style="width:60px;height:45px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🎵</div>
+                    <div style="width:60px;height:45px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg class="app-icon app-icon-md" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
                     {% endif %}
                     <div style="flex:1;min-width:0">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -331,27 +331,27 @@
                                 {{ s.title }}
                             </a>
                             <span class="app-chip app-chip-small app-chip-success" style="font-size:10.5px">
-                                ▶ {{ s.stream_type }}
+                                <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg> {{ s.stream_type }}</span>
                             </span>
                         </div>
                         <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
-                            <span>👤 <strong>{{ s.username }}</strong> (ID {{ s.user_id }})</span>
+                            <span><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> <strong>{{ s.username }}</strong> (ID {{ s.user_id }})</span>
                             {% if s.device_mac %}
-                            <span>📡 <code>{{ s.device_mac }}</code></span>
+                            <span><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg> <code>{{ s.device_mac }}</code></span>
                             {% endif %}
                             <span>⏱ Berjalan: <strong id="elapsed-{{ s.session_id }}">{{ s.elapsed_formatted }}</strong></span>
-                            <span>📊 {{ s.bytes_formatted }} ({{ s.bitrate }})</span>
+                            <span><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> {{ s.bytes_formatted }} ({{ s.bitrate }})</span>
                         </div>
                     </div>
                     <button type="button" class="app-button app-button-small" style="background:#dc2626;color:white;flex-shrink:0" onclick="stopPlayback('{{ s.session_id }}')">
-                        ⏹ Hentikan
+                        <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Hentikan</span>
                     </button>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
             <div id="noStreamsPlaceholder" style="padding:24px;text-align:center;color:#64748b;font-size:13px;background:#f8fafc;border-radius:8px;border:1px dashed #cbd5e1;">
-                🎧 Tidak ada user yang sedang memainkan YouTube Music saat ini.
+                Tidak ada user yang sedang memainkan YouTube Music saat ini.
             </div>
             {% endif %}
         </div>
@@ -380,21 +380,21 @@
             <span style="font-size:12px;font-weight:600;color:#64748b;margin-right:2px">Filter:</span>
             <button type="button" class="filter-pill active" data-filter="all" onclick="setQuickFilter('all')">Semua User</button>
             <button type="button" class="filter-pill" data-filter="active_today" onclick="setQuickFilter('active_today')">
-                ⚡ Aktivitas Hari Ini {% if active_today_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ active_today_count }}</span>{% endif %}
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Aktivitas Hari Ini {% if active_today_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ active_today_count }}</span>{% endif %}
             </button>
             <button type="button" class="filter-pill" data-filter="stream_youtube" onclick="setQuickFilter('stream_youtube')">
-                🎵 Stream YouTube {% if stream_today_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ stream_today_count }}</span>{% endif %}
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Stream YouTube {% if stream_today_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ stream_today_count }}</span>{% endif %}
             </button>
             <button type="button" class="filter-pill" data-filter="tools_today" onclick="setQuickFilter('tools_today')">
-                🔧 MCP Tools Hari Ini {% if tools_today_count > 0 %}<span class="app-chip app-chip-small app-chip-info" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ tools_today_count }}</span>{% endif %}
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> MCP Tools Hari Ini {% if tools_today_count > 0 %}<span class="app-chip app-chip-small app-chip-info" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ tools_today_count }}</span>{% endif %}
             </button>
             <button type="button" class="filter-pill" data-filter="mac_saved" onclick="setQuickFilter('mac_saved')">
-                📟 MAC Tersimpan {% if mac_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ mac_count }}</span>{% endif %}
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> MAC Tersimpan {% if mac_count > 0 %}<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">{{ mac_count }}</span>{% endif %}
             </button>
-            <button type="button" class="filter-pill" data-filter="mcp_connected" onclick="setQuickFilter('mcp_connected')">🟢 MCP Konek</button>
-            <button type="button" class="filter-pill" data-filter="mcp_disconnected" onclick="setQuickFilter('mcp_disconnected')">⚪ Blom Konek MCP</button>
-            <button type="button" class="filter-pill" data-filter="newest" onclick="setQuickFilter('newest')">⏱ Baru Terdaftar</button>
-            <button type="button" class="filter-pill" data-filter="oldest" onclick="setQuickFilter('oldest')">⏳ User Lama</button>
+            <button type="button" class="filter-pill" data-filter="mcp_connected" onclick="setQuickFilter('mcp_connected')"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#10b981; margin-right:4px;"></span> MCP Konek</button>
+            <button type="button" class="filter-pill" data-filter="mcp_disconnected" onclick="setQuickFilter('mcp_disconnected')"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#94a3b8; margin-right:4px;"></span> Blom Konek MCP</button>
+            <button type="button" class="filter-pill" data-filter="newest" onclick="setQuickFilter('newest')">Baru Terdaftar</button>
+            <button type="button" class="filter-pill" data-filter="oldest" onclick="setQuickFilter('oldest')">User Lama</button>
         </div>
 
         <div class="app-table-wrap">
@@ -438,13 +438,13 @@
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 <span class="app-table-title">{{ item.username }}</span>
                                 {% if item.email %}
-                                <span class="app-table-subtext" style="font-size:11px; color:#64748b; font-weight:600;" title="Email akun: {{ item.email }}">✉️ {{ item.email }}</span>
+                                <span class="app-table-subtext" style="font-size:11px; color:#64748b; font-weight:600;" title="Email akun: {{ item.email }}"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> {{ item.email }}</span>
                                 {% endif %}
                                 {% if act.has_activity %}
                                 <span class="app-chip app-chip-small app-chip-success" style="font-size:9.5px; padding:1px 6px; font-weight:800;" title="User aktif hari ini">Aktif Hari Ini</span>
                                 {% endif %}
                                 <a href="/admin/activity-monitor?user_id={{ item.id }}" class="app-chip app-chip-small" style="font-size:9.5px; padding:1px 6px; font-weight:700; text-decoration:none; background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; transition:all 0.15s ease;" title="Buka riwayat tools & lagu user ini di Monitor Aktivitas">
-                                    🔍 Detail
+                                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Detail
                                 </a>
                             </div>
                             {% if item.created_at %}
@@ -468,12 +468,12 @@
                             <div style="margin-top: 5px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
                                 {% if act.has_tools %}
                                 <span class="app-chip app-chip-small" style="font-size: 10px; padding: 2px 6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700;" title="Tools terpanggil hari ini: {{ act.tools_list|join(', ') }}">
-                                    ⚡ {{ act.tools_count }} Tool ({{ act.last_tool or 'MCP' }})
+                                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> {{ act.tools_count }} Tool ({{ act.last_tool or 'MCP' }})
                                 </span>
                                 {% endif %}
                                 {% if act.has_stream %}
                                 <span class="app-chip app-chip-small" style="font-size: 10px; padding: 2px 6px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-weight:700;" title="Lagu diputar hari ini: {{ act.last_song or 'YouTube' }}">
-                                    🎵 {{ act.youtube_count or 1 }} Lagu{% if act.last_song %}: {{ act.last_song[:20] }}...{% endif %}
+                                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> {{ act.youtube_count or 1 }} Lagu{% if act.last_song %}: {{ act.last_song[:20] }}...{% endif %}
                                 </span>
                                 {% endif %}
                                 {% if act.last_activity_time %}
@@ -485,7 +485,7 @@
                         <td>
                             {% if item.mcp_status.connected %}
                             <span class="app-chip app-chip-small app-chip-success" title="{{ item.mcp_status.message }}">
-                                ✓ Terhubung
+                                <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Terhubung</span>
                             </span>
                             {% elif item.mcp_status.has_token %}
                             <span class="app-chip app-chip-small app-chip-info" title="Token tersimpan, menunggu koneksi">
@@ -493,7 +493,7 @@
                             </span>
                             {% else %}
                             <span class="app-chip app-chip-small app-chip-neutral">
-                                ✗ Tidak ada
+                                <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Tidak ada</span>
                             </span>
                             {% endif %}
                         </td>
@@ -502,7 +502,7 @@
                             <div style="margin-bottom: 6px;">
                                 <span class="app-chip app-chip-small app-chip-success" style="font-size: 11px; background: rgba(16, 185, 129, 0.18); border: 1px solid #10b981; color: #059669; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
                                     <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
-                                    🔊 Sedang Memutar
+                                    <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> Sedang Memutar</span>
                                 </span>
                             </div>
                             {% endif %}
@@ -516,10 +516,10 @@
                                         <code style="font-family: ui-monospace, monospace; font-size: 11px; font-weight: 800; color: #047857; background: rgba(16, 185, 129, 0.1); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.25);">
                                             {{ sl.board_mac }}
                                         </code>
-                                        <span class="app-chip app-chip-small app-chip-success" style="font-size: 9px; padding: 1px 4px; font-weight: 700;">🔒 Terkunci</span>
-                                        <button type="button" onclick="viewBoardHistoryAdmin('{{ sl.board_mac }}', '{{ item.id }}', {{ sl.slot_number }})" style="background: transparent; border: 1px solid rgba(59, 130, 246, 0.4); color: #3b82f6; font-size: 9.5px; font-weight: 700; border-radius: 3px; padding: 1px 5px; cursor: pointer;" title="Lihat riwayat audit MAC ini">📜 Riwayat</button>
+                                        <span class="app-chip app-chip-small app-chip-success" style="font-size: 9px; padding: 1px 4px; font-weight: 700;"><span style="display:inline-flex; align-items:center; gap:3px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Terkunci</span></span>
+                                        <button type="button" onclick="viewBoardHistoryAdmin('{{ sl.board_mac }}', '{{ item.id }}', {{ sl.slot_number }})" style="background: transparent; border: 1px solid rgba(59, 130, 246, 0.4); color: #3b82f6; font-size: 9.5px; font-weight: 700; border-radius: 3px; padding: 1px 5px; cursor: pointer;" title="Lihat riwayat audit MAC ini"><span style="display:inline-flex; align-items:center; gap:3px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg> Riwayat</span></button>
                                     {% elif sl.token_preview %}
-                                        <span class="app-chip app-chip-small app-chip-info" style="font-size: 9.5px; padding: 1px 5px;">⏳ Menunggu Board</span>
+                                        <span class="app-chip app-chip-small app-chip-info" style="font-size: 9.5px; padding: 1px 5px;">Menunggu Board</span>
                                     {% else %}
                                         <span style="color: #94a3b8; font-size: 10px;">- kosong -</span>
                                     {% endif %}
@@ -533,7 +533,7 @@
                                         {{ item.device_mac }}
                                     </code>
                                     <span class="app-chip app-chip-small app-chip-success" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; border-radius: 4px;">Tersimpan OK</span>
-                                    <button type="button" onclick="viewBoardHistoryAdmin('{{ item.device_mac }}', '{{ item.id }}', 1)" style="background: transparent; border: 1px solid rgba(59, 130, 246, 0.4); color: #3b82f6; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 6px; cursor: pointer;">📜 Riwayat</button>
+                                    <button type="button" onclick="viewBoardHistoryAdmin('{{ item.device_mac }}', '{{ item.id }}', 1)" style="background: transparent; border: 1px solid rgba(59, 130, 246, 0.4); color: #3b82f6; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 6px; cursor: pointer;"><span style="display:inline-flex; align-items:center; gap:3px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg> Riwayat</span></button>
                                 </div>
                             </div>
                             {% else %}
@@ -585,7 +585,7 @@
             </table>
         </div>
 
-        <!-- 🌟 Slide ke Samping / Pagination 15 User -->
+        <!-- Slide ke Samping / Pagination 15 User -->
         <div id="userPaginationBar" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--app-border);flex-wrap:wrap;gap:12px;">
             <div style="font-size:13px;color:var(--app-muted);font-weight:600;display:flex;align-items:center;gap:8px;">
                 <span>Menampilkan</span>
@@ -602,17 +602,17 @@
                     <!-- Slide numbers rendered by JS -->
                 </div>
                 <button type="button" id="userNextSlideBtn" class="app-button app-button-small" onclick="slideUserPage(1)" style="font-size:12.5px;font-weight:800;padding:7px 14px;border-radius:6px;">
-                    Geser Kanan (Next) ▶
+                    Geser Kanan (Next) <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
             </div>
         </div>
     </section>
 
-    <!-- ⚡ Live Server & MCP Console (SSE) -->
+    <!-- Live Server & MCP Console (SSE) -->
     <section class="app-card" style="margin-top: 24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:12px;">
             <div style="display:flex;align-items:center;gap:10px;">
-                <h2 class="app-section-title" style="margin:0;">⚡ Live Server & MCP Console (SSE)</h2>
+                <h2 class="app-section-title" style="margin:0; display:flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Live Server &amp; MCP Console (SSE)</h2>
                 <span id="sseStatusBadge" class="app-chip app-chip-small app-chip-info" style="font-size:10.5px;padding:2px 8px;display:inline-flex;align-items:center;gap:5px;">
                     <span id="sseStatusDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#38bdf8;"></span>
                     <span id="sseStatusText">Menyambungkan SSE...</span>
@@ -623,10 +623,10 @@
                     ⬇ Auto-Scroll: ON
                 </button>
                 <button type="button" class="app-button app-button-small" onclick="clearLiveConsole()" style="font-size:11.5px;">
-                    🗑 Bersihkan
+                    <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Bersihkan</span>
                 </button>
                 <button type="button" class="app-button app-button-small" onclick="reconnectSSE()" style="font-size:11.5px;">
-                    🔄 Reconnect
+                    <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Reconnect</span>
                 </button>
             </div>
         </div>
@@ -635,11 +635,11 @@
         <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
             <span style="font-size:12px;font-weight:700;color:var(--app-muted);margin-right:4px;">Kategori:</span>
             <button type="button" class="filter-pill active" data-sse-cat="all" onclick="setConsoleFilter('all')">Semua Log</button>
-            <button type="button" class="filter-pill" data-sse-cat="mcp" onclick="setConsoleFilter('mcp')">🔌 MCP Bridge</button>
-            <button type="button" class="filter-pill" data-sse-cat="audio" onclick="setConsoleFilter('audio')">🎵 Audio Stream</button>
-            <button type="button" class="filter-pill" data-sse-cat="chat" onclick="setConsoleFilter('chat')">💬 Tanya AI</button>
-            <button type="button" class="filter-pill" data-sse-cat="material" onclick="setConsoleFilter('material')">📚 Knowledge</button>
-            <button type="button" class="filter-pill" data-sse-cat="system" onclick="setConsoleFilter('system')">⚙️ System</button>
+            <button type="button" class="filter-pill" data-sse-cat="mcp" onclick="setConsoleFilter('mcp')"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M7 8h10a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3z"/><path d="M12 16v6"/><path d="M8 2v2"/><path d="M16 2v2"/></svg> MCP Bridge</span></button>
+            <button type="button" class="filter-pill" data-sse-cat="audio" onclick="setConsoleFilter('audio')"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Audio Stream</span></button>
+            <button type="button" class="filter-pill" data-sse-cat="chat" onclick="setConsoleFilter('chat')"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Tanya AI</span></button>
+            <button type="button" class="filter-pill" data-sse-cat="material" onclick="setConsoleFilter('material')"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Knowledge</span></button>
+            <button type="button" class="filter-pill" data-sse-cat="system" onclick="setConsoleFilter('system')"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> System</span></button>
         </div>
 
         <!-- Terminal Console Screen -->
@@ -864,7 +864,7 @@
                     id="tool-${tool.name}"
                     ${tool.enabled ? 'checked' : ''}
                     onchange="toggleTool('${tool.name}', this.checked)">
-                <span style="font-size: 18px; flex-shrink: 0;">${tool.icon || '🔧'}</span>
+                <span style="font-size: 18px; flex-shrink: 0;">${tool.icon || '<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>'}</span>
                 <div style="flex:1; min-width:0;">
                     <div class="mcp-tool-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${tool.title || formatToolName(tool.name)}">
                         ${tool.title || formatToolName(tool.name)}
@@ -960,7 +960,7 @@
                             <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                     <span class="app-chip app-chip-small ${h.action === 'bind' ? 'app-chip-success' : 'app-chip-neutral'}" style="font-weight:700; text-transform:uppercase; font-size:10px;">
-                                        ${h.action === 'bind' ? '🔒 Diikat (Bind)' : '✂️ Dilepas (Detach)'}
+                                        ${h.action === 'bind' ? 'Diikat (Bind)' : 'Dilepas (Detach)'}
                                     </span>
                                     <span style="font-size:11px; color:#64748b;">${h.bound_at || '-'}</span>
                                 </div>
@@ -1363,17 +1363,17 @@
             const activeTodayPill = document.querySelector('.filter-pill[data-filter="active_today"]');
             if (activeTodayPill && data.totals.users_active_today !== undefined) {
                 const c = data.totals.users_active_today;
-                activeTodayPill.innerHTML = `⚡ Aktivitas Hari Ini ${c > 0 ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${c}</span>` : ''}`;
+                activeTodayPill.innerHTML = `<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Aktivitas Hari Ini ${c > 0 ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${c}</span>` : ''}`;
             }
             const streamTodayPill = document.querySelector('.filter-pill[data-filter="stream_youtube"]');
             if (streamTodayPill && data.totals.users_stream_today !== undefined) {
                 const c = data.totals.users_stream_today;
-                streamTodayPill.innerHTML = `🎵 Stream YouTube ${c > 0 ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${c}</span>` : ''}`;
+                streamTodayPill.innerHTML = `<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Stream YouTube ${c > 0 ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${c}</span>` : ''}`;
             }
             const toolsTodayPill = document.querySelector('.filter-pill[data-filter="tools_today"]');
             if (toolsTodayPill && data.totals.users_tools_today !== undefined) {
                 const c = data.totals.users_tools_today;
-                toolsTodayPill.innerHTML = `🔧 MCP Tools Hari Ini ${c > 0 ? `<span class="app-chip app-chip-small app-chip-info" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${c}</span>` : ''}`;
+                toolsTodayPill.innerHTML = `<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> MCP Tools Hari Ini ${c > 0 ? `<span class="app-chip app-chip-small app-chip-info" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${c}</span>` : ''}`;
             }
         }
 
@@ -1392,7 +1392,7 @@
             if (streams.length === 0) {
                 container.innerHTML = `
                     <div id="noStreamsPlaceholder" style="padding:24px;text-align:center;color:#64748b;font-size:13px;background:#f8fafc;border-radius:8px;border:1px dashed #cbd5e1;">
-                        🎧 Tidak ada user yang sedang memainkan YouTube Music saat ini.
+                        Tidak ada user yang sedang memainkan YouTube Music saat ini.
                     </div>
                 `;
             } else {
@@ -1400,7 +1400,7 @@
                     <div style="display:flex;flex-direction:column;gap:10px" id="activeStreamsList">
                         ${streams.map(s => `
                             <div class="stream-card" id="stream-card-${s.session_id}">
-                                ${s.thumbnail_url ? `<img src="${s.thumbnail_url}" alt="Thumbnail" style="width:60px;height:45px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : `<div style="width:60px;height:45px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🎵</div>`}
+                                ${s.thumbnail_url ? `<img src="${s.thumbnail_url}" alt="Thumbnail" style="width:60px;height:45px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : `<div style="width:60px;height:45px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg class="app-icon app-icon-md" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`}
                                 <div style="flex:1;min-width:0">
                                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                                         <span class="music-bar-anim"><span></span><span></span><span></span></span>
@@ -1408,18 +1408,18 @@
                                             ${s.title}
                                         </a>
                                         <span class="app-chip app-chip-small app-chip-success" style="font-size:10.5px">
-                                            ▶ ${s.stream_type}
+                                            <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg> ${s.stream_type}</span>
                                         </span>
                                     </div>
                                     <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:11.5px;color:#64748b;flex-wrap:wrap">
-                                        <span>👤 <strong>${s.username}</strong> (ID ${s.user_id})</span>
-                                        ${s.device_mac ? `<span>📡 <code>${s.device_mac}</code></span>` : ''}
-                                        <span>⏱ Berjalan: <strong>${s.elapsed_formatted}</strong></span>
-                                        <span>📊 ${s.bytes_formatted} (${s.bitrate})</span>
+                                        <span><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> <strong>${s.username}</strong> (ID ${s.user_id})</span>
+                                        ${s.device_mac ? `<span><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg> <code>${s.device_mac}</code></span>` : ''}
+                                        <span><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Berjalan: <strong>${s.elapsed_formatted}</strong></span>
+                                        <span><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> ${s.bytes_formatted} (${s.bitrate})</span>
                                     </div>
                                 </div>
                                 <button type="button" class="app-button app-button-small" style="background:#dc2626;color:white;flex-shrink:0" onclick="stopPlayback('${s.session_id}')">
-                                    ⏹ Hentikan
+                                    <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Hentikan</span>
                                 </button>
                             </div>
                         `).join('')}
@@ -1437,7 +1437,7 @@
             const macCount = data.users.filter(u => Boolean(u.device_mac)).length;
             const macPill = document.querySelector('.filter-pill[data-filter="mac_saved"]');
             if (macPill) {
-                macPill.innerHTML = `📟 MAC Tersimpan ${macCount > 0 ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${macCount}</span>` : ''}`;
+                macPill.innerHTML = `<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> MAC Tersimpan ${macCount > 0 ? `<span class="app-chip app-chip-small app-chip-success" style="font-size:10px;padding:1px 5px;margin-left:4px;border-radius:999px;">${macCount}</span>` : ''}`;
             }
 
             data.users.forEach(u => {
@@ -1486,7 +1486,7 @@
                             <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
                                 <span class="app-chip app-chip-small app-chip-success" style="font-size: 11px; background: rgba(16, 185, 129, 0.18); border: 1px solid #10b981; color: #059669; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
                                     <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
-                                    🔊 Sedang Memutar
+                                    <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> Sedang Memutar</span>
                                 </span>
                                 ${u.device_mac ? `
                                     <div style="display: inline-flex; align-items: center; gap: 5px;">
@@ -1698,13 +1698,13 @@
     }, 5000);
 </script>
 
-<!-- 📜 Modal Riwayat Tautan Board ID (Admin) -->
+<!-- Modal Riwayat Tautan Board ID (Admin) -->
 <div id="adminBoardHistoryModal" style="display: none; position: fixed; inset: 0; z-index: 99999; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px;">
     <div style="background: var(--app-surface, #1e293b); border: 1px solid var(--app-border, #334155); border-radius: 16px; width: 100%; max-width: 720px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
         <div style="padding: 18px 24px; border-bottom: 1px solid var(--app-border, #334155); display: flex; align-items: center; justify-content: space-between;">
             <div>
                 <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--app-text, #f8fafc); display: flex; align-items: center; gap: 8px;">
-                    <span>📜</span>
+                    <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
                     <span id="adminBoardHistTitle">Audit Riwayat Tautan Board ESP32</span>
                 </h3>
                 <p style="margin: 4px 0 0 0; font-size: 12.5px; color: var(--app-muted, #94a3b8);">Linimasa lengkap siapa yang pernah tertaut, kapan tertaut, dan kapan terakhir aktif</p>
@@ -1741,7 +1741,7 @@ async function viewBoardHistoryAdmin(mac) {
         let html = '';
         if (data.is_protected) {
             html += `<div style="margin-bottom: 16px; padding: 12px 16px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 10px; font-size: 13px; color: #a5b4fc; display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 20px;">🛡️</span>
+                <svg class="app-icon app-icon-md" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 <div>
                     <strong>Master Protected Device:</strong> Board ID ini memiliki status terlindungi permanen di level database PostgreSQL. Tidak akan pernah dihapus oleh operasi apapun.
                 </div>
@@ -1755,24 +1755,24 @@ async function viewBoardHistoryAdmin(mac) {
             data.history.forEach((h, idx) => {
                 const isActive = h.status === 'ACTIVE';
                 const statusBadge = isActive 
-                    ? `<span style="background: #10b981; color: white; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;">🟢 Sedang Tertaut (Aktif)</span>`
-                    : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600;">⚪ Terputus / Riwayat Lampau</span>`;
+                    ? `<span style="background: #10b981; color: white; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#ffffff; margin-right:4px;"></span> Sedang Tertaut (Aktif)</span>`
+                    : `<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#94a3b8; margin-right:4px;"></span> Terputus / Riwayat Lampau</span>`;
                 
                 html += `
                 <div style="background: var(--app-card, rgba(255,255,255,0.03)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 12px; padding: 14px 16px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                         <div style="font-weight: 700; font-size: 14px; color: var(--app-text, #fff); display: flex; align-items: center; gap: 6px;">
-                            <span>👤</span>
+                            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             <span>${h.username || 'User ID ' + h.user_id}</span>
                             <span style="font-size: 11.5px; color: var(--app-muted, #94a3b8); font-weight: 500;">(ID Akun: ${h.user_id})</span>
                         </div>
                         ${statusBadge}
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; font-size: 12px; color: var(--app-muted, #94a3b8);">
-                        <div>📅 <strong>Pernah Tertaut:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
-                        <div>⏱️ <strong>Terakhir Aktif:</strong> ${h.last_active_str || h.last_active_at || '-'}</div>
-                        <div>🔌 <strong>Terakhir Tertaut / Diputus:</strong> ${h.unlinked_at_str ? h.unlinked_at_str : '<span style="color: #10b981; font-weight: 600;">Masih aktif sampai sekarang</span>'}</div>
-                        <div>📝 <strong>Catatan / Alasan:</strong> ${h.notes || 'Normal binding'}</div>
+                        <div><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <strong>Pernah Tertaut:</strong> ${h.linked_at_str || h.linked_at || '-'}</div>
+                        <div><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> <strong>Terakhir Aktif:</strong> ${h.last_active_str || h.last_active_at || '-'}</div>
+                        <div><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M7 8h10a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3z"/><path d="M12 16v6"/><path d="M8 2v2"/><path d="M16 2v2"/></svg> <strong>Terakhir Tertaut / Diputus:</strong> ${h.unlinked_at_str ? h.unlinked_at_str : '<span style="color: #10b981; font-weight: 600;">Masih aktif sampai sekarang</span>'}</div>
+                        <div><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> <strong>Catatan / Alasan:</strong> ${h.notes || 'Normal binding'}</div>
                     </div>
                 </div>`;
             });

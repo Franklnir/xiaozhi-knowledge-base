@@ -202,7 +202,7 @@
                 <span style="font-size:10px; background:#ef4444; color:#fff; font-weight:900; padding:2px 7px; border-radius:99px; text-transform:uppercase;">YouTube & TikTok Stream</span>
             </div>
             <h1 class="app-title" style="display:flex; align-items:center; gap:10px;">
-                <span>🎵 Playlist Musik (YouTube & TikTok)</span>
+                <span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-md" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Playlist Musik (YouTube &amp; TikTok)</span>
             </h1>
             <p class="app-subtitle">
                 Atur daftar lagu favorit Anda dari YouTube maupun TikTok. Panggil lagu berdasarkan <strong>nomor (#1, #2)</strong>, <strong>judul lagu</strong>, atau <strong>link video</strong> melalui perintah suara Xiaozhi atau tombol play langsung ke ESP32.
@@ -210,10 +210,10 @@
         </div>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; color:#fff; font-weight:800; display:inline-flex; align-items:center; gap:6px; padding:10px 18px;">
-                <span>➕</span> Tambah Lagu ke Playlist
+                <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Tambah Lagu ke Playlist</span>
             </button>
             <button type="button" onclick="document.getElementById('playlistFirmwareModal').style.display='flex'" class="app-button" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
-                <span>ℹ️</span> Info Firmware
+                <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info Firmware</span>
             </button>
         </div>
     </header>
@@ -222,9 +222,7 @@
     <!-- Prominent Firmware Warning Overlay Reminder Banner -->
     <div class="firmware-warning-banner">
         <div style="display:flex; align-items:center; gap:14px; flex:1 1 320px;">
-            <div style="width:40px; height:40px; border-radius:50%; background:rgba(239,68,68,0.15); border:1.5px solid #ef4444; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">
-                ⚠️
-            </div>
+            <div style="width:40px; height:40px; border-radius:50%; background:rgba(239,68,68,0.15); border:1.5px solid #ef4444; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#ef4444;"><svg class="app-icon app-icon-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
             <div>
                 <strong style="color:#ef4444; font-size:14px; display:block; line-height:1.4;">
                     menu ini berfungsi untuk firmware yang udah support putar lagu via youtube
@@ -276,13 +274,13 @@
         <div class="app-stat-card">
             <p class="app-stat-label">Audio Cache Server</p>
             <p class="app-stat-value" style="font-size:16px; color:#10b981;">
-                ⚡ Siap Diputar Instan
+                <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Siap Diputar Instan</span>
             </p>
         </div>
         <div class="app-stat-card">
             <p class="app-stat-label">Perintah Panggilan Voice AI</p>
             <p class="app-stat-value" style="font-size:15px; color:var(--app-text);">
-                ✓ Nomor & Judul Lagu
+                <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Nomor &amp; Judul Lagu</span>
             </p>
         </div>
     </section>
@@ -292,7 +290,7 @@
         <div class="app-card-header is-compact">
             <div>
                 <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                    <span>🗣️</span> Panduan Perintah Suara Xiaozhi
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Panduan Perintah Suara Xiaozhi</span>
                 </h2>
                 <p class="app-section-subtitle">Ucapkan kalimat berikut ke mikrofon ESP32 Xiaozhi Anda untuk memutar musik:</p>
             </div>
@@ -302,10 +300,10 @@
                 <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:6px;">1. Panggil Berdasarkan Nomor Urut</div>
                 <div style="display:flex; flex-wrap:wrap; gap:6px;">
                     <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar lagu nomor 1')" title="Klik untuk salin">
-                        "Xiaozhi, putar lagu nomor 1" 📋
+                        "Xiaozhi, putar lagu nomor 1" <svg class="app-icon app-icon-xs" style="color:var(--app-muted);" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                     </span>
                     <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar playlist nomor 2')" title="Klik untuk salin">
-                        "Xiaozhi, putar playlist nomor 2" 📋
+                        "Xiaozhi, putar playlist nomor 2" <svg class="app-icon app-icon-xs" style="color:var(--app-muted);" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                     </span>
                 </div>
             </div>
@@ -314,7 +312,7 @@
                 <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:6px;">2. Panggil Berdasarkan Judul Lagu</div>
                 <div style="display:flex; flex-wrap:wrap; gap:6px;">
                     <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar judul lagu dari playlist saya')" title="Klik untuk salin">
-                        "Xiaozhi, putar [judul lagu] dari playlist" 📋
+                        "Xiaozhi, putar [judul lagu] dari playlist" <svg class="app-icon app-icon-xs" style="color:var(--app-muted);" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                     </span>
                 </div>
             </div>
@@ -323,11 +321,11 @@
                 <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:6px;">3. Putar Bebas Dari YouTube</div>
                 <div style="display:flex; flex-wrap:wrap; gap:6px;">
                     <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, putar lagu Denny Caknan')" title="Klik untuk salin">
-                        "Xiaozhi, putar lagu [apa saja di YouTube]" 📋
+                        "Xiaozhi, putar lagu [apa saja di YouTube]" <svg class="app-icon app-icon-xs" style="color:var(--app-muted);" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                     </span>
                 </div>
                 <p style="font-size:11px; color:var(--app-muted); margin:4px 0 0;">
-                    💡 Jika lagu tidak ada di playlist, Xiaozhi otomatis mencarinya di YouTube secara langsung.
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Jika lagu tidak ada di playlist, Xiaozhi otomatis mencarinya di YouTube secara langsung.</span>
                 </p>
             </div>
 
@@ -335,7 +333,7 @@
                 <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:6px;">4. Cek Daftar Playlist</div>
                 <div style="display:flex; flex-wrap:wrap; gap:6px;">
                     <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, sebutkan lagu di playlist saya')" title="Klik untuk salin">
-                        "Xiaozhi, sebutkan playlist saya" 📋
+                        "Xiaozhi, sebutkan playlist saya" <svg class="app-icon app-icon-xs" style="color:var(--app-muted);" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                     </span>
                 </div>
             </div>
@@ -344,14 +342,14 @@
                 <div style="font-size:11.5px; font-weight:800; color:var(--app-muted); text-transform:uppercase; margin-bottom:6px;">5. Cek Status Cache (Putar Lancar)</div>
                 <div style="display:flex; flex-wrap:wrap; gap:6px;">
                     <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, cek status cache playlist saya')" title="Klik untuk salin">
-                        "Xiaozhi, cek status cache playlist saya" 📋
+                        "Xiaozhi, cek status cache playlist saya" <svg class="app-icon app-icon-xs" style="color:var(--app-muted);" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                     </span>
                     <span class="voice-cmd-chip" onclick="copyVoiceSnippet('Xiaozhi, lagu mana yang sudah siap diputar lancar?')" title="Klik untuk salin">
-                        "Xiaozhi, lagu mana yang sudah siap diputar lancar?" 📋
+                        "Xiaozhi, lagu mana yang sudah siap diputar lancar?" <svg class="app-icon app-icon-xs" style="color:var(--app-muted);" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                     </span>
                 </div>
                 <p style="font-size:11px; color:var(--app-muted); margin:4px 0 0;">
-                    ⚡ Xiaozhi otomatis memeriksa apakah file sudah 100% ter-cache di harddisk server atau berisiko tersendat jika cachenya belum selesai.
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Xiaozhi otomatis memeriksa apakah file sudah 100% ter-cache</span> di harddisk server atau berisiko tersendat jika cachenya belum selesai.
                 </p>
             </div>
         </div>
@@ -362,7 +360,7 @@
         <div class="app-card-header" style="flex-wrap:wrap; gap:14px;">
             <div>
                 <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                    <span>📋</span> Daftar Lagu Playlist Anda
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Daftar Lagu Playlist Anda</span>
                 </h2>
                 <p class="app-section-subtitle">
                     Total <strong id="tableTrackCount">{{ tracks|length }}</strong> lagu terdaftar di playlist akun Anda.
@@ -372,16 +370,16 @@
                 <input 
                     type="text" 
                     id="trackSearchInput" 
-                    placeholder="🔍 Cari nomor, judul, artis, URL..." 
+                    placeholder="Cari nomor, judul, artis, URL..." 
                     class="app-input" 
                     style="width:240px; font-size:12.5px; padding:7px 12px;"
                     oninput="filterPlaylistTable()"
                 >
                 <button type="button" onclick="cacheAllTracks()" class="app-button" style="font-size:12px; padding:7px 12px; display:inline-flex; align-items:center; gap:5px; font-weight:700;" title="Unduh dan simpan semua audio playlist ke disk server VPS agar siap diputar instan tanpa buffering">
-                    <span>⚡</span> Unduh Semua Cache
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Unduh Semua Cache</span>
                 </button>
                 <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; font-size:12.5px; padding:7px 14px;">
-                    ➕ Tambah Lagu
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Tambah Lagu</span>
                 </button>
             </div>
         </div>
@@ -410,17 +408,13 @@
                             <td>
                                 <div class="track-thumb-box">
                                     {% if track.video_id.startswith('tt_') %}
-                                    <div style="width:100%; height:100%; background:linear-gradient(135deg, #000 50%, #fe2c55 100%); display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px;">
-                                        🎵
-                                    </div>
+                                    <div style="width:100%; height:100%; background:linear-gradient(135deg, #000 50%, #fe2c55 100%); display:flex; align-items:center; justify-content:center; color:#fff;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
                                     <a href="{{ track.youtube_url }}" target="_blank" rel="noopener noreferrer" class="track-thumb-play-overlay" title="Buka video di TikTok">
                                         ↗
                                     </a>
                                     {% else %}
                                     <img src="https://img.youtube.com/vi/{{ track.video_id }}/hqdefault.jpg" onerror="this.src='https://img.youtube.com/vi/{{ track.video_id }}/default.jpg'" class="track-thumb-img" alt="Thumbnail">
-                                    <div class="track-thumb-play-overlay" onclick="previewYouTubeModal('{{ track.video_id }}', '{{ track.title|escape }}')" title="Pratinjau Video YouTube">
-                                        ▶
-                                    </div>
+                                    <div class="track-thumb-play-overlay" onclick="previewYouTubeModal('{{ track.video_id }}', '{{ track.title|escape }}')" title="Pratinjau Video YouTube"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>
                                     {% endif %}
                                 </div>
                             </td>
@@ -428,11 +422,11 @@
                                 <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                     {% if track.video_id.startswith('tt_') %}
                                     <span style="background:#000; color:#00f2fe; border:1px solid #fe2c55; font-size:10px; font-weight:800; padding:1px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;">
-                                        🎵 TikTok
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> TikTok
                                     </span>
                                     {% else %}
                                     <span style="background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.25); font-size:10px; font-weight:800; padding:1px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;">
-                                        📺 YouTube
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg> YouTube
                                     </span>
                                     {% endif %}
                                     <span style="font-weight:800; font-size:14px; color:var(--app-text); line-height:1.35;" id="track-title-{{ track.id }}">
@@ -440,7 +434,7 @@
                                     </span>
                                     {% if not track.is_active %}
                                     <span class="app-chip app-chip-small" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:10px; font-weight:800; padding:1px 6px;">
-                                        🔒 Nonaktif (Paket Plus)
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Nonaktif (Paket Plus)
                                     </span>
                                     {% endif %}
                                 </div>
@@ -448,7 +442,7 @@
                                     <span id="track-artist-{{ track.id }}">{{ track.artist or ('TikTok Creator' if track.video_id.startswith('tt_') else 'YouTube Audio') }}</span>
                                     <span>•</span>
                                     {% if track.duration %}
-                                    <span style="font-weight:700; color:var(--app-text-muted, #888); font-size:11.5px;">⏱️ {{ track.duration }}</span>
+                                    <span style="font-weight:700; color:var(--app-text-muted, #888); font-size:11.5px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> {{ track.duration }}</span>
                                     <span>•</span>
                                     {% endif %}
                                     <span style="font-family:monospace; font-size:11px; background:var(--app-surface-muted); padding:1px 5px; border-radius:4px; border:1px solid var(--app-border);">
@@ -459,11 +453,9 @@
                             <td>
                                 <div style="display:flex; align-items:center; gap:6px;">
                                     <a href="{{ track.youtube_url }}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px; color:{% if track.video_id.startswith('tt_') %}#fe2c55{% else %}#ef4444{% endif %}; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ track.youtube_url }}">
-                                        <span>{% if track.video_id.startswith('tt_') %}🎵{% else %}📺{% endif %}</span> <span id="track-url-{{ track.id }}">{{ track.youtube_url }}</span> ↗
+                                        {% if track.video_id.startswith('tt_') %}<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>{% else %}<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg>{% endif %} <span id="track-url-{{ track.id }}">{{ track.youtube_url }}</span> ↗
                                     </a>
-                                    <button type="button" onclick="navigator.clipboard.writeText('{{ track.youtube_url }}'); if(window.App&&App.toast)App.toast.success('Link disalin!'); else alert('Link disalin!');" title="Salin Link" class="app-button" style="padding:2px 6px; font-size:11px;">
-                                        📋
-                                    </button>
+                                    <button type="button" onclick="navigator.clipboard.writeText(\'{{ track.youtube_url }}\'); if(window.App && App.toast) App.toast.success(\'URL disalin!\');" title="Salin URL" style="background:transparent; border:none; cursor:pointer; color:var(--app-muted); display:inline-flex; align-items:center;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></button>
                                 </div>
                             </td>
                             <td style="text-align:center;" id="track-cache-cell-{{ track.id }}">
@@ -479,17 +471,17 @@
                                 </span>
                                 {% else %}
                                 <button type="button" onclick="cacheSingleTrack({{ track.id }}, '{{ track.title|escape }}')" class="app-button" style="padding:3px 8px; font-size:11px; font-weight:700; color:var(--app-muted); border-radius:999px;" title="Klik untuk unduh audio ke server sekarang">
-                                    ⚡ Unduh Cache
+                                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Unduh Cache
                                 </button>
                                 {% endif %}
                             </td>
                             <td style="text-align:right;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
                                     <button type="button" onclick="openEditTrackModal({{ track.id }}, '{{ track.title|escape }}', '{{ track.youtube_url|escape }}', '{{ track.artist|escape }}')" class="app-button" style="padding:5px 10px; font-size:12px; font-weight:700;" title="Edit Judul & Link">
-                                        ✏️ Edit
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit
                                     </button>
                                     <button type="button" onclick="deleteTrack({{ track.id }}, '{{ track.title|escape }}')" class="app-button app-button-danger" style="padding:5px 10px; font-size:12px; font-weight:700;" title="Hapus dari Playlist">
-                                        🗑️ Hapus
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Hapus
                                     </button>
                                 </div>
                             </td>
@@ -498,13 +490,13 @@
                     {% else %}
                         <tr id="emptyTableRow">
                             <td colspan="6" style="text-align:center; padding:48px 16px; color:var(--app-muted);">
-                                <div style="font-size:36px; margin-bottom:12px;">🎵</div>
+                                <div style="display:flex; justify-content:center; margin-bottom:12px; color:var(--app-muted);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
                                 <h3 style="font-size:16px; font-weight:800; color:var(--app-text); margin:0 0 6px;">Playlist Anda Masih Kosong</h3>
                                 <p style="font-size:13px; max-width:420px; margin:0 auto 16px;">
                                     Tambahkan lagu favorit dengan memasukkan judul dan link YouTube agar Xiaozhi dapat memutarnya berdasarkan perintah suara Anda!
                                 </p>
                                 <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; padding:8px 16px;">
-                                    ➕ Tambah Lagu Pertama
+                                    <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Tambah Lagu Pertama
                                 </button>
                             </td>
                         </tr>
@@ -524,11 +516,9 @@
         <div style="padding:20px 24px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                 <h3 id="addModalTitle" style="font-size:18px; font-weight:900; margin:0; display:flex; align-items:center; gap:8px;">
-                    <span>➕</span> Tambah Lagu ke Playlist
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Tambah Lagu ke Playlist</span>
                 </h3>
-                <button type="button" onclick="closeAddTrackModal()" class="app-button" style="padding:4px 8px; font-size:14px; font-weight:900; border:none; background:transparent;">
-                    ✕
-                </button>
+                <button type="button" onclick="closeAddTrackModal()" class="app-button" style="padding:4px 8px; border:none; background:transparent; cursor:pointer;" aria-label="Tutup"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
             <form id="formAddTrack" onsubmit="submitAddTrack(event)">
@@ -552,21 +542,19 @@
                                 oninput="onAddUrlChanged(this.value)"
                             >
                             <button type="button" onclick="pasteFromClipboard('addYoutubeUrl', onAddUrlChanged)" class="app-button" style="padding:6px 12px; font-size:12px; font-weight:700;" title="Tempel dari Clipboard">
-                                📋 Tempel
+                                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Tempel
                             </button>
                         </div>
                         <p class="app-field-hint">Auto-deteksi cerdas: Cukup tempel link YouTube (video, Shorts) atau TikTok (vt.tiktok.com, vm.tiktok.com, video link). Sistem otomatis mengenali platformnya.</p>
                         <div style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.25); border-radius:6px; padding:4px 10px; font-size:11.5px; color:#059669;">
-                            <span>⚡</span> <strong>Ketentuan Durasi:</strong> Diizinkan 1 lagu versi 1 jam (maks. 1 jam 10 menit). Lagu lainnya maksimal 10 menit.
+                            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> <strong>Ketentuan Durasi:</strong> Diizinkan 1 lagu versi 1 jam (maks. 1 jam 10 menit). Lagu lainnya maksimal 10 menit.
                         </div>
                     </div>
 
                     <!-- Live Media Preview Box -->
                     <div id="addPreviewBox" style="display:none; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px; padding:12px; align-items:center; gap:12px;">
                         <img id="addPreviewThumb" src="" alt="Preview Thumbnail" style="width:80px; height:54px; object-fit:cover; border-radius:6px; border:1px solid var(--app-border); display:none;">
-                        <div id="addPreviewIconBox" style="width:80px; height:54px; border-radius:6px; background:linear-gradient(135deg, #000 50%, #fe2c55 100%); display:none; align-items:center; justify-content:center; color:#fff; font-size:24px; border:1px solid #fe2c55; flex-shrink:0;">
-                            🎵
-                        </div>
+                        <div id="addPreviewIconBox" style="width:80px; height:54px; border-radius:6px; background:linear-gradient(135deg, #000 50%, #fe2c55 100%); display:none; align-items:center; justify-content:center; color:#fff; border:1px solid #fe2c55; flex-shrink:0;"><svg class="app-icon app-icon-md" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
                         <div style="min-width:0; flex:1;">
                             <div id="addPreviewTag" style="font-size:11px; font-weight:800; text-transform:uppercase;"></div>
                             <div id="addPreviewId" style="font-family:monospace; font-size:12px; font-weight:700; color:var(--app-text); word-break:break-all;"></div>
@@ -607,7 +595,7 @@
                         Batal
                     </button>
                     <button type="submit" id="btnAddTrackSubmit" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; padding:8px 20px; font-weight:800;">
-                        💾 Simpan ke Playlist
+                        <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan ke Playlist</span>
                     </button>
                 </div>
             </form>
@@ -624,11 +612,9 @@
         <div style="padding:20px 24px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                 <h3 id="editModalTitle" style="font-size:18px; font-weight:900; margin:0; display:flex; align-items:center; gap:8px;">
-                    <span>✏️</span> Edit Lagu Playlist
+                    <span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Lagu Playlist</span>
                 </h3>
-                <button type="button" onclick="closeEditTrackModal()" class="app-button" style="padding:4px 8px; font-size:14px; font-weight:900; border:none; background:transparent;">
-                    ✕
-                </button>
+                <button type="button" onclick="closeEditTrackModal()" class="app-button" style="padding:4px 8px; border:none; background:transparent; cursor:pointer;" aria-label="Tutup"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
             <form id="formEditTrack" onsubmit="submitEditTrack(event)">
@@ -682,7 +668,7 @@
                         Batal
                     </button>
                     <button type="submit" id="btnEditTrackSubmit" class="app-button app-button-primary" style="padding:8px 20px; font-weight:800;">
-                        💾 Simpan Perubahan
+                        <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan Perubahan</span>
                     </button>
                 </div>
             </form>
@@ -699,9 +685,7 @@
             <h3 id="previewVideoTitle" style="font-size:15px; font-weight:800; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:500px;">
                 Pratinjau Video YouTube
             </h3>
-            <button type="button" onclick="closePreviewVideoModal()" class="app-button" style="padding:4px 8px; font-weight:900; border:none; background:transparent;">
-                ✕
-            </button>
+            <button type="button" onclick="closePreviewVideoModal()" class="app-button" style="padding:4px 8px; border:none; background:transparent; cursor:pointer;" aria-label="Tutup"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
         <div style="position:relative; padding-bottom:56.25%; height:0; overflow:hidden; background:#000;">
             <iframe id="previewIframe" src="" style="position:absolute; top:0; left:0; width:100%; height:100%; border:0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
@@ -787,26 +771,26 @@
                 thumb.src = "https://img.youtube.com/vi/" + info.id + "/mqdefault.jpg";
                 thumb.style.display = 'block';
                 if (iconBox) iconBox.style.display = 'none';
-                tagEl.innerHTML = '<span style="color:#ef4444; font-weight:800;">✓ YouTube Terdeteksi (Auto)</span>';
+                tagEl.innerHTML = '<span style="color:#ef4444; font-weight:800; display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> YouTube Terdeteksi</span>';
                 idEl.textContent = "ID: " + info.id + " (https://youtube.com/watch?v=" + info.id + ")";
                 if (badge) {
                     badge.style.display = 'inline-block';
                     badge.style.background = 'rgba(239, 68, 68, 0.15)';
                     badge.style.color = '#ef4444';
                     badge.style.border = '1px solid #ef4444';
-                    badge.textContent = '📺 YouTube Terdeteksi';
+                    badge.textContent = '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg> YouTube Terdeteksi';
                 }
             } else if (info.platform === 'tiktok') {
                 thumb.style.display = 'none';
                 if (iconBox) iconBox.style.display = 'flex';
-                tagEl.innerHTML = '<span style="color:#00f2fe; font-weight:800;">✓ TikTok Terdeteksi (Auto)</span>';
+                tagEl.innerHTML = '<span style="color:#00f2fe; font-weight:800; display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> TikTok Terdeteksi</span>';
                 idEl.textContent = info.title;
                 if (badge) {
                     badge.style.display = 'inline-block';
                     badge.style.background = '#000';
                     badge.style.color = '#00f2fe';
                     badge.style.border = '1px solid #fe2c55';
-                    badge.textContent = '🎵 TikTok Terdeteksi';
+                    badge.textContent = '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> TikTok Terdeteksi';
                 }
             }
         } else {
@@ -865,7 +849,7 @@
             setTimeout(() => window.location.reload(), 600);
         } catch (err) {
             btn.disabled = false;
-            btn.textContent = "💾 Simpan ke Playlist";
+            btn.textContent = "<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan ke Playlist</span>";
             if (window.App && App.toast) App.toast.error(err.message);
             else alert(err.message);
         }
@@ -924,10 +908,10 @@
             if (artistEl) artistEl.textContent = artist || 'YouTube Audio';
             if (urlEl) urlEl.textContent = data.track.youtube_url || rawUrl;
             btn.disabled = false;
-            btn.textContent = "💾 Simpan Perubahan";
+            btn.textContent = "<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan Perubahan</span>";
         } catch (err) {
             btn.disabled = false;
-            btn.textContent = "💾 Simpan Perubahan";
+            btn.textContent = "<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan Perubahan</span>";
             if (window.App && App.toast) App.toast.error(err.message);
             else alert(err.message);
         }
@@ -1019,7 +1003,7 @@
         } else {
             const safeTitle = (title || '').replace(/'/g, "\\'");
             return `<button type="button" onclick="cacheSingleTrack(${trackId}, '${safeTitle}')" class="app-button" style="padding:3px 8px; font-size:11px; font-weight:700; color:var(--app-muted); border-radius:999px;" title="Klik untuk unduh audio ke server sekarang">
-                ⚡ Unduh Cache
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Unduh Cache
             </button>`;
         }
     }

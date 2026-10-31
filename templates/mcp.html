@@ -1246,7 +1246,7 @@ if (quickSaveLabelBtn) {
             const res = await fetch("/api/mcp/slots/update-label", { method: "POST", body: fd });
             const data = await res.json();
             if (res.ok && data.success) {
-                quickSaveLabelBtn.textContent = "✓ Tersimpan";
+                quickSaveLabelBtn.innerHTML = '<span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Tersimpan</span>';
                 setTimeout(() => { quickSaveLabelBtn.textContent = "Perbarui Nama"; }, 2000);
                 pollMcp();
             } else {

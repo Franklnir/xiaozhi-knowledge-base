@@ -83,82 +83,85 @@
     Object.keys(_pollers).forEach(stopPolling);
   }
 
-  /* ── Toast Notification ─────────────────────────────────── */
+  /* ── Modern Toast Notification System ─────────────────────── */
   let _toastContainer = null;
 
+  const _toastIcons = {
+    success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    error: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    warning: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    info: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+    close: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+  };
+
+  function _stripLeadingEmoji(text) {
+    if (!text || typeof text !== "string") return "";
+    return text.replace(/^[\s\u{1F300}-\u{1FAD6}\u{2600}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u2713\u2715\u26A0\u2705\u274C\u2139\u{1F389}\u{1F4E1}\u26A1\u{1F50C}\u{1F512}\u{1F513}\u25B6\u23F9\u{1F504}\u{1F4E4}\u{1F9F9}\u2B05\u2794\u2022\u2013\u2014\-:\s]+/u, "").trim() || text;
+  }
+
   function _ensureToastContainer() {
-    if (_toastContainer) return _toastContainer;
+    if (_toastContainer && document.body.contains(_toastContainer)) return _toastContainer;
     _toastContainer = document.createElement("div");
     _toastContainer.id = "app-toast-container";
+    _toastContainer.className = "app-toast-container";
     _toastContainer.setAttribute("aria-live", "polite");
     _toastContainer.setAttribute("aria-atomic", "true");
-    Object.assign(_toastContainer.style, {
-      position: "fixed",
-      top: "16px",
-      right: "16px",
-      zIndex: "10000",
-      display: "flex",
-      flexDirection: "column",
-      gap: "8px",
-      maxWidth: "380px",
-      pointerEvents: "none",
-    });
     document.body.appendChild(_toastContainer);
     return _toastContainer;
   }
 
-  function _toastStyle(type) {
-    const base = {
-      padding: "12px 16px",
-      borderRadius: "var(--app-radius, 8px)",
-      fontSize: "14px",
-      fontWeight: "500",
-      lineHeight: "1.4",
-      boxShadow: "var(--app-shadow, 0 4px 12px rgba(0,0,0,.15))",
-      pointerEvents: "auto",
-      transform: "translateX(120%)",
-      transition: "transform .25s ease, opacity .25s ease",
-      opacity: "0",
-      cursor: "pointer",
-    };
-    const colors = {
-      success: { background: "#059669", color: "#fff" },
-      error: { background: "#dc2626", color: "#fff" },
-      warning: { background: "#d97706", color: "#fff" },
-      info: { background: "var(--app-sky, #0284c7)", color: "#fff" },
-    };
-    return { ...base, ...(colors[type] || colors.info) };
-  }
-
   function toast(message, type, durationMs) {
     type = type || "info";
-    durationMs = durationMs || 3500;
+    durationMs = durationMs || (type === "error" ? 5000 : 3800);
     const container = _ensureToastContainer();
     const el = document.createElement("div");
-    el.textContent = message;
-    Object.assign(el.style, _toastStyle(type));
+    el.className = "app-toast-item app-toast-" + type;
     el.setAttribute("role", "status");
-    el.addEventListener("click", function () {
-      el.style.opacity = "0";
-      el.style.transform = "translateX(120%)";
+
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "app-toast-icon-wrap";
+    iconWrap.innerHTML = _toastIcons[type] || _toastIcons.info;
+
+    const content = document.createElement("div");
+    content.className = "app-toast-content";
+    content.textContent = _stripLeadingEmoji(message);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "app-toast-close";
+    closeBtn.setAttribute("aria-label", "Tutup");
+    closeBtn.innerHTML = _toastIcons.close;
+
+    el.appendChild(iconWrap);
+    el.appendChild(content);
+    el.appendChild(closeBtn);
+
+    let dismissed = false;
+    function dismiss() {
+      if (dismissed) return;
+      dismissed = true;
+      el.classList.add("is-dismissing");
       setTimeout(function () {
-        el.remove();
-      }, 300);
+        if (el.parentNode) el.remove();
+      }, 260);
+    }
+
+    closeBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      dismiss();
     });
+    el.addEventListener("click", dismiss);
+
     container.appendChild(el);
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
-        el.style.transform = "translateX(0)";
-        el.style.opacity = "1";
+        el.classList.add("is-visible");
       });
     });
-    setTimeout(function () {
-      el.style.opacity = "0";
-      el.style.transform = "translateX(120%)";
-      setTimeout(function () {
-        el.remove();
-      }, 300);
-    }, durationMs);
+
+    if (durationMs > 0) {
+      setTimeout(dismiss, durationMs);
+    }
   }
 
   toast.success = function (msg, dur) { toast(msg, "success", dur); };

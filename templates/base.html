@@ -1877,6 +1877,213 @@
             0% { background-position: 100% 0; }
             100% { background-position: -100% 0; }
         }
+
+        /* Universal Crisp Vector Icons */
+        .app-icon {
+            display: inline-block;
+            vertical-align: -0.15em;
+            width: 1.15em;
+            height: 1.15em;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
+        }
+        .app-icon-xs { width: 13px; height: 13px; }
+        .app-icon-sm { width: 15px; height: 15px; }
+        .app-icon-md { width: 18px; height: 18px; }
+        .app-icon-lg { width: 22px; height: 22px; }
+        .app-icon-xl { width: 28px; height: 28px; }
+
+        /* Modern Toast Notification Cards */
+        .app-toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 400px;
+            width: calc(100% - 40px);
+            pointer-events: none;
+        }
+        .app-toast-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 15px;
+            border-radius: var(--app-radius, 10px);
+            font-size: 13.5px;
+            line-height: 1.45;
+            font-weight: 600;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.14), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            pointer-events: auto;
+            transform: translateX(120%);
+            opacity: 0;
+            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease;
+            cursor: pointer;
+            border: 1px solid transparent;
+            user-select: none;
+        }
+        .app-toast-item.is-visible {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        .app-toast-item.is-dismissing {
+            transform: translateX(120%);
+            opacity: 0;
+        }
+        .app-toast-icon-wrap {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .app-toast-content {
+            flex: 1;
+            word-break: break-word;
+        }
+        .app-toast-close {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            opacity: 0.55;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            color: inherit;
+            padding: 0;
+            border-radius: 4px;
+        }
+        .app-toast-close:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        /* Toast Themes: Original Light */
+        .app-toast-success {
+            background: #ffffff;
+            color: #065f46;
+            border-color: #a7f3d0;
+            border-left: 4px solid #059669;
+        }
+        .app-toast-success .app-toast-icon-wrap {
+            background: #ecfdf5;
+            color: #059669;
+            border: 1px solid #a7f3d0;
+        }
+
+        .app-toast-error {
+            background: #ffffff;
+            color: #991b1b;
+            border-color: #fecaca;
+            border-left: 4px solid #dc2626;
+        }
+        .app-toast-error .app-toast-icon-wrap {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .app-toast-warning {
+            background: #ffffff;
+            color: #92400e;
+            border-color: #fde68a;
+            border-left: 4px solid #d97706;
+        }
+        .app-toast-warning .app-toast-icon-wrap {
+            background: #fffbeb;
+            color: #d97706;
+            border: 1px solid #fde68a;
+        }
+
+        .app-toast-info {
+            background: #ffffff;
+            color: #075985;
+            border-color: #bae6fd;
+            border-left: 4px solid #0284c7;
+        }
+        .app-toast-info .app-toast-icon-wrap {
+            background: #f0f9ff;
+            color: #0284c7;
+            border: 1px solid #bae6fd;
+        }
+
+        /* Toast: Dark Theme */
+        :root[data-theme="dark"] .app-toast-item {
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+        }
+        :root[data-theme="dark"] .app-toast-success {
+            background: #13241b;
+            color: #a7f3d0;
+            border-color: #065f46;
+            border-left-color: #10b981;
+        }
+        :root[data-theme="dark"] .app-toast-success .app-toast-icon-wrap {
+            background: #064e3b;
+            color: #34d399;
+            border-color: #059669;
+        }
+        :root[data-theme="dark"] .app-toast-error {
+            background: #271415;
+            color: #fecaca;
+            border-color: #7f1d1d;
+            border-left-color: #ef4444;
+        }
+        :root[data-theme="dark"] .app-toast-error .app-toast-icon-wrap {
+            background: #450a0a;
+            color: #f87171;
+            border-color: #991b1b;
+        }
+        :root[data-theme="dark"] .app-toast-warning {
+            background: #271d0e;
+            color: #fde68a;
+            border-color: #78350f;
+            border-left-color: #f59e0b;
+        }
+        :root[data-theme="dark"] .app-toast-warning .app-toast-icon-wrap {
+            background: #451a03;
+            color: #fbbf24;
+            border-color: #b45309;
+        }
+        :root[data-theme="dark"] .app-toast-info {
+            background: #111f2d;
+            color: #bae6fd;
+            border-color: #0c4a6e;
+            border-left-color: #38bdf8;
+        }
+        :root[data-theme="dark"] .app-toast-info .app-toast-icon-wrap {
+            background: #082f49;
+            color: #38bdf8;
+            border-color: #0369a1;
+        }
+
+        /* Toast: Neo-Brutalism Theme */
+        :root[data-theme="neo"] .app-toast-item {
+            border: 2.5px solid #111827 !important;
+            box-shadow: 4px 4px 0 #111827 !important;
+            border-radius: 6px;
+        }
+        :root[data-theme="neo"] .app-toast-success { background: #ffffff; color: #111827; }
+        :root[data-theme="neo"] .app-toast-success .app-toast-icon-wrap { background: #10b981; color: #ffffff; border: 1.5px solid #111827; }
+        :root[data-theme="neo"] .app-toast-error { background: #ffffff; color: #111827; }
+        :root[data-theme="neo"] .app-toast-error .app-toast-icon-wrap { background: #ef4444; color: #ffffff; border: 1.5px solid #111827; }
+        :root[data-theme="neo"] .app-toast-warning { background: #ffffff; color: #111827; }
+        :root[data-theme="neo"] .app-toast-warning .app-toast-icon-wrap { background: #f59e0b; color: #ffffff; border: 1.5px solid #111827; }
+        :root[data-theme="neo"] .app-toast-info { background: #ffffff; color: #111827; }
+        :root[data-theme="neo"] .app-toast-info .app-toast-icon-wrap { background: #0284c7; color: #ffffff; border: 1.5px solid #111827; }
     </style>
     <script src="/static/js/app.js"></script>
 </head>
@@ -1905,12 +2112,10 @@
             </div>
             <div class="pwa-banner-actions">
                 <button type="button" id="pwaInstallBtn" class="pwa-btn-install" onclick="window.triggerPwaInstall()">
-                    <span class="pwa-btn-icon">⚡</span>
+                    <span class="pwa-btn-icon"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
                     <span>Pasang Aplikasi</span>
                 </button>
-                <button type="button" class="pwa-btn-dismiss" onclick="window.dismissPwaBanner()" title="Tutup" aria-label="Tutup Banner">
-                    ✕
-                </button>
+                <button type="button" class="pwa-btn-dismiss" onclick="window.dismissPwaBanner()" title="Tutup" aria-label="Tutup Banner"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
         </div>
     </aside>
@@ -1920,12 +2125,12 @@
         <div class="pwa-guide-backdrop" onclick="window.closePwaGuide()"></div>
         <div class="pwa-guide-box">
             <div class="pwa-guide-header">
-                <div class="pwa-guide-icon">📲</div>
+                <div class="pwa-guide-icon"><svg class="app-icon app-icon-xl" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div>
                 <div>
                     <h3 id="pwaGuideTitle" class="pwa-guide-heading">Pasang Xiaozhi AI di Layar Utama</h3>
                     <p class="pwa-guide-sub">Akses instan seperti aplikasi native tanpa perlu membuka browser lagi.</p>
                 </div>
-                <button type="button" class="pwa-guide-close" onclick="window.closePwaGuide()" aria-label="Tutup Dialog">✕</button>
+                <button type="button" class="pwa-guide-close" onclick="window.closePwaGuide()" aria-label="Tutup Dialog"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             
             <!-- Petunjuk Safari iOS -->
@@ -1933,13 +2138,13 @@
                 <div class="pwa-step-item">
                     <div class="pwa-step-num">1</div>
                     <div class="pwa-step-text">
-                        Ketuk ikon <strong>Bagikan / Share</strong> (<span style="font-size:16px;">⎋</span> / <span>📤</span>) di bilah bawah browser Safari Anda.
+                        Ketuk ikon <strong>Bagikan / Share</strong> (<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>) di bilah bawah browser Safari Anda.
                     </div>
                 </div>
                 <div class="pwa-step-item">
                     <div class="pwa-step-num">2</div>
                     <div class="pwa-step-text">
-                        Geser ke bawah dan pilih <strong>"Tambahkan ke Layar Utama"</strong> (<em>Add to Home Screen</em> ➕).
+                        Geser ke bawah dan pilih <strong>"Tambahkan ke Layar Utama"</strong> (<em>Add to Home Screen</em> <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>).
                     </div>
                 </div>
                 <div class="pwa-step-item">
@@ -1974,7 +2179,7 @@
 
             <div class="pwa-guide-footer">
                 <button type="button" class="pwa-btn-understand" onclick="window.closePwaGuide()">
-                    Mengerti, Saya Pasang Sekarang 👍
+                    Mengerti, Saya Pasang Sekarang
                 </button>
             </div>
         </div>
@@ -1989,12 +2194,12 @@
                 <div class="mcp-radar-ring ring-1"></div>
                 <div class="mcp-radar-ring ring-2"></div>
                 <div class="mcp-radar-ring ring-3"></div>
-                <div class="mcp-radar-core" id="reqOverlayCoreIcon">🔌</div>
+                <div class="mcp-radar-core" id="reqOverlayCoreIcon"><svg class="app-icon" style="width:28px;height:28px;" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M7 8h10a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3z"/><path d="M12 16v6"/><path d="M8 2v2"/><path d="M16 2v2"/></svg></div>
             </div>
 
             <!-- Compact Badge -->
             <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:#fef3c7; color:#92400e; border:2px solid #d97706; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:12px;">
-                <span>⚠️</span> KONEKSI MCP WAJIB
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> KONEKSI MCP WAJIB
             </div>
 
             <!-- Header -->
@@ -2019,14 +2224,7 @@
                             style="width:100%; font-family:monospace; font-size:12.5px; padding-right:42px; box-sizing:border-box;"
                             onkeydown="if(event.key==='Enter') window.submitMcpDirect('reqOverlay')"
                         >
-                        <button 
-                            type="button" 
-                            onclick="if(navigator.clipboard){navigator.clipboard.readText().then(t=>{document.getElementById('reqOverlayMcpInput').value=t.trim()}).catch(()=>{})}" 
-                            title="Tempel dari Clipboard"
-                            style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; font-size:16px; opacity:0.75;"
-                        >
-                            📋
-                        </button>
+                        <button type="button" onclick="if(navigator.clipboard){navigator.clipboard.readText().then(t=>{document.getElementById(\'reqOverlayMcpInput\').value=t.trim()}).catch(()=>{})}" title="Tempel dari Clipboard" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; opacity:0.75; display:flex; align-items:center; justify-content:center; color:var(--app-muted);"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></button>
                     </div>
                     <div id="reqOverlayErrorMsg" style="display:none; color:#dc2626; font-size:12px; font-weight:700; padding:2px 4px;"></div>
                     <button 
@@ -2036,7 +2234,7 @@
                         class="app-button app-button-primary" 
                         style="width:100%; font-size:14px; font-weight:800; padding:11px 18px; justify-content:center; border:2px solid #111827; box-shadow:3px 3px 0 #111827; background:#047857; color:#fff;"
                     >
-                        ⚡ Hubungkan Sekarang
+                        <span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Hubungkan Sekarang</span>
                     </button>
                 </div>
             </div>
@@ -2055,13 +2253,13 @@
             <!-- Action Navigation Links -->
             <div style="display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap;">
                 <a href="/dokumentasi" class="app-button" style="flex:1; min-width:130px; font-size:12.5px; font-weight:800; padding:9px 12px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); background:var(--app-surface-muted);">
-                    📖 Dokumentasi
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> Dokumentasi</span>
                 </a>
                 <a href="/web-flasher" class="app-button" style="flex:1; min-width:130px; font-size:12.5px; font-weight:800; padding:9px 12px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); background:var(--app-surface-muted);">
-                    ⚡ Web Flasher
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Web Flasher</span>
                 </a>
                 <a href="/logout" class="app-button" style="font-size:12.5px; font-weight:700; padding:9px 14px; text-decoration:none; justify-content:center; border:2px solid var(--app-border-strong); color:#dc2626;">
-                    🚪 Keluar
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Keluar</span>
                 </a>
             </div>
         </div>
@@ -2076,12 +2274,12 @@
                 <div class="mcp-radar-ring ring-1"></div>
                 <div class="mcp-radar-ring ring-2"></div>
                 <div class="mcp-radar-ring ring-3"></div>
-                <div class="mcp-radar-core" id="clickModalCoreIcon">🔒</div>
+                <div class="mcp-radar-core" id="clickModalCoreIcon"><svg class="app-icon" style="width:28px;height:28px;" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
             </div>
 
             <!-- Compact Badge -->
             <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:#fef3c7; color:#92400e; border:2px solid #d97706; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:12px;">
-                <span>⚠️</span> KONEKSI MCP DIPERLUKAN
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> KONEKSI MCP DIPERLUKAN
             </div>
 
             <!-- Header -->
@@ -2106,14 +2304,7 @@
                             style="width:100%; font-family:monospace; font-size:12.5px; padding-right:42px; box-sizing:border-box;"
                             onkeydown="if(event.key==='Enter') window.submitMcpDirect('clickModal')"
                         >
-                        <button 
-                            type="button" 
-                            onclick="if(navigator.clipboard){navigator.clipboard.readText().then(t=>{document.getElementById('clickModalMcpInput').value=t.trim()}).catch(()=>{})}" 
-                            title="Tempel dari Clipboard"
-                            style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; font-size:16px; opacity:0.75;"
-                        >
-                            📋
-                        </button>
+                        <button type="button" onclick="if(navigator.clipboard){navigator.clipboard.readText().then(t=>{document.getElementById(\'reqOverlayMcpInput\').value=t.trim()}).catch(()=>{})}" title="Tempel dari Clipboard" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; opacity:0.75; display:flex; align-items:center; justify-content:center; color:var(--app-muted);"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></button>
                     </div>
                     <div id="clickModalErrorMsg" style="display:none; color:#dc2626; font-size:12px; font-weight:700; padding:2px 4px;"></div>
                     <button 
@@ -2123,7 +2314,7 @@
                         class="app-button app-button-primary" 
                         style="width:100%; font-size:14px; font-weight:800; padding:11px 18px; justify-content:center; border:2px solid #111827; box-shadow:3px 3px 0 #111827;"
                     >
-                        ⚡ Hubungkan Sekarang
+                        <span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Hubungkan Sekarang</span>
                     </button>
                 </div>
             </div>
@@ -2152,13 +2343,11 @@
     <div class="mcp-blocking-overlay" id="playlistFirmwareModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="playlistFirmwareModalTitle">
         <div class="mcp-blocking-box" style="max-width:480px; text-align:center;">
             <!-- Icon with music & youtube vibe -->
-            <div style="width:68px; height:68px; border-radius:50%; background:linear-gradient(135deg, rgba(239,68,68,0.15), rgba(249,115,22,0.15)); border:2px solid #ef4444; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; font-size:32px; box-shadow:0 0 20px rgba(239,68,68,0.25);">
-                🎵
-            </div>
+            <div style="width:68px; height:68px; border-radius:50%; background:linear-gradient(135deg, rgba(239,68,68,0.15), rgba(249,115,22,0.15)); border:2px solid #ef4444; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; box-shadow:0 0 20px rgba(239,68,68,0.25); color:#ef4444;"><svg class="app-icon" style="width:32px;height:32px;" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
 
             <!-- Compact Badge -->
             <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:#fef2f2; color:#b91c1c; border:1.5px solid #f87171; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:12px;">
-                <span>📢</span> PEMBERITAHUAN FITUR PLAYLIST
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> PEMBERITAHUAN FITUR PLAYLIST
             </div>
 
             <!-- Header -->
@@ -2169,7 +2358,7 @@
             <!-- Exact requested notification text in high-contrast callout -->
             <div style="background:rgba(239,68,68,0.08); border:2px dashed #ef4444; border-radius:12px; padding:14px 16px; margin:0 0 16px; text-align:center;">
                 <p style="font-size:13.5px; font-weight:800; color:#ef4444; margin:0; line-height:1.5;">
-                    ⚠️ menu ini berfungsi untuk firmware yang udah support putar lagu via youtube
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Menu ini berfungsi untuk firmware yang sudah support putar lagu via YouTube &amp; TikTok</span>
                 </p>
             </div>
 
@@ -2179,7 +2368,7 @@
 
             <div style="display:flex; flex-direction:column; gap:10px;">
                 <button type="button" onclick="window.proceedToPlaylist()" class="app-button app-button-primary app-button-full" style="background:#ef4444; border-color:#b91c1c; padding:10px 16px; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px;">
-                    <span>▶️</span> Lanjutkan ke Playlist
+                    <svg class="app-icon app-icon-sm" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg> Lanjutkan ke Playlist
                 </button>
                 <button type="button" onclick="window.closePlaylistFirmwareModal()" class="app-button app-button-full" style="padding:8px 16px; font-size:13px;">
                     Tutup
@@ -2246,12 +2435,12 @@
             <a href="/relay-nyata" class="app-sidebar-link {% if page in ['relay_nyata', 'smarthome'] or active_page in ['relay_nyata', 'smarthome'] %}is-active{% endif %}">
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
                 Relay Nyata
-                {% if user and user.role != 'admin' and not mcp_connected %}<span class="app-mcp-lock-badge">🔒 Perlu MCP</span>{% endif %}
+                {% if user and user.role != 'admin' and not mcp_connected %}<span class="app-mcp-lock-badge"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Perlu MCP</span>{% endif %}
             </a>
             <a href="/riwayat-chat" class="app-sidebar-link {% if page == 'chat_history' %}is-active{% endif %}">
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
                 Riwayat Chat
-                {% if user and user.role != 'admin' and not mcp_connected %}<span class="app-mcp-lock-badge">🔒 Perlu MCP</span>{% endif %}
+                {% if user and user.role != 'admin' and not mcp_connected %}<span class="app-mcp-lock-badge"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Perlu MCP</span>{% endif %}
             </a>
             <a href="/playlist" class="app-sidebar-link {% if page == 'playlist' or active_page == 'playlist' %}is-active{% endif %}" onclick="return handlePlaylistNav(event);" id="navPlaylistLink">
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></span>
@@ -2341,7 +2530,7 @@
                 <div class="app-sidebar-avatar">{{ user.username[0]|upper }}</div>
                 <div>
                     <div class="app-sidebar-username">{{ user.username }}</div>
-                    <div class="app-sidebar-role">{{ user.role|capitalize }} {% if user and user.role != 'admin' and not mcp_connected %}<span title="Koneksi MCP Diperlukan">🔒</span>{% endif %}</div>
+                    <div class="app-sidebar-role">{{ user.role|capitalize }} {% if user and user.role != 'admin' and not mcp_connected %}<span title="Koneksi MCP Diperlukan"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>{% endif %}</div>
                 </div>
             </a>
             <select id="themeSelect" class="app-input" style="font-size:12px; padding:6px 8px; min-height:32px" aria-label="Tema">
@@ -2366,7 +2555,7 @@
         </a>
         <div class="app-guest-nav">
             <a href="/firmware/marketplace" class="app-button" style="text-decoration:none;">Marketplace</a>
-            <a href="/web-flasher" class="app-button" style="text-decoration:none;">⚡ Flasher</a>
+            <a href="/web-flasher" class="app-button" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Flasher</a>
             <a href="/dokumentasi" class="app-button" style="text-decoration:none;">Dokumentasi</a>
             <a href="/login" class="app-button app-button-primary" style="text-decoration:none;">Masuk</a>
         </div>
@@ -2508,7 +2697,7 @@
                 radar.classList.add('is-connecting');
                 radar.classList.remove('is-connected');
             }
-            if (coreIcon) coreIcon.textContent = '📡';
+            if (coreIcon) coreIcon.innerHTML = '<svg class="app-icon" style="width:28px;height:28px;" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M7 8h10a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3z"/><path d="M12 16v6"/><path d="M8 2v2"/><path d="M16 2v2"/></svg>';
 
             try {
                 const csrfToken = {{ csrf_token|tojson }};
@@ -2532,7 +2721,7 @@
                         radar.classList.remove('is-connecting');
                         radar.classList.add('is-connected');
                     }
-                    if (coreIcon) coreIcon.textContent = '✅';
+                    if (coreIcon) coreIcon.innerHTML = '<svg class="app-icon" style="width:30px;height:30px;color:#059669;" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
 
                     // Hide spinner and shimmer bar immediately
                     const spinner = connPanel ? connPanel.querySelector('.mcp-tech-spinner') : null;
@@ -2541,10 +2730,10 @@
                     if (shimmer) shimmer.style.display = 'none';
 
                     if (statusText) {
-                        statusText.innerHTML = '<span style="color:#059669; font-weight:900;">🎉 Berhasil Terhubung ke XiaoZhi!</span>';
+                        statusText.innerHTML = '<span style="color:#059669; font-weight:800; display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Berhasil Terhubung ke XiaoZhi!</span>';
                     }
                     if (submitBtn) {
-                        submitBtn.textContent = '✅ Terhubung! Membuka Halaman...';
+                        submitBtn.innerHTML = '<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Terhubung! Membuka Halaman...</span>';
                         submitBtn.style.background = '#059669';
                         submitBtn.style.borderColor = '#047857';
                         submitBtn.style.color = '#fff';
@@ -2586,12 +2775,12 @@
                     if (attempts >= 40) { // 16s
                         clearInterval(pollTimer);
                         if (radar) radar.classList.remove('is-connecting');
-                        if (coreIcon) coreIcon.textContent = prefix === 'reqOverlay' ? '🔌' : '🔒';
+                        if (coreIcon) coreIcon.innerHTML = prefix === 'reqOverlay' ? '<svg class="app-icon" style="width:28px;height:28px;" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M7 8h10a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3z"/><path d="M12 16v6"/><path d="M8 2v2"/><path d="M16 2v2"/></svg>' : '<svg class="app-icon" style="width:28px;height:28px;" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
                         if (connPanel) connPanel.style.display = 'none';
                         if (input) input.disabled = false;
                         if (submitBtn) {
                             submitBtn.disabled = false;
-                            submitBtn.textContent = '⚡ Hubungkan Sekarang';
+                            submitBtn.innerHTML = '<span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Hubungkan Sekarang</span>';
                             submitBtn.style.opacity = '1';
                         }
                         if (errorEl) {
@@ -2603,12 +2792,12 @@
 
             } catch (err) {
                 if (radar) radar.classList.remove('is-connecting');
-                if (coreIcon) coreIcon.textContent = prefix === 'reqOverlay' ? '🔌' : '🔒';
+                if (coreIcon) coreIcon.innerHTML = prefix === 'reqOverlay' ? '<svg class="app-icon" style="width:28px;height:28px;" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="M7 8h10a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3z"/><path d="M12 16v6"/><path d="M8 2v2"/><path d="M16 2v2"/></svg>' : '<svg class="app-icon" style="width:28px;height:28px;" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
                 if (connPanel) connPanel.style.display = 'none';
                 if (input) input.disabled = false;
                 if (submitBtn) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = '⚡ Hubungkan Sekarang';
+                    submitBtn.innerHTML = '<span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Hubungkan Sekarang</span>';
                     submitBtn.style.opacity = '1';
                 }
                 if (errorEl) {
@@ -2759,14 +2948,12 @@
             <div style="height:6px; background:linear-gradient(90deg, #10b981, #0284c7, #f59e0b);"></div>
             
             <!-- Close Button -->
-            <button type="button" onclick="window.closeMobileAppModal()" style="position:absolute; top:14px; right:14px; width:34px; height:34px; border:2px solid #111; border-radius:8px; background:var(--app-surface); cursor:pointer; font-size:16px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 #111; z-index:10;" aria-label="Tutup Modal">
-                ✕
-            </button>
+            <button type="button" onclick="window.closeMobileAppModal()" style="position:absolute; top:14px; right:14px; width:34px; height:34px; border:2px solid #111; border-radius:8px; background:var(--app-surface); cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 #111; z-index:10;" aria-label="Tutup Modal"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
 
             <div style="padding:24px 28px;">
                 <!-- Header Badge -->
                 <div style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:#d1fae5; color:#065f46; border:2px solid #047857; border-radius:99px; font-size:11.5px; font-weight:900; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:12px;">
-                    <span>⌚</span> APLIKASI RESMI APP CHRONOS
+                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> APLIKASI RESMI APP CHRONOS
                 </div>
 
                 <div style="display:flex; flex-wrap:wrap; gap:24px; align-items:center;">
@@ -2783,7 +2970,7 @@
                         <!-- PEMBERITAHUAN LISENSI RESMI -->
                         <div style="background:#fff1f2; border:2px solid #e11d48; border-radius:10px; padding:10px 14px; margin-bottom:14px; box-shadow:2px 2px 0 #111;">
                             <div style="display:flex; align-items:center; gap:6px; color:#be123c; font-size:12px; font-weight:900; margin-bottom:3px;">
-                                <span>⚠️</span> PERHATIAN: DUKUNGAN LISENSI FIRMWARE
+                                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> PERHATIAN: DUKUNGAN LISENSI FIRMWARE
                             </div>
                             <p style="font-size:11.5px; line-height:1.5; color:#881337; margin:0;">
                                 Aplikasi <strong>App Chronos</strong> ini <strong>HANYA support untuk firmware berlisensi resmi xiaozhiscig.biz.id</strong>. Fitur sinkronisasi BLE tidak akan aktif pada firmware tanpa lisensi.
@@ -2792,31 +2979,31 @@
 
                         <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
                             <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--app-text);">
-                                <span style="color:#10b981; font-weight:900;">✓</span> Login Terpadu & Google Sign-In
+                                <svg class="app-icon app-icon-sm" style="color:#10b981;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Login Terpadu & Google Sign-In
                             </div>
                             <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--app-text);">
-                                <span style="color:#10b981; font-weight:900;">✓</span> Auto-Connect Bluetooth BLE ESP32
+                                <svg class="app-icon app-icon-sm" style="color:#10b981;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Auto-Connect Bluetooth BLE ESP32
                             </div>
                             <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--app-text);">
-                                <span style="color:#10b981; font-weight:900;">✓</span> Realtime Saklar IoT & Dual Mode Smart Home (Baru di v1.4.8)
+                                <svg class="app-icon app-icon-sm" style="color:#10b981;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Realtime Saklar IoT & Dual Mode Smart Home (Baru di v1.4.8)
                             </div>
                             <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--app-text);">
-                                <span style="color:#10b981; font-weight:900;">✓</span> 100% Gratis, Cepat & Tanpa Iklan
+                                <svg class="app-icon app-icon-sm" style="color:#10b981;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> 100% Gratis, Cepat & Tanpa Iklan
                             </div>
                         </div>
 
                         <div style="display:flex; flex-direction:column; gap:8px;">
                             <a href="/download/app" download="espbridge-xiaozhi-v1.4.8.apk" class="app-button app-button-primary" style="background:#047857; color:#fff; font-size:13.5px; font-weight:900; padding:12px 18px; border:2px solid #111; box-shadow:3px 3px 0 #111; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:10px;">
-                                <span>⬇️</span> Unduh File APK v1.4.8 (~44 MB)
+                                <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Unduh File APK v1.4.8 (~44 MB)
                             </a>
                             <a href="/download/app.zip" download="espbridge-xiaozhi-v1.4.8.zip" class="app-button" style="background:#0284c7; color:#fff; font-size:12.5px; font-weight:800; padding:9px 14px; border:2px solid #111; box-shadow:2.5px 2.5px 0 #111; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:10px;">
-                                <span>📦</span> Unduh File ZIP Anti-Macet (~33 MB)
+                                <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Unduh File ZIP Anti-Macet (~33 MB)
                             </a>
                             <a href="/app-chronos" class="app-button" style="background:var(--app-surface); color:var(--app-text); font-size:12px; font-weight:800; padding:9px 14px; border:2px solid #111; box-shadow:2.5px 2.5px 0 #111; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:10px;">
-                                <span>📖</span> Buka Halaman Lengkap & Panduan App Chronos
+                                <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> Buka Halaman Lengkap &amp; Panduan App Chronos
                             </a>
                             <div style="font-size:10.5px; line-height:1.4; color:var(--app-muted); background:var(--app-surface-soft, #f1f5f9); border:1px dashed var(--app-border, #cbd5e1); border-radius:8px; padding:6px 10px;">
-                                💡 <strong>Info:</strong> Jika Chrome/Brave di HP Anda berhenti di 100% (stuck verifikasi browser), silakan pilih <strong>Unduh File ZIP</strong> (buka/ekstrak lalu pasang APK langsung).
+                                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> <strong>Info:</strong> Jika Chrome/Brave di HP Anda berhenti di 100% (stuck verifikasi browser), silakan pilih <strong>Unduh File ZIP</strong> (buka/ekstrak lalu pasang APK langsung).
                             </div>
                             <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--app-muted); padding:0 2px;">
                                 <span>Versi: <strong style="color:var(--app-text);">v1.4.8 (Build 15)</strong></span>
@@ -2829,7 +3016,7 @@
                     <!-- Right Column: Barcode / QR Code Card -->
                     <div style="flex:0 0 200px; margin:0 auto; background:#f8fafc; border:2px solid #111; border-radius:14px; padding:14px; text-align:center; box-shadow:4px 4px 0 #111;">
                         <div style="font-size:12px; font-weight:900; color:#111; margin-bottom:10px; display:flex; align-items:center; justify-content:center; gap:4px;">
-                            <span>📸</span> Scan Barcode HP
+                            <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> Scan Barcode HP
                         </div>
                         <div style="background:#fff; padding:8px; border:1.5px solid #111; border-radius:10px; display:inline-block;">
                             <img id="mobileAppQrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&ecc=M&data=https%3A%2F%2Fxiaozhiscig.biz.id%2Fdownload%2Fapp" onerror="this.src='/download/qr.png'" alt="Barcode Download APK v1.4.7" style="width:140px; height:140px; display:block; border-radius:4px;">
@@ -2873,19 +3060,19 @@
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     {% if active_announcement.category == 'warning' %}
                     <span class="app-chip" style="font-size:11.5px; font-weight:900; background:#fef08a; color:#854d0e; border:1.5px solid #111; box-shadow:1.5px 1.5px 0 #111; padding:3px 9px; border-radius:6px;">
-                        ⚠️ PENGUMUMAN PENTING
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> PENGUMUMAN PENTING
                     </span>
                     {% elif active_announcement.category == 'update' %}
                     <span class="app-chip" style="font-size:11.5px; font-weight:900; background:#86efac; color:#14532d; border:1.5px solid #111; box-shadow:1.5px 1.5px 0 #111; padding:3px 9px; border-radius:6px;">
-                        🚀 PEMBARUAN SISTEM
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> PEMBARUAN SISTEM
                     </span>
                     {% elif active_announcement.category == 'maintenance' %}
                     <span class="app-chip" style="font-size:11.5px; font-weight:900; background:#fecdd3; color:#9f1239; border:1.5px solid #111; box-shadow:1.5px 1.5px 0 #111; padding:3px 9px; border-radius:6px;">
-                        🔧 PEMELIHARAAN SERVER
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> PEMELIHARAAN SERVER
                     </span>
                     {% else %}
                     <span class="app-chip" style="font-size:11.5px; font-weight:900; background:#bae6fd; color:#0369a1; border:1.5px solid #111; box-shadow:1.5px 1.5px 0 #111; padding:3px 9px; border-radius:6px;">
-                        📢 INFORMASI PENGUMUMAN
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> INFORMASI PENGUMUMAN
                     </span>
                     {% endif %}
                     {% if active_announcement.updated_at %}
@@ -2894,9 +3081,7 @@
                     </span>
                     {% endif %}
                 </div>
-                <button type="button" onclick="closeAnnouncementModal()" style="background:var(--app-surface); border:2px solid #111; border-radius:8px; width:32px; height:32px; cursor:pointer; font-size:16px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 #111;" aria-label="Tutup Pengumuman">
-                    &times;
-                </button>
+                <button type="button" onclick="closeAnnouncementModal()" style="background:var(--app-surface); border:2px solid #111; border-radius:8px; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 0 #111;" aria-label="Tutup Pengumuman"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
             <!-- Title -->
@@ -2910,7 +3095,7 @@
             <!-- Footer Button -->
             <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px;">
                 <button type="button" onclick="closeAnnouncementModal()" class="app-button app-button-primary" style="background:#ffe600; color:#111; font-weight:900; font-size:13.5px; padding:10px 24px; border:2px solid #111; box-shadow:3px 3px 0 #111; border-radius:10px; cursor:pointer;">
-                    ✓ Saya Mengerti
+                    <span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Saya Mengerti</span>
                 </button>
             </div>
         </div>

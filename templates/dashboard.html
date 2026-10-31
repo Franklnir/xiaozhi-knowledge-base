@@ -529,7 +529,7 @@
                     <p class="text-xs text-slate-700">Asisten suara Xiaozhi belum dapat membaca materi atau mengontrol perangkat hingga endpoint MCP Anda terhubung.</p>
                 </div>
             </div>
-            <a href="#mcpCard" class="rounded-lg border-2 border-black bg-amber-300 px-3.5 py-1.5 text-xs font-black text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-amber-400 text-center whitespace-nowrap">Hubungkan Sekarang ➔</a>
+            <a href="#mcpCard" class="rounded-lg border-2 border-black bg-amber-300 px-3.5 py-1.5 text-xs font-black text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-amber-400 text-center whitespace-nowrap">Hubungkan Sekarang <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
         </div>
     </div>
     {% endif %}
@@ -666,16 +666,16 @@
                 <div class="flex items-center gap-2 w-full sm:w-auto">
                     <select id="filterCategory" onchange="filterTable()" class="app-select w-full sm:w-48" style="font-size:13px;">
                         <option value="all">Semua Kategori</option>
-                        <optgroup label="📂 Kategori Reguler">
+                        <optgroup label="Kategori Reguler">
                             {% for cat in categories if cat.name|trim|lower != 'data dari api' %}
                             <option value="{{ cat.name }}">{{ cat.name }}</option>
                             {% endfor %}
                         </optgroup>
-                        <optgroup label="⚡ Khusus Realtime API">
-                            <option value="data dari api">⚡ data dari api</option>
+                        <optgroup label="Khusus Realtime API">
+                            <option value="data dari api">data dari api</option>
                         </optgroup>
-                        <optgroup label="🎬 Khusus YouTube Media">
-                            <option value="Video YouTube">🎬 Video YouTube</option>
+                        <optgroup label="Khusus YouTube Media">
+                            <option value="Video YouTube">Video YouTube</option>
                         </optgroup>
                     </select>
                 </div>
@@ -882,13 +882,13 @@
                             <button type="button" onclick="openCategoryModal()" class="text-xs text-emerald-700 dark:text-emerald-400 font-bold hover:underline">+ Kategori Baru</button>
                         </div>
                         <select id="category" name="category" required class="app-select" onchange="syncLiveApiFields('add')">
-                            <optgroup label="📂 Kategori Reguler (Teks & Dokumen)">
+                            <optgroup label="Kategori Reguler (Teks & Dokumen)">
                                 {% for cat in categories if cat.name|trim|lower != 'data dari api' %}
                                 <option value="{{ cat.name }}">{{ cat.name }}</option>
                                 {% endfor %}
                             </optgroup>
-                            <optgroup label="⚡ Khusus Realtime Live API (Endpoint Eksternal)">
-                                <option value="data dari api">⚡ data dari api (Live Endpoint API JSON)</option>
+                            <optgroup label="Khusus Realtime Live API (Endpoint Eksternal)">
+                                <option value="data dari api">data dari api (Live Endpoint API JSON)</option>
                             </optgroup>
                         </select>
                     </div>
@@ -912,7 +912,7 @@
                     </div>
                     <input id="api_url" type="url" name="api_url" placeholder="https://api.domain.com/data-json" autocomplete="off" class="app-input text-xs font-mono">
                     <div class="p-2 rounded bg-sky-100/70 dark:bg-sky-900/40 text-[11px] text-sky-900 dark:text-sky-200 leading-normal border border-sky-300/40 dark:border-sky-700/40">
-                        🛡️ <strong>Khusus Live API:</strong> Endpoint terenkripsi ketat di database (Fernet AES-256) & terproteksi Row-Level Security (RLS). Sistem menarik data realtime langsung dari endpoint secara aman tanpa scraping web.
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <strong>Khusus Live API:</strong> Endpoint terenkripsi ketat di database (Fernet AES-256) & terproteksi Row-Level Security (RLS). Sistem menarik data realtime langsung dari endpoint secara aman tanpa scraping web.
                     </div>
                     <div class="flex items-center justify-between pt-1">
                         <span class="text-[11px] font-semibold text-slate-500" id="liveApiStatus">Data JSON terbaru akan ditarik otomatis.</span>
@@ -969,13 +969,13 @@
                     <div>
                         <label for="edit_category" class="app-label">Kategori <span class="text-rose-600">*</span></label>
                         <select id="edit_category" name="category" required class="app-select" onchange="syncLiveApiFields('edit')">
-                            <optgroup label="📂 Kategori Reguler (Teks & Dokumen)">
+                            <optgroup label="Kategori Reguler (Teks & Dokumen)">
                                 {% for cat in categories if cat.name|trim|lower != 'data dari api' %}
                                 <option value="{{ cat.name }}">{{ cat.name }}</option>
                                 {% endfor %}
                             </optgroup>
-                            <optgroup label="⚡ Khusus Realtime Live API (Endpoint Eksternal)">
-                                <option value="data dari api">⚡ data dari api (Live Endpoint API JSON)</option>
+                            <optgroup label="Khusus Realtime Live API (Endpoint Eksternal)">
+                                <option value="data dari api">data dari api (Live Endpoint API JSON)</option>
                             </optgroup>
                         </select>
                     </div>
@@ -999,7 +999,7 @@
                     </div>
                     <input id="edit_api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input text-xs font-mono">
                     <div class="p-2 rounded bg-sky-100/70 dark:bg-sky-900/40 text-[11px] text-sky-900 dark:text-sky-200 leading-normal border border-sky-300/40 dark:border-sky-700/40">
-                        🛡️ Endpoint diamankan dengan enkripsi at-rest Fernet AES-256 dan isolasi PostgreSQL RLS.
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Endpoint diamankan dengan enkripsi at-rest Fernet AES-256 dan isolasi PostgreSQL RLS.
                     </div>
                     <div class="flex items-center justify-between pt-1">
                         <span class="text-[11px] font-semibold text-slate-500" id="editLiveApiStatus">Data API akan tampil di Isi Data.</span>
@@ -1288,7 +1288,7 @@
             const liveEndpoint = document.getElementById('viewLiveEndpointText');
             if (liveEndpoint) {
                 if (item.source_type === 'api_live' && (item.masked_api_url || item.api_label || item.api_url)) {
-                    liveEndpoint.textContent = '🛡️ Endpoint Terenkripsi: ' + (item.masked_api_url || item.api_label || 'Aktif (AES-256)');
+                    liveEndpoint.innerHTML = '<span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Endpoint Terenkripsi:</span> ' + (item.masked_api_url || item.api_label || 'Aktif (AES-256)');
                 } else {
                     liveEndpoint.textContent = '';
                 }
