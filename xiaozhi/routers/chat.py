@@ -478,14 +478,51 @@ async def chat_history_api(
 
 
 @router.post("/riwayat-chat/clear")
-async def clear_chat_history(request: Request, csrf_token: str = Form(...)):
+async def clear_chat_history(
+    request: Request,
+    csrf_token: str = Form(...),
+    slot_number: Optional[str] = Form(None),
+):
     user = get_current_user(request)
     if not user:
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
     store = get_store()
     validate_csrf(request, csrf_token, user)
-    removed = store.clear_chat_history(user["id"])
-    return redirect_with_message("/riwayat-chat", f"{removed} riwayat chat dihapus.")
+    clean_slot = int(slot_number) if slot_number and str(slot_number).isdigit() else None
+    removed = store.clear_chat_history(user["id"], slot_number=clean_slot)
+    msg = f"{removed} riwayat chat Slot {clean_slot} berhasil dihapus." if clean_slot else f"{removed} riwayat chat berhasil dihapus."
+    return redirect_with_message("/riwayat-chat", msg)
+
+
+@router.post("/api/chat-history/clear-slot")
+async def clear_chat_history_slot_api(
+    request: Request,
+    slot_number: int = Form(1),
+    csrf_token: Optional[str] = Form(None),
+):
+    user = require_user(request)
+    store = get_store()
+    if csrf_token:
+        validate_csrf(request, csrf_token, user)
+
+    if not (1 <= slot_number <= 3):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error_code": "INVALID_SLOT_NUMBER",
+                "message": "Nomor slot harus bernilai 1, 2, atau 3.",
+                "received_value": slot_number,
+            },
+        )
+
+    removed = store.clear_chat_history(user["id"], slot_number=slot_number)
+    return {
+        "success": True,
+        "slot_number": slot_number,
+        "removed_count": removed,
+        "message": f"Riwayat percakapan untuk Slot {slot_number} berhasil dibersihkan.",
+    }
 
 
 @router.post("/riwayat-chat/delete/{chat_id}")

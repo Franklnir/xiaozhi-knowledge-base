@@ -1875,6 +1875,7 @@ class PostgresStore:
         tool_name: str = "",
         slot_number: Optional[int] = None,
         device_mac: str = "",
+        strict_slot: bool = False,
     ) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
@@ -1884,7 +1885,10 @@ class PostgresStore:
                     sql += " AND TO_CHAR(created_at, 'YYYY-MM-DD') = %s"
                     params.append(date)
                 if slot_number is not None:
-                    if int(slot_number) == 1:
+                    if strict_slot:
+                        sql += " AND slot_number = %s"
+                        params.append(int(slot_number))
+                    elif int(slot_number) == 1:
                         sql += " AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0)"
                     else:
                         sql += " AND slot_number = %s"
@@ -1971,13 +1975,88 @@ class PostgresStore:
                 total = row["total"] if row and "total" in row else 0
                 return {"total": total, "total_calls": total}
 
-    def clear_chat_history(self, owner_id: int) -> int:
+    def clear_chat_history(self, owner_id: int, slot_number: Optional[int] = None) -> int:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM chat_history WHERE owner_id = %s", (int(owner_id),))
+                if slot_number is None:
+                    cur.execute("DELETE FROM chat_history WHERE owner_id = %s", (int(owner_id),))
+                else:
+                    cur.execute(
+                        "DELETE FROM chat_history WHERE owner_id = %s AND slot_number = %s",
+                        (int(owner_id), int(slot_number)),
+                    )
                 count = cur.rowcount
             conn.commit()
         return count
+
+    def get_chat_history_item(self, chat_id: int, owner_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                sql = "SELECT * FROM chat_history WHERE id = %s"
+                params: List[Any] = [int(chat_id)]
+                if owner_id is not None:
+                    sql += " AND owner_id = %s"
+                    params.append(int(owner_id))
+                cur.execute(sql, params)
+                row = cur.fetchone()
+                if not row:
+                    return None
+                cols = [desc[0] for desc in cur.description]
+                return dict(zip(cols, row))
+
+    def find_chat_compaction_candidates(
+        self,
+        older_than_days: int = 7,
+        min_size_bytes: int = 2048,
+        limit: int = 50,
+        owner_id: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                sql = '''
+                    SELECT id, owner_id, slot_number, tool_name, request_payload, response_payload, created_at
+                    FROM chat_history
+                    WHERE created_at <= (CURRENT_TIMESTAMP - (%s || ' days')::INTERVAL)
+                      AND (
+                        (octet_length(COALESCE(request_payload::text, '')) >= %s AND NOT (COALESCE(request_payload::jsonb, '{}'::jsonb) ? '_archived'))
+                        OR
+                        (octet_length(COALESCE(response_payload::text, '')) >= %s AND NOT (COALESCE(response_payload::jsonb, '{}'::jsonb) ? '_archived'))
+                      )
+                '''
+                params: List[Any] = [int(older_than_days), int(min_size_bytes), int(min_size_bytes)]
+                if owner_id is not None:
+                    sql += " AND owner_id = %s"
+                    params.append(int(owner_id))
+                sql += " ORDER BY id ASC LIMIT %s"
+                params.append(int(limit))
+                cur.execute(sql, params)
+                cols = [desc[0] for desc in cur.description]
+                return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    def update_chat_payloads(
+        self,
+        chat_id: int,
+        owner_id: int,
+        request_payload: Optional[Any] = None,
+        response_payload: Optional[Any] = None,
+    ) -> bool:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                updates = []
+                params: List[Any] = []
+                if request_payload is not None:
+                    updates.append("request_payload = %s::jsonb")
+                    params.append(json.dumps(request_payload, default=str) if not isinstance(request_payload, str) else request_payload)
+                if response_payload is not None:
+                    updates.append("response_payload = %s::jsonb")
+                    params.append(json.dumps(response_payload, default=str) if not isinstance(response_payload, str) else response_payload)
+                if not updates:
+                    return False
+                params.extend([int(chat_id), int(owner_id)])
+                sql = f"UPDATE chat_history SET {', '.join(updates)} WHERE id = %s AND owner_id = %s"
+                cur.execute(sql, params)
+                conn.commit()
+                return cur.rowcount > 0
 
     def delete_chat_history_item(self, owner_id: int, chat_id: int) -> bool:
         with self._get_conn() as conn:

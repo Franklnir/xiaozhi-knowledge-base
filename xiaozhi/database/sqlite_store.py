@@ -1479,22 +1479,32 @@ class SQLiteStore:
 
         if xiaozhi_answer and not user_message:
             conn = self._get_conn()
-            if slot_num == 1:
+            pending = None
+            if clean_req_id:
                 pending = conn.execute(
                     """SELECT id, user_message, request_payload, created_at
                        FROM chat_history
-                       WHERE owner_id = ? AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0) AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
+                       WHERE owner_id = ? AND request_id = ? AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
                        ORDER BY id DESC LIMIT 1""",
-                    (owner_id,)
+                    (owner_id, clean_req_id)
                 ).fetchone()
-            else:
-                pending = conn.execute(
-                    """SELECT id, user_message, request_payload, created_at
-                       FROM chat_history
-                       WHERE owner_id = ? AND slot_number = ? AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
-                       ORDER BY id DESC LIMIT 1""",
-                    (owner_id, slot_num)
-                ).fetchone()
+            if not pending:
+                if slot_num == 1:
+                    pending = conn.execute(
+                        """SELECT id, user_message, request_payload, created_at
+                           FROM chat_history
+                           WHERE owner_id = ? AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0) AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
+                           ORDER BY id DESC LIMIT 1""",
+                        (owner_id,)
+                    ).fetchone()
+                else:
+                    pending = conn.execute(
+                        """SELECT id, user_message, request_payload, created_at
+                           FROM chat_history
+                           WHERE owner_id = ? AND slot_number = ? AND (xiaozhi_answer IS NULL OR xiaozhi_answer = '')
+                           ORDER BY id DESC LIMIT 1""",
+                        (owner_id, slot_num)
+                    ).fetchone()
             if pending:
                 p_id = pending["id"]
                 conn.execute(
@@ -1545,6 +1555,7 @@ class SQLiteStore:
         tool_name: str = "",
         slot_number: Optional[int] = None,
         device_mac: str = "",
+        strict_slot: bool = False,
     ) -> List[Dict[str, Any]]:
         conn = self._get_conn()
         sql = "SELECT * FROM chat_history WHERE owner_id = ?"
@@ -1555,7 +1566,10 @@ class SQLiteStore:
             params.append(date)
 
         if slot_number is not None:
-            if int(slot_number) == 1:
+            if strict_slot:
+                sql += " AND slot_number = ?"
+                params.append(int(slot_number))
+            elif int(slot_number) == 1:
                 sql += " AND (slot_number = 1 OR slot_number IS NULL OR slot_number = 0)"
             else:
                 sql += " AND slot_number = ?"
@@ -1629,11 +1643,78 @@ class SQLiteStore:
         row = conn.execute(sql, params).fetchone()
         return {"total": row["total"] if row else 0}
 
-    def clear_chat_history(self, owner_id: int) -> int:
+    def clear_chat_history(self, owner_id: int, slot_number: Optional[int] = None) -> int:
         conn = self._get_conn()
-        cursor = conn.execute("DELETE FROM chat_history WHERE owner_id = ?", (owner_id,))
+        if slot_number is None:
+            cursor = conn.execute("DELETE FROM chat_history WHERE owner_id = ?", (owner_id,))
+        else:
+            cursor = conn.execute(
+                "DELETE FROM chat_history WHERE owner_id = ? AND slot_number = ?",
+                (owner_id, int(slot_number)),
+            )
         conn.commit()
         return cursor.rowcount
+
+    def get_chat_history_item(self, chat_id: int, owner_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        conn = self._get_conn()
+        sql = "SELECT * FROM chat_history WHERE id = ?"
+        params: List[Any] = [int(chat_id)]
+        if owner_id is not None:
+            sql += " AND owner_id = ?"
+            params.append(int(owner_id))
+        row = conn.execute(sql, params).fetchone()
+        return dict(row) if row else None
+
+    def find_chat_compaction_candidates(
+        self,
+        older_than_days: int = 7,
+        min_size_bytes: int = 2048,
+        limit: int = 50,
+        owner_id: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        conn = self._get_conn()
+        sql = '''
+            SELECT id, owner_id, slot_number, tool_name, request_payload, response_payload, created_at
+            FROM chat_history
+            WHERE created_at <= datetime('now', '-' || ? || ' days')
+              AND (
+                (length(COALESCE(request_payload, '')) >= ? AND request_payload NOT LIKE '%"_archived": true%')
+                OR
+                (length(COALESCE(response_payload, '')) >= ? AND response_payload NOT LIKE '%"_archived": true%')
+              )
+        '''
+        params: List[Any] = [int(older_than_days), int(min_size_bytes), int(min_size_bytes)]
+        if owner_id is not None:
+            sql += " AND owner_id = ?"
+            params.append(int(owner_id))
+        sql += " ORDER BY id ASC LIMIT ?"
+        params.append(int(limit))
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_chat_payloads(
+        self,
+        chat_id: int,
+        owner_id: int,
+        request_payload: Optional[Any] = None,
+        response_payload: Optional[Any] = None,
+    ) -> bool:
+        conn = self._get_conn()
+        updates = []
+        params: List[Any] = []
+        if request_payload is not None:
+            updates.append("request_payload = ?")
+            params.append(json.dumps(request_payload, default=str) if not isinstance(request_payload, str) else request_payload)
+        if response_payload is not None:
+            updates.append("response_payload = ?")
+            params.append(json.dumps(response_payload, default=str) if not isinstance(response_payload, str) else response_payload)
+        if not updates:
+            return False
+        params.extend([int(chat_id), int(owner_id)])
+        sql = f"UPDATE chat_history SET {', '.join(updates)} WHERE id = ? AND owner_id = ?"
+        cur = conn.execute(sql, params)
+        conn.commit()
+        return cur.rowcount > 0
 
     def delete_chat_history_item(self, owner_id: int, chat_id: int) -> bool:
         conn = self._get_conn()

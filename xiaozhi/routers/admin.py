@@ -1062,3 +1062,223 @@ async def admin_api_access_plus_toggle_track(
         "message": f"Status lagu berhasil " + ("diaktifkan." if active_bool else "dinonaktifkan (Paket Plus)."),
     }
 
+
+# ============================================================================
+# CHAT MEMORY MANAGEMENT & COMPACTION APIS (Non-Generic, Lightweight on VPS)
+# ============================================================================
+
+
+@router.get("/admin/api/chat-memory/stats")
+async def admin_api_chat_memory_stats(
+    request: Request,
+    owner_id: Optional[int] = None,
+):
+    """
+    Statistik kompresi dan penggunaan disk arsip memori percakapan.
+    Ringan dan efisien untuk pemantauan VPS.
+    """
+    require_admin(request)
+    store = get_store()
+    try:
+        from xiaozhi.services.chat_memory_service import get_chat_memory_archive_stats
+        stats = get_chat_memory_archive_stats(store, owner_id=owner_id)
+        return {
+            "success": True,
+            "status": "healthy",
+            "archive_files_count": stats["archive_files_count"],
+            "archive_disk_usage_bytes": stats["archive_disk_usage_bytes"],
+            "archive_disk_usage_human": stats["archive_disk_usage_human"],
+            "candidates_older_than_7d": stats["candidates_older_than_7d"],
+            "scope": f"owner_{owner_id}" if owner_id else "global_system",
+        }
+    except Exception as exc:
+        logging.getLogger("xiaozhi.admin").exception("Error fetching chat memory stats: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error_code": "STATS_CALCULATION_FAILED",
+                "message": "Gagal menghitung statistik penyimpanan arsip memori percakapan.",
+                "detail": str(exc),
+            },
+        )
+
+
+@router.post("/admin/api/chat-memory/compact")
+async def admin_api_chat_memory_compact(
+    request: Request,
+    days: int = 7,
+    min_size_kb: int = 2,
+    batch_size: int = 50,
+    owner_id: Optional[int] = None,
+):
+    """
+    Jalankan pembersihan dan kompresi arsip payload JSON riwayat percakapan secara bertahap.
+    Aman, idempoten, dan dibatasi waktu eksekusi agar tidak membebani CPU VPS.
+    """
+    require_admin(request)
+    store = get_store()
+
+    if not (1 <= days <= 365):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error_code": "INVALID_DAYS_RANGE",
+                "message": "Parameter 'days' harus bernilai antara 1 hingga 365 hari.",
+                "received_value": days,
+            },
+        )
+
+    if not (1 <= min_size_kb <= 100):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error_code": "INVALID_MIN_SIZE",
+                "message": "Parameter 'min_size_kb' harus bernilai antara 1 hingga 100 KB.",
+                "received_value": min_size_kb,
+            },
+        )
+
+    if not (1 <= batch_size <= 200):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error_code": "INVALID_BATCH_SIZE",
+                "message": "Parameter 'batch_size' maksimal 200 item per proses untuk menjaga stabilitas memori VPS.",
+                "received_value": batch_size,
+            },
+        )
+
+    try:
+        from xiaozhi.services.chat_memory_service import run_chat_memory_compactor_batch
+        res = run_chat_memory_compactor_batch(
+            store,
+            older_than_days=days,
+            min_size_bytes=min_size_kb * 1024,
+            batch_size=batch_size,
+            owner_id=owner_id,
+            max_seconds=4.0,
+        )
+        return {
+            "success": True,
+            "message": "Proses kompresi riwayat chat berhasil diselesaikan.",
+            "data": res,
+        }
+    except Exception as exc:
+        logging.getLogger("xiaozhi.admin").exception("Error during chat compaction: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error_code": "COMPACTION_EXECUTION_ERROR",
+                "message": "Terjadi kendala teknis saat menjalankan batch kompresi riwayat.",
+                "detail": str(exc),
+            },
+        )
+
+
+@router.post("/admin/api/chat-memory/clear-slot")
+async def admin_api_chat_memory_clear_slot(
+    request: Request,
+    target_owner_id: int = Form(...),
+    slot_number: int = Form(...),
+    csrf_token: str = Form(...),
+):
+    """
+    Hapus memori percakapan secara terisolasi hanya pada slot tertentu untuk pengguna tertentu.
+    """
+    admin = require_admin(request)
+    store = get_store()
+    validate_csrf(request, csrf_token, admin)
+
+    if not (1 <= slot_number <= 3):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error_code": "INVALID_SLOT_NUMBER",
+                "message": "Nomor slot harus bernilai 1, 2, atau 3.",
+                "received_value": slot_number,
+            },
+        )
+
+    try:
+        removed = store.clear_chat_history(owner_id=target_owner_id, slot_number=slot_number)
+        return {
+            "success": True,
+            "message": f"Berhasil membersihkan {removed} percakapan pada Slot {slot_number} untuk User #{target_owner_id}.",
+            "target_owner_id": target_owner_id,
+            "slot_number": slot_number,
+            "removed_records": removed,
+        }
+    except Exception as exc:
+        logging.getLogger("xiaozhi.admin").exception("Error clearing slot chat memory: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error_code": "CLEAR_SLOT_FAILED",
+                "message": "Gagal menghapus riwayat percakapan pada slot yang ditentukan.",
+                "detail": str(exc),
+            },
+        )
+
+
+@router.get("/admin/api/chat-memory/payload/{history_id}")
+async def admin_api_chat_memory_payload(
+    request: Request,
+    history_id: int,
+):
+    """
+    Melihat payload asli percakapan (mendekompresi otomatis jika sudah berada di arsip storage).
+    """
+    require_admin(request)
+    store = get_store()
+
+    record = store.get_chat_history_item(history_id)
+    if not record:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "error_code": "CHAT_RECORD_NOT_FOUND",
+                "message": f"Record riwayat percakapan #{history_id} tidak ditemukan di database.",
+            },
+        )
+
+    try:
+        from xiaozhi.services.chat_memory_service import resolve_original_history_payload
+        ok_req, original_req, err_req = resolve_original_history_payload(record, "request_payload")
+        ok_res, original_res, err_res = resolve_original_history_payload(record, "response_payload")
+
+        res_p = record.get("response_payload")
+        is_archived = (
+            isinstance(res_p, dict) and bool(res_p.get("_archived"))
+            or isinstance(res_p, str) and '"_archived": true' in res_p
+        )
+
+        return {
+            "success": True,
+            "history_id": history_id,
+            "owner_id": record["owner_id"],
+            "slot_number": record.get("slot_number", 1),
+            "tool_name": record.get("tool_name", ""),
+            "created_at": record.get("created_at", ""),
+            "request_payload": original_req,
+            "response_payload": original_res,
+            "is_archived": is_archived,
+        }
+    except Exception as exc:
+        logging.getLogger("xiaozhi.admin").exception("Error resolving original payload: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error_code": "PAYLOAD_DECOMPRESSION_FAILED",
+                "message": "Gagal membaca atau mendekompresi payload asli dari arsip.",
+                "detail": str(exc),
+            },
+        )

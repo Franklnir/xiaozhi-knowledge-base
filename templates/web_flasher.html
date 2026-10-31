@@ -2229,37 +2229,85 @@
         });
     }
 
+    // Helper: Melepaskan seluruh resource serial port secara bersih tanpa mengunci port
+    async function safelyCloseRawPort(p) {
+        if (!p) return;
+        try {
+            if (p.readable && p.readable.locked) {
+                try {
+                    const r = p.readable.getReader();
+                    await r.cancel();
+                    r.releaseLock();
+                } catch (_) {}
+            }
+            if (p.writable && p.writable.locked) {
+                try {
+                    const w = p.writable.getWriter();
+                    await w.abort();
+                    w.releaseLock();
+                } catch (_) {}
+            }
+            if (p.readable || p.writable) {
+                await p.close();
+            }
+        } catch (e) {
+            console.warn('SafelyCloseRawPort warning:', e);
+        }
+    }
+
+    async function releaseSerialResources(force = false) {
+        if (transport) {
+            try {
+                await transport.disconnect();
+            } catch (tErr) {
+                console.warn('Transport disconnect warning:', tErr);
+            }
+            transport = null;
+        }
+        if (port) {
+            await safelyCloseRawPort(port);
+            if (force) {
+                port = null;
+            }
+        }
+        esploader = null;
+    }
+
     // Centralized UI State Manager: Menjamin konsistensi status terhubung / gagal
     function setConnectionUIState(connected, chip = '', dev = '') {
-        if (connected) {
-            if (connStatusBadge) connStatusBadge.className = 'app-status-pill is-online';
-            if (connStatusText) connStatusText.textContent = `Terhubung: ${chip || 'ESP32'}`;
-            if (connNotice) connNotice.style.display = 'none';
-            if (usbPlugNotice) usbPlugNotice.style.display = 'none';
-            if (btnConnect) btnConnect.style.display = 'none';
-            if (btnDisconnect) btnDisconnect.style.display = 'inline-flex';
-            if (chipInfoBox) chipInfoBox.style.display = 'grid';
+        try {
+            if (connected) {
+                if (connStatusBadge) connStatusBadge.className = 'app-status-pill is-online';
+                if (connStatusText) connStatusText.textContent = `Terhubung: ${chip || 'ESP32'}`;
+                if (connNotice) connNotice.style.display = 'none';
+                if (usbPlugNotice) usbPlugNotice.style.display = 'none';
+                if (btnConnect) btnConnect.style.display = 'none';
+                if (btnDisconnect) btnDisconnect.style.display = 'inline-flex';
+                if (chipInfoBox) chipInfoBox.style.display = 'grid';
 
-            if (chipModel) chipModel.textContent = chip || 'ESP32';
-            if (chipUsbInfo) chipUsbInfo.textContent = dev || '-';
-            if (chipFeatures) chipFeatures.textContent = 'Wi-Fi, Bluetooth 5 (LE), Flash';
-            if (progressStatusText) progressStatusText.textContent = `Port terhubung (${chip || 'ESP32'} - ${dev || 'COM'}). Silakan lanjut ke Step 5.`;
-        } else {
-            if (connStatusBadge) connStatusBadge.className = 'app-status-pill is-offline';
-            if (connStatusText) connStatusText.textContent = 'Port Belum Terhubung';
-            if (connNotice) connNotice.style.display = 'block';
-            if (btnConnect) btnConnect.style.display = 'inline-flex';
-            if (btnDisconnect) btnDisconnect.style.display = 'none';
-            if (chipInfoBox) chipInfoBox.style.display = 'none';
-            if (chipUsbInfo) chipUsbInfo.textContent = '-';
-            if (chipModel) chipModel.textContent = '-';
-            if (chipMac) chipMac.textContent = '-';
-            if (chipCrystal) chipCrystal.textContent = '-';
-            if (progressStatusText) progressStatusText.textContent = 'Port belum terhubung.';
+                if (chipModel) chipModel.textContent = chip || 'ESP32';
+                if (chipUsbInfo) chipUsbInfo.textContent = dev || '-';
+                if (chipFeatures) chipFeatures.textContent = 'Wi-Fi, Bluetooth 5 (LE), Flash';
+                if (progressStatusText) progressStatusText.textContent = `Port terhubung (${chip || 'ESP32'} - ${dev || 'COM'}). Silakan lanjut ke Step 5.`;
+            } else {
+                if (connStatusBadge) connStatusBadge.className = 'app-status-pill is-offline';
+                if (connStatusText) connStatusText.textContent = 'Port Belum Terhubung';
+                if (connNotice) connNotice.style.display = 'block';
+                if (btnConnect) btnConnect.style.display = 'inline-flex';
+                if (btnDisconnect) btnDisconnect.style.display = 'none';
+                if (chipInfoBox) chipInfoBox.style.display = 'none';
+                if (chipUsbInfo) chipUsbInfo.textContent = '-';
+                if (chipModel) chipModel.textContent = '-';
+                if (chipMac) chipMac.textContent = '-';
+                if (chipCrystal) chipCrystal.textContent = '-';
+                if (progressStatusText) progressStatusText.textContent = 'Port belum terhubung.';
+            }
+        } catch (domErr) {
+            console.warn('UI state update warning:', domErr);
         }
-        updateFlashButtonState();
-        if (typeof updateStepperUI === 'function') updateStepperUI();
-        if (typeof saveWizardState === 'function') saveWizardState();
+        try { updateFlashButtonState(); } catch (_) {}
+        try { if (typeof updateStepperUI === 'function') updateStepperUI(); } catch (_) {}
+        try { if (typeof saveWizardState === 'function') saveWizardState(); } catch (_) {}
     }
 
     // Connect Web Serial Port (PC / Laptop Chromium)
@@ -2273,21 +2321,15 @@
         }
 
         // 2. Putuskan dan tutup port lama jika masih terbuka di memori
-        if (transport) {
-            try { await transport.disconnect(); } catch (e) {}
-            transport = null;
-        }
-        if (port) {
-            try {
-                if (port.readable || port.writable) await port.close();
-            } catch (e) {}
-            port = null;
-        }
-        esploader = null;
+        await releaseSerialResources(true);
 
         const serialObj = getSerialApi();
         if (!serialObj || !serialObj.api) {
-            alert('Browser ini tidak mendukung Web Serial API.\n\nHarap buka Web Flasher di Komputer PC atau Laptop menggunakan peramban:\n- Google Chrome\n- Microsoft Edge\n- Opera\n- Brave Browser');
+            showOverlayNotice(
+                'Peramban Tidak Didukung',
+                'Browser ini tidak mendukung Web Serial API.<br><br>Harap buka Web Flasher di Komputer PC atau Laptop menggunakan peramban Google Chrome, Microsoft Edge, Opera, atau Brave.',
+                'warning'
+            );
             return;
         }
 
@@ -2298,12 +2340,9 @@
 
             // Jika port yang dipilih kebetulan sudah dalam status open, tutup dahulu secara aman
             if (port && (port.readable || port.writable)) {
-                try {
-                    await port.close();
-                    await new Promise(r => setTimeout(r, 80));
-                } catch (closeErr) {
-                    console.warn('Port was open, close attempt result:', closeErr);
-                }
+                logToConsole('[INFO] Port terdeteksi terbuka dari sesi sebelumnya. Menginisialisasi ulang...');
+                await safelyCloseRawPort(port);
+                await new Promise(r => setTimeout(r, 100));
             }
 
             const dev = identifyUsbDevice(port);
@@ -2348,10 +2387,14 @@
             setConnectionUIState(true, chip, dev);
 
             if (typeof showWizardNotice === 'function') {
-                if (currentSourceMode === 'preset' && currentPresetId === 'esp32s3_cam' && !chip.toUpperCase().includes('ESP32-S3')) {
-                    showWizardNotice(`Perhatian: Preset terpilih adalah untuk ESP32-S3, namun chip yang terdeteksi adalah ${chip}. Pastikan tipe board sesuai!`, 'warning');
-                } else {
-                    showWizardNotice(`Perangkat ${chip} berhasil terhubung! Silakan klik "Lanjut ke Step 5" untuk memulai flashing.`, 'success');
+                try {
+                    if (currentSourceMode === 'preset' && currentPresetId === 'esp32s3_cam' && !chip.toUpperCase().includes('ESP32-S3')) {
+                        showWizardNotice(`Perhatian: Preset terpilih adalah untuk ESP32-S3, namun chip yang terdeteksi adalah ${chip}. Pastikan tipe board sesuai!`, 'warning');
+                    } else {
+                        showWizardNotice(`Perangkat ${chip} berhasil terhubung! Silakan klik "Lanjut ke Step 5" untuk memulai flashing.`, 'success');
+                    }
+                } catch (notifErr) {
+                    console.warn('Wizard notice warning:', notifErr);
                 }
             }
 
@@ -2359,17 +2402,7 @@
             logToConsole(`[ERROR] Gagal menghubungkan port: ${err.message}`);
 
             // Bersihkan resource port agar tidak terkunci pada percobaan berikutnya
-            if (transport) {
-                try { await transport.disconnect(); } catch (e) {}
-                transport = null;
-            }
-            if (port) {
-                try {
-                    if (port.readable || port.writable) await port.close();
-                } catch (e) {}
-                port = null;
-            }
-            esploader = null;
+            await releaseSerialResources(true);
 
             // KONSISTENSI STATUS: Jika gagal, status WAJIB offline & Step 4 tidak centang
             setConnectionUIState(false);
@@ -2380,7 +2413,11 @@
             if (err.name === 'NotFoundError') {
                 logToConsole('[TIPS] Pemilihan port dibatalkan oleh pengguna.');
             } else {
-                showOverlayNotice("Gagal Terhubung ke ESP32", `Gagal koneksi: ${err.message}<br><br>Pastikan kabel USB mendukung transfer data (bukan kabel charge saja), port tidak sedang dipakai aplikasi lain (Arduino IDE / VS Code), atau tahan tombol BOOT saat menyambung.`, "warning");
+                showOverlayNotice(
+                    "Gagal Terhubung ke ESP32",
+                    `Gagal koneksi: ${err.message}<br><br>Pastikan kabel USB mendukung transfer data (bukan kabel charge saja), port tidak sedang dipakai aplikasi lain (Arduino IDE / VS Code), atau tahan tombol BOOT saat menyambung.`,
+                    "warning"
+                );
             }
         }
     });
@@ -2390,13 +2427,7 @@
         if (isMonitoring) {
             await stopSerialMonitor(true);
         }
-        try {
-            if (transport) await transport.disconnect();
-            else if (port && (port.readable || port.writable)) await port.close();
-        } catch (e) {}
-        esploader = null;
-        transport = null;
-        port = null;
+        await releaseSerialResources(true);
 
         setConnectionUIState(false);
         if (progressStatusText) progressStatusText.textContent = 'Port diputuskan.';

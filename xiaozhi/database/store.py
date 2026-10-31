@@ -1579,7 +1579,10 @@ class HFJsonStore:
                     continue
                 if slot_number is not None:
                     item_slot = int(item.get("slot_number", 1) or 1)
-                    if int(slot_number) == 1:
+                    if kwargs.get("strict_slot"):
+                        if item_slot != int(slot_number):
+                            continue
+                    elif int(slot_number) == 1:
                         if item_slot not in (0, 1):
                             continue
                     else:
@@ -1694,19 +1697,87 @@ class HFJsonStore:
             "tool": sum(1 for item in rows if item.get("source") == "mcp_tool"),
         }
 
-    def clear_chat_history(self, owner_id: int) -> int:
+    def clear_chat_history(self, owner_id: int, slot_number: Optional[int] = None) -> int:
         with self._lock:
             data = self._load()
             before = len(data.get("chat_history", []))
-            data["chat_history"] = [
-                item
-                for item in data.get("chat_history", [])
-                if int(item.get("owner_id", 0)) != int(owner_id)
-            ]
+            if slot_number is None:
+                data["chat_history"] = [
+                    item
+                    for item in data.get("chat_history", [])
+                    if int(item.get("owner_id", 0)) != int(owner_id)
+                ]
+            else:
+                s_num = int(slot_number)
+                data["chat_history"] = [
+                    item
+                    for item in data.get("chat_history", [])
+                    if not (int(item.get("owner_id", 0)) == int(owner_id) and int(item.get("slot_number", 1)) == s_num)
+                ]
             removed = before - len(data["chat_history"])
             if removed:
                 self._commit(data, "Clear Xiaozhi chat history")
             return removed
+
+    def get_chat_history_item(self, chat_id: int, owner_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            data = self._load()
+            for item in data.get("chat_history", []):
+                if int(item.get("id", 0)) == int(chat_id):
+                    if owner_id is None or int(item.get("owner_id", 0)) == int(owner_id):
+                        return dict(item)
+            return None
+
+    def find_chat_compaction_candidates(
+        self,
+        older_than_days: int = 7,
+        min_size_bytes: int = 2048,
+        limit: int = 50,
+        owner_id: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+        cutoff_iso = cutoff.isoformat()
+        with self._lock:
+            data = self._load()
+            candidates = []
+            for item in data.get("chat_history", []):
+                if owner_id is not None and int(item.get("owner_id", 0)) != int(owner_id):
+                    continue
+                c_at = str(item.get("created_at") or "")
+                if c_at > cutoff_iso:
+                    continue
+                req_p = str(item.get("request_payload") or "")
+                res_p = str(item.get("response_payload") or "")
+                is_req_large = len(req_p) >= min_size_bytes and '"_archived": true' not in req_p
+                is_res_large = len(res_p) >= min_size_bytes and '"_archived": true' not in res_p
+                if is_req_large or is_res_large:
+                    candidates.append(dict(item))
+                    if len(candidates) >= limit:
+                        break
+            return candidates
+
+    def update_chat_payloads(
+        self,
+        chat_id: int,
+        owner_id: int,
+        request_payload: Optional[Any] = None,
+        response_payload: Optional[Any] = None,
+    ) -> bool:
+        with self._lock:
+            data = self._load()
+            found = False
+            for item in data.get("chat_history", []):
+                if int(item.get("id", 0)) == int(chat_id) and int(item.get("owner_id", 0)) == int(owner_id):
+                    if request_payload is not None:
+                        item["request_payload"] = request_payload
+                    if response_payload is not None:
+                        item["response_payload"] = response_payload
+                    found = True
+                    break
+            if found:
+                self._commit(data, f"Update payloads for chat {chat_id}")
+            return found
 
     def delete_chat_history_item(self, owner_id: int, chat_id: int) -> bool:
         with self._lock:

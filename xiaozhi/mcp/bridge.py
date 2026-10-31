@@ -119,6 +119,11 @@ async def start_mcp_background(store):
         resp_payload = None
 
         msg_id = str(payload.get("id")) if payload.get("id") is not None else None
+        turn_request_id = (
+            f"{request_id}:{msg_id[:32]}"[:64]
+            if msg_id
+            else str(request_id or "")[:64]
+        )
 
         # Clean old pending tool calls (> 120s)
         now_ts = time.time()
@@ -147,7 +152,7 @@ async def start_mcp_background(store):
                     "token_hash": token_hash,
                     "slot": slot,
                     "device_mac": device_mac,
-                    "request_id": request_id,
+                    "request_id": turn_request_id,
                     "time": now_ts,
                 }
 
@@ -173,6 +178,7 @@ async def start_mcp_background(store):
         if not user_message and not xiaozhi_answer:
             messages = collect_chat_messages(payload)
             if messages:
+                request_id = turn_request_id
                 user_message = "\n\n".join(item["content"] for item in messages if item["role"] == "user")
                 xiaozhi_answer = "\n\n".join(item["content"] for item in messages if item["role"] == "assistant")
                 if direction == "inbound":

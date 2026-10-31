@@ -840,9 +840,9 @@ def format_user_persona_for_prompt(
     """
     lines = ["Berikut adalah profil & preferensi personal pengguna yang tersimpan:"]
 
-    # Injected 3 Recent Chats (Short-Term Memory / Active Session)
+    # Injected recent chats (Short-Term Memory / Active Session)
     if recent_chats:
-        lines.append("\n[3 Percakapan Terakhir di Perangkat Ini (Short-Term Memory)]")
+        lines.append("\n[3 Percakapan Terakhir di Slot Aktif (Short-Term Memory)]")
         lines.append("Gunakan konteks percakapan terakhir ini untuk memahami pembicaraan yang baru saja berlangsung:")
         for idx, chat in enumerate(recent_chats, 1):
             u = chat.get("pesan_user") or chat.get("user_message") or "-"
@@ -853,7 +853,7 @@ def format_user_persona_for_prompt(
             t_str = f" [Tool: {t}]" if t and t != "save_chat_history" else ""
             lines.append(f"{idx}. User: \"{u}\"{t_str}{w_str}")
             lines.append(f"   Xiaozhi: \"{a}\"")
-        lines.append("💡 Rekomendasi Proaktif: Jika pengguna menyapa atau bertanya singkat (misal 'halo', 'lanjutin tadi'), Anda dapat menyapa kembali dan secara proaktif mengaitkan dengan topik terakhir di atas!")
+        lines.append("Jika pengguna merujuk ke obrolan sebelumnya, gunakan hanya konteks yang cocok di atas. Sebutkan waktunya jika tersedia; jika ragu, tanyakan konfirmasi.")
 
     # Injected RAG Vector Persona insights
     if persona_analysis:
