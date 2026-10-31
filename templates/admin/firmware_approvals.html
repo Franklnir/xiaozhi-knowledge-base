@@ -1,380 +1,895 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div style="margin-bottom:24px;">
-    <h1 style="font-size:24px; font-weight:900; margin:0 0 6px; color:var(--app-text);">
-        Approval & Lisensi Firmware
-    </h1>
-    <p style="font-size:13.5px; color:var(--app-muted); margin:0;">
-        Kelola preset firmware resmi (upload .bin ke bucket &amp; auto-versioning), generator kode lisensi sekali pakai, dan persetujuan produk marketplace.
-    </p>
-</div>
+<style>
+    /* Firmware Approvals Modern Layout Styles */
+    .fw-page {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    .fw-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .fw-title-group h1 {
+        font-size: clamp(20px, 2.2vw, 26px);
+        font-weight: 900;
+        letter-spacing: -0.5px;
+        margin: 4px 0 6px 0;
+        color: var(--app-text);
+        word-break: break-word;
+    }
 
-<!-- ======================================================== -->
-<!-- SECTION 1: MANAJEMEN PRESET FIRMWARE (.BIN KE BUCKET)    -->
-<!-- ======================================================== -->
-<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:30px;">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:18px; border-bottom:1px solid var(--app-border); padding-bottom:14px;">
-        <div>
-            <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-                <span>💾</span> Preset Firmware BIN &amp; Auto-Versioning (Bucket S3 / R2)
-            </h2>
-            <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
-                Unggah file binary firmware (.bin) baru atau perbarui preset yang ada. File dienkripsi AES-256-GCM dan disimpan di Object Storage agar tidak membebani VPS. Jika mengupdate preset yang ada, versi otomatis naik (v001 ➔ v002 ➔ dst).
+    /* Tab Buttons */
+    .admin-tab-btn {
+        padding: 6px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--app-border);
+        background: var(--app-surface);
+        color: var(--app-muted);
+        font-size: 12.5px;
+        font-weight: 750;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+        user-select: none;
+    }
+    .admin-tab-btn:hover {
+        background: var(--app-soft, rgba(0,0,0,0.03));
+        color: var(--app-text);
+        border-color: var(--app-border-strong, #94a3b8);
+    }
+    .admin-tab-btn.active {
+        background: var(--app-text);
+        color: var(--app-surface);
+        border-color: var(--app-text);
+    }
+    :root[data-theme="dark"] .admin-tab-btn.active {
+        background: #10b981;
+        color: #052e1a;
+        border-color: #10b981;
+    }
+    :root[data-theme="neo"] .admin-tab-btn {
+        border: 2px solid #111;
+        box-shadow: 2px 2px 0 #111;
+        font-weight: 900;
+    }
+    :root[data-theme="neo"] .admin-tab-btn.active {
+        background: #4ade80;
+        color: #111;
+        box-shadow: 3px 3px 0 #111;
+    }
+
+    /* Card Panels */
+    .fw-card {
+        background: var(--app-surface);
+        border: 1.5px solid var(--app-border-strong, #334155);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+        box-sizing: border-box;
+    }
+    :root[data-theme="neo"] .fw-card {
+        border: 2px solid #111;
+        box-shadow: 4px 4px 0 #111;
+        border-radius: 10px;
+    }
+
+    /* Sub-Tables for Version History */
+    .fw-subtable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11.5px;
+        background: var(--app-surface-muted, #f8fafc);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .fw-subtable th {
+        background: rgba(0,0,0,0.04);
+        padding: 8px 10px;
+        text-align: left;
+        font-weight: 800;
+        text-transform: uppercase;
+        font-size: 10.5px;
+        color: var(--app-muted);
+        border-bottom: 1px solid var(--app-border);
+    }
+    .fw-subtable td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--app-border);
+        color: var(--app-text);
+        vertical-align: middle;
+    }
+    :root[data-theme="dark"] .fw-subtable {
+        background: #090e1a;
+    }
+    :root[data-theme="dark"] .fw-subtable th {
+        background: #0f172a;
+    }
+
+    /* Copy Button & Feedback */
+    .btn-copy-code {
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+    }
+
+    /* Toast Notification */
+    #fwToast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: #0f172a;
+        color: #fff;
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-size: 12.5px;
+        font-weight: 750;
+        display: none;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        z-index: 99999;
+        transition: opacity 0.2s ease;
+    }
+    :root[data-theme="dark"] #fwToast {
+        background: #10b981;
+        color: #052e1a;
+    }
+</style>
+
+<div class="fw-page">
+    <!-- Header -->
+    <header class="fw-header">
+        <div class="fw-title-group">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <p class="app-eyebrow" style="background:#4ade80; color:#111; font-weight:900; padding:2px 8px; border-radius:4px; display:inline-block; margin:0;">
+                    PANEL ADMIN FIRMWARE
+                </p>
+                <span class="app-chip app-chip-neutral" style="font-size:11px;">Storage: S3 / Cloudflare R2</span>
+            </div>
+            <h1>Approval &amp; Lisensi Firmware</h1>
+            <p class="app-subtitle" style="margin:0; color:var(--app-muted); font-size:13.5px;">
+                Kelola preset binary firmware (.bin), histori rilis versi otomatis, generator kode lisensi sekali pakai, dan hak akses pengguna.
             </p>
         </div>
-    </div>
 
-    <!-- Form Upload / Update Preset -->
-    <form method="POST" action="/admin/firmware/presets/save" enctype="multipart/form-data" style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:16px; margin-bottom:24px;">
-        <div style="font-weight:800; font-size:14px; margin-bottom:12px; color:var(--app-text); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-            <span id="presetFormTitle">➕ Tambah Preset Firmware Baru atau Update Versi</span>
-            <span class="app-chip app-chip-neutral" id="presetVersionPreview" style="font-size:11px;">Versi Target: Otomatis</span>
-        </div>
-
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:14px;">
-            <div>
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    Mode / Pilih Preset:
-                </label>
-                <select id="presetSelector" class="app-input" onchange="onPresetSelected(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px;">
-                    <option value="__NEW__">➕ -- Buat Preset Baru --</option>
-                    {% for p in presets %}
-                    <option value="{{ p.id }}" data-title="{{ p.title }}" data-chip="{{ p.chip }}" data-offset="{{ p.offset }}" data-desc="{{ p.description }}" data-activever="{{ p.active_version }}">
-                        {{ p.title }} (ID: {{ p.id }}) [{{ p.active_version }}]
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div>
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    ID Preset (Unik &amp; Permanen):
-                </label>
-                <input type="text" id="presetIdInput" name="preset_id" placeholder="misal: esp32s3_cam" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;" required>
-            </div>
-
-            <div>
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    Judul / Nama Preset:
-                </label>
-                <input type="text" id="presetTitleInput" name="title" placeholder="misal: ESP32-S3 N16R8 Cam Full Factory" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;" required>
-            </div>
-
-            <div>
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    Tipe Chip ESP:
-                </label>
-                <select id="presetChipSelect" name="chip" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
-                    <option value="ESP32-S3">ESP32-S3 (Recommended)</option>
-                    <option value="ESP32">ESP32 Klasik</option>
-                    <option value="ESP32-C3">ESP32-C3</option>
-                    <option value="ESP32-C6">ESP32-C6</option>
-                    <option value="ESP8266">ESP8266</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    Flash Offset:
-                </label>
-                <input type="text" id="presetOffsetInput" name="offset" value="0x0" placeholder="0x0" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
-            </div>
-
-            <div>
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    File Firmware Binary (.bin):
-                </label>
-                <input type="file" name="firmware_file" accept=".bin" class="app-input" style="width:100%; font-size:12px; padding:5px 8px;">
-            </div>
-        </div>
-
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
-            <div>
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    Deskripsi Preset:
-                </label>
-                <textarea id="presetDescInput" name="description" rows="2" placeholder="Keterangan fungsi binary, dukungan layar, modul kamera, dll." class="app-input" style="width:100%; font-size:12px;"></textarea>
-            </div>
-            <div>
-                <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                    Catatan Rilis / Changelog Versi (Opsional):
-                </label>
-                <textarea name="changelog" rows="2" placeholder="misal: Optimasi latency mic I2S dan perbaikan resolusi kamera..." class="app-input" style="width:100%; font-size:12px;"></textarea>
-            </div>
-        </div>
-
-        <div style="display:flex; justify-content:flex-end; gap:10px;">
-            <button type="submit" class="app-button app-button-primary" style="font-weight:850; font-size:13px; padding:8px 18px;">
-                ☁️ Simpan &amp; Upload ke Bucket Private
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <a href="/admin/firmware/catalog-approvals" class="app-button" style="text-decoration:none; font-weight:800; font-size:12.5px; border:2px solid #111; background:var(--app-surface); box-shadow:2px 2px 0 #111; display:inline-flex; align-items:center; gap:6px;">
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                <span>Approval Katalog</span>
+                {% if approvals %}
+                <span class="app-chip app-chip-warning" style="font-size:10.5px; padding:1px 6px;">{{ approvals|length }} review</span>
+                {% endif %}
+            </a>
+            <button type="button" class="app-button app-button-primary" onclick="focusUploadForm()" style="font-weight:850; font-size:12.5px; display:inline-flex; align-items:center; gap:6px;">
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Upload Firmware</span>
             </button>
         </div>
-    </form>
+    </header>
 
-    <!-- Daftar Preset Aktif & Histori Versi -->
-    <h3 style="font-size:14px; font-weight:800; margin:0 0 10px; color:var(--app-text);">
-        Daftar Preset Tersedia di Sistem:
-    </h3>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px;">
-        {% for p in presets %}
-        <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:14px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px;">
-                <div>
-                    <strong style="font-size:14.5px; color:var(--app-text); display:block;">{{ p.title }}</strong>
-                    <code style="font-size:11.5px; color:var(--app-muted);">ID: {{ p.id }}</code>
-                </div>
-                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
-                    <span class="app-chip app-chip-success" style="font-size:11px; font-weight:900;">
-                        🔓 Versi Aktif: {{ p.active_version }}
-                    </span>
-                    <span style="font-size:11px; color:var(--app-muted);">Chip: <strong>{{ p.chip }}</strong></span>
-                </div>
-            </div>
-
-            <p style="font-size:12px; color:var(--app-muted); margin:0 0 10px; line-height:1.45;">
-                {{ p.description or 'Tidak ada deskripsi.' }}
-            </p>
-
-            <div style="border-top:1px dashed var(--app-border); padding-top:8px; font-size:11.5px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span>Offset: <strong>{{ p.offset }}</strong></span>
-                    <span>Ukuran: <strong>{{ (p.size_bytes / (1024*1024))|round(2) if p.size_bytes else '0' }} MB</strong></span>
-                    <span>Total Rilis: <strong>{{ p.versions|length }} versi</strong></span>
-                </div>
-
-                {% if p.versions %}
-                <details style="margin-top:8px; cursor:pointer;" open>
-                    <summary style="font-weight:750; color:var(--app-accent, #059669); outline:none;">
-                        📜 Histori Versi Firmware ({{ p.versions|length }} Tersedia)
-                    </summary>
-                    <div style="margin-top:8px; display:grid; gap:8px;">
-                        {% for v in p.versions|reverse %}
-                        <div style="background:var(--app-surface); border:1.5px solid {% if v.version == p.active_version %}var(--app-accent, #059669){% else %}var(--app-border){% endif %}; border-radius:6px; padding:8px 10px; font-size:11.5px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                                <div style="display:flex; align-items:center; gap:6px;">
-                                    <span class="app-chip {% if v.version == p.active_version %}app-chip-success{% else %}app-chip-neutral{% endif %}" style="font-size:10.5px; font-weight:900;">
-                                        {{ v.version }}
-                                    </span>
-                                    <strong style="color:var(--app-text);">{{ v.filename }}</strong>
-                                    {% if v.version == p.active_version %}
-                                    <span style="color:#059669; font-size:10.5px; font-weight:850;">(⭐ Versi Aktif Saat Ini)</span>
-                                    {% endif %}
-                                </div>
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <span style="color:var(--app-muted); font-size:11px;">{{ v.uploaded_at[:16].replace('T', ' ') if v.uploaded_at else '' }}</span>
-                                    {% if v.version != p.active_version %}
-                                    <form method="POST" action="/admin/firmware/presets/{{ p.id }}/set-active-version" style="display:inline; margin:0;" onsubmit="return confirm('Jadikan versi {{ v.version }} sebagai versi aktif default untuk pengguna?')">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                        <input type="hidden" name="version" value="{{ v.version }}">
-                                        <button type="submit" class="app-button app-button-secondary app-button-small" style="font-size:10.5px; padding:2px 8px; font-weight:800;">
-                                            🔄 Jadikan Versi Aktif
-                                        </button>
-                                    </form>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <form method="POST" action="/admin/firmware/presets/{{ p.id }}/versions/{{ v.version }}/delete" style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:6px; margin-top:7px;" onsubmit="return confirm('Hapus versi {{ v.version }} dari preset ini? Password admin akan divalidasi sebelum penghapusan.')">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <label for="delete-password-{{ p.id }}-{{ loop.index }}" style="font-size:10.5px; color:var(--app-muted);">Password admin:</label>
-                                <input id="delete-password-{{ p.id }}-{{ loop.index }}" type="password" name="password" required maxlength="128" autocomplete="current-password" placeholder="Masukkan password" class="app-input" style="width:155px; padding:3px 7px; font-size:10.5px;">
-                                <button type="submit" class="app-button app-button-danger app-button-small" style="font-size:10.5px; padding:3px 8px; font-weight:800;">Hapus versi</button>
-                            </form>
-                            <div style="color:var(--app-muted); margin-top:4px; font-size:11px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
-                                <span>📝 {{ v.changelog or 'Tanpa catatan rilis' }}</span>
-                                <span>{{ (v.size_bytes / (1024*1024))|round(2) }} MB • SHA: <code style="font-size:10px;">{{ v.sha256[:12] if v.sha256 else '-' }}...</code></span>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </details>
-                {% endif %}
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-</div>
-
-<!-- ======================================================== -->
-<!-- SECTION 2: GENERATOR KODE LISENSI SEKALI PAKAI           -->
-<!-- ======================================================== -->
-<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:30px;">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:18px; border-bottom:1px solid var(--app-border); padding-bottom:14px;">
-        <div>
-            <h2 style="font-size:18px; font-weight:900; margin:0 0 4px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-                <span>🔑</span> Generator Kode Lisensi Sekali Pakai (One-Time Claim Code)
-            </h2>
-            <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
-                Buat kode lisensi unik yang hanya dapat diklaim <strong>satu kali</strong> oleh pengguna mana pun. Setelah diklaim, kode otomatis hangus dan akses preset user tersebut langsung terbuka 🔓 permanen termasuk update versi terbaru.
-            </p>
-        </div>
-    </div>
-
-    <!-- Form Generate Kode -->
-    <form method="POST" action="/admin/firmware/claim-codes/generate" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:20px; background:var(--app-surface-muted); padding:12px; border-radius:var(--app-radius); border:1px solid var(--app-border-strong);">
-        <div style="flex:1; min-width:200px;">
-            <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                Target Preset:
-            </label>
-            <select name="preset_id" class="app-input" style="width:100%; font-size:12.5px; padding:6px 10px;">
-                {% for p in presets %}
-                <option value="{{ p.id }}">{{ p.title }} (ID: {{ p.id }})</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div style="flex:2; min-width:240px;">
-            <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                Catatan Penerima / Nomor Pesanan (Opsional):
-            </label>
-            <input type="text" name="note" placeholder="misal: Pembeli Kit Tokopedia Order #99182 / Pak Budi" class="app-input" style="width:100%; font-size:12.5px; padding:6px 10px;">
-        </div>
-
-        <button type="submit" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:8px 16px; white-space:nowrap;">
-            ⚡ Generate Kode Baru
-        </button>
-    </form>
-
-    <!-- Tabel Kode Klaim -->
-    <h3 style="font-size:14px; font-weight:800; margin:0 0 10px; color:var(--app-text);">
-        Daftar Kode Lisensi yang Diterbitkan:
-    </h3>
-    {% if not claim_codes %}
-    <div style="padding:16px; background:var(--app-surface-muted); border-radius:var(--app-radius); text-align:center; color:var(--app-muted); font-size:12.5px; margin-bottom:10px;">
-        Belum ada kode lisensi yang digenerate. Klik tombol di atas untuk membuat kode baru.
-    </div>
-    {% else %}
-    <div class="app-table-wrap" style="max-height:360px; overflow-y:auto; margin-bottom:10px;">
-        <table class="app-table">
-            <thead>
-                <tr>
-                    <th>Kode Lisensi (Sekali Pakai)</th>
-                    <th>Target Preset</th>
-                    <th>Catatan / Label</th>
-                    <th>Status Penggunaan</th>
-                    <th>Dibuat Oleh</th>
-                    <th>Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in claim_codes %}
-                <tr>
-                    <td>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <code style="font-size:13px; font-weight:900; background:var(--app-surface); padding:3px 8px; border-radius:4px; border:1.5px solid var(--app-border-strong); letter-spacing:0.5px; color:var(--app-text);">
-                                {{ c.code }}
-                            </code>
-                            <button type="button" class="app-button app-button-small" style="padding:2px 8px; font-size:11px;" onclick="navigator.clipboard.writeText('{{ c.code }}'); alert('Kode {{ c.code }} berhasil disalin ke clipboard!');">
-                                📋 Salin
-                            </button>
-                        </div>
-                    </td>
-                    <td>
-                        <strong style="font-size:12.5px;">{{ c.preset_id }}</strong>
-                    </td>
-                    <td style="font-size:12px; color:var(--app-muted); max-width:200px;">
-                        {{ c.note or '-' }}
-                    </td>
-                    <td>
-                        {% if c.is_used %}
-                        <span class="app-chip app-chip-neutral" style="font-size:11px; text-decoration:line-through;">
-                            SUDAH DIKLAIM
-                        </span>
-                        <div style="font-size:11px; color:var(--app-muted); margin-top:2px;">
-                            Oleh: <strong>{{ c.claimed_by }}</strong> ({{ c.claimed_at[:10] if c.claimed_at else '' }})
-                        </div>
-                        {% else %}
-                        <span class="app-chip app-chip-success" style="font-size:11px; font-weight:850;">
-                            🟢 SIAP DIKLAIM (1x)
-                        </span>
-                        {% endif %}
-                    </td>
-                    <td style="font-size:11.5px; color:var(--app-muted);">
-                        {{ c.created_by }} • {{ c.created_at[:10] if c.created_at else '' }}
-                    </td>
-                    <td>
-                        {% if not c.is_used %}
-                        <form method="POST" action="/admin/firmware/claim-codes/{{ c.id }}/delete" style="display:inline;" onsubmit="return confirm('Hapus kode lisensi {{ c.code }}?')">
-                            <button type="submit" class="app-button app-button-danger app-button-small" style="font-size:11px; padding:3px 8px;">
-                                🗑️ Hapus
-                            </button>
-                        </form>
-                        {% else %}
-                        <span style="font-size:11px; color:var(--app-muted);">Hangus</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% if message %}
+    <div class="app-alert app-alert-info" style="margin-bottom:20px;">
+        {{ message }}
     </div>
     {% endif %}
-</div>
 
-<!-- ======================================================== -->
-<!-- SECTION 3: PENGGUNA DENGAN LISENSI PRESET AKTIF          -->
-<!-- ======================================================== -->
-<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); margin-bottom:30px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-        <h2 style="font-size:18px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-            <span>👥</span> Pengguna dengan Lisensi Preset Aktif
-            <span class="app-chip app-chip-success" style="font-size:12px; font-weight:800; padding:2px 8px;">
-                {{ preset_granted|length if preset_granted else 0 }} user
-            </span>
-        </h2>
+    <!-- Stat Metric Grid -->
+    {% set total_versions = namespace(count=0) %}
+    {% for p in presets %}
+        {% set total_versions.count = total_versions.count + (p.versions|length if p.versions else 0) %}
+    {% endfor %}
+
+    {% set unused_codes = namespace(count=0) %}
+    {% for c in claim_codes %}
+        {% if not c.is_used %}
+            {% set unused_codes.count = unused_codes.count + 1 %}
+        {% endif %}
+    {% endfor %}
+
+    <section class="app-stat-grid" style="margin-bottom:24px;">
+        <div class="app-stat-card" style="border-left: 5px solid #10b981;">
+            <p class="app-stat-label" style="display:flex; align-items:center; gap:6px;">
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                Preset Firmware
+            </p>
+            <p class="app-stat-value" style="color:#10b981;">{{ presets|length }}</p>
+            <p style="font-size:11.5px; color:var(--app-muted); margin:4px 0 0 0;">Binary preset terdaftar</p>
+        </div>
+
+        <div class="app-stat-card" style="border-left: 5px solid #0284c7;">
+            <p class="app-stat-label" style="display:flex; align-items:center; gap:6px;">
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                Total Versi Rilis
+            </p>
+            <p class="app-stat-value" style="color:#0284c7;">{{ total_versions.count }}</p>
+            <p style="font-size:11.5px; color:var(--app-muted); margin:4px 0 0 0;">Histori rilis terenkripsi S3</p>
+        </div>
+
+        <div class="app-stat-card" style="border-left: 5px solid #f59e0b;">
+            <p class="app-stat-label" style="display:flex; align-items:center; gap:6px;">
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5M7 11l-4 4 2 2 4-4m-2-2l2-2 4 4-2 2M15 9l6-6"/><circle cx="7.5" cy="16.5" r="3.5"/></svg>
+                Kode Siap Klaim
+            </p>
+            <p class="app-stat-value" style="color:#d97706;">{{ unused_codes.count }} / {{ claim_codes|length }}</p>
+            <p style="font-size:11.5px; color:var(--app-muted); margin:4px 0 0 0;">Lisensi sekali pakai aktif</p>
+        </div>
+
+        <div class="app-stat-card" style="border-left: 5px solid #8b5cf6;">
+            <p class="app-stat-label" style="display:flex; align-items:center; gap:6px;">
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Pengguna Terlisensi
+            </p>
+            <p class="app-stat-value" style="color:#7c3aed;">{{ preset_granted|length if preset_granted else 0 }}</p>
+            <p style="font-size:11.5px; color:var(--app-muted); margin:4px 0 0 0;">Akun berhak akses firmware</p>
+        </div>
+    </section>
+
+    <!-- Tab View Navigation Bar -->
+    <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; align-items:center; border-bottom:1px solid var(--app-border); padding-bottom:12px;">
+        <button type="button" class="admin-tab-btn active" id="tabBtnPresets" onclick="switchFirmwareTab('presets')">
+            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            <span>Preset Firmware &amp; Versi</span>
+            <span class="app-chip app-chip-small" style="font-size:10.5px;">{{ presets|length }}</span>
+        </button>
+
+        <button type="button" class="admin-tab-btn" id="tabBtnClaimCodes" onclick="switchFirmwareTab('claim-codes')">
+            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5M7 11l-4 4 2 2 4-4m-2-2l2-2 4 4-2 2M15 9l6-6"/><circle cx="7.5" cy="16.5" r="3.5"/></svg>
+            <span>Kode Lisensi Sekali Pakai</span>
+            <span class="app-chip app-chip-small" style="font-size:10.5px;">{{ claim_codes|length }}</span>
+        </button>
+
+        <button type="button" class="admin-tab-btn" id="tabBtnUsers" onclick="switchFirmwareTab('users')">
+            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Lisensi Pengguna Aktif</span>
+            <span class="app-chip app-chip-small" style="font-size:10.5px;">{{ preset_granted|length if preset_granted else 0 }}</span>
+        </button>
     </div>
 
-    {% if preset_granted %}
-    <div style="display:flex; flex-wrap:wrap; gap:10px;">
-        {% for uname, g in preset_granted.items() %}
-        <div style="display:inline-flex; align-items:center; gap:8px; padding:6px 12px; background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); font-size:12.5px;">
-            <span style="font-weight:800; color:var(--app-text);">👤 {{ uname }}</span>
-            {% if g.presets_list %}
-                {% for p in g.presets_list %}
-                <span class="app-chip app-chip-neutral" style="font-size:10.5px; padding:2px 6px; display:inline-flex; align-items:center; gap:4px;">
-                    {{ p.preset_id }}
-                    <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
-                        <input type="hidden" name="username" value="{{ uname }}">
-                        <input type="hidden" name="preset_id" value="{{ p.preset_id }}">
-                        <button type="submit" title="Cabut Akses ({{ p.preset_id }})" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:14px; padding:0 2px; line-height:1;" onclick="return confirm('Cabut akses preset {{ p.preset_id }} untuk {{ uname }}?')">&times;</button>
-                    </form>
+    <!-- ======================================================== -->
+    <!-- TAB 1: PRESET FIRMWARE & AUTO-VERSIONING                 -->
+    <!-- ======================================================== -->
+    <div id="tabContentPresets" class="fw-tab-pane">
+        <!-- Form Upload / Update Preset -->
+        <div class="fw-card" id="uploadCard" style="background:var(--app-surface-muted);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px; border-bottom:1px solid var(--app-border); padding-bottom:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span id="presetFormTitle" style="font-weight:900; font-size:15px; color:var(--app-text);">
+                        Tambah Preset Firmware Baru atau Update Versi
+                    </span>
+                </div>
+                <span class="app-chip app-chip-neutral" id="presetVersionPreview" style="font-size:11px; font-weight:800;">
+                    Versi Target: Otomatis
                 </span>
-                {% endfor %}
+            </div>
+
+            <form method="POST" action="/admin/firmware/presets/save" enctype="multipart/form-data" id="presetUploadForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:14px;">
+                    <div>
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                            Mode / Pilih Preset:
+                        </label>
+                        <select id="presetSelector" class="app-input" onchange="onPresetSelected(this.value)" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                            <option value="__NEW__">-- Buat Preset Baru --</option>
+                            {% for p in presets %}
+                            <option value="{{ p.id }}" data-title="{{ p.title }}" data-chip="{{ p.chip }}" data-offset="{{ p.offset }}" data-desc="{{ p.description }}" data-activever="{{ p.active_version }}">
+                                {{ p.title }} (ID: {{ p.id }}) [{{ p.active_version }}]
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                            ID Preset (Unik &amp; Permanen):
+                        </label>
+                        <input type="text" id="presetIdInput" name="preset_id" placeholder="misal: esp32s3_cam" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;" required>
+                    </div>
+
+                    <div>
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                            Judul / Nama Preset:
+                        </label>
+                        <input type="text" id="presetTitleInput" name="title" placeholder="misal: ESP32-S3 Cam Full Factory" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;" required>
+                    </div>
+
+                    <div>
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                            Tipe Chip ESP:
+                        </label>
+                        <select id="presetChipSelect" name="chip" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                            <option value="ESP32-S3">ESP32-S3 (Recommended)</option>
+                            <option value="ESP32">ESP32 Klasik</option>
+                            <option value="ESP32-C3">ESP32-C3</option>
+                            <option value="ESP32-C6">ESP32-C6</option>
+                            <option value="ESP8266">ESP8266</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                            Flash Offset:
+                        </label>
+                        <input type="text" id="presetOffsetInput" name="offset" value="0x0" placeholder="0x0" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                    </div>
+
+                    <div>
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                            File Firmware Binary (.bin):
+                        </label>
+                        <input type="file" name="firmware_file" accept=".bin" class="app-input" style="width:100%; font-size:12px; padding:5px 8px;">
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:14px;">
+                    <div>
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                            Deskripsi Preset:
+                        </label>
+                        <textarea id="presetDescInput" name="description" rows="2" placeholder="Keterangan fungsi binary, dukungan layar, modul kamera, dll." class="app-input" style="width:100%; font-size:12px;"></textarea>
+                    </div>
+                    <div>
+                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                            Catatan Rilis / Changelog Versi (Opsional):
+                        </label>
+                        <textarea name="changelog" rows="2" placeholder="misal: Optimasi latency audio I2S dan perbaikan WiFi reconnect..." class="app-input" style="width:100%; font-size:12px;"></textarea>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button type="submit" class="app-button app-button-primary" style="font-weight:850; font-size:13px; padding:8px 20px; display:inline-flex; align-items:center; gap:6px;">
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                        <span>Simpan &amp; Upload ke Bucket Private</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tabel Master Preset Firmware -->
+        <div class="fw-card" style="padding:0; overflow:hidden;">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--app-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <h2 style="font-size:16px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                    <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                    <span>Daftar Preset Firmware Resmi</span>
+                </h2>
+                <span class="app-chip app-chip-neutral" style="font-size:11px;">{{ presets|length }} Preset Terpasang</span>
+            </div>
+
+            {% if not presets %}
+            <div style="padding:48px 20px; text-align:center; color:var(--app-muted);">
+                <svg class="app-icon" style="width:40px; height:40px; color:var(--app-muted); margin-bottom:8px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <div style="font-weight:800; font-size:15px; color:var(--app-text);">Belum Ada Preset Firmware</div>
+                <p style="margin:4px 0 12px; font-size:13px;">Gunakan form di atas untuk mengunggah preset binary firmware pertama.</p>
+            </div>
             {% else %}
-                <span class="app-chip app-chip-neutral" style="font-size:10.5px; padding:2px 6px;">{{ g.preset_id }}</span>
-                <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
-                    <input type="hidden" name="username" value="{{ uname }}">
-                    <input type="hidden" name="preset_id" value="{{ g.preset_id }}">
-                    <button type="submit" title="Cabut Akses" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:16px; padding:0 2px; line-height:1;" onclick="return confirm('Cabut akses preset untuk {{ uname }}?')">&times;</button>
-                </form>
+            <div class="app-table-wrap" style="margin:0;">
+                <table class="app-table" style="margin:0; width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="min-width:200px;">Preset &amp; Deskripsi</th>
+                            <th style="min-width:110px;">Target Chip</th>
+                            <th style="min-width:120px;">Versi Aktif</th>
+                            <th style="min-width:100px;">Offset &amp; Ukuran</th>
+                            <th style="min-width:110px;">Total Versi</th>
+                            <th style="min-width:140px; text-align:right;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in presets %}
+                        <tr id="preset-row-{{ p.id }}">
+                            <!-- Preset & Deskripsi -->
+                            <td>
+                                <div style="display:flex; flex-direction:column; gap:2px;">
+                                    <strong style="font-size:13.5px; color:var(--app-text);">{{ p.title }}</strong>
+                                    <div>
+                                        <code style="font-size:11px; background:var(--app-soft, #f1f5f9); padding:1px 6px; border-radius:4px; border:1px solid var(--app-border);">ID: {{ p.id }}</code>
+                                    </div>
+                                    {% if p.description %}
+                                    <div style="font-size:11.5px; color:var(--app-muted); margin-top:2px; max-width:320px; line-height:1.35;">
+                                        {{ p.description }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+
+                            <!-- Target Chip -->
+                            <td>
+                                <span class="app-chip app-chip-neutral" style="font-size:11px; font-weight:800;">
+                                    {{ p.chip }}
+                                </span>
+                            </td>
+
+                            <!-- Versi Aktif -->
+                            <td>
+                                <div style="display:flex; flex-direction:column; gap:2px;">
+                                    <span class="app-chip app-chip-success" style="font-size:11px; font-weight:900; display:inline-flex; align-items:center; gap:4px;">
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                                        {{ p.active_version }}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- Offset & Ukuran -->
+                            <td>
+                                <div style="display:flex; flex-direction:column; gap:2px; font-size:11.5px;">
+                                    <span>Offset: <code style="font-size:11px;">{{ p.offset }}</code></span>
+                                    <span style="color:var(--app-muted);">{{ (p.size_bytes / (1024*1024))|round(2) if p.size_bytes else '0' }} MB</span>
+                                </div>
+                            </td>
+
+                            <!-- Total Versi -->
+                            <td>
+                                <button type="button" class="app-button app-button-small" onclick="toggleVersionHistory('{{ p.id }}')" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:4px;">
+                                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                                    <span>{{ p.versions|length }} Versi</span>
+                                </button>
+                            </td>
+
+                            <!-- Aksi -->
+                            <td style="text-align:right;">
+                                <div style="display:inline-flex; gap:6px; justify-content:flex-end; flex-wrap:wrap;">
+                                    <button type="button" class="app-button app-button-primary app-button-small" onclick="selectPresetForUpdate('{{ p.id }}')" style="font-size:11px; padding:3px 9px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                                        Update
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Sub-Row: Expandable Version History -->
+                        <tr id="history-box-{{ p.id }}" style="display:none; background:var(--app-soft, #f8fafc);">
+                            <td colspan="6" style="padding:14px 20px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                    <div style="font-weight:800; font-size:12.5px; color:var(--app-text); display:flex; align-items:center; gap:6px;">
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                                        Histori Rilis Versi: <strong>{{ p.title }}</strong> ({{ p.versions|length }} rilis)
+                                    </div>
+                                    <button type="button" class="app-button app-button-small" onclick="toggleVersionHistory('{{ p.id }}')" style="font-size:10.5px; padding:2px 8px;">
+                                        Tutup &times;
+                                    </button>
+                                </div>
+
+                                {% if not p.versions %}
+                                <div style="font-size:12px; color:var(--app-muted); padding:8px 0;">Tidak ada file rilis versi untuk preset ini.</div>
+                                {% else %}
+                                <table class="fw-subtable">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:90px;">Versi</th>
+                                            <th>File Binary</th>
+                                            <th>Waktu Rilis</th>
+                                            <th>Ukuran &amp; Checksum</th>
+                                            <th>Changelog / Catatan</th>
+                                            <th style="text-align:right; width:220px;">Manajemen Versi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for v in p.versions|reverse %}
+                                        <tr>
+                                            <td>
+                                                <span class="app-chip {% if v.version == p.active_version %}app-chip-success{% else %}app-chip-neutral{% endif %}" style="font-size:10.5px; font-weight:900;">
+                                                    {{ v.version }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div style="font-weight:750; color:var(--app-text);">{{ v.filename }}</div>
+                                                {% if v.version == p.active_version %}
+                                                <span style="color:#059669; font-size:10.5px; font-weight:800; display:inline-flex; align-items:center; gap:3px;">
+                                                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                                                    Versi Aktif Default
+                                                </span>
+                                                {% endif %}
+                                            </td>
+                                            <td style="color:var(--app-muted); font-size:11px;">
+                                                {{ v.uploaded_at[:16].replace('T', ' ') if v.uploaded_at else '-' }}
+                                            </td>
+                                            <td>
+                                                <div style="font-size:11px;">{{ (v.size_bytes / (1024*1024))|round(2) }} MB</div>
+                                                {% if v.sha256 %}
+                                                <div style="font-size:10px; color:var(--app-muted); font-family:monospace;" title="{{ v.sha256 }}">
+                                                    SHA: {{ v.sha256[:10] }}...
+                                                </div>
+                                                {% endif %}
+                                            </td>
+                                            <td style="color:var(--app-muted); font-size:11.5px; max-width:240px;">
+                                                {{ v.changelog or 'Tanpa catatan rilis' }}
+                                            </td>
+                                            <td style="text-align:right;">
+                                                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                                                    {% if v.version != p.active_version %}
+                                                    <form method="POST" action="/admin/firmware/presets/{{ p.id }}/set-active-version" style="margin:0; display:inline;" onsubmit="return confirm('Jadikan versi {{ v.version }} sebagai versi aktif default pengguna?')">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                                        <input type="hidden" name="version" value="{{ v.version }}">
+                                                        <button type="submit" class="app-button app-button-secondary app-button-small" style="font-size:10.5px; padding:2px 8px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                                                            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                                            Aktifkan Versi
+                                                        </button>
+                                                    </form>
+                                                    {% endif %}
+
+                                                    <form method="POST" action="/admin/firmware/presets/{{ p.id }}/versions/{{ v.version }}/delete" style="display:inline-flex; align-items:center; gap:4px; margin:0;" onsubmit="return confirm('Hapus versi {{ v.version }} dari preset ini? Password admin akan divalidasi.')">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                                        <input type="password" name="password" required maxlength="128" placeholder="Password admin" class="app-input" style="width:115px; padding:2px 6px; font-size:10.5px;">
+                                                        <button type="submit" class="app-button app-button-danger app-button-small" style="font-size:10.5px; padding:2px 7px; font-weight:800;">
+                                                            Hapus
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
             {% endif %}
         </div>
-        {% endfor %}
     </div>
-    {% else %}
-    <div style="padding:16px; background:var(--app-surface-muted); border-radius:var(--app-radius); text-align:center; color:var(--app-muted); font-size:13px;">
-        Belum ada pengguna dengan lisensi aktif.
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: KODE LISENSI SEKALI PAKAI (CLAIM CODES)           -->
+    <!-- ======================================================== -->
+    <div id="tabContentClaimCodes" class="fw-tab-pane" style="display:none;">
+        <!-- Generator Form Card -->
+        <div class="fw-card" style="background:var(--app-surface-muted);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:10px;">
+                <h2 style="font-size:16px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                    <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5M7 11l-4 4 2 2 4-4m-2-2l2-2 4 4-2 2M15 9l6-6"/><circle cx="7.5" cy="16.5" r="3.5"/></svg>
+                    <span>Generator Kode Lisensi Sekali Pakai (One-Time Claim Code)</span>
+                </h2>
+                <span class="app-chip app-chip-neutral" style="font-size:11px;">Hangus Otomatis Pasca Klaim</span>
+            </div>
+
+            <p style="font-size:12.5px; color:var(--app-muted); margin:0 0 14px; line-height:1.45;">
+                Kode lisensi dapat diberikan kepada pembeli kit hardware (misal: Tokopedia / Shopee / Komunitas). Pengguna mengklaim kode di menu klaim lisensi, dan preset otomatis terbuka permanen di akunnya.
+            </p>
+
+            <form method="POST" action="/admin/firmware/claim-codes/generate" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                
+                <div style="flex:1; min-width:220px;">
+                    <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                        Target Preset Firmware:
+                    </label>
+                    <select name="preset_id" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                        {% for p in presets %}
+                        <option value="{{ p.id }}">{{ p.title }} (ID: {{ p.id }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="flex:2; min-width:260px;">
+                    <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                        Catatan Penerima / Nomor Pesanan Marketplace (Opsional):
+                    </label>
+                    <input type="text" name="note" placeholder="misal: Pembeli Kit Tokopedia Order #99182 / Bpk. Hendra" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                </div>
+
+                <button type="submit" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:8px 18px; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;">
+                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span>Generate Kode Lisensi</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Tabel Kode Lisensi -->
+        <div class="fw-card" style="padding:0; overflow:hidden;">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--app-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <h3 style="font-size:15px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span>Daftar Kode Lisensi yang Diterbitkan</span>
+                </h3>
+                <span class="app-chip app-chip-neutral" style="font-size:11px;">{{ claim_codes|length }} Kode Total</span>
+            </div>
+
+            {% if not claim_codes %}
+            <div style="padding:48px 20px; text-align:center; color:var(--app-muted);">
+                <svg class="app-icon" style="width:40px; height:40px; color:var(--app-muted); margin-bottom:8px;" viewBox="0 0 24 24"><path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5M7 11l-4 4 2 2 4-4m-2-2l2-2 4 4-2 2M15 9l6-6"/><circle cx="7.5" cy="16.5" r="3.5"/></svg>
+                <div style="font-weight:800; font-size:15px; color:var(--app-text);">Belum Ada Kode Lisensi</div>
+                <p style="margin:4px 0 0; font-size:13px;">Gunakan form di atas untuk menerbitkan kode klaim pertama.</p>
+            </div>
+            {% else %}
+            <div class="app-table-wrap" style="margin:0;">
+                <table class="app-table" style="margin:0; width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="min-width:180px;">Kode Lisensi (1x Pakai)</th>
+                            <th style="min-width:140px;">Target Preset</th>
+                            <th style="min-width:180px;">Catatan / Order ID</th>
+                            <th style="min-width:160px;">Status Penggunaan</th>
+                            <th style="min-width:130px;">Dibuat Oleh</th>
+                            <th style="min-width:90px; text-align:right;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in claim_codes %}
+                        <tr>
+                            <!-- Kode Lisensi -->
+                            <td>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <code style="font-size:13px; font-weight:900; background:var(--app-surface); padding:3px 8px; border-radius:4px; border:1.5px solid var(--app-border-strong); letter-spacing:0.5px; color:var(--app-text);">
+                                        {{ c.code }}
+                                    </code>
+                                    <button type="button" class="app-button app-button-small btn-copy-code" onclick="copyClaimCode('{{ c.code }}')" title="Salin kode ke clipboard">
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                        <span>Salin</span>
+                                    </button>
+                                </div>
+                            </td>
+
+                            <!-- Target Preset -->
+                            <td>
+                                <strong style="font-size:12.5px; color:var(--app-text);">{{ c.preset_id }}</strong>
+                            </td>
+
+                            <!-- Catatan -->
+                            <td style="font-size:12px; color:var(--app-muted);">
+                                {{ c.note or '-' }}
+                            </td>
+
+                            <!-- Status -->
+                            <td>
+                                {% if c.is_used %}
+                                <div style="display:flex; flex-direction:column; gap:2px;">
+                                    <span class="app-chip app-chip-neutral" style="font-size:10.5px; text-decoration:line-through; font-weight:800;">
+                                        SUDAH DIKLAIM
+                                    </span>
+                                    <div style="font-size:11px; color:var(--app-muted);">
+                                        Oleh: <strong>{{ c.claimed_by }}</strong> ({{ c.claimed_at[:10] if c.claimed_at else '' }})
+                                    </div>
+                                </div>
+                                {% else %}
+                                <span class="app-chip app-chip-success" style="font-size:11px; font-weight:850; display:inline-flex; align-items:center; gap:4px;">
+                                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                                    SIAP DIKLAIM (1x)
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Dibuat Oleh -->
+                            <td style="font-size:11.5px; color:var(--app-muted);">
+                                {{ c.created_by }}<br>
+                                <span style="font-size:10.5px;">{{ c.created_at[:10] if c.created_at else '' }}</span>
+                            </td>
+
+                            <!-- Aksi -->
+                            <td style="text-align:right;">
+                                {% if not c.is_used %}
+                                <form method="POST" action="/admin/firmware/claim-codes/{{ c.id }}/delete" style="display:inline;" onsubmit="return confirm('Hapus kode lisensi {{ c.code }}?')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="app-button app-button-danger app-button-small" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:3px;">
+                                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        Hapus
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span style="font-size:11px; color:var(--app-muted);">Hangus</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
     </div>
-    {% endif %}
+
+    <!-- ======================================================== -->
+    <!-- TAB 3: PENGGUNA DENGAN LISENSI PRESET AKTIF              -->
+    <!-- ======================================================== -->
+    <div id="tabContentUsers" class="fw-tab-pane" style="display:none;">
+        <!-- Grant Access Form Card -->
+        <div class="fw-card" style="background:var(--app-surface-muted);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; border-bottom:1px solid var(--app-border); padding-bottom:10px;">
+                <h2 style="font-size:16px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                    <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                    <span>Beri Akses Lisensi Preset Manual ke Pengguna</span>
+                </h2>
+                <span class="app-chip app-chip-neutral" style="font-size:11px;">Bypass Kode Lisensi</span>
+            </div>
+
+            <p style="font-size:12.5px; color:var(--app-muted); margin:0 0 14px; line-height:1.45;">
+                Gunakan form ini untuk langsung memberikan hak akses lisensi firmware ke username tertentu tanpa melalui proses klaim kode sekali pakai.
+            </p>
+
+            <form method="POST" action="/admin/firmware/preset-approvals/grant" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                
+                <div style="flex:1; min-width:200px;">
+                    <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                        Username Pengguna:
+                    </label>
+                    <input type="text" name="username" placeholder="misal: frank_developer" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;" required>
+                </div>
+
+                <div style="flex:1; min-width:220px;">
+                    <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
+                        Pilih Target Preset Firmware:
+                    </label>
+                    <select name="preset_id" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
+                        {% for p in presets %}
+                        <option value="{{ p.id }}">{{ p.title }} (ID: {{ p.id }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:8px 18px; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;">
+                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Beri Akses Lisensi</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Tabel Pengguna Terlisensi -->
+        <div class="fw-card" style="padding:0; overflow:hidden;">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--app-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <h3 style="font-size:15px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
+                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Daftar Pengguna Berlisensi Aktif</span>
+                </h3>
+                <span class="app-chip app-chip-success" style="font-size:11px; font-weight:800;">
+                    {{ preset_granted|length if preset_granted else 0 }} Pengguna Terdaftar
+                </span>
+            </div>
+
+            {% if not preset_granted %}
+            <div style="padding:48px 20px; text-align:center; color:var(--app-muted);">
+                <svg class="app-icon" style="width:40px; height:40px; color:var(--app-muted); margin-bottom:8px;" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                <div style="font-weight:800; font-size:15px; color:var(--app-text);">Belum Ada Pengguna dengan Lisensi Aktif</div>
+                <p style="margin:4px 0 0; font-size:13px;">Pengguna akan muncul di sini setelah mengklaim kode atau diberi hak akses manual.</p>
+            </div>
+            {% else %}
+            <div class="app-table-wrap" style="margin:0;">
+                <table class="app-table" style="margin:0; width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="min-width:180px;">Nama Pengguna</th>
+                            <th style="min-width:320px;">Preset Firmware yang Dapat Diakses</th>
+                            <th style="min-width:100px; text-align:right;">Total Lisensi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for uname, g in preset_granted.items() %}
+                        <tr>
+                            <!-- Username -->
+                            <td>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <div style="width:32px; height:32px; border-radius:50%; background:#10b981; color:#ffffff; font-weight:900; font-size:13px; display:flex; align-items:center; justify-content:center; border:1.5px solid var(--app-border-strong); flex-shrink:0;">
+                                        {{ uname[0]|upper }}
+                                    </div>
+                                    <strong style="font-size:13.5px; color:var(--app-text);">{{ uname }}</strong>
+                                </div>
+                            </td>
+
+                            <!-- Preset Badges with Revoke -->
+                            <td>
+                                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                    {% if g.presets_list %}
+                                        {% for p in g.presets_list %}
+                                        <span class="app-chip app-chip-neutral" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:6px;">
+                                            <span style="font-weight:750;">{{ p.preset_id }}</span>
+                                            <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                                <input type="hidden" name="username" value="{{ uname }}">
+                                                <input type="hidden" name="preset_id" value="{{ p.preset_id }}">
+                                                <button type="submit" title="Cabut Akses ({{ p.preset_id }})" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:13px; padding:0; line-height:1; display:flex; align-items:center;" onclick="return confirm('Cabut akses preset {{ p.preset_id }} untuk pengguna {{ uname }}?')">
+                                                    &times;
+                                                </button>
+                                            </form>
+                                        </span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="app-chip app-chip-neutral" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:6px;">
+                                            <span style="font-weight:750;">{{ g.preset_id }}</span>
+                                            <form method="POST" action="/admin/firmware/preset-approvals/revoke" style="margin:0; display:inline;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                                <input type="hidden" name="username" value="{{ uname }}">
+                                                <input type="hidden" name="preset_id" value="{{ g.preset_id }}">
+                                                <button type="submit" title="Cabut Akses" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:13px; padding:0; line-height:1; display:flex; align-items:center;" onclick="return confirm('Cabut akses preset untuk {{ uname }}?')">
+                                                    &times;
+                                                </button>
+                                            </form>
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+
+                            <!-- Total -->
+                            <td style="text-align:right;">
+                                <span class="app-chip app-chip-small app-chip-success" style="font-size:10.5px; font-weight:800;">
+                                    {{ g.presets_list|length if g.presets_list else 1 }} Lisensi
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
-<!-- ======================================================== -->
-<!-- SECTION 4: LINK KE MENU KHUSUS APPROVAL KATALOG          -->
-<!-- ======================================================== -->
-<div style="background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); padding:20px; box-shadow:var(--app-shadow); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
-    <div>
-        <h2 style="font-size:17px; font-weight:900; margin:0 0 4px; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-            <span>📦</span> Approval Produk Katalog Marketplace
-        </h2>
-        <p style="font-size:12.5px; color:var(--app-muted); margin:0;">
-            Tinjau pengajuan produk firmware yang diunggah oleh komunitas seller sebelum tayang di katalog marketplace. Fitur ini kini berada di menu khusus <strong>Approval Katalog</strong>.
-        </p>
-    </div>
-    <a href="/admin/firmware/catalog-approvals" class="app-button app-button-primary" style="font-weight:800; font-size:13.5px; text-decoration:none; white-space:nowrap;">
-        Buka Approval Katalog ➔
-    </a>
+<!-- Toast Feedback Notification -->
+<div id="fwToast">
+    <svg class="app-icon app-icon-xs" style="stroke:#10b981;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="fwToastText">Teks berhasil disalin!</span>
 </div>
 
 <script>
+    // Tab Switching
+    function switchFirmwareTab(tabName) {
+        const tabs = ['presets', 'claim-codes', 'users'];
+        tabs.forEach(t => {
+            const btn = document.getElementById(t === 'presets' ? 'tabBtnPresets' : (t === 'claim-codes' ? 'tabBtnClaimCodes' : 'tabBtnUsers'));
+            const content = document.getElementById(t === 'presets' ? 'tabContentPresets' : (t === 'claim-codes' ? 'tabContentClaimCodes' : 'tabContentUsers'));
+            
+            if (btn && content) {
+                if (t === tabName) {
+                    btn.classList.add('active');
+                    content.style.display = 'block';
+                } else {
+                    btn.classList.remove('active');
+                    content.style.display = 'none';
+                }
+            }
+        });
+        try {
+            localStorage.setItem('fw_approval_tab', tabName);
+        } catch (e) {}
+    }
+
+    // Toggle Version History Sub-row
+    function toggleVersionHistory(presetId) {
+        const box = document.getElementById('history-box-' + presetId);
+        if (box) {
+            box.style.display = (box.style.display === 'none' || box.style.display === '') ? 'table-row' : 'none';
+        }
+    }
+
+    // Select preset and focus upload form
+    function selectPresetForUpdate(presetId) {
+        switchFirmwareTab('presets');
+        const selector = document.getElementById('presetSelector');
+        if (selector) {
+            selector.value = presetId;
+            onPresetSelected(presetId);
+        }
+        focusUploadForm();
+    }
+
+    function focusUploadForm() {
+        switchFirmwareTab('presets');
+        const card = document.getElementById('uploadCard');
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const titleInput = document.getElementById('presetTitleInput');
+            if (titleInput) titleInput.focus();
+        }
+    }
+
     // Handler Selector Preset Form
     function onPresetSelected(val) {
         var opt = document.querySelector('#presetSelector option[value="' + val + '"]');
@@ -387,32 +902,74 @@
         var descInput = document.getElementById('presetDescInput');
 
         if (val === '__NEW__' || !opt) {
-            formTitle.textContent = '➕ Tambah Preset Firmware Baru';
-            verPreview.textContent = 'Versi Target: v001 (Awal)';
-            verPreview.className = 'app-chip app-chip-neutral';
-            idInput.value = '';
-            idInput.readOnly = false;
-            titleInput.value = '';
-            chipSelect.value = 'ESP32-S3';
-            offsetInput.value = '0x0';
-            descInput.value = '';
+            if (formTitle) formTitle.textContent = 'Tambah Preset Firmware Baru';
+            if (verPreview) {
+                verPreview.textContent = 'Versi Target: v001 (Awal)';
+                verPreview.className = 'app-chip app-chip-neutral';
+            }
+            if (idInput) {
+                idInput.value = '';
+                idInput.readOnly = false;
+            }
+            if (titleInput) titleInput.value = '';
+            if (chipSelect) chipSelect.value = 'ESP32-S3';
+            if (offsetInput) offsetInput.value = '0x0';
+            if (descInput) descInput.value = '';
         } else {
             var activeVer = opt.dataset.activever || 'v001';
             var match = activeVer.match(/\d+/);
             var nextNum = match ? parseInt(match[0], 10) + 1 : 2;
             var nextVerCode = 'v' + ('000' + nextNum).slice(-3);
 
-            formTitle.textContent = '🔄 Update Versi Preset: ' + (opt.dataset.title || val);
-            verPreview.textContent = 'Jika upload .bin ➔ Otomatis jadi ' + nextVerCode + ' (saat ini: ' + activeVer + ')';
-            verPreview.className = 'app-chip app-chip-success';
+            if (formTitle) formTitle.textContent = 'Update Versi Preset: ' + (opt.dataset.title || val);
+            if (verPreview) {
+                verPreview.textContent = 'Upload .bin baru -> Otomatis jadi ' + nextVerCode + ' (saat ini: ' + activeVer + ')';
+                verPreview.className = 'app-chip app-chip-success';
+            }
 
-            idInput.value = val;
-            idInput.readOnly = true;
-            titleInput.value = opt.dataset.title || '';
-            chipSelect.value = opt.dataset.chip || 'ESP32-S3';
-            offsetInput.value = opt.dataset.offset || '0x0';
-            descInput.value = opt.dataset.desc || '';
+            if (idInput) {
+                idInput.value = val;
+                idInput.readOnly = true;
+            }
+            if (titleInput) titleInput.value = opt.dataset.title || '';
+            if (chipSelect) chipSelect.value = opt.dataset.chip || 'ESP32-S3';
+            if (offsetInput) offsetInput.value = opt.dataset.offset || '0x0';
+            if (descInput) descInput.value = opt.dataset.desc || '';
         }
     }
+
+    // Copy Claim Code with Toast
+    function copyClaimCode(code) {
+        if (!navigator.clipboard) {
+            prompt("Salin kode lisensi:", code);
+            return;
+        }
+        navigator.clipboard.writeText(code).then(() => {
+            showToast("Kode " + code + " berhasil disalin!");
+        }).catch(() => {
+            prompt("Salin kode lisensi:", code);
+        });
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('fwToast');
+        const txt = document.getElementById('fwToastText');
+        if (!t || !txt) return;
+        txt.textContent = msg;
+        t.style.display = 'flex';
+        t.style.opacity = '1';
+        setTimeout(() => {
+            t.style.opacity = '0';
+            setTimeout(() => { t.style.display = 'none'; }, 200);
+        }, 2500);
+    }
+
+    // Restore active tab
+    try {
+        const savedTab = localStorage.getItem('fw_approval_tab');
+        if (savedTab && ['presets', 'claim-codes', 'users'].includes(savedTab)) {
+            switchFirmwareTab(savedTab);
+        }
+    } catch (e) {}
 </script>
 {% endblock %}

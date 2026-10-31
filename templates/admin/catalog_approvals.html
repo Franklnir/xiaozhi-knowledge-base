@@ -38,7 +38,7 @@
 <div class="catalog-approval-header">
     <div>
         <h1 style="font-size:24px; font-weight:900; margin:0 0 6px; color:var(--app-text); display:flex; align-items:center; gap:10px;">
-            <span>📦</span> Approval Katalog Produk Firmware
+            <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Approval Katalog Produk Firmware
         </h1>
         <p style="font-size:13.5px; color:var(--app-muted); margin:0;">
             Tinjau pengajuan produk firmware yang diunggah oleh komunitas seller sebelum tayang di katalog marketplace.
@@ -46,7 +46,7 @@
     </div>
     <div>
         <span class="catalog-approval-badge">
-            ⏳ {{ approvals|length }} Menunggu Review
+            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg> {{ approvals|length }} Menunggu Review
         </span>
     </div>
 </div>
@@ -59,7 +59,7 @@
 
 {% if not approvals %}
 <div class="app-muted-panel" style="text-align:center; padding:60px 20px; background:var(--app-surface); border:2px solid var(--app-border-strong); border-radius:var(--app-radius); box-shadow:var(--app-shadow);">
-    <div style="font-size:44px; margin-bottom:12px;">✨</div>
+    <div style="margin-bottom:12px;"><svg class="app-icon" style="width:48px; height:48px; color:var(--app-muted);" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
     <h3 style="font-size:18px; font-weight:800; margin:0 0 6px; color:var(--app-text);">Antrean Review Marketplace Kosong</h3>
     <p style="color:var(--app-muted); font-size:13.5px; margin:0 auto; max-width:440px;">
         Tidak ada produk firmware seller yang sedang menunggu persetujuan saat ini. Semua pengajuan telah diproses.
@@ -101,7 +101,7 @@
                     </td>
                     <td>
                         <div style="font-size:12.5px; font-weight:700; color:var(--app-text);">
-                            💾 {{ a.original_filename or 'firmware.bin' }}
+                            <span style="display:inline-flex; align-items:center; gap:5px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> {{ a.original_filename or 'firmware.bin' }}</span>
                         </div>
                         <div style="font-size:11.5px; color:var(--app-muted); margin-top:2px;">
                             Versi: <strong>{{ a.version_label }}</strong> • Ukuran: <strong>{{ ((a.file_size or 0) / (1024*1024))|round(2) }} MB</strong>
@@ -119,11 +119,11 @@
                             <form method="POST" action="/admin/firmware/approvals/{{ a.approval_id }}/approve">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <button type="submit" class="app-button app-button-primary app-button-small" style="font-weight:800;" onclick="return confirm('Setujui dan publikasikan produk ini ke katalog marketplace?')">
-                                    ✅ Setujui
+                                    <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Setujui</span>
                                 </button>
                             </form>
                             <button type="button" onclick="openRejectModal('{{ a.approval_id }}', '{{ a.title|escape }}')" class="app-button app-button-danger app-button-small" style="font-weight:800;">
-                                ❌ Tolak
+                                <span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Tolak</span>
                             </button>
                         </div>
                     </td>
@@ -140,7 +140,7 @@
     <div class="mcp-blocking-box" style="max-width:460px; text-align:left; background:var(--app-surface); border:2.5px solid #111; border-radius:12px; box-shadow:6px 6px 0 #111; padding:24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid var(--app-border); padding-bottom:10px;">
             <h2 style="font-size:18px; font-weight:900; margin:0; color:#dc2626; display:flex; align-items:center; gap:8px;">
-                <span>❌</span> Tolak Produk Firmware
+                <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Tolak Produk Firmware
             </h2>
             <button type="button" onclick="closeRejectModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--app-muted); line-height:1;" aria-label="Tutup">&times;</button>
         </div>
