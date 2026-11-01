@@ -345,3 +345,84 @@ def test_relay_virtual_smarthome_guard_and_16_channel_security(tmp_path):
 
 
 
+
+
+def test_multi_room_voice_disambiguation_and_graceful_ack(tmp_path):
+    """
+    Test real user issue resolution:
+    1. Multi-room collision: When commanding Relay X in Room 1 (8CH), it must NOT trigger Room 2 (6CH).
+    2. Number normalization: "no 2", "nomor dua", "d ruang 1" must correctly match.
+    3. Batch control per room: "matikan semua lampu di ruang 1" must target only Room 1.
+    4. Graceful ACK: Sent MQTT commands return success=True even if hardware ACK has network delay.
+    """
+    db_file = str(tmp_path / "test_multi_room.db")
+    os.environ["DB_BACKEND"] = "sqlite"
+    os.environ["SQLITE_DB_PATH"] = db_file
+    from xiaozhi import dependencies
+    store = SQLiteStore(db_path=db_file)
+    dependencies._store = store
+    user = store.create_user("multiroom_tester", "pwd12345678")
+    owner_id = user["id"]
+
+    # Room 1: Ruang 1 (8 relays)
+    cfg1 = generate_real_relay_api_config("Ruang 1")
+    relays1 = [
+        {"relay_number": i, "nama_relay": f"Lampu {i}", "voice_command_on": f"nyalakan lampu {i} ruang 1", "voice_command_off": f"matikan lampu {i} ruang 1", "status": "OFF"}
+        for i in range(1, 9)
+    ]
+    r1_id = store.add_relay_room(owner_id, "Ruang 1", cfg1["api_slug"], cfg1["api_token"], cfg1["api_client_id"], relays1)
+
+    # Room 2: Ruang 2 (6 relays) - created after Room 1
+    cfg2 = generate_real_relay_api_config("Ruang 2")
+    relays2 = [
+        {"relay_number": i, "nama_relay": f"Lampu {i}", "voice_command_on": f"nyalakan lampu {i}", "voice_command_off": f"matikan lampu {i}", "status": "OFF"}
+        for i in range(1, 7)
+    ]
+    r2_id = store.add_relay_room(owner_id, "Ruang 2", cfg2["api_slug"], cfg2["api_token"], cfg2["api_client_id"], relays2)
+
+    # 1. Disambiguation Test: "nyalakan lampu no 2 d ruang 1" MUST match Ruang 1, NOT Ruang 2!
+    m1 = store.match_real_relay_command(owner_id, "nyalakan lampu no 2 d ruang 1")
+    assert m1 is not None
+    assert m1["room"]["id"] == r1_id
+    assert m1["relay"]["relay_number"] == 2
+    assert m1["command"] == "ON"
+
+    # 2. Spelled-out number test: "matikan lampu nomor dua di ruang 1"
+    m2 = store.match_real_relay_command(owner_id, "tolong matikan lampu nomor dua di ruang 1")
+    assert m2 is not None
+    assert m2["room"]["id"] == r1_id
+    assert m2["relay"]["relay_number"] == 2
+    assert m2["command"] == "OFF"
+
+    # 3. Room 2 command: "nyalakan lampu 3 ruang 2"
+    m3 = store.match_real_relay_command(owner_id, "nyalakan lampu 3 ruang 2")
+    assert m3 is not None
+    assert m3["room"]["id"] == r2_id
+    assert m3["relay"]["relay_number"] == 3
+
+    # 4. Batch room command: "matikan semua lampu di ruang 1"
+    m4 = store.match_real_relay_command(owner_id, "matikan semua lampu di ruang 1")
+    assert m4 is not None
+    assert m4.get("is_all") is True
+    assert m4["room"]["id"] == r1_id
+    assert m4["command"] == "OFF"
+
+    # 5. Target & Channel matching: match_real_relay_for_target
+    from xiaozhi.routers.relay_nyata import match_real_relay_for_target, control_real_relay, control_all_real_relays
+    m5 = match_real_relay_for_target(owner_id, target="Ruang 1", action="nyalakan", channel=4)
+    assert m5 is not None
+    assert m5["room"]["id"] == r1_id
+    assert m5["relay"]["relay_number"] == 4
+    assert m5["command"] == "ON"
+
+    # 6. Graceful ACK: Sent MQTT command returns success=True with pending=True
+    r1 = store.get_relay_room(owner_id, r1_id)
+    resp = control_real_relay(owner_id, r1, r1["relays"][1], "ON", source="mcp_voice")
+    assert resp["success"] is True
+    assert resp["pending"] is True
+    assert "telah diproses" in resp["message"]
+
+    # 7. Batch room control execution
+    batch_resp = control_all_real_relays(owner_id, "OFF", room_id=r1_id, source="mcp_voice")
+    assert batch_resp["success"] is True
+    assert batch_resp["count"] == 8

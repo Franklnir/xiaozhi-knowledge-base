@@ -74,15 +74,20 @@ def handle_virtual_tool_with_real_relay(owner_id: int, name: str, arguments: Dic
     action = arguments.get("action", "")
     channel = arguments.get("channel")
     if name == "control_relay":
-        channel_text = str(channel or "").strip()
-        if channel_text in SMART_HOME_RELAYS:
-            target = smart_home_room_name(channel_text)
+        if not target and channel:
+            channel_text = str(channel or "").strip()
+            if channel_text in SMART_HOME_RELAYS:
+                target = smart_home_room_name(channel_text)
     matched = match_real_relay_for_target(owner_id, target=target, action=action, channel=channel)
     if not matched:
         response = {"success": False, "message": "Perintah suara tidak cocok dengan daftar Relay Nyata yang tersimpan."}
         record_mcp_tool_history(owner_id, name, f"{target} {action}".strip(), arguments, response)
         return response
-    response = control_real_relay(owner_id, matched["room"], matched["relay"], matched["command"], source="mcp_voice")
+    if matched.get("is_all"):
+        target_room_id = matched["room"]["id"] if matched.get("room") else None
+        response = control_all_real_relays(owner_id, matched["command"], room_id=target_room_id, source="mcp_voice")
+    else:
+        response = control_real_relay(owner_id, matched["room"], matched["relay"], matched["command"], source="mcp_voice")
     response["routed_from"] = name
     record_mcp_tool_history(owner_id, name, f"{target} {action}".strip(), arguments, response)
     return response

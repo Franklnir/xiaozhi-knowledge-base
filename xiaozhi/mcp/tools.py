@@ -1787,12 +1787,22 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         owner_id = mcp_active_owner_ctx.get()
         if owner_id is None:
             return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif."}
-        from xiaozhi.routers.relay_nyata import control_real_relay, match_real_relay_command
+        from xiaozhi.routers.relay_nyata import control_real_relay, control_all_real_relays, match_real_relay_command
         matched = match_real_relay_command(owner_id, user_message)
         if not matched:
             response = {"success": False, "message": "Perintah suara tidak cocok dengan Relay Nyata yang tersimpan."}
             record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message}, response)
             return response
+        if matched.get("is_all"):
+            target_room = matched.get("room")
+            target_room_id = target_room["id"] if target_room else None
+            try:
+                response = control_all_real_relays(owner_id, matched["command"], room_id=target_room_id, source="mcp_voice")
+                record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message, "all": True, "room_id": target_room_id, "command": matched["command"]}, response)
+                return response
+            except Exception:
+                logger.exception("Error MCP real relay batch")
+                return {"success": False, "message": "Gagal menjalankan kontrol seluruh relay."}
         room = matched["room"]
         relay = matched["relay"]
         command = matched["command"]

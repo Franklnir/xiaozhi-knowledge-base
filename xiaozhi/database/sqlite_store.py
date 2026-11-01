@@ -2392,18 +2392,9 @@ class SQLiteStore:
         conn.commit()
 
     def match_real_relay_command(self, owner_id: int, user_message: str) -> Optional[Dict[str, Any]]:
-        from xiaozhi.core.utils import normalize_voice_command
-        normalized_msg = normalize_voice_command(user_message)
+        from xiaozhi.routers.relay_nyata import smart_match_real_relay
         rooms = self.list_relay_rooms(owner_id)
-        for room in rooms:
-            for relay in room.get("relays", []):
-                on_cmd = normalize_voice_command(relay.get("voice_command_on", ""))
-                off_cmd = normalize_voice_command(relay.get("voice_command_off", ""))
-                if on_cmd and on_cmd in normalized_msg:
-                    return {"room": room, "relay": relay, "command": "ON"}
-                if off_cmd and off_cmd in normalized_msg:
-                    return {"room": room, "relay": relay, "command": "OFF"}
-        return None
+        return smart_match_real_relay(rooms, user_message)
 
     # ── Audio Queue ────────────────────────────────────────────────────────
 
