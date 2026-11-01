@@ -686,6 +686,7 @@
                             Pada tab <strong>Pengaturan Hardware</strong>, pilih tipe modul layar yang sesuai:
                             <ul style="margin:6px 0 0 16px; padding:0;">
                                 <li><strong>ST7789 240x280 1.69" (8-Pin SPI, CS=GPIO 45):</strong> Modul layar IPS 1.69" resolusi 240x280.</li>
+                                <li><strong>ST7789 240x240 1.3" (7-Pin / 8-Pin SPI, CS=GPIO 45 atau GND):</strong> Modul layar TFT IPS 1.3 inch resolusi 240x240 (driver ST7789).</li>
                                 <li><strong>ST7789 240x240 1.54" (8-Pin SPI, CS=GPIO 45):</strong> Modul layar IPS 1.54" resolusi 240x240.</li>
                                 <li><strong>OLED SSD1306 128x64 0.96" (I2C):</strong> Layar OLED monokrom 0.96 inch I2C.</li>
                                 <li><strong>OLED SH1106 128x64 0.96" / 1.3" (I2C):</strong> Layar OLED monokrom 1.3 inch chip driver SH1106 I2C.</li>
@@ -760,6 +761,19 @@
                                 </td>
                             </tr>
                             <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
+                                    ST7789 240x240 1.3"<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(7-Pin / 8-Pin SPI, CS=45 / GND)</span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px; font-family:monospace; color:var(--app-sky);">
+                                    <code>st7789_240x240_7p</code><br>
+                                    <span style="font-size:11px; color:var(--app-muted);">atau <code>st7789_240x240_8p</code></span>
+                                </td>
+                                <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-text);">
+                                    <strong>Untuk:</strong> Modul layar TFT IPS 1.3" resolusi 240x240 chip driver ST7789 (tersedia model 7-pin tanpa CS maupun 8-pin dengan CS).<br>
+                                    <span style="color:var(--app-muted); display:inline-block; margin-top:4px;"><strong>Wiring:</strong> GND=GND, VCC=3.3V, SCL=19, SDA=20, RES=21, DC=47, BLK=38, CS=45 (atau ke GND jika model 7-Pin).</span>
+                                </td>
+                            </tr>
+                            <tr>
                                 <td style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand);">
                                     ST7789 240x240 1.54"<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(8-Pin SPI, CS=GPIO 45)</span>
                                 </td>
@@ -1284,8 +1298,93 @@
                 </div>
 
                 <!-- Sub-tabel 2: Layar ST7789 SPI & OLED I2C -->
+                <div style="font-size:14px; font-weight:800; color:var(--app-text); margin:20px 0 10px; display:flex; align-items:center; gap:8px;">
+                    <span>🖥️</span> Tabel Pinout Lengkap ST7789 240x240 (1.3" &amp; 1.54") ➔ ESP32-S3
+                </div>
+                <div style="font-size:12.5px; color:var(--app-muted); margin-bottom:12px; line-height:1.6;">
+                    Modul layar TFT <strong>1.3 inch resolusi 240x240 IPS (Driver ST7789)</strong> sangat populer untuk speaker XiaoZhi karena dimensinya yang ringkas, sudut pandang lebar, dan reproduksi warna cerah:
+                </div>
+
+                <!-- TABEL PINOUT LENGKAP PERSIS SESUAI SPESIFIKASI PENGGUNA -->
+                <div style="overflow-x:auto; margin-bottom:14px;">
+                    <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                        <thead>
+                            <tr style="background:var(--app-surface-muted); text-align:left;">
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Pin Modul ST7789</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:22%;">Fungsi Pin</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; width:26%;">Sambungkan ke Pin ESP32-S3</th>
+                                <th style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px;">Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750; color:var(--app-text);">GND</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-muted);">Ground</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750;"><span class="app-chip app-chip-neutral" style="font-weight:700;">GND</span></td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:12.5px; color:var(--app-muted);">Ground bersama</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750; color:var(--app-text);">VCC</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-muted);">Power</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750;"><span class="app-chip app-chip-warning" style="font-weight:700;">3.3V (atau 5V)</span></td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:12.5px; color:var(--app-text);"><strong>3.3V direkomendasikan</strong></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750; color:var(--app-text);">SCL / SCK</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-muted);">SPI Clock</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750;"><strong style="color:var(--app-brand);">GPIO 19</strong></td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:12.5px; font-family:monospace; color:#d97706; font-weight:750;">DISPLAY_CLK_PIN</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750; color:var(--app-text);">SDA / MOSI</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-muted);">SPI Data In</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750;"><strong style="color:var(--app-brand);">GPIO 20</strong></td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:12.5px; font-family:monospace; color:#d97706; font-weight:750;">DISPLAY_MOSI_PIN</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750; color:var(--app-text);">RES / RST</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-muted);">Reset</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750;"><strong style="color:var(--app-brand);">GPIO 21</strong></td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:12.5px; font-family:monospace; color:#d97706; font-weight:750;">DISPLAY_RST_PIN</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750; color:var(--app-text);">DC / RS</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-muted);">Data / Command</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750;"><strong style="color:var(--app-brand);">GPIO 47</strong></td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:12.5px; font-family:monospace; color:#d97706; font-weight:750;">DISPLAY_DC_PIN</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750; color:var(--app-text);">BLK / BL / LED</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-muted);">Backlight Control</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750;"><strong style="color:var(--app-brand);">GPIO 38</strong></td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:12.5px; font-family:monospace; color:#d97706; font-weight:750;">DISPLAY_BACKLIGHT_PIN</td>
+                            </tr>
+                            <tr style="background:var(--app-surface-muted);">
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750; color:var(--app-text);">CS (jika ada 8-Pin)</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; color:var(--app-muted);">Chip Select</td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:750;"><strong style="color:var(--app-brand);">GPIO 45</strong> <em>(atau ke GND)</em></td>
+                                <td style="padding:9px 12px; border:1px solid var(--app-border); font-size:12.5px; color:var(--app-muted);">Lihat catatan di bawah</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- CATATAN TAMBAHAN PERSIS SESUAI SPESIFIKASI GAMBAR -->
+                <div class="doc-tip" style="margin-bottom:20px; line-height:1.65;">
+                    <div style="font-size:13px; font-weight:800; color:var(--app-text); margin-bottom:8px;">
+                        📌 Catatan Tambahan Layar ST7789 240x240:
+                    </div>
+                    <ol style="margin:0 0 0 18px; padding:0; font-size:12.5px; color:var(--app-text); line-height:1.7;">
+                        <li><strong>Jika Layar Anda Model 7-Pin (Tanpa Pin CS):</strong> Modul TFT 1.3" ST7789 umumnya berformat 7-Pin (GND, VCC, SCL, SDA, RES, DC, BLK). Pada modul ini pin CS internal sudah dihubungkan permanen ke GND pada PCB modul (SPI Mode 3, CS dinonaktifkan). Anda cukup menyambungkan 7 pin tersebut langsung ke ESP32-S3 sesuai tabel di atas tanpa perlu jalur CS.</li>
+                        <li><strong>Jika Layar Anda Model 8-Pin (Ada Pin CS):</strong> Sambungkan pin CS layar ke <strong>GPIO 45</strong> pada ESP32-S3, atau Anda juga bisa menghubungkannya langsung ke pin GND untuk menghemat pin.</li>
+                        <li><strong>Tegangan VCC:</strong> Disarankan menggunakan <strong>3.3V</strong> untuk kestabilan sinyal logika SPI driver ST7789 dan menghindari suhu berlebih.</li>
+                        <li><strong>Kontrol Kecerahan Backlight:</strong> Sambungkan pin BLK ke <strong>GPIO 38</strong> untuk mengaktifkan pengaturan kecerahan layar melalui perintah suara AI (<em>"Redupkan layar"</em>, <em>"Terangkan layar"</em>) atau melalui portal web.</li>
+                    </ol>
+                </div>
+
+                <!-- REFERENSI PINOUT LAYAR LAINNYA (240x280 & OLED I2C) -->
                 <div style="font-size:13px; font-weight:700; color:var(--app-text); margin:16px 0 8px; display:flex; align-items:center; gap:6px;">
-                    <span>🖥️</span> Pinout Modul Layar (ST7789 SPI 8-Pin &amp; OLED I2C)
+                    <span>🖥️</span> Pinout Modul Layar Lainnya (ST7789 240x280 1.69" &amp; OLED I2C)
                 </div>
                 <div style="overflow-x:auto; margin-bottom:16px;">
                     <table style="width:100%; border-collapse:collapse; background:var(--app-surface); border:1px solid var(--app-border); border-radius:var(--app-radius);">
@@ -1299,7 +1398,7 @@
                         <tbody>
                             <tr>
                                 <td rowspan="6" style="padding:10px 12px; border:1px solid var(--app-border); font-size:13px; font-weight:700; color:var(--app-brand); vertical-align:top;">
-                                    ST7789 IPS LCD<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(240x280 / 240x240 SPI)</span>
+                                    ST7789 1.69" IPS LCD<br><span style="font-size:11px; font-weight:normal; color:var(--app-muted);">(240x280 8-Pin SPI)</span>
                                 </td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:13px;">SCL / SCLK = <strong style="color:var(--app-brand);">GPIO 19</strong></td>
                                 <td style="padding:8px 12px; border:1px solid var(--app-border); font-size:12px; color:var(--app-muted);">SPI Clock Pulsa</td>
