@@ -85,6 +85,8 @@
 
   /* ── Modern Toast Notification System ─────────────────────── */
   let _toastContainer = null;
+  const _MAX_VISIBLE_TOASTS = 3;
+  const _recentToastTimes = new Map();
 
   const _toastIcons = {
     success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
@@ -112,8 +114,30 @@
 
   function toast(message, type, durationMs) {
     type = type || "info";
-    durationMs = durationMs || (type === "error" ? 5000 : 3800);
+    durationMs = durationMs || (type === "error" ? 5000 : 2600);
     const container = _ensureToastContainer();
+    const cleanMsg = _stripLeadingEmoji(message);
+    if (!cleanMsg) return;
+
+    // 1. Cegah banjir notifikasi dengan pesan sama persis dalam 2 detik
+    const now = Date.now();
+    const lastTime = _recentToastTimes.get(cleanMsg) || 0;
+    if (now - lastTime < 2000) {
+      return;
+    }
+    _recentToastTimes.set(cleanMsg, now);
+    if (_recentToastTimes.size > 50) {
+      for (const [k, v] of _recentToastTimes.entries()) {
+        if (now - v > 10000) _recentToastTimes.delete(k);
+      }
+    }
+
+    // 2. Batasi tumpukan toast maksimal 3 buah (Singkirkan toast terlama secara otomatis)
+    while (container.children.length >= _MAX_VISIBLE_TOASTS) {
+      const oldest = container.children[0];
+      if (oldest) oldest.remove();
+    }
+
     const el = document.createElement("div");
     el.className = "app-toast-item app-toast-" + type;
     el.setAttribute("role", "status");
@@ -124,7 +148,7 @@
 
     const content = document.createElement("div");
     content.className = "app-toast-content";
-    content.textContent = _stripLeadingEmoji(message);
+    content.textContent = cleanMsg;
 
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";

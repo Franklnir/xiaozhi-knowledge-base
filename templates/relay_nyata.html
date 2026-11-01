@@ -3358,6 +3358,45 @@ void loop() {
     // Map untuk micro-polling loop verifikasi adaptif (Real-Time Dual-Channel tanpa refresh)
     const activeVerificationLoops = new Map();
 
+    // ── Smart Debounced Relay Confirmation Toast (Anti-Spam / Anti-Cascade) ──
+    let _relayToastBuffer = [];
+    let _relayToastDebounceTimer = null;
+    const _recentlyToastedRelays = new Set(); // key: `${roomId}-${relayNumber}-${status}`
+
+    function notifyRelayConfirmed(roomId, relayNumber, relayName, status) {
+        const dedupeKey = `${roomId}-${relayNumber}-${status}`;
+        if (_recentlyToastedRelays.has(dedupeKey)) return;
+        _recentlyToastedRelays.add(dedupeKey);
+        setTimeout(() => _recentlyToastedRelays.delete(dedupeKey), 2500);
+
+        _relayToastBuffer.push({
+            roomId,
+            relayNumber,
+            relayName: relayName || `Relay CH ${relayNumber}`,
+            status
+        });
+
+        if (_relayToastDebounceTimer) clearTimeout(_relayToastDebounceTimer);
+        _relayToastDebounceTimer = setTimeout(() => {
+            const items = _relayToastBuffer.slice();
+            _relayToastBuffer = [];
+            if (items.length === 0) return;
+
+            if (items.length === 1) {
+                showToast(`✓ Konfirmasi ESP32: ${items[0].relayName} telah ${items[0].status}!`, "success");
+            } else {
+                // Multi-relay batch action (e.g. Turn all OFF or voice command controlling multiple channels)
+                const sampleStatus = items[0].status;
+                const allSame = items.every(i => i.status === sampleStatus);
+                if (allSame) {
+                    showToast(`✓ Konfirmasi ESP32: ${items.length} relay berhasil ${sampleStatus}!`, "success");
+                } else {
+                    showToast(`✓ Konfirmasi ESP32: ${items.length} status relay berhasil diperbarui!`, "success");
+                }
+            }
+        }, 180);
+    }
+
     function stopRelayVerification(key) {
         if (activeVerificationLoops.has(key)) {
             clearInterval(activeVerificationLoops.get(key));
@@ -3416,7 +3455,7 @@ void loop() {
 
                     paintDeviceConnection(targetRoom);
 
-                    showToast(`✓ Konfirmasi ESP32: ${(targetRelay.nama_relay || "Relay CH " + relayNumber)} telah ${currentStatus}!`, "success");
+                    notifyRelayConfirmed(roomId, relayNumber, targetRelay.nama_relay, currentStatus);
                 }
             } catch (e) {
                 // Ignore transient network errors during fast micro-poll
@@ -3655,8 +3694,21 @@ void loop() {
                     const key = `${data.room_id}-${data.relay_number}`;
 
                     if (data.source === "device_ack" || !data.pending) {
+                        const wasWaiting = activeVerificationLoops.has(key) || pendingHardwareWatchdogs.has(key);
                         // Mikrokontroler ESP32 telah mengonfirmasi eksekusi fisik relay!
                         stopRelayVerification(key);
+
+                        const roomId = Number(data.room_id);
+                        let statusChanged = false;
+                        if (cachedRooms[roomId] && Array.isArray(cachedRooms[roomId].relays)) {
+                            const prevR = cachedRooms[roomId].relays.find(r => Number(r.relay_number) === Number(data.relay_number));
+                            if (prevR) {
+                                if (String(prevR.status).toUpperCase() !== String(data.status).toUpperCase()) {
+                                    statusChanged = true;
+                                    prevR.status = data.status;
+                                }
+                            }
+                        }
 
                         // BARU SEKARANG status UI tombol diubah sesuai konfirmasi mikrokontroler!
                         paintRelay(data.room_id, {
@@ -3666,14 +3718,15 @@ void loop() {
                             desired_status: data.status
                         });
 
-                        const roomId = Number(data.room_id);
                         if (!cachedRooms[roomId]) cachedRooms[roomId] = { id: roomId };
                         cachedRooms[roomId].device_connected = true;
                         cachedRooms[roomId].device_last_seen_at = new Date().toISOString();
                         paintDeviceConnection(cachedRooms[roomId]);
 
-                        if (data.source === "device_ack") {
-                            showToast(`✓ Konfirmasi ESP32: ${(data.relay_name || "Relay CH " + data.relay_number)} telah ${data.status}!`, "success");
+                        // Hanya tampilkan notifikasi jika user/AI sedang menunggu (wasWaiting) ATAU statusnya benar-benar berubah!
+                        // Ini mencegah banjir toast dari routine background heartbeat ESP32
+                        if (data.source === "device_ack" && (wasWaiting || statusChanged)) {
+                            notifyRelayConfirmed(roomId, data.relay_number, data.relay_name, data.status);
                         }
                     } else {
                         // Status pending dari MCP voice atau inisiator lain
