@@ -1472,9 +1472,20 @@ void reconnectMQTT() {{
     espClient.stop();
     delay(50);
 
+    // Dynamic Client ID: sertakan ID chip hardware unik agar jika 2 board memakai slug sama tidak saling kick
+    char dynamicClientId[64];
+    #if defined(ESP32)
+    uint32_t chipId = (uint32_t)ESP.getEfuseMac();
+    snprintf(dynamicClientId, sizeof(dynamicClientId), "%s-%06X", CLIENT_ID, chipId & 0xFFFFFF);
+    #elif defined(ESP8266)
+    snprintf(dynamicClientId, sizeof(dynamicClientId), "%s-%06X", CLIENT_ID, ESP.getChipId() & 0xFFFFFF);
+    #else
+    snprintf(dynamicClientId, sizeof(dynamicClientId), "%s", CLIENT_ID);
+    #endif
+
     // LWT: Jika koneksi putus mendadak, Mosquitto otomatis mempublikasikan "offline"
-    if (mqttClient.connect(CLIENT_ID, TOPIC_AVAILABILITY, 1, true, "offline")) {{
-        Serial.println(" BERHASIL!");
+    if (mqttClient.connect(dynamicClientId, TOPIC_AVAILABILITY, 1, true, "offline")) {{
+        Serial.printf(" BERHASIL! (ID: %s)\\n", dynamicClientId);
         mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
         mqttClient.subscribe(TOPIC_COMMAND, 1);
         Serial.printf("[MQTT] Subscribed ke topic: %s\\n", TOPIC_COMMAND);
@@ -1498,12 +1509,12 @@ void handleSerialInput() {{
         printSystemStatus();
     }} else if (cmd.equalsIgnoreCase("help") || cmd.equalsIgnoreCase("?")) {{
         Serial.println("\\n--- DAFTAR PERINTAH SERIAL MONITOR ---");
-        Serial.println("status      : Tampilkan ringkasan status sistem & relay lengkap");
-        Serial.println("all on      : Nyalakan semua channel relay");
-        Serial.println("all off     : Matikan semua channel relay");
-        Serial.println("<no> on     : Contoh '1 on' untuk menyalakan Channel 1");
-        Serial.println("<no> off    : Contoh '1 off' untuk mematikan Channel 1");
-        Serial.println("<no>        : Contoh '1' untuk toggle Channel 1");
+        Serial.println("status          : Tampilkan ringkasan status sistem & relay lengkap");
+        Serial.println("all on          : Nyalakan semua channel relay");
+        Serial.println("all off         : Matikan semua channel relay");
+        Serial.println("<no> on         : Contoh '1 on' untuk menyalakan Channel 1");
+        Serial.println("<no> off        : Contoh '1 off' untuk mematikan Channel 1");
+        Serial.println("<no> toggle     : Contoh '1 toggle' untuk toggle Channel 1");
         Serial.println("---------------------------------------\\n");
     }} else if (cmd.equalsIgnoreCase("all on")) {{
         Serial.println("[SERIAL] ⚡ Menyalakan SEMUA channel relay...");
@@ -1529,7 +1540,10 @@ void handleSerialInput() {{
             act.trim();
             act.toUpperCase();
         }} else {{
+            // Tanpa aksi eksplisit (misal hanya angka 1 akibat noise/glitch serial RX),
+            // abaikan demi keamanan anti-glitch agar relay tidak ter-toggle sendiri.
             ch = cmd.toInt();
+            act = "";
         }}
 
         int idx = ch - 1;
@@ -1540,9 +1554,11 @@ void handleSerialInput() {{
             }} else if (act == "OFF") {{
                 applyRelay(idx, false);
                 publishState(idx, "serial_cmd");
-            }} else {{
+            }} else if (act == "TOGGLE") {{
                 applyRelay(idx, !relayStates[idx]);
                 publishState(idx, "serial_toggle");
+            }} else {{
+                Serial.printf("[SERIAL WARN] Perintah tidak lengkap untuk channel %d. Gunakan '%d on', '%d off', atau '%d toggle'. Diabaikan demi keamanan.\\n", ch, ch, ch, ch);
             }}
         }} else {{
             Serial.printf("[SERIAL] Perintah '%s' tidak dikenal. Ketik 'help' atau 'status'.\\n", cmd.c_str());
