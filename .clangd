@@ -6,3 +6,4 @@ CompileFlags:
     - -ferror-limit=0
 Diagnostics:
   Suppress: '*'
+

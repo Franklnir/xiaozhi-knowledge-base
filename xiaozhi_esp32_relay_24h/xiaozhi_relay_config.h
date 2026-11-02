@@ -42,4 +42,31 @@ const int RELAY_PINS[NUM_RELAYS] = { 4, 16 };
 // - false : Relay ON saat pin bernilai HIGH (3.3V)
 const bool RELAY_ACTIVE_LOW = true;
 
+// 4. INDIKATOR LED ONBOARD (STATUS & AKTIVITAS)
+// Status LED bawaan board:
+// - ESP32 Klasik (WROOM-32) : GPIO 2 (Active High: false)
+// - ESP32-C3 Super Mini     : GPIO 8 (Active Low: true)
+// - ESP32-S3 / S3 N16R8     : GPIO 21 (Active High: false)
+// - ESP32-S2                : GPIO 15 (Active High: false)
+// - ESP8266 (NodeMCU/D1)    : GPIO 2 (Active Low: true)
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+const int STATUS_LED_PIN = 8;
+const bool STATUS_LED_ACTIVE_LOW = true;
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+const int STATUS_LED_PIN = 21;
+const bool STATUS_LED_ACTIVE_LOW = false;
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+const int STATUS_LED_PIN = 15;
+const bool STATUS_LED_ACTIVE_LOW = false;
+#elif defined(ESP8266)
+const int STATUS_LED_PIN = 2;
+const bool STATUS_LED_ACTIVE_LOW = true;
+#elif defined(LED_BUILTIN)
+const int STATUS_LED_PIN = LED_BUILTIN;
+const bool STATUS_LED_ACTIVE_LOW = false;
+#else
+const int STATUS_LED_PIN = 2;
+const bool STATUS_LED_ACTIVE_LOW = false;
+#endif
+
 #endif // XIAOZHI_RELAY_CONFIG_H

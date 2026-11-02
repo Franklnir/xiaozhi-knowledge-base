@@ -1186,16 +1186,28 @@ async def download_arduino_project_zip(room_id: int, request: Request):
         board_lower = board_name.lower()
         if "n16r8" in board_lower or ("s3" in board_lower and "16" in board_lower):
             default_pins = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21]
+            led_pin = 21
+            led_active_low = "false"
         elif "s2" in board_lower:
             default_pins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+            led_pin = 15
+            led_active_low = "false"
         elif "s3" in board_lower:
             default_pins = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+            led_pin = 21
+            led_active_low = "false"
         elif "c3" in board_lower:
             default_pins = [4, 5, 6, 7, 10, 3, 1, 0]
+            led_pin = 8
+            led_active_low = "true"
         elif "8266" in board_lower:
             default_pins = [5, 4, 14, 12, 13, 15]
+            led_pin = 2
+            led_active_low = "true"
         else:
             default_pins = [4, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 5, 13, 14]
+            led_pin = 2
+            led_active_low = "false"
 
         num_relays = max(1, min(len(room.get("relays", [])) or int(room.get("jumlah_relay", 2) or 2), len(default_pins)))
         pins_str = ", ".join(str(p) for p in default_pins[:num_relays])
@@ -1264,6 +1276,55 @@ unsigned long lastMqttRetry = 0;
 unsigned long lastHeartbeat = 0;
 unsigned long lastStatusPrint = 0;
 unsigned long wifiDisconnectSince = 0;
+
+// ============================================================
+// 4. INDIKATOR STATUS & AKTIVITAS LED ONBOARD
+// ============================================================
+const int STATUS_LED_PIN = {led_pin};
+const bool STATUS_LED_ACTIVE_LOW = {led_active_low};
+
+unsigned long ledActivityUntil = 0;
+int ledActivityBlinks = 0;
+
+void setStatusLed(bool on) {{
+    if (STATUS_LED_PIN < 0) return;
+    digitalWrite(STATUS_LED_PIN, STATUS_LED_ACTIVE_LOW ? (on ? LOW : HIGH) : (on ? HIGH : LOW));
+}}
+
+void triggerActivityLed(int numBlinks = 2) {{
+    ledActivityBlinks = numBlinks * 2;
+    ledActivityUntil = millis();
+}}
+
+void updateStatusLed() {{
+    if (STATUS_LED_PIN < 0) return;
+    unsigned long now = millis();
+
+    // 1. Jika OFFLINE (WiFi atau MQTT terputus): LED mati total (tidak berkedip)
+    if (WiFi.status() != WL_CONNECTED || !mqttClient.connected()) {{
+        setStatusLed(false);
+        return;
+    }}
+
+    // 2. Jika ada aktivitas data masuk / keluar: Kedip cepat (60ms ON / 60ms OFF)
+    if (ledActivityBlinks > 0) {{
+        if (now >= ledActivityUntil) {{
+            bool turnOn = (ledActivityBlinks % 2 != 0);
+            setStatusLed(turnOn);
+            ledActivityBlinks--;
+            ledActivityUntil = now + 60;
+        }}
+        return;
+    }}
+
+    // 3. Jika ONLINE normal (Standby): Denyut halus (Heartbeat: 80ms ON tiap 1.5 detik)
+    unsigned long cycle = now % 1500;
+    if (cycle < 80) {{
+        setStatusLed(true);
+    }} else {{
+        setStatusLed(false);
+    }}
+}}
 
 bool isDuplicate(const String& id) {{
     if (id.length() == 0) return false;
@@ -1338,11 +1399,13 @@ void publishState(int relayIndex, const String& cmdId) {{
     char buffer[256];
     size_t len = serializeJson(doc, buffer);
     mqttClient.publish(TOPIC_STATE, (uint8_t*)buffer, len, false);
+    triggerActivityLed(2);
     Serial.printf("[STATUS MQTT] 📤 State terkirim ke Broker: CH %d = %s (Cmd: %s)\\n", 
                   relayIndex + 1, relayStates[relayIndex] ? "ON" : "OFF", cmdId.c_str());
 }}
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {{
+    triggerActivityLed(2);
     Serial.printf("[MQTT RECV] Pesan diterima di topic [%s]\\n", topic);
 
     StaticJsonDocument<512> doc;
@@ -1486,6 +1549,7 @@ void reconnectMQTT() {{
 
     // LWT: Jika koneksi putus mendadak, Mosquitto otomatis mempublikasikan "offline"
     if (mqttClient.connect(dynamicClientId, TOPIC_AVAILABILITY, 1, true, "offline")) {{
+        triggerActivityLed(3);
         Serial.printf(" BERHASIL! (ID: %s)\\n", dynamicClientId);
         mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
         mqttClient.subscribe(TOPIC_COMMAND, 1);
@@ -1588,6 +1652,12 @@ void setup() {{
         relayStates[i] = false;
     }}
 
+    // Inisialisasi pin status LED bawaan board
+    if (STATUS_LED_PIN >= 0) {{
+        pinMode(STATUS_LED_PIN, OUTPUT);
+        setStatusLed(false);
+    }}
+
     Serial.println("\\n==========================================");
     Serial.printf(" XIAOZHI SMART RELAY (%s) BOOTED\\n", "{board_name}");
     Serial.printf(" Client ID      : %s\\n", CLIENT_ID);
@@ -1609,6 +1679,7 @@ void setup() {{
 }}
 
 void loop() {{
+    updateStatusLed();
     unsigned long now = millis();
 
     // Service MQTT first so serial input or other work cannot starve keepalive packets.

@@ -2009,7 +2009,9 @@
             pins: [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21],
             note: "Pinout ESP32-S3 N16R8 memakai GPIO aman [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21]. PENTING: Jangan gunakan GPIO 33-37 karena terhubung ke Octal PSRAM (R8) & GPIO 26-32 (SPI Flash N16), serta hindari strapping GPIO 0, 3, 45, 46.",
             includeWifi: "#include <WiFi.h>",
-            cdcBoot: true
+            cdcBoot: true,
+            ledPin: 21,
+            ledActiveLow: false
         },
         esp32_s3: {
             name: "ESP32-S3 (Xtensa Dual-Core AI)",
@@ -2018,7 +2020,9 @@
             pins: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21],
             note: "Pinout GPIO [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21] aman untuk ESP32-S3 (Bebas dari strapping GPIO 0, 3, 45, 46 dan bebas dari SPI Flash/PSRAM Octal GPIO 26-37).",
             includeWifi: "#include <WiFi.h>",
-            cdcBoot: true
+            cdcBoot: true,
+            ledPin: 21,
+            ledActiveLow: false
         },
         esp32_s2: {
             name: "ESP32-S2 (Xtensa Single-Core USB)",
@@ -2027,7 +2031,9 @@
             pins: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
             note: "Pinout GPIO [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] aman untuk ESP32-S2 (Bebas dari strapping GPIO 0, 45, 46, SPI Flash 26-32, dan USB 19, 20).",
             includeWifi: "#include <WiFi.h>",
-            cdcBoot: true
+            cdcBoot: true,
+            ledPin: 15,
+            ledActiveLow: false
         },
         esp32_classic: {
             name: "ESP32 Klasik (WROOM-32 / WROVER)",
@@ -2036,7 +2042,9 @@
             pins: [4, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 5, 13, 14],
             note: "Pinout GPIO [4, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33] sangat aman untuk ESP32 standar (Bebas strapping 0, 2, 5, 12, 15 dan bebas input-only 34-39).",
             includeWifi: "#include <WiFi.h>",
-            cdcBoot: false
+            cdcBoot: false,
+            ledPin: 2,
+            ledActiveLow: false
         },
         esp32_c3: {
             name: "ESP32-C3 (RISC-V)",
@@ -2045,7 +2053,9 @@
             pins: [4, 5, 6, 7, 10, 3, 1, 0],
             note: "Pinout GPIO [4, 5, 6, 7, 10, 3] sangat aman untuk ESP32-C3 (Bebas dari strapping bootloader GPIO 0, 1, 8, 9). Aktifkan 'USB CDC On Boot' jika memakai USB-C langsung.",
             includeWifi: "#include <WiFi.h>",
-            cdcBoot: true
+            cdcBoot: true,
+            ledPin: 8,
+            ledActiveLow: true
         },
         esp8266: {
             name: "ESP8266 (NodeMCU / D1 Mini)",
@@ -2055,7 +2065,9 @@
             pinLabels: ["D1 (GPIO 5)", "D2 (GPIO 4)", "D5 (GPIO 14)", "D6 (GPIO 12)", "D7 (GPIO 13)", "D8 (GPIO 15)"],
             note: "Pinout ESP8266 memakai D1(5), D2(4), D5(14), D6(12), D7(13), D8(15). Hindari D3/D4/D0 saat boot.",
             includeWifi: "#include <ESP8266WiFi.h>",
-            cdcBoot: false
+            cdcBoot: false,
+            ledPin: 2,
+            ledActiveLow: true
         }
     };
 
@@ -2082,6 +2094,9 @@
         const ssid = cppStringLiteral(wifiSsid || "WIFI_RUMAH_ANDA");
         const pass = cppStringLiteral(wifiPass || "PASSWORD_WIFI");
         const logicStr = activeLow ? "true" : "false";
+        const ledPinVal = (profile.ledPin !== undefined) ? profile.ledPin : 2;
+        const ledActiveLowVal = (profile.ledActiveLow !== undefined) ? profile.ledActiveLow : false;
+        const ledLogicStr = ledActiveLowVal ? "true" : "false";
         // MQTT topic must use the persisted unique slug used by the server/gateway.
         // Deriving it from the display name drops the random suffix and breaks routing.
         const slug = room.api_slug || room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -2164,6 +2179,55 @@ unsigned long lastHeartbeat = 0;
 unsigned long lastStatusPrint = 0;
 unsigned long wifiDisconnectSince = 0;
 
+// ============================================================
+// 4. INDIKATOR STATUS & AKTIVITAS LED ONBOARD
+// ============================================================
+const int STATUS_LED_PIN = ${ledPinVal};
+const bool STATUS_LED_ACTIVE_LOW = ${ledLogicStr};
+
+unsigned long ledActivityUntil = 0;
+int ledActivityBlinks = 0;
+
+void setStatusLed(bool on) {
+    if (STATUS_LED_PIN < 0) return;
+    digitalWrite(STATUS_LED_PIN, STATUS_LED_ACTIVE_LOW ? (on ? LOW : HIGH) : (on ? HIGH : LOW));
+}
+
+void triggerActivityLed(int numBlinks = 2) {
+    ledActivityBlinks = numBlinks * 2;
+    ledActivityUntil = millis();
+}
+
+void updateStatusLed() {
+    if (STATUS_LED_PIN < 0) return;
+    unsigned long now = millis();
+
+    // 1. Jika OFFLINE (WiFi atau MQTT terputus): LED mati total (tidak berkedip)
+    if (WiFi.status() != WL_CONNECTED || !mqttClient.connected()) {
+        setStatusLed(false);
+        return;
+    }
+
+    // 2. Jika ada aktivitas data masuk / keluar: Kedip cepat (60ms ON / 60ms OFF)
+    if (ledActivityBlinks > 0) {
+        if (now >= ledActivityUntil) {
+            bool turnOn = (ledActivityBlinks % 2 != 0);
+            setStatusLed(turnOn);
+            ledActivityBlinks--;
+            ledActivityUntil = now + 60;
+        }
+        return;
+    }
+
+    // 3. Jika ONLINE normal (Standby): Denyut halus (Heartbeat: 80ms ON tiap 1.5 detik)
+    unsigned long cycle = now % 1500;
+    if (cycle < 80) {
+        setStatusLed(true);
+    } else {
+        setStatusLed(false);
+    }
+}
+
 bool isDuplicate(const String& id) {
     if (id.length() == 0) return false;
     for (int i = 0; i < DEDUP_SLOTS; i++) {
@@ -2242,11 +2306,13 @@ void publishState(int relayIndex, const String& cmdId) {
                       relayIndex + 1, mqttClient.connected() ? "true" : "false", mqttClient.state());
     }
     if (sent) {
+        triggerActivityLed(2);
         Serial.println("[STATUS MQTT] State terkirim ke client MQTT.");
     }
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    triggerActivityLed(2);
     Serial.printf("[MQTT RECV] Pesan diterima di topic [%s]\\n", topic);
 
     StaticJsonDocument<512> doc;
@@ -2387,6 +2453,7 @@ void reconnectMQTT() {
 
     // LWT: Jika koneksi putus mendadak, Mosquitto otomatis mempublikasikan "offline"
     if (mqttClient.connect(dynamicClientId, TOPIC_AVAILABILITY, 1, true, "offline")) {
+        triggerActivityLed(3);
         Serial.printf(" BERHASIL! (ID: %s)\\n", dynamicClientId);
         mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
         mqttClient.subscribe(TOPIC_COMMAND, 1);
@@ -2489,6 +2556,12 @@ void setup() {
         relayStates[i] = false;
     }
 
+    // Inisialisasi pin status LED bawaan board
+    if (STATUS_LED_PIN >= 0) {
+        pinMode(STATUS_LED_PIN, OUTPUT);
+        setStatusLed(false);
+    }
+
     Serial.println("\\n==========================================");
     Serial.printf(" XIAOZHI SMART RELAY (%s) BOOTED\\n", "${profile.headerTitle}");
     Serial.printf(" Client ID      : %s\\n", CLIENT_ID);
@@ -2510,6 +2583,7 @@ void setup() {
 }
 
 void loop() {
+    updateStatusLed();
     unsigned long now = millis();
 
     // Service MQTT first so serial input or other work cannot starve keepalive packets.
@@ -2630,6 +2704,55 @@ const bool RELAY_ACTIVE_LOW = ${logicStr};
 bool relayStates[NUM_RELAYS] = { ${Array(numRelays).fill("false").join(", ")} };
 
 // ============================================================
+// INDIKATOR STATUS & AKTIVITAS LED ONBOARD
+// ============================================================
+const int STATUS_LED_PIN = ${ledPinVal};
+const bool STATUS_LED_ACTIVE_LOW = ${ledLogicStr};
+
+unsigned long ledActivityUntil = 0;
+int ledActivityBlinks = 0;
+
+void setStatusLed(bool on) {
+    if (STATUS_LED_PIN < 0) return;
+    digitalWrite(STATUS_LED_PIN, STATUS_LED_ACTIVE_LOW ? (on ? LOW : HIGH) : (on ? HIGH : LOW));
+}
+
+void triggerActivityLed(int numBlinks = 2) {
+    ledActivityBlinks = numBlinks * 2;
+    ledActivityUntil = millis();
+}
+
+void updateStatusLed() {
+    if (STATUS_LED_PIN < 0) return;
+    unsigned long now = millis();
+
+    // 1. Jika OFFLINE: LED mati total (tidak berkedip)
+    if (WiFi.status() != WL_CONNECTED) {
+        setStatusLed(false);
+        return;
+    }
+
+    // 2. Jika ada aktivitas data masuk / keluar: Kedip cepat
+    if (ledActivityBlinks > 0) {
+        if (now >= ledActivityUntil) {
+            bool turnOn = (ledActivityBlinks % 2 != 0);
+            setStatusLed(turnOn);
+            ledActivityBlinks--;
+            ledActivityUntil = now + 60;
+        }
+        return;
+    }
+
+    // 3. Jika ONLINE normal (Standby): Denyut halus (Heartbeat: 80ms ON tiap 1.5 detik)
+    unsigned long cycle = now % 1500;
+    if (cycle < 80) {
+        setStatusLed(true);
+    } else {
+        setStatusLed(false);
+    }
+}
+
+// ============================================================
 // 4. CEGAH EKSEKUSI GANDA
 // ============================================================
 unsigned long lastPollTime = 0;
@@ -2723,6 +2846,7 @@ bool sendStatusUpdate(const String& commandId) {
     bool ok = (httpCode >= 200 && httpCode < 300);
 
     if (ok) {
+        triggerActivityLed(2);
         Serial.printf("[ACK] Berhasil kirim status ke server (HTTP %d)\\n", httpCode);
     } else {
         Serial.printf("[ACK] Gagal (HTTP %d)\\n", httpCode);
@@ -2736,6 +2860,7 @@ bool sendStatusUpdate(const String& commandId) {
 // 6. PROSES PERINTAH
 // ============================================================
 void processCommand(JsonObject cmd) {
+    triggerActivityLed(2);
     String commandId = cmd["id"] | "";
     int relayNum     = cmd["relay"] | 0;
     String action    = cmd["command"] | "";
@@ -2944,6 +3069,12 @@ ${cdcBootCode}
         relayStates[i] = false;
     }
 
+    // Inisialisasi pin status LED bawaan board
+    if (STATUS_LED_PIN >= 0) {
+        pinMode(STATUS_LED_PIN, OUTPUT);
+        setStatusLed(false);
+    }
+
     Serial.println("\\n==========================================");
     Serial.printf(" %s: %s (READY)\\n", "${profile.headerTitle}", CLIENT_ID);
     Serial.printf(" Board Target: %s\\n", "${profile.arduinoBoard}");
@@ -2962,6 +3093,7 @@ ${cdcBootCode}
 }
 
 void loop() {
+    updateStatusLed();
     unsigned long now = millis();
 
     // Terima perintah langsung dari Serial Monitor

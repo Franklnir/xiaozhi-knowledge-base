@@ -40,6 +40,50 @@ unsigned long lastHeartbeat = 0;
 unsigned long lastStatusPrint = 0;
 unsigned long wifiDisconnectSince = 0;
 
+// Indikator LED Onboard (Status & Aktivitas)
+unsigned long ledActivityUntil = 0;
+int ledActivityBlinks = 0;
+
+void setStatusLed(bool on) {
+    if (STATUS_LED_PIN < 0) return;
+    digitalWrite(STATUS_LED_PIN, STATUS_LED_ACTIVE_LOW ? (on ? LOW : HIGH) : (on ? HIGH : LOW));
+}
+
+void triggerActivityLed(int numBlinks = 2) {
+    ledActivityBlinks = numBlinks * 2;
+    ledActivityUntil = millis();
+}
+
+void updateStatusLed() {
+    if (STATUS_LED_PIN < 0) return;
+    unsigned long now = millis();
+
+    // 1. Jika OFFLINE (WiFi atau MQTT terputus): LED mati total (tidak berkedip)
+    if (WiFi.status() != WL_CONNECTED || !mqttClient.connected()) {
+        setStatusLed(false);
+        return;
+    }
+
+    // 2. Jika ada aktivitas data masuk / keluar: Kedip cepat (60ms ON / 60ms OFF)
+    if (ledActivityBlinks > 0) {
+        if (now >= ledActivityUntil) {
+            bool turnOn = (ledActivityBlinks % 2 != 0);
+            setStatusLed(turnOn);
+            ledActivityBlinks--;
+            ledActivityUntil = now + 60;
+        }
+        return;
+    }
+
+    // 3. Jika ONLINE normal (Standby): Denyut halus (Heartbeat: 80ms ON tiap 1.5 detik)
+    unsigned long cycle = now % 1500;
+    if (cycle < 80) {
+        setStatusLed(true);
+    } else {
+        setStatusLed(false);
+    }
+}
+
 bool isDuplicate(const String& id) {
     if (id.length() == 0) return false;
     for (int i = 0; i < DEDUP_SLOTS; i++) {
@@ -113,11 +157,13 @@ void publishState(int relayIndex, const String& cmdId) {
     char buffer[256];
     size_t len = serializeJson(doc, buffer);
     mqttClient.publish(TOPIC_STATE, (uint8_t*)buffer, len, false);
+    triggerActivityLed(2);
     Serial.printf("[STATUS MQTT] 📤 State terkirim ke Broker: CH %d = %s (Cmd: %s)\n", 
                   relayIndex + 1, relayStates[relayIndex] ? "ON" : "OFF", cmdId.c_str());
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    triggerActivityLed(2);
     Serial.printf("[MQTT RECV] Pesan diterima di topic [%s]\n", topic);
 
     StaticJsonDocument<512> doc;
@@ -222,6 +268,7 @@ void reconnectMQTT() {
 
     // LWT: Jika koneksi putus tiba-tiba, Mosquitto otomatis broadcast status offline
     if (mqttClient.connect(dynamicClientId, TOPIC_AVAILABILITY, 1, true, "offline")) {
+        triggerActivityLed(3);
         Serial.printf("[MQTT] ✅ BERHASIL TERHUBUNG! (ID: %s)\n", dynamicClientId);
         mqttClient.publish(TOPIC_AVAILABILITY, "online", true);
         mqttClient.subscribe(TOPIC_COMMAND, 1);
@@ -323,6 +370,12 @@ void setup() {
         relayStates[i] = false;
     }
 
+    // Inisialisasi pin status LED bawaan board
+    if (STATUS_LED_PIN >= 0) {
+        pinMode(STATUS_LED_PIN, OUTPUT);
+        setStatusLed(false);
+    }
+
     Serial.println("\n==========================================");
     Serial.println(" XIAOZHI SMART RELAY 24/7 FIRMWARE BOOTED");
     Serial.printf(" Client ID      : %s\n", CLIENT_ID);
@@ -344,6 +397,7 @@ void setup() {
 }
 
 void loop() {
+    updateStatusLed();
     unsigned long now = millis();
 
     handleSerialInput();
