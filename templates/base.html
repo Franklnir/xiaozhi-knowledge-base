@@ -817,26 +817,35 @@
             background-size: 22px 22px;
         }
 
-        /* 1. Cards, Stat Cards, & Containers */
+        /* 1. Cards, Stat Cards, & Containers (Unified 8px Squircle) */
         :root[data-theme="neo"] .app-card,
         :root[data-theme="neo"] .app-stat-card,
-        :root[data-theme="neo"] .auth-card {
+        :root[data-theme="neo"] .auth-card,
+        :root[data-theme="neo"] .fw-card,
+        :root[data-theme="neo"] .dashboard-card,
+        :root[data-theme="neo"] .relay-room-card,
+        :root[data-theme="neo"] .relay-mode-nav,
+        :root[data-theme="neo"] .relay-quick-stats,
+        :root[data-theme="neo"] .doc-step,
+        :root[data-theme="neo"] .app-muted-panel {
             border: 2.5px solid #111111 !important;
-            box-shadow: 5px 5px 0 #111111 !important;
-            border-radius: 12px !important;
+            box-shadow: 4.5px 4.5px 0 #111111 !important;
+            border-radius: 8px !important;
             background: #ffffff !important;
         }
         :root[data-theme="neo"] .app-stat-card {
-            box-shadow: 4px 4px 0 #111111 !important;
+            box-shadow: 3.5px 3.5px 0 #111111 !important;
+            border: 2px solid #111111 !important;
+            border-radius: 8px !important;
             transition: transform .12s ease, box-shadow .12s ease;
         }
         :root[data-theme="neo"] .app-stat-card:hover {
             transform: translate(-1.5px, -1.5px);
-            box-shadow: 5.5px 5.5px 0 #111111 !important;
+            box-shadow: 5px 5px 0 #111111 !important;
         }
         :root[data-theme="neo"] .app-stat-label {
             color: #222222 !important;
-            font-weight: 800 !important;
+            font-weight: 850 !important;
             text-transform: uppercase;
             font-size: 11px;
             letter-spacing: 0.6px;
@@ -846,7 +855,7 @@
             color: #111111 !important;
         }
         :root[data-theme="neo"] .app-card-header {
-            border-bottom: 2px solid #111111;
+            border-bottom: 2.5px solid #111111 !important;
             padding-bottom: 12px;
             margin-bottom: 16px;
         }
@@ -856,25 +865,35 @@
             letter-spacing: -0.2px;
         }
 
-        /* 2. Buttons: Tactile Hard-Shadow & Active Press */
-        :root[data-theme="neo"] .app-button {
+        /* 2. Buttons: Tactile Hard-Shadow & Active Press (Unified 6px) */
+        :root[data-theme="neo"] .app-button,
+        :root[data-theme="neo"] .relay-head-btn,
+        :root[data-theme="neo"] .admin-tab-btn,
+        :root[data-theme="neo"] .relay-cfg-tab,
+        :root[data-theme="neo"] .filter-pill {
             border: 2px solid #111111 !important;
-            box-shadow: 3.5px 3.5px 0 #111111 !important;
-            border-radius: 8px !important;
-            font-weight: 800 !important;
+            box-shadow: 3px 3px 0 #111111 !important;
+            border-radius: 6px !important;
+            font-weight: 850 !important;
             background: #ffffff;
             color: #111111 !important;
             text-transform: none;
             transition: transform .1s ease, box-shadow .1s ease, background-color .15s ease !important;
         }
-        :root[data-theme="neo"] .app-button:hover {
+        :root[data-theme="neo"] .app-button:hover,
+        :root[data-theme="neo"] .relay-head-btn:hover,
+        :root[data-theme="neo"] .admin-tab-btn:hover,
+        :root[data-theme="neo"] .filter-pill:hover {
             transform: translate(-1.5px, -1.5px) !important;
-            box-shadow: 5px 5px 0 #111111 !important;
+            box-shadow: 4.5px 4.5px 0 #111111 !important;
             background: #fffde7 !important;
             color: #111111 !important;
         }
-        :root[data-theme="neo"] .app-button:active {
-            transform: translate(2.5px, 2.5px) !important;
+        :root[data-theme="neo"] .app-button:active,
+        :root[data-theme="neo"] .relay-head-btn:active,
+        :root[data-theme="neo"] .admin-tab-btn:active,
+        :root[data-theme="neo"] .filter-pill:active {
+            transform: translate(2px, 2px) !important;
             box-shadow: 1px 1px 0 #111111 !important;
         }
         :root[data-theme="neo"] .app-button-primary {
@@ -899,7 +918,6 @@
             background: #ff4d4d !important;
             color: #ffffff !important;
             border-color: #111111 !important;
-            text-shadow: 0 1px 1px rgba(0,0,0,0.25);
         }
         :root[data-theme="neo"] .app-button-danger:hover {
             background: #ef233c !important;
@@ -915,16 +933,16 @@
             color: #ffffff !important;
         }
 
-        /* 3. Inputs & Form Controls */
+        /* 3. Inputs & Form Controls (Unified 6px) */
         :root[data-theme="neo"] .app-input,
         :root[data-theme="neo"] .app-select,
         :root[data-theme="neo"] .app-textarea {
             border: 2px solid #111111 !important;
             box-shadow: 3px 3px 0 #111111 !important;
-            border-radius: 8px !important;
+            border-radius: 6px !important;
             background: #ffffff !important;
             color: #111111 !important;
-            font-weight: 650 !important;
+            font-weight: 700 !important;
             transition: box-shadow .12s ease, background-color .12s ease;
         }
         :root[data-theme="neo"] .app-input:focus,
@@ -947,12 +965,12 @@
             font-weight: 600;
         }
 
-        /* 4. Alerts & Notifications */
+        /* 4. Alerts & Notifications (Unified 6px) */
         :root[data-theme="neo"] .app-alert {
             border: 2px solid #111111 !important;
-            box-shadow: 3.5px 3.5px 0 #111111 !important;
-            border-radius: 8px !important;
-            font-weight: 750 !important;
+            box-shadow: 3px 3px 0 #111111 !important;
+            border-radius: 6px !important;
+            font-weight: 800 !important;
             color: #111111 !important;
         }
         :root[data-theme="neo"] .app-alert-info {
@@ -972,14 +990,30 @@
             color: #065f46 !important;
         }
 
-        /* 5. Chips, Status Pills, Badges */
+        /* 5. Chips, Status Pills, Badges (Unified 4px Sticker Stamps - NO Oval Pills!) */
         :root[data-theme="neo"] .app-chip,
-        :root[data-theme="neo"] .app-status-pill {
+        :root[data-theme="neo"] .app-status-pill,
+        :root[data-theme="neo"] .filter-pill,
+        :root[data-theme="neo"] .filter-pill span:not([style*="border-radius:50%"]),
+        :root[data-theme="neo"] .relay-mode-badge,
+        :root[data-theme="neo"] .relay-live-chip,
+        :root[data-theme="neo"] .relay-conn-badge,
+        :root[data-theme="neo"] .relay-channel-count-tag,
+        :root[data-theme="neo"] .relay-status-pill-badge,
+        :root[data-theme="neo"] .relay-api-pill,
+        :root[data-theme="neo"] .banner-badge,
+        :root[data-theme="neo"] .guide-pill,
+        :root[data-theme="neo"] .room-channel,
+        :root[data-theme="neo"] .room-state,
+        :root[data-theme="neo"] [class*="chip"],
+        :root[data-theme="neo"] [class*="pill"]:not([style*="border-radius:50%"]):not(.pulse-dot):not(.app-status-dot):not(.relay-pulse-dot) {
             border: 1.5px solid #111111 !important;
             box-shadow: 2px 2px 0 #111111 !important;
-            border-radius: 6px !important;
+            border-radius: 4px !important;
             font-weight: 850 !important;
             color: #111111 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.3px !important;
         }
         :root[data-theme="neo"] .app-chip-success,
         :root[data-theme="neo"] .app-status-pill.is-online {
@@ -999,11 +1033,11 @@
             color: #991b1b !important;
         }
 
-        /* 6. Tables */
+        /* 6. Tables & Wrappers (Unified 8px) */
         :root[data-theme="neo"] .app-table-wrap {
             border: 2.5px solid #111111 !important;
             box-shadow: 4.5px 4.5px 0 #111111 !important;
-            border-radius: 10px !important;
+            border-radius: 8px !important;
             background: #ffffff !important;
             overflow: hidden;
         }
@@ -1075,10 +1109,12 @@
 
         /* 8. Modals & Overlays */
         :root[data-theme="neo"] .app-modal-box,
-        :root[data-theme="neo"] .mcp-blocking-box {
+        :root[data-theme="neo"] .mcp-blocking-box,
+        :root[data-theme="neo"] .relay-modal-card,
+        :root[data-theme="neo"] .relay-dialog {
             border: 3px solid #111111 !important;
-            box-shadow: 8px 8px 0 #111111 !important;
-            border-radius: 16px !important;
+            box-shadow: 6px 6px 0 #111111 !important;
+            border-radius: 8px !important;
             background: #ffffff !important;
         }
 

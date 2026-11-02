@@ -788,148 +788,269 @@
     }
 
     /* ── Neo Theme Neobrutalist Polishing Overrides ─────────────── */
+
+    /* 1. Dual Mode Switcher (Unified 8px Container, 6px Buttons, 4px Badges) */
+    :root[data-theme="neo"] .relay-mode-nav {
+        background: #ffffff !important;
+        border: 2.5px solid #111111 !important;
+        border-radius: 8px !important;
+        box-shadow: 4.5px 4.5px 0 #111111 !important;
+        padding: 8px !important;
+    }
+    :root[data-theme="neo"] .relay-mode-btn {
+        border-radius: 6px !important;
+        border: 2px solid transparent !important;
+        transition: all 0.12s ease !important;
+    }
+    :root[data-theme="neo"] .relay-mode-btn:hover {
+        background: #fffde7 !important;
+        border-color: #111111 !important;
+        transform: translate(-1.5px, -1.5px) !important;
+        box-shadow: 3px 3px 0 #111111 !important;
+    }
+    :root[data-theme="neo"] .relay-mode-btn.is-active {
+        background: #fff06a !important;
+        border: 2px solid #111111 !important;
+        box-shadow: 3px 3px 0 #111111 !important;
+    }
+    :root[data-theme="neo"] .relay-mode-icon-box {
+        border: 2px solid #111111 !important;
+        border-radius: 6px !important;
+        box-shadow: 2px 2px 0 #111111 !important;
+        background: #ffffff !important;
+        color: #111111 !important;
+    }
+    :root[data-theme="neo"] .relay-mode-btn.is-active .relay-mode-icon-box {
+        background: #111111 !important;
+        color: #ffe600 !important;
+    }
+    :root[data-theme="neo"] .relay-mode-badge {
+        border-radius: 4px !important;
+        border: 1.5px solid #111111 !important;
+        box-shadow: 1.5px 1.5px 0 #111111 !important;
+        font-weight: 850 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.3px !important;
+        background: #ffffff !important;
+        color: #111111 !important;
+    }
+    :root[data-theme="neo"] .relay-mode-badge.is-active-badge {
+        background: #4ade80 !important;
+        color: #064e3b !important;
+    }
+
+    /* 2. Quick Live Status Strip (Unified 8px Container, 4px Badges) */
+    :root[data-theme="neo"] .relay-quick-stats {
+        background: #ffffff !important;
+        border: 2.5px solid #111111 !important;
+        border-radius: 8px !important;
+        box-shadow: 4.5px 4.5px 0 #111111 !important;
+        padding: 12px 18px !important;
+    }
+    :root[data-theme="neo"] .relay-live-chip {
+        border-radius: 4px !important;
+        border: 1.5px solid #111111 !important;
+        box-shadow: 2px 2px 0 #111111 !important;
+        background: #86efac !important;
+        color: #064e3b !important;
+        font-weight: 850 !important;
+        text-transform: uppercase !important;
+        font-size: 11px !important;
+    }
+
+    /* 3. Room Cards & Grid Balance (Unified 8px Squircle) */
+    :root[data-theme="neo"] .relay-grid {
+        align-items: stretch !important;
+    }
     :root[data-theme="neo"] .relay-room-card {
-        background: #ffffff;
-        border: 2px solid #111111;
-        border-radius: 12px;
-        box-shadow: 4px 4px 0 #111111;
+        background: #ffffff !important;
+        border: 2.5px solid #111111 !important;
+        border-radius: 8px !important;
+        box-shadow: 4.5px 4.5px 0 #111111 !important;
+        transition: transform 0.12s ease, box-shadow 0.12s ease !important;
     }
     :root[data-theme="neo"] .relay-room-card:hover {
-        box-shadow: 6px 6px 0 #111111;
-        border-color: #111111;
+        transform: translate(-1.5px, -1.5px) !important;
+        box-shadow: 6px 6px 0 #111111 !important;
+        border-color: #111111 !important;
     }
     :root[data-theme="neo"] .relay-room-header {
-        background: #fffef2;
-        border-bottom: 2px solid #111111;
+        background: #fffdf0 !important;
+        border-bottom: 2.5px solid #111111 !important;
     }
     :root[data-theme="neo"] .relay-room-icon-badge {
-        background: #0057ff;
-        color: #ffffff;
-        border: 2px solid #111111;
-        box-shadow: 2px 2px 0 #111111;
+        border-radius: 6px !important;
+        border: 2px solid #111111 !important;
+        box-shadow: 2.5px 2.5px 0 #111111 !important;
+        background: #ffe600 !important;
+        color: #111111 !important;
+        font-weight: 900 !important;
     }
     :root[data-theme="neo"] .relay-channel-count-tag {
-        background: #ffffff;
-        border: 1.5px solid #111111;
-        box-shadow: 1.5px 1.5px 0 #111111;
-        color: #111111;
+        border-radius: 4px !important;
+        border: 1.5px solid #111111 !important;
+        box-shadow: 1.5px 1.5px 0 #111111 !important;
+        background: #ffffff !important;
+        color: #111111 !important;
+        font-weight: 850 !important;
     }
     :root[data-theme="neo"] .relay-client-mono {
-        background: #ffffff;
-        border: 1px solid #111111;
-        padding: 1px 6px;
-        border-radius: 4px;
-        color: #111111;
+        border-radius: 4px !important;
+        border: 1px solid #111111 !important;
+        background: #f1f5f9 !important;
+        color: #111111 !important;
+        font-weight: 750 !important;
     }
     :root[data-theme="neo"] .relay-head-btn {
-        background: #ffffff;
-        border: 1.5px solid #111111;
-        box-shadow: 2px 2px 0 #111111;
-        color: #111111;
+        border-radius: 6px !important;
+        border: 2px solid #111111 !important;
+        box-shadow: 2px 2px 0 #111111 !important;
+        background: #ffffff !important;
+        color: #111111 !important;
+        font-weight: 850 !important;
     }
     :root[data-theme="neo"] .relay-head-btn:hover {
-        background: #fff06a;
-        transform: translate(-1px, -1px);
-        box-shadow: 3px 3px 0 #111111;
+        background: #ffe600 !important;
+        transform: translate(-1px, -1px) !important;
+        box-shadow: 3px 3px 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-head-btn:active {
-        transform: translate(1px, 1px);
-        box-shadow: 0 0 0 #111111;
+        transform: translate(1px, 1px) !important;
+        box-shadow: 0 0 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-head-btn-del:hover {
-        background: #fee2e2;
-        color: #d90429;
+        background: #ff4d4d !important;
+        color: #ffffff !important;
     }
     :root[data-theme="neo"] .relay-room-master-bar {
-        background: #ffffff;
-        border: 2px solid #111111;
-        box-shadow: 2.5px 2.5px 0 #111111;
+        background: #ffffff !important;
+        border: 2px solid #111111 !important;
+        border-radius: 6px !important;
+        box-shadow: 2.5px 2.5px 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-conn-badge {
-        border: 1.5px solid #111111;
+        border-radius: 4px !important;
+        border: 1.5px solid #111111 !important;
+        box-shadow: 1.5px 1.5px 0 #111111 !important;
+        font-weight: 850 !important;
+        text-transform: uppercase !important;
     }
     :root[data-theme="neo"] .relay-conn-badge.is-online {
-        background: #d1fae5;
-        color: #065f46;
+        background: #86efac !important;
+        color: #064e3b !important;
     }
     :root[data-theme="neo"] .relay-conn-badge.is-offline {
-        background: #f1f5f9;
-        color: #475569;
+        background: #fca5a5 !important;
+        color: #7f1d1d !important;
     }
     :root[data-theme="neo"] .relay-master-pill-btn {
-        border: 1.5px solid #111111;
-        box-shadow: 1.5px 1.5px 0 #111111;
+        border-radius: 5px !important;
+        border: 1.5px solid #111111 !important;
+        box-shadow: 2px 2px 0 #111111 !important;
+        font-weight: 850 !important;
     }
     :root[data-theme="neo"] .relay-master-pill-btn:hover {
-        transform: translate(-1px, -1px);
-        box-shadow: 2.5px 2.5px 0 #111111;
+        background: #fffde7 !important;
+        transform: translate(-1px, -1px) !important;
+        box-shadow: 3px 3px 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-master-pill-btn:active {
-        transform: translate(1px, 1px);
-        box-shadow: 0 0 0 #111111;
+        transform: translate(1px, 1px) !important;
+        box-shadow: 0 0 0 #111111 !important;
     }
+
+    /* 4. Relay Tiles (Unified 6px Squircle, 2px Border, 3px Hard Shadow) */
     :root[data-theme="neo"] .relay-tile {
-        background: #ffffff;
-        border: 2px solid #111111;
-        border-radius: 10px;
-        box-shadow: 3px 3px 0 #111111;
+        background: #ffffff !important;
+        border: 2px solid #111111 !important;
+        border-radius: 6px !important;
+        box-shadow: 3px 3px 0 #111111 !important;
+        transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+    }
+    :root[data-theme="neo"] .relay-tile:hover {
+        transform: translate(-1px, -1px) !important;
+        box-shadow: 4.5px 4.5px 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-tile.is-on {
-        background: #f0fdf4;
-        border-color: #111111;
-        box-shadow: 3px 3px 0 #10b981;
+        background: #f0fdf4 !important;
+        border: 2px solid #111111 !important;
+        box-shadow: 3px 3px 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-tile.is-off {
-        background: #ffffff;
-        border-color: #111111;
+        background: #ffffff !important;
+        border: 2px solid #111111 !important;
+        box-shadow: 3px 3px 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-bulb-icon {
-        border: 1.5px solid #111111;
-        box-shadow: 1px 1px 0 #111111;
+        border-radius: 6px !important;
+        border: 1.5px solid #111111 !important;
+        box-shadow: 1.5px 1.5px 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-tile.is-on .relay-bulb-icon {
-        background: #fff06a;
-        color: #111111;
+        background: #ffe600 !important;
+        color: #111111 !important;
     }
     :root[data-theme="neo"] .relay-status-pill-badge {
-        border: 1.5px solid #111111;
+        border-radius: 4px !important;
+        border: 1.5px solid #111111 !important;
+        box-shadow: 1.5px 1.5px 0 #111111 !important;
+        font-weight: 850 !important;
+        text-transform: uppercase !important;
     }
     :root[data-theme="neo"] .relay-switch-slider {
-        border: 2px solid #111111;
+        border: 2px solid #111111 !important;
+        border-radius: 6px !important;
     }
     :root[data-theme="neo"] .relay-switch-slider:before {
-        border: 1.5px solid #111111;
+        border: 1.5px solid #111111 !important;
+        border-radius: 4px !important;
     }
     :root[data-theme="neo"] .relay-voice-section {
-        background: #fffbe8;
-        border: 1.5px solid #111111;
+        background: #fffdf0 !important;
+        border: 2px solid #111111 !important;
+        border-radius: 6px !important;
     }
     :root[data-theme="neo"] .relay-voice-chip {
-        background: #ffffff;
-        border: 1.5px solid #111111;
-        box-shadow: 1.5px 1.5px 0 #111111;
+        border-radius: 4px !important;
+        background: #ffffff !important;
+        border: 1.5px solid #111111 !important;
+        box-shadow: 1.5px 1.5px 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-voice-chip:hover {
-        transform: translate(-1px, -1px);
-        box-shadow: 2.5px 2.5px 0 #111111;
+        background: #ffe600 !important;
+        transform: translate(-1px, -1px) !important;
+        box-shadow: 2.5px 2.5px 0 #111111 !important;
     }
     :root[data-theme="neo"] .relay-voice-chip:active {
-        transform: translate(1px, 1px);
-        box-shadow: 0 0 0 #111111;
+        transform: translate(1px, 1px) !important;
+        box-shadow: 0 0 0 #111111 !important;
     }
     :root[data-theme="neo"] .voice-badge-on,
     :root[data-theme="neo"] .voice-badge-off {
-        border: 1px solid #111111;
+        border-radius: 3px !important;
+        border: 1px solid #111111 !important;
+        font-weight: 850 !important;
     }
     :root[data-theme="neo"] .relay-room-footer {
-        background: #ffffff;
-        border-top: 2px solid #111111;
+        background: #ffffff !important;
+        border-top: 2.5px solid #111111 !important;
     }
     :root[data-theme="neo"] .relay-api-pill {
-        background: #fff06a;
-        border: 1.5px solid #111111;
-        color: #111111;
-        box-shadow: 1.5px 1.5px 0 #111111;
+        border-radius: 4px !important;
+        background: #ffe600 !important;
+        border: 1.5px solid #111111 !important;
+        color: #111111 !important;
+        box-shadow: 2px 2px 0 #111111 !important;
+        font-weight: 850 !important;
+    }
+
+    /* 5. Modals & Overlays (Unified 8px) */
+    :root[data-theme="neo"] .relay-modal-card,
+    :root[data-theme="neo"] .relay-dialog {
+        border-radius: 8px !important;
+        border: 3px solid #111111 !important;
+        box-shadow: 6px 6px 0 #111111 !important;
+        background: #ffffff !important;
     }
 
     /* ── Enhanced Modals ────────────────────────────────────────── */
