@@ -305,6 +305,9 @@ void handleSerialInput() {
 
 void setup() {
     Serial.begin(115200);
+#if defined(ESP32)
+    Serial.setTxTimeoutMs(0); // Non-blocking jika dihidupkan dengan charger tanpa PC
+#endif
 
     // Sinkronisasi port USB CDC Serial
     unsigned long startSerial = millis();

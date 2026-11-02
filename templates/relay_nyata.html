@@ -2340,13 +2340,12 @@ void connectWiFi() {
         Serial.printf("[WIFI] Lingkungan terdeteksi: HARDWARE FISIK NYATA\\n");
         Serial.printf("[WIFI] Menghubungkan ke '%s' (RSSI: %d dBm)...\\n", WIFI_SSID, WiFi.RSSI(targetIndex));
         WiFi.scanDelete();
-        // Do not pin the connection to a scan-result BSSID. That pointer becomes
-        // invalid after scanDelete(), and fixed BSSID selection breaks roaming.
         WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     } else {
-        Serial.printf("[WIFI] ❌ SSID '%s' tidak ditemukan di sekitar.\\n", WIFI_SSID);
+        // Fallback tangguh: jika SSID belum muncul di scan (sinyal lemah/hidden/cold-boot), tetap hubungkan langsung
+        Serial.printf("[WIFI] ⚠️ SSID '%s' belum muncul di scan; mencoba koneksi langsung...\\n", WIFI_SSID);
         WiFi.scanDelete();
-        return;
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     }
 
     int timeout = 0;
@@ -2471,6 +2470,9 @@ void handleSerialInput() {
 
 void setup() {
     Serial.begin(115200);
+#if defined(ESP32)
+    Serial.setTxTimeoutMs(0); // Non-blocking jika dihidupkan dengan charger tanpa PC
+#endif
     Serial.setTimeout(50);
 
     // Sinkronisasi port USB CDC Serial

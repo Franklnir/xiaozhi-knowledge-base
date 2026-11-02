@@ -1441,9 +1441,10 @@ void connectWiFi() {{
         WiFi.scanDelete();
         WiFi.begin(WIFI_SSID, WIFI_PASSWORD, chan, bssid);
     }} else {{
-        Serial.printf("[WIFI] ❌ SSID '%s' tidak ditemukan di sekitar.\\n", WIFI_SSID);
+        // Fallback tangguh: jika SSID belum muncul di scan (sinyal lambat/hidden/cold-boot), tetap hubungkan langsung
+        Serial.printf("[WIFI] ⚠️ SSID '%s' belum muncul di scan; mencoba koneksi langsung...\\n", WIFI_SSID);
         WiFi.scanDelete();
-        return;
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     }}
 
     int timeout = 0;
@@ -1568,6 +1569,9 @@ void handleSerialInput() {{
 
 void setup() {{
     Serial.begin(115200);
+#if defined(ESP32)
+    Serial.setTxTimeoutMs(0); // Non-blocking jika dihidupkan dengan charger tanpa PC
+#endif
     Serial.setTimeout(50);
 
     // Sinkronisasi port USB CDC Serial
