@@ -765,3 +765,83 @@ def test_internal_playback_start_auto_resolve_and_bind(tmp_path):
             assert any(t.get("board_mac") == mac for t in tokens)
 
     asyncio.run(_run())
+
+
+def test_playback_progress_and_byte_tracking(tmp_path):
+    """Test that byte progress from Go Gateway is recorded and estimates work smoothly."""
+    from xiaozhi.services.playback_tracker import playback_tracker
+    from xiaozhi.routers import youtube
+    import time
+    import asyncio
+    import json
+    from starlette.requests import Request
+
+    session = playback_tracker.start_session(
+        user_id=999,
+        username="progress_user",
+        video_id="TEST_PROG_VID",
+        title="Testing Progress",
+        stream_type="HTTP Stream",
+        device_mac="AA:BB:CC:DD:EE:FF",
+        bitrate="32k",
+    )
+    sid = session.session_id
+
+    # 1. Test calculation from bitrate & time when 0 explicit bytes
+    session.started_at = time.time() - 30
+    d = session.to_dict()
+    assert d["bytes_streamed"] > 0
+    assert "KB" in d["bytes_formatted"]
+    assert d["bytes_formatted"] != "0 KB"
+
+    # 2. Test explicit byte updates (e.g. from Go Gateway)
+    async def _test_endpoint():
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": "/internal/playback/progress",
+            "headers": [(b"content-type", b"application/json")],
+        }
+        body_bytes = json.dumps({
+            "session_id": sid,
+            "user_id": 999,
+            "bytes_streamed": 350000,
+        }).encode()
+
+        async def receive():
+            return {"type": "http.request", "body": body_bytes}
+
+        req = Request(scope, receive)
+        res = await youtube.internal_playback_progress(req)
+        assert res.get("success") is True
+
+        # Check session reflects explicit bytes
+        sess = playback_tracker.get_session_by_mac("AA:BB:CC:DD:EE:FF")
+        assert sess is not None
+        assert sess.bytes_streamed == 350000
+        sess_dict = sess.to_dict()
+        assert sess_dict["bytes_streamed"] == 350000
+        assert sess_dict["bytes_formatted"] == f"{350000 // 1024} KB"
+
+        # End session with total_bytes
+        scope_end = {
+            "type": "http",
+            "method": "POST",
+            "path": "/internal/playback/end",
+            "headers": [(b"content-type", b"application/json")],
+        }
+        end_body = json.dumps({
+            "session_id": sid,
+            "user_id": 999,
+            "reason": "finished",
+            "total_bytes": 500000,
+        }).encode()
+
+        async def receive_end():
+            return {"type": "http.request", "body": end_body}
+
+        req_end = Request(scope_end, receive_end)
+        res_end = await youtube.internal_playback_end(req_end)
+        assert res_end.get("success") is True
+
+    asyncio.run(_test_endpoint())

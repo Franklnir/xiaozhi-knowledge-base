@@ -49,10 +49,17 @@ type PlaybackStartPayload struct {
 	Chip      string `json:"chip"`
 }
 
+type PlaybackProgressPayload struct {
+	SessionID     string `json:"session_id"`
+	UserID        int64  `json:"user_id"`
+	BytesStreamed int64  `json:"bytes_streamed"`
+}
+
 type PlaybackEndPayload struct {
-	SessionID string `json:"session_id"`
-	UserID    int64  `json:"user_id"`
-	Reason    string `json:"reason"`
+	SessionID  string `json:"session_id"`
+	UserID     int64  `json:"user_id"`
+	Reason     string `json:"reason"`
+	TotalBytes int64  `json:"total_bytes"`
 }
 
 func (h *AudioStreamHandler) notifyPlaybackStart(ctx context.Context, ownerID int64, videoID, title, mac, bitrate, chip string) string {
@@ -89,15 +96,40 @@ func (h *AudioStreamHandler) notifyPlaybackStart(ctx context.Context, ownerID in
 	return res.SessionID
 }
 
-func (h *AudioStreamHandler) notifyPlaybackEnd(ownerID int64, sessionID, reason string) {
+func (h *AudioStreamHandler) notifyPlaybackProgress(sessionID string, ownerID int64, bytesStreamed int64) {
+	if h.cfg.PythonBackendURL == "" || sessionID == "" {
+		return
+	}
+	payload := PlaybackProgressPayload{
+		SessionID:     sessionID,
+		UserID:        ownerID,
+		BytesStreamed: bytesStreamed,
+	}
+	body, _ := json.Marshal(payload)
+	url := fmt.Sprintf("%s/internal/playback/progress", strings.TrimRight(h.cfg.PythonBackendURL, "/"))
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := h.httpClient.Do(req)
+	if err == nil {
+		_ = resp.Body.Close()
+	}
+}
+
+func (h *AudioStreamHandler) notifyPlaybackEnd(ownerID int64, sessionID, reason string, totalBytes int64) {
 	if h.cfg.PythonBackendURL == "" {
 		return
 	}
 	go func() {
 		payload := PlaybackEndPayload{
-			SessionID: sessionID,
-			UserID:    ownerID,
-			Reason:    reason,
+			SessionID:  sessionID,
+			UserID:     ownerID,
+			Reason:     reason,
+			TotalBytes: totalBytes,
 		}
 		body, _ := json.Marshal(payload)
 		url := fmt.Sprintf("%s/internal/playback/end", strings.TrimRight(h.cfg.PythonBackendURL, "/"))
@@ -344,7 +376,7 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 				}
 				sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
 
-				totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate)
+				totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate, sessionID, ownerID)
 				if cmd != nil {
 					if cmd.Process != nil {
 						_ = cmd.Process.Kill()
@@ -357,7 +389,7 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 					reason = "stopped"
 				}
 				log.Printf("[AUDIO CACHE END] Video %s finished, streamed %d bytes", videoID, totalBytes)
-				h.notifyPlaybackEnd(ownerID, sessionID, reason)
+				h.notifyPlaybackEnd(ownerID, sessionID, reason, totalBytes)
 				return
 			}
 		}
@@ -465,12 +497,13 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		title = fmt.Sprintf("YouTube %s", videoID)
 	}
 	sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
+	var totalBytes int64
 	defer func() {
 		reason := "finished"
 		if r.Context().Err() != nil {
 			reason = "stopped"
 		}
-		h.notifyPlaybackEnd(ownerID, sessionID, reason)
+		h.notifyPlaybackEnd(ownerID, sessionID, reason, totalBytes)
 	}()
 
 	// Set audio headers for ESP32 and flush immediately so ESP32 client timer does not time out
@@ -492,7 +525,8 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 
 	log.Printf("[STREAM START] Video %s -> ESP32 %s (%s, %dHz, br=%s)", videoID, mac, chip, sampleRate, bitrate)
 
-	totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate)
+	streamBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate, sessionID, ownerID)
+	totalBytes = streamBytes
 
 	if cmd.Process != nil {
 		_ = cmd.Process.Kill()
@@ -522,12 +556,13 @@ func parseBitrateBps(bitrate string) int {
 // streamWithAdaptivePacing delivers audio chunks to ESP32 with adaptive rate limiting.
 // 15 chunk pertama (~30KB = ~6-8s audio) dikirim instan untuk mengisi buffer hardware ESP32.
 // Selanjutnya dialirkan dengan pembatas laju (nominal + 45% headroom) agar buffer ESP32 tidak meluap (overflow).
-func (h *AudioStreamHandler) streamWithAdaptivePacing(ctx context.Context, w http.ResponseWriter, r io.Reader, flusher http.Flusher, bitrate string) (int64, error) {
+func (h *AudioStreamHandler) streamWithAdaptivePacing(ctx context.Context, w http.ResponseWriter, r io.Reader, flusher http.Flusher, bitrate string, sessionID string, ownerID int64) (int64, error) {
 	bytesPerSec := parseBitrateBps(bitrate)
 	buf := make([]byte, 2048)
 	totalBytes := int64(0)
 	loopCount := 0
 	targetSendTime := time.Now()
+	lastReportTime := time.Now()
 
 	for {
 		select {
@@ -548,6 +583,13 @@ func (h *AudioStreamHandler) streamWithAdaptivePacing(ctx context.Context, w htt
 			}
 			totalBytes += int64(n)
 			loopCount++
+
+			// Periodically notify Python backend about streamed bytes (every ~3s)
+			if sessionID != "" && time.Since(lastReportTime) >= 3*time.Second {
+				lastReportTime = time.Now()
+				currentBytes := totalBytes
+				go h.notifyPlaybackProgress(sessionID, ownerID, currentBytes)
+			}
 
 			// Adaptive Pacing:
 			// 15 chunk pertama dikirim instan tanpa delay untuk mengisi buffer hardware ESP32

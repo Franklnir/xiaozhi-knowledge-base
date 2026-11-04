@@ -1229,6 +1229,20 @@ async def internal_playback_start(request: Request):
     return {"success": True, "session_id": session.session_id}
 
 
+@router.post("/internal/playback/progress")
+async def internal_playback_progress(request: Request):
+    """Internal endpoint called periodically by Go Gateway to report audio streaming byte progress."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    session_id = str(body.get("session_id") or "").strip()
+    bytes_streamed = int(body.get("bytes_streamed") or 0)
+    if session_id and bytes_streamed > 0:
+        playback_tracker.update_bytes(session_id, bytes_streamed)
+    return {"success": True}
+
+
 @router.post("/internal/playback/end")
 async def internal_playback_end(request: Request):
     """Internal endpoint called by Go Gateway to report when an audio stream ends."""
@@ -1241,8 +1255,11 @@ async def internal_playback_end(request: Request):
     user_id = int(body.get("user_id") or 0)
     device_mac = str(body.get("device_mac") or "").strip()
     video_id = str(body.get("video_id") or "").strip()
+    total_bytes = int(body.get("total_bytes") or 0)
 
     if session_id:
+        if total_bytes > 0:
+            playback_tracker.update_bytes(session_id, total_bytes)
         playback_tracker.end_session(session_id, reason=reason)
     elif user_id:
         playback_tracker.handle_device_status(user_id, reason, video_id=video_id, device_mac=device_mac)

@@ -34,6 +34,11 @@ class PlaybackSession:
         self.bytes_streamed += byte_count
         self.last_active_at = time.time()
 
+    def set_bytes(self, total_bytes: int) -> None:
+        if total_bytes > self.bytes_streamed:
+            self.bytes_streamed = total_bytes
+            self.last_active_at = time.time()
+
     @property
     def elapsed_seconds(self) -> int:
         return max(0, int(time.time() - self.started_at))
@@ -43,6 +48,36 @@ class PlaybackSession:
         s = self.elapsed_seconds
         mins, secs = divmod(s, 60)
         return f"{mins:02d}:{secs:02d}"
+
+    @property
+    def current_bytes(self) -> int:
+        if self.bytes_streamed > 0:
+            return self.bytes_streamed
+        # When streaming via Go Gateway or before chunk reports arrive,
+        # estimate bytes transferred accurately from bitrate and elapsed time.
+        kbps = 24
+        if self.bitrate:
+            digits = "".join(c for c in str(self.bitrate) if c.isdigit())
+            if digits:
+                try:
+                    val = int(digits)
+                    if val > 0:
+                        kbps = val
+                except ValueError:
+                    pass
+        # nominal bps + ~5% Ogg container framing overhead
+        bytes_per_sec = int((kbps * 1000) / 8 * 1.05)
+        # ESP32 bursts the first ~24KB instantly to fill hardware ring buffer,
+        # then continues at steady rate
+        initial_burst = min(24576, bytes_per_sec * 6) if self.elapsed_seconds > 0 else 0
+        return int(initial_burst + self.elapsed_seconds * bytes_per_sec)
+
+    @property
+    def bytes_formatted(self) -> str:
+        b = self.current_bytes
+        if b < 1048576:
+            return f"{b // 1024} KB"
+        return f"{b / 1048576:.1f} MB"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -58,8 +93,8 @@ class PlaybackSession:
             "elapsed_seconds": self.elapsed_seconds,
             "elapsed_formatted": self.elapsed_formatted,
             "duration": self.duration,
-            "bytes_streamed": self.bytes_streamed,
-            "bytes_formatted": f"{self.bytes_streamed // 1024} KB" if self.bytes_streamed < 1048576 else f"{self.bytes_streamed / 1048576:.1f} MB",
+            "bytes_streamed": self.current_bytes,
+            "bytes_formatted": self.bytes_formatted,
             "thumbnail_url": f"https://img.youtube.com/vi/{self.video_id}/mqdefault.jpg" if self.video_id else "",
             "video_url": f"https://www.youtube.com/watch?v={self.video_id}" if self.video_id else "",
             "status": "Memutar",
@@ -162,6 +197,13 @@ class PlaybackTracker:
                     })
                 except Exception:
                     pass
+
+    def update_bytes(self, session_id: str, bytes_streamed: int) -> None:
+        """Update streamed byte count for a session (reported by Go Gateway or proxy)."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session:
+                session.set_bytes(bytes_streamed)
 
     def stop_session(self, session_id: str) -> bool:
         """Force stop a session by setting its abort event."""
