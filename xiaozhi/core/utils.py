@@ -134,6 +134,17 @@ def format_size_mb(size_bytes: int) -> str:
     return f"{size_bytes / (1024 * 1024):.2f} MB"
 
 
+def extract_youtube_playlist_id(url_or_id: str) -> Optional[str]:
+    """Extract YouTube playlist ID from URL or query parameter."""
+    if not url_or_id:
+        return None
+    cleaned = str(url_or_id).strip()
+    m = re.search(r"[?&]list=([a-zA-Z0-9_-]+)", cleaned)
+    if m:
+        return m.group(1)
+    return None
+
+
 def extract_youtube_video_id(url_or_id: str) -> Optional[str]:
     """Extract 11-char YouTube video ID from various URL formats or plain ID."""
     if not url_or_id:
@@ -303,7 +314,7 @@ def detect_media_url_source(url_or_id: str) -> Optional[Dict[str, str]]:
                 "canonical_url": cleaned,
             }
 
-    # 1. Check YouTube
+    # 1. Check YouTube Video
     yt_id = extract_youtube_video_id(cleaned)
     if yt_id:
         return {
@@ -311,6 +322,36 @@ def detect_media_url_source(url_or_id: str) -> Optional[Dict[str, str]]:
             "video_id": yt_id,
             "canonical_url": f"https://www.youtube.com/watch?v={yt_id}",
         }
+
+    # 1b. Check YouTube Playlist URL (auto-resolve first track if pure playlist URL)
+    if "youtube.com" in cleaned or "youtu.be" in cleaned:
+        pl_id = extract_youtube_playlist_id(cleaned)
+        if pl_id:
+            try:
+                import yt_dlp
+                ydl_opts = {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "extract_flat": True,
+                    "playlist_items": "1",
+                    "socket_timeout": 6,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(f"https://www.youtube.com/playlist?list={pl_id}", download=False)
+                    if info:
+                        entries = list(info.get("entries") or [])
+                        if entries and entries[0] and entries[0].get("id"):
+                            first_vid = entries[0]["id"]
+                            return {
+                                "platform": "youtube",
+                                "video_id": first_vid,
+                                "canonical_url": f"https://www.youtube.com/watch?v={first_vid}",
+                                "playlist_id": pl_id,
+                                "playlist_title": info.get("title") or "YouTube Playlist",
+                                "resolved_title": entries[0].get("title"),
+                            }
+            except Exception as pl_err:
+                logger.debug("Failed auto-resolving first track from YouTube playlist %s: %s", pl_id, pl_err)
 
     # 2. Check TikTok
     tt_info = extract_tiktok_media_info(cleaned)

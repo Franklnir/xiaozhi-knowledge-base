@@ -87,6 +87,19 @@ def validate_csrf(request: Request, token: str, user: Optional[Dict[str, Any]]) 
         raise HTTPException(status_code=403, detail="Token keamanan form tidak cocok dengan sesi.")
 
 
+def is_api_request(request: Request) -> bool:
+    """Check if request is targeting an API endpoint or expects JSON response."""
+    path = request.url.path
+    if path.startswith("/api/") or path.startswith("/ws/"):
+        return True
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept and "text/html" not in accept:
+        return True
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return True
+    return False
+
+
 def require_mcp_connected_if_not_admin(request: Request, user: Dict[str, Any]) -> None:
     """
     Enforce that non-admin users must have an active MCP WebSocket connection.
@@ -98,6 +111,16 @@ def require_mcp_connected_if_not_admin(request: Request, user: Dict[str, Any]) -
 
     from xiaozhi.services.mcp_service import is_mcp_connected
     if not is_mcp_connected(int(user["id"])):
+        if is_api_request(request):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "success": False,
+                    "mcp_required": True,
+                    "mcp_connected": False,
+                    "message": "Koneksi MCP wajib untuk akun non-admin. Silakan hubungkan endpoint WebSocket MCP."
+                }
+            )
         accept = request.headers.get("accept", "")
         if "text/html" in accept:
             raise HTTPException(
@@ -184,7 +207,9 @@ def redirect_with_error(url: str, error: str, status_code: int = 303) -> Redirec
 def require_user(request: Request) -> Dict[str, Any]:
     user = get_current_user(request)
     if not user:
-        # Check if browser request (Accept HTML) or API request (Accept JSON)
+        if is_api_request(request):
+            raise HTTPException(status_code=401, detail="Sesi login telah berakhir. Silakan masuk kembali.")
+        # Check if browser page request (Accept HTML)
         accept = request.headers.get("accept", "")
         if "text/html" in accept:
             raise HTTPException(status_code=303, headers={"Location": "/login?message=Silakan+masuk+terlebih+dahulu."})
@@ -195,11 +220,15 @@ def require_user(request: Request) -> Dict[str, Any]:
 def require_admin(request: Request) -> Dict[str, Any]:
     user = get_current_user(request)
     if not user:
+        if is_api_request(request):
+            raise HTTPException(status_code=401, detail="Sesi login telah berakhir. Silakan masuk kembali.")
         accept = request.headers.get("accept", "")
         if "text/html" in accept:
             raise HTTPException(status_code=303, headers={"Location": "/login?message=Silakan+masuk+terlebih+dahulu."})
         raise HTTPException(status_code=401, detail="Login diperlukan.")
     if user.get("role") != "admin":
+        if is_api_request(request):
+            raise HTTPException(status_code=403, detail="Akses admin diperlukan.")
         accept = request.headers.get("accept", "")
         if "text/html" in accept:
             raise HTTPException(status_code=303, headers={"Location": "/dashboard"})

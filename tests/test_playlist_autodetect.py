@@ -143,3 +143,39 @@ def test_normalize_tiktok_url_for_ytdlp():
     res2 = normalize_tiktok_url_for_ytdlp(raw_vid)
     assert res2 == "https://www.tiktok.com/@video/video/7520992939187932472"
 
+
+def test_youtube_playlist_id_and_autoresolve():
+    from xiaozhi.core.utils import extract_youtube_playlist_id
+
+    pl_url = "https://www.youtube.com/playlist?list=PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj"
+    assert extract_youtube_playlist_id(pl_url) == "PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj"
+
+    pl_watch = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj"
+    assert extract_youtube_playlist_id(pl_watch) == "PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj"
+
+
+def test_api_unauthorized_returns_401_json_never_303_redirect():
+    from fastapi.testclient import TestClient
+    from xiaozhi.main import app
+
+    client = TestClient(app)
+
+    # 1. API request with browser default Accept header (which includes text/html) MUST return 401 JSON, NOT 303 redirect
+    resp = client.post(
+        "/api/v1/playlist",
+        headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+        json={"youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 401
+    assert "application/json" in resp.headers.get("content-type", "")
+    data = resp.json()
+    assert "detail" in data
+    assert "Sesi login telah berakhir" in data["detail"] or "Login diperlukan" in data["detail"]
+
+    # 2. Web page request GET /playlist with text/html should redirect to /login
+    resp_page = client.get("/playlist", headers={"Accept": "text/html"}, follow_redirects=False)
+    assert resp_page.status_code == 303
+    assert "/login" in resp_page.headers.get("Location", "")
+
+

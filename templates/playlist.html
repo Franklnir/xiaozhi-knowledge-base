@@ -749,6 +749,11 @@
         if (ytMatch) {
             return { platform: 'youtube', id: ytMatch[1], title: 'YouTube Video' };
         }
+        // 2b. YouTube Playlist URL
+        const plMatch = url.match(/(?:youtube\.com\/(?:playlist\?list=|watch\?.+&list=)|youtu\.be\/.*[?&]list=)([\w-]+)/);
+        if (plMatch) {
+            return { platform: 'youtube_playlist', id: plMatch[1], title: 'YouTube Playlist' };
+        }
         // 3. TikTok URL
         if (/tiktok\.com|douyin\.com/i.test(url)) {
             const mFull = url.match(/\/(?:video|photo|v)\/(\d{15,25})/);
@@ -814,6 +819,18 @@
                     badge.style.border = '1px solid #ef4444';
                     badge.innerHTML = '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg> YouTube Terdeteksi';
                 }
+            } else if (info.platform === 'youtube_playlist') {
+                thumb.style.display = 'none';
+                if (iconBox) iconBox.style.display = 'flex';
+                tagEl.innerHTML = '<span style="color:#ef4444; font-weight:800; display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Playlist YouTube Terdeteksi</span>';
+                idEl.textContent = "Playlist: " + info.id + " (Server akan otomatis mengambil lagu dari playlist)";
+                if (badge) {
+                    badge.style.display = 'inline-block';
+                    badge.style.background = 'rgba(239, 68, 68, 0.15)';
+                    badge.style.color = '#ef4444';
+                    badge.style.border = '1px solid #ef4444';
+                    badge.innerHTML = '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M21 15V6M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM12 12H3M16 6H3M12 18H3"/></svg> Playlist YouTube Terdeteksi';
+                }
             } else if (info.platform === 'tiktok') {
                 thumb.style.display = 'none';
                 if (iconBox) iconBox.style.display = 'flex';
@@ -846,6 +863,44 @@
         document.getElementById('modalAddTrack').classList.remove('is-active');
     }
 
+    // Bulletproof API Fetch Helper: Handles Session Expiry, Non-JSON / Maintenance responses safely
+    async function safeApiFetch(url, options = {}) {
+        options.headers = options.headers || {};
+        options.headers['Accept'] = 'application/json';
+        if (csrfToken && !options.headers['X-CSRF-Token']) {
+            options.headers['X-CSRF-Token'] = csrfToken;
+        }
+
+        const resp = await fetch(url, options);
+
+        if (resp.status === 401 || resp.redirected) {
+            if (window.App && App.toast) {
+                App.toast.error("Sesi login Anda telah berakhir. Mengarahkan ke halaman login...");
+            }
+            setTimeout(() => {
+                window.location.href = '/login?message=Sesi+login+telah+berakhir.+Silakan+masuk+kembali.';
+            }, 1200);
+            throw new Error("Sesi login telah berakhir.");
+        }
+
+        let data = null;
+        const ct = resp.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+            try {
+                data = await resp.json();
+            } catch (_) {
+                data = null;
+            }
+        }
+
+        if (!resp.ok || (data && data.success === false)) {
+            const msg = (data && (data.detail || data.message)) || ("Gagal memproses permintaan (HTTP " + resp.status + ").");
+            throw new Error(msg);
+        }
+
+        return data || {};
+    }
+
     // Submit Add Track
     async function submitAddTrack(e) {
         e.preventDefault();
@@ -860,11 +915,10 @@
         btn.textContent = "Menyimpan...";
 
         try {
-            const resp = await fetch('/api/v1/playlist', {
+            const data = await safeApiFetch('/api/v1/playlist', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     youtube_url: rawUrl,
@@ -872,10 +926,6 @@
                     artist: artist
                 })
             });
-            const data = await resp.json();
-            if (!resp.ok || !data.success) {
-                throw new Error(data.detail || data.message || "Gagal menambahkan lagu.");
-            }
 
             if (window.App && App.toast) App.toast.success(data.message || "Lagu berhasil ditambahkan!");
             closeAddTrackModal();
@@ -884,8 +934,10 @@
         } catch (err) {
             btn.disabled = false;
             btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan ke Playlist</span>`;
-            if (window.App && App.toast) App.toast.error(err.message);
-            else alert(err.message);
+            if (err.message !== "Sesi login telah berakhir.") {
+                if (window.App && App.toast) App.toast.error(err.message);
+                else alert(err.message);
+            }
         }
     }
 
@@ -914,11 +966,10 @@
         btn.textContent = "Menyimpan...";
 
         try {
-            const resp = await fetch('/api/v1/playlist/' + trackId, {
+            const data = await safeApiFetch('/api/v1/playlist/' + trackId, {
                 method: 'PUT',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     title: title,
@@ -926,10 +977,6 @@
                     artist: artist
                 })
             });
-            const data = await resp.json();
-            if (!resp.ok || !data.success) {
-                throw new Error(data.detail || data.message || "Gagal memperbarui lagu.");
-            }
 
             if (window.App && App.toast) App.toast.success(data.message || "Perubahan disimpan!");
             closeEditTrackModal();
@@ -940,14 +987,16 @@
             const urlEl = document.getElementById('track-url-' + trackId);
             if (titleEl) titleEl.textContent = title;
             if (artistEl) artistEl.textContent = artist || 'YouTube Audio';
-            if (urlEl) urlEl.textContent = data.track.youtube_url || rawUrl;
+            if (urlEl) urlEl.textContent = (data.track && data.track.youtube_url) || rawUrl;
             btn.disabled = false;
             btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan Perubahan</span>`;
         } catch (err) {
             btn.disabled = false;
             btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan Perubahan</span>`;
-            if (window.App && App.toast) App.toast.error(err.message);
-            else alert(err.message);
+            if (err.message !== "Sesi login telah berakhir.") {
+                if (window.App && App.toast) App.toast.error(err.message);
+                else alert(err.message);
+            }
         }
     }
 
@@ -956,16 +1005,26 @@
         if (!confirm("Hapus lagu '" + title + "' dari playlist Anda?")) return;
 
         try {
-            const resp = await fetch('/api/v1/playlist/' + trackId, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-Token': csrfToken
-                }
+            const data = await safeApiFetch('/api/v1/playlist/' + trackId, {
+                method: 'DELETE'
             });
-            const data = await resp.json();
-            if (!resp.ok || !data.success) {
-                throw new Error(data.detail || data.message || "Gagal menghapus lagu.");
+
+            if (window.App && App.toast) App.toast.success(data.message || "Lagu berhasil dihapus.");
+            const row = document.getElementById('track-row-' + trackId);
+            if (row) row.remove();
+
+            // Decrement counter
+            const totalEl = document.getElementById('statTotalTracks');
+            const tableTotalEl = document.getElementById('tableTrackCount');
+            if (totalEl) totalEl.textContent = Math.max(0, parseInt(totalEl.textContent || 0) - 1);
+            if (tableTotalEl) tableTotalEl.textContent = Math.max(0, parseInt(tableTotalEl.textContent || 0) - 1);
+        } catch (err) {
+            if (err.message !== "Sesi login telah berakhir.") {
+                if (window.App && App.toast) App.toast.error(err.message);
+                else alert(err.message);
             }
+        }
+    }
 
             if (window.App && App.toast) App.toast.success(data.message || "Lagu berhasil dihapus.");
             const row = document.getElementById('track-row-' + trackId);
@@ -1044,8 +1103,12 @@
 
     async function checkCacheStatus() {
         try {
-            const resp = await fetch('/api/v1/playlist/cache-status');
+            const resp = await fetch('/api/v1/playlist/cache-status', {
+                headers: { 'Accept': 'application/json' }
+            });
             if (!resp.ok) return;
+            const ct = resp.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) return;
             const data = await resp.json();
             if (!data.success || !data.tracks) return;
 
@@ -1085,17 +1148,17 @@
             if (cell) {
                 cell.innerHTML = renderCacheBadge({ status: 'downloading', is_cached: false, percent: 0 }, trackId, title);
             }
-            const resp = await fetch('/api/v1/playlist/' + trackId + '/cache', {
-                method: 'POST',
-                headers: { 'X-CSRF-Token': csrfToken }
+            const data = await safeApiFetch('/api/v1/playlist/' + trackId + '/cache', {
+                method: 'POST'
             });
-            const data = await resp.json();
             if (window.App && App.toast && data.message) {
                 App.toast.success(data.message);
             }
             startCachePolling();
         } catch (err) {
-            if (window.App && App.toast) App.toast.error("Gagal memulai cache: " + err.message);
+            if (err.message !== "Sesi login telah berakhir.") {
+                if (window.App && App.toast) App.toast.error("Gagal memulai cache: " + err.message);
+            }
         }
     }
 
@@ -1104,17 +1167,17 @@
             if (window.App && App.toast) {
                 App.toast.info("Memasukkan semua lagu yang belum di-cache ke antrean server...");
             }
-            const resp = await fetch('/api/v1/playlist/cache-all', {
-                method: 'POST',
-                headers: { 'X-CSRF-Token': csrfToken }
+            const data = await safeApiFetch('/api/v1/playlist/cache-all', {
+                method: 'POST'
             });
-            const data = await resp.json();
             if (window.App && App.toast && data.message) {
                 App.toast.success(data.message);
             }
             startCachePolling();
         } catch (err) {
-            if (window.App && App.toast) App.toast.error("Gagal memulai cache semua: " + err.message);
+            if (err.message !== "Sesi login telah berakhir.") {
+                if (window.App && App.toast) App.toast.error("Gagal memulai cache semua: " + err.message);
+            }
         }
     }
 

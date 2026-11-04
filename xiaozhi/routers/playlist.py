@@ -225,8 +225,12 @@ async def api_add_playlist_track(request: Request):
 
     if not title and dur_info.get("title"):
         title = dur_info["title"]
+    if not title and media_info.get("resolved_title"):
+        title = media_info["resolved_title"]
     if not artist and dur_info.get("artist"):
         artist = dur_info["artist"]
+    if not artist and media_info.get("playlist_title"):
+        artist = media_info["playlist_title"]
     track_duration = dur_info.get("formatted_duration") or ""
 
     if platform == "youtube":
