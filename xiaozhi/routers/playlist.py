@@ -87,15 +87,11 @@ async def playlist_page(request: Request):
     active_tracks_count = sum(1 for t in tracks if t.get("is_active", True))
     disabled_tracks_count = len(tracks) - active_tracks_count
 
-    user_mac = store.get_user_mac_address(user["id"]) if hasattr(store, "get_user_mac_address") else ""
-
     return render(
         request,
         "playlist.html",
         {
             "user": user,
-            "user_mac": user_mac or "",
-            "has_registered_device": bool(user_mac),
             "page": "playlist",
             "active_page": "playlist",
             "tracks": tracks,
@@ -225,12 +221,8 @@ async def api_add_playlist_track(request: Request):
 
     if not title and dur_info.get("title"):
         title = dur_info["title"]
-    if not title and media_info.get("resolved_title"):
-        title = media_info["resolved_title"]
     if not artist and dur_info.get("artist"):
         artist = dur_info["artist"]
-    if not artist and media_info.get("playlist_title"):
-        artist = media_info["playlist_title"]
     track_duration = dur_info.get("formatted_duration") or ""
 
     if platform == "youtube":
@@ -429,21 +421,6 @@ async def api_play_playlist_track(track_id: int, request: Request):
     device_base = base.replace("https://", "http://") if user_mac else base
     full_stream = f"{device_base}{stream_url}" if stream_url.startswith("/") else stream_url
 
-    # Expire old audio commands so queue doesn't bloat
-    if hasattr(store, "expire_audio_commands"):
-        try:
-            store.expire_audio_commands(minutes=30)
-        except Exception:
-            pass
-
-    # Acknowledge older pending commands for this owner to keep queue clean and avoid ESP32 buffer overload
-    try:
-        old_cmds = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else []
-        for oc in old_cmds:
-            store.ack_audio_command(owner_id, oc["id"])
-    except Exception:
-        pass
-
     try:
         store.queue_audio_command(
             owner_id,
@@ -456,19 +433,12 @@ async def api_play_playlist_track(track_id: int, request: Request):
     except Exception as exc:
         logger.warning("Failed to queue audio for ESP32: %s", exc)
 
-    has_device = bool(user_mac)
-    msg = f"Perintah memutar #{track.get('track_number')} '{title}' telah dikirim ke perangkat speaker ESP32."
-    if not has_device:
-        msg = f"Perintah memutar #{track.get('track_number')} '{title}' diantrekan di server. (Catatan: Perangkat ESP32 belum tertaut ke akun Anda, hubungkan perangkat di menu Perangkat untuk mendengarkan di speaker fisik)."
-
     return {
         "success": True,
-        "message": msg,
+        "message": f"Perintah memutar #{track.get('track_number')} '{title}' telah dikirim ke perangkat speaker ESP32.",
         "stream_url": full_stream,
         "video_id": vid,
         "track": updated_track,
-        "has_registered_device": has_device,
-        "device_mac": user_mac or None,
     }
 
 

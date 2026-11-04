@@ -382,9 +382,6 @@ async def _execute_download_and_cache(
         "-vbr", "on",
         "-compression_level", "5",
         "-application", "audio",
-        "-flush_packets", "1",
-        "-frame_duration", "60",
-        "-page_duration", "60000",
         "-threads", "1",
         str(tmp_cache_path),
     ]

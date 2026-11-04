@@ -1182,22 +1182,7 @@ async def audio_commands_for_device(device_id: str, request: Request):
             except Exception:
                 pass
 
-    if hasattr(store, "expire_audio_commands"):
-        try:
-            store.expire_audio_commands(minutes=30)
-        except Exception:
-            pass
-
     commands = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else store.get_audio_commands(owner_id)
-
-    if commands:
-        latest = commands[-1]
-        for old in commands[:-1]:
-            try:
-                store.ack_audio_command(owner_id, old["id"])
-            except Exception:
-                pass
-        commands = [latest]
 
     formatted_commands = []
     base_url = str(request.base_url).rstrip("/")

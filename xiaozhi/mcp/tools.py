@@ -1884,38 +1884,12 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         Cari lagu di YouTube dan kembalikan URL audio yang bisa diputar.
         Gunakan tool ini saat user ingin mendengarkan musik, memutar lagu,
         atau meminta rekomendasi lagu dari YouTube.
-        JANGAN gunakan tool ini jika user meminta VIDEO ('putar video', 'tonton video', dll),
-        karena untuk video harus diinspeksi terlebih dahulu menggunakan inspect_youtube_video.
 
         Args:
             query: Nama lagu atau kata kunci pencarian. Contoh: "lofi hip hop", "Bohemian Rhapsody", "lagu Indonesia terbaru"
         """
         owner_id = mcp_active_owner_ctx.get()
         try:
-            q_clean = (query or "").strip().lower()
-
-            # 0a. Cek apakah pengguna HANYA ingin MENGECEK status/riwayat (bukan menyuruh putar lagu baru)
-            check_indicators = [
-                "cek lagu", "cek video", "cek musik", "cek pencarian", "cek pemutaran", "cek riwayat",
-                "tadi lagu", "tadi video", "tadi cari", "tadi putar", "tadi apa",
-                "lagu tadi", "video tadi", "pencarian tadi", "riwayat tadi",
-                "lagu terakhir", "video terakhir", "pencarian terakhir", "pemutaran terakhir",
-                "yang tadi diputar", "yang barusan diputar", "lagu apa ini", "video apa ini",
-                "sedang putar apa", "apa yang sedang diputar", "status pemutaran", "status lagu", "status musik"
-            ]
-            if any(ind in q_clean for ind in check_indicators):
-                logger.info("Redirecting play_youtube_song to get_playback_status because query is an inquiry: %s", query)
-                return get_playback_status(query=query)
-
-            # 0b. Intersep permintaan VIDEO agar tidak asal putar (wajib inspeksi & konfirmasi user dahulu)
-            video_indicators = [
-                "video", "tonton", "nonton", "lihat", "clip", "klip", "tayangan",
-                "channel", "eps", "episode", "vlog", "trailer", "youtube.com", "youtu.be"
-            ]
-            if any(ind in q_clean for ind in video_indicators):
-                logger.info("Redirecting play_youtube_song to inspect_youtube_video for query: %s", query)
-                return inspect_youtube_video(query=query)
-
             # 1. Cek jika user meminta playlist secara umum tanpa nomor/judul spesifik
             if owner_id and is_generic_playlist_query(query) and hasattr(store, "get_user_playlist"):
                 all_tracks = store.get_user_playlist(owner_id)
@@ -2089,11 +2063,6 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return response
         except ValueError as exc:
             response = {"success": False, "message": str(exc), "results": []}
-            record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query}, response)
-            return response
-        except Exception as exc:
-            logger.exception("Error YouTube search: %s", exc)
-            response = {"success": False, "message": f"Gagal mencari lagu: {exc}", "results": []}
             record_mcp_tool_history(owner_id, "play_youtube_song", query, {"query": query}, response)
             return response
         except Exception as exc:
@@ -2524,7 +2493,6 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
     @mcp_server.tool()
     def play_playlist_song(query: str) -> dict:
-
         """
         Putar lagu dari daftar Playlist Musik YouTube pribadi pengguna berdasarkan:
         - Nomor urut lagu (contoh: "1", "nomor 2", "track 3", "playlist 1")
@@ -2540,19 +2508,6 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return {"success": False, "message": "Belum ada koneksi akun/perangkat aktif."}
 
         try:
-            q_clean = (query or "").strip().lower()
-            check_indicators = [
-                "cek lagu", "cek video", "cek musik", "cek pencarian", "cek pemutaran", "cek riwayat",
-                "tadi lagu", "tadi video", "tadi cari", "tadi putar", "tadi apa",
-                "lagu tadi", "video tadi", "pencarian tadi", "riwayat tadi",
-                "lagu terakhir", "video terakhir", "pencarian terakhir", "pemutaran terakhir",
-                "yang tadi diputar", "yang barusan diputar", "lagu apa ini", "video apa ini",
-                "sedang putar apa", "apa yang sedang diputar", "status pemutaran", "status lagu", "status musik"
-            ]
-            if any(ind in q_clean for ind in check_indicators):
-                logger.info("Redirecting play_playlist_song to get_playback_status because query is an inquiry: %s", query)
-                return get_playback_status(query=query)
-
             features = store.get_user_features(owner_id)
             if not features.get("youtube_music", True):
                 return {"success": False, "message": "Fitur YouTube Music telah dinonaktifkan untuk akun Anda."}
@@ -2625,16 +2580,6 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
             device_base = base.replace("https://", "http://") if user_mac else base
             full_stream = f"{device_base}{stream_url}" if stream_url.startswith("/") else stream_url
-
-            # Clear older pending audio commands for this owner to prevent conflicting command jumps on ESP32
-            try:
-                if hasattr(store, "expire_audio_commands"):
-                    store.expire_audio_commands(minutes=30)
-                old_cmds = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else []
-                for oc in old_cmds:
-                    store.ack_audio_command(owner_id, oc["id"])
-            except Exception:
-                pass
 
             try:
                 store.queue_audio_command(
