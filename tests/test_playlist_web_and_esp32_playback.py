@@ -112,4 +112,4 @@ def test_api_play_playlist_track_without_device():
         assert data["success"] is True
         assert data["has_registered_device"] is False
         assert data["device_mac"] is None
-        assert "Tes Web" in data["message"]
+        assert "diantrekan di server" in data["message"]

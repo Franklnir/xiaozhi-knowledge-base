@@ -455,7 +455,7 @@ async def api_play_playlist_track(track_id: int, request: Request):
     has_device = bool(user_mac)
     msg = f"Perintah memutar #{track.get('track_number')} '{title}' telah dikirim ke perangkat speaker ESP32."
     if not has_device:
-        msg = f"Perintah memutar #{track.get('track_number')} '{title}' diantrekan di server. (Tips: Perangkat ESP32 belum tertaut ke akun Anda, hubungkan perangkat untuk suara fisik atau dengarkan langsung via tombol 'Tes Web')."
+        msg = f"Perintah memutar #{track.get('track_number')} '{title}' diantrekan di server. (Catatan: Perangkat ESP32 belum tertaut ke akun Anda, hubungkan perangkat di menu Perangkat untuk mendengarkan di speaker fisik)."
 
     return {
         "success": True,
