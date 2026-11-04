@@ -30,52 +30,14 @@ def is_valid_upload_file(item) -> bool:
 
 
 # ── MARKETPLACE CATALOG ──────────────────────────────────────────────────────
-@router.get("/marketplace", response_class=HTMLResponse)
+@router.get("/marketplace")
 async def marketplace_catalog(request: Request, q: Optional[str] = None):
-    user = get_current_user(request)
-    service = get_product_service()
-    products = service.get_marketplace_list(limit=30, search=q)
-    repo = get_marketplace_repo()
-    return render(request, "marketplace/index.html", {
-        "user": user,
-        "page": "marketplace",
-        "products": products,
-        "search_query": q or "",
-        "db_ready": repo.is_db_ready(),
-    })
+    return RedirectResponse(url="/", status_code=302)
 
 
-@router.get("/marketplace/{product_id_or_slug}", response_class=HTMLResponse)
+@router.get("/marketplace/{product_id_or_slug}")
 async def marketplace_product_detail(request: Request, product_id_or_slug: str):
-    user = get_current_user(request)
-    uid = int(user["id"]) if user else None
-    service = get_product_service()
-    product = service.get_product_detail(product_id_or_slug, current_user_id=uid)
-    if not product:
-        raise HTTPException(status_code=404, detail="Produk firmware tidak ditemukan.")
-
-    # Fee transparency calculation preview
-    subtotal = int(product["price_amount"])
-    platform_fee = int(MARKETPLACE_ADMIN_FEE_FLAT + int(subtotal * MARKETPLACE_ADMIN_FEE_PERCENT))
-    platform_fee = min(platform_fee, subtotal)
-    ppn_amount = int(round(platform_fee * 0.11))
-    seller_net = subtotal - platform_fee
-
-    # MCP connection check for buyer
-    mcp_connected = False
-    if user:
-        from xiaozhi.services.mcp_service import is_mcp_connected
-        mcp_connected = bool(is_mcp_connected(int(user["id"])))
-
-    return render(request, "marketplace/detail.html", {
-        "user": user,
-        "page": "marketplace",
-        "product": product,
-        "platform_fee": platform_fee,
-        "ppn_amount": ppn_amount,
-        "seller_net": seller_net,
-        "mcp_connected": mcp_connected,
-    })
+    return RedirectResponse(url="/", status_code=302)
 
 
 # ── SELLER PRODUCTS ──────────────────────────────────────────────────────────

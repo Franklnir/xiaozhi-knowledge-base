@@ -817,33 +817,6 @@ async def profile_page(request: Request, mode: Optional[str] = "profile", sub: O
             "enabled": is_enabled,
         })
 
-    # Load Marketplace Data for Mode Marketplace
-    seller_products = []
-    purchases = []
-    financial_data = {
-        "wallet": {"available_balance": 0},
-        "summary": {"gross_sales": 0, "total_fees": 0, "net_sales": 0, "total_orders": 0},
-        "ledger": [],
-        "withdrawals": [],
-        "orders": [],
-        "minimum_withdrawal": 10000,
-        "withdrawal_fee": 2500,
-    }
-    db_ready = False
-    chat_unread_total = 0
-    try:
-        from xiaozhi.marketplace.deps import get_marketplace_repo, get_wallet_service, get_chat_service
-        repo = get_marketplace_repo()
-        wallet_service = get_wallet_service()
-        chat_service = get_chat_service()
-        seller_products = repo.get_seller_products(int(user["id"]))
-        purchases = repo.get_buyer_purchases(int(user["id"]))
-        financial_data = wallet_service.get_seller_financial_data(int(user["id"]))
-        chat_unread_total = chat_service.get_total_unread_count(int(user["id"]))
-        db_ready = repo.is_db_ready()
-    except Exception as exc:
-        logger.warning("Error loading marketplace data in profile: %s", exc)
-
     return render(
         request,
         "profile.html",
@@ -862,13 +835,6 @@ async def profile_page(request: Request, mode: Optional[str] = "profile", sub: O
             "total_disabled": total_disabled,
             "device_mac": device_mac,
             "active_page": "profile",
-            "active_mode": mode or "profile",
-            "active_sub": sub or "products",
-            "seller_products": seller_products,
-            "purchases": purchases,
-            "financial_data": financial_data,
-            "chat_unread_total": chat_unread_total,
-            "db_ready": db_ready,
         },
     )
 
