@@ -2626,6 +2626,16 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             device_base = base.replace("https://", "http://") if user_mac else base
             full_stream = f"{device_base}{stream_url}" if stream_url.startswith("/") else stream_url
 
+            # Clear older pending audio commands for this owner to prevent conflicting command jumps on ESP32
+            try:
+                if hasattr(store, "expire_audio_commands"):
+                    store.expire_audio_commands(minutes=30)
+                old_cmds = store.get_pending_audio_commands(owner_id) if hasattr(store, "get_pending_audio_commands") else []
+                for oc in old_cmds:
+                    store.ack_audio_command(owner_id, oc["id"])
+            except Exception:
+                pass
+
             try:
                 store.queue_audio_command(
                     owner_id,

@@ -28,15 +28,33 @@
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Accept": "application/json",
         "X-CSRF-Token": getCsrfToken(),
       },
       body: JSON.stringify(body || {}),
     });
+    if (res.status === 401 || res.redirected) {
+      if (window.App && App.toast) {
+        App.toast.error("Sesi login Anda telah berakhir. Mengarahkan ke halaman login...");
+      }
+      setTimeout(() => {
+        window.location.href = '/login?message=Sesi+login+telah+berakhir.+Silakan+masuk+kembali.';
+      }, 1200);
+      throw new Error("Sesi login telah berakhir.");
+    }
+    const ct = res.headers.get("content-type") || "";
     if (!res.ok) {
+      if (ct.includes("application/json")) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || errJson.message || `HTTP ${res.status}`);
+      }
       const text = await res.text().catch(() => "");
       throw new Error(text || `HTTP ${res.status}`);
     }
-    return res.json();
+    if (!ct.includes("application/json")) {
+      return {};
+    }
+    return res.json().catch(() => ({}));
   }
 
   async function postForm(url, formData) {
@@ -49,18 +67,64 @@
     if (!formData.has("csrf_token")) {
       formData.set("csrf_token", getCsrfToken());
     }
-    const res = await fetch(url, { method: "POST", body: formData });
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+      },
+      body: formData,
+    });
+    if (res.status === 401 || res.redirected) {
+      if (window.App && App.toast) {
+        App.toast.error("Sesi login Anda telah berakhir. Mengarahkan ke halaman login...");
+      }
+      setTimeout(() => {
+        window.location.href = '/login?message=Sesi+login+telah+berakhir.+Silakan+masuk+kembali.';
+      }, 1200);
+      throw new Error("Sesi login telah berakhir.");
+    }
+    const ct = res.headers.get("content-type") || "";
     if (!res.ok) {
+      if (ct.includes("application/json")) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || errJson.message || `HTTP ${res.status}`);
+      }
       const text = await res.text().catch(() => "");
       throw new Error(text || `HTTP ${res.status}`);
     }
-    return res.json();
+    if (!ct.includes("application/json")) {
+      return {};
+    }
+    return res.json().catch(() => ({}));
   }
 
   async function fetchJson(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    const res = await fetch(url, {
+      headers: {
+        "Accept": "application/json",
+      },
+    });
+    if (res.status === 401 || res.redirected) {
+      if (window.App && App.toast) {
+        App.toast.error("Sesi login Anda telah berakhir. Mengarahkan ke halaman login...");
+      }
+      setTimeout(() => {
+        window.location.href = '/login?message=Sesi+login+telah+berakhir.+Silakan+masuk+kembali.';
+      }, 1200);
+      throw new Error("Sesi login telah berakhir.");
+    }
+    const ct = res.headers.get("content-type") || "";
+    if (!res.ok) {
+      if (ct.includes("application/json")) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || errJson.message || `HTTP ${res.status}`);
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
+    if (!ct.includes("application/json")) {
+      return {};
+    }
+    return res.json().catch(() => ({}));
   }
 
   /* ── Polling Manager ────────────────────────────────────── */

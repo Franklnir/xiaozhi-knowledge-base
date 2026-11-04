@@ -344,7 +344,21 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 				}
 				sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
 
-				totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate)
+				// For cached playlist tracks, pace using the actual encoded file bitrate to prevent buffer overrun/underrun
+				pacingBitrate := bitrate
+				if strings.Contains(match, "_16k.") {
+					pacingBitrate = "16k"
+				} else if strings.Contains(match, "_24k.") {
+					pacingBitrate = "24k"
+				} else if strings.Contains(match, "_32k.") {
+					pacingBitrate = "32k"
+				} else if strings.Contains(match, "_8k.") {
+					pacingBitrate = "8k"
+				} else if strings.Contains(match, "_12k.") {
+					pacingBitrate = "12k"
+				}
+
+				totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, pacingBitrate)
 				if cmd != nil {
 					if cmd.Process != nil {
 						_ = cmd.Process.Kill()
@@ -501,7 +515,7 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 	log.Printf("[STREAM END] Video %s finished, streamed %d bytes", videoID, totalBytes)
 }
 
-// parseBitrateBps parses bitrate strings like "16k", "24k", "32k" into bytes per second with 45% delivery headroom.
+// parseBitrateBps parses bitrate strings like "8k", "12k", "16k", "24k", "32k" into bytes per second with 8% delivery headroom.
 func parseBitrateBps(bitrate string) int {
 	re := regexp.MustCompile(`^(\d+)`)
 	matches := re.FindStringSubmatch(strings.TrimSpace(bitrate))
@@ -512,22 +526,25 @@ func parseBitrateBps(bitrate string) int {
 		}
 	}
 	nominalBps := (kbps * 1000) / 8
-	bytesPerSec := int(float64(nominalBps) * 1.45)
-	if bytesPerSec < 2200 {
-		bytesPerSec = 2200
+	bytesPerSec := int(float64(nominalBps) * 1.08)
+	if bytesPerSec < 1000 {
+		bytesPerSec = 1000
 	}
 	return bytesPerSec
 }
 
-// streamWithAdaptivePacing delivers audio chunks to ESP32 with adaptive rate limiting.
-// 15 chunk pertama (~30KB = ~6-8s audio) dikirim instan untuk mengisi buffer hardware ESP32.
-// Selanjutnya dialirkan dengan pembatas laju (nominal + 45% headroom) agar buffer ESP32 tidak meluap (overflow).
+// streamWithAdaptivePacing delivers audio chunks to ESP32 with accurate adaptive rate limiting.
+// 4 chunk pertama (~4KB audio) dikirim instan untuk mengisi pre-buffer hardware ESP32 tanpa overflow.
+// Selanjutnya dialirkan dengan kecepatan pemutaran real-time (+8% headroom) agar buffer ESP32
+// tidak meluap (overflow), socket tidak terputus, dan pemutaran playlist berjalan mulus tanpa loncat.
 func (h *AudioStreamHandler) streamWithAdaptivePacing(ctx context.Context, w http.ResponseWriter, r io.Reader, flusher http.Flusher, bitrate string) (int64, error) {
 	bytesPerSec := parseBitrateBps(bitrate)
-	buf := make([]byte, 2048)
+	buf := make([]byte, 1024)
 	totalBytes := int64(0)
 	loopCount := 0
-	targetSendTime := time.Now()
+	var targetSendTime time.Time
+
+	const initialBurstChunks = 4
 
 	for {
 		select {
@@ -550,22 +567,21 @@ func (h *AudioStreamHandler) streamWithAdaptivePacing(ctx context.Context, w htt
 			loopCount++
 
 			// Adaptive Pacing:
-			// 15 chunk pertama dikirim instan tanpa delay untuk mengisi buffer hardware ESP32
-			if loopCount > 15 {
+			// 4 chunk pertama (~4KB) dikirim instan untuk mengisi pre-buffer hardware ESP32
+			if loopCount > initialBurstChunks {
+				now := time.Now()
+				if targetSendTime.IsZero() || targetSendTime.Before(now.Add(-2*time.Second)) {
+					targetSendTime = now
+				}
 				chunkDur := time.Duration(float64(n) / float64(bytesPerSec) * float64(time.Second))
 				targetSendTime = targetSendTime.Add(chunkDur)
 				sleepDur := time.Until(targetSendTime)
 				if sleepDur > 0 {
-					if sleepDur > 400*time.Millisecond {
-						sleepDur = 400 * time.Millisecond
-					}
 					select {
 					case <-time.After(sleepDur):
 					case <-ctx.Done():
 						return totalBytes, ctx.Err()
 					}
-				} else if sleepDur < -1500*time.Millisecond {
-					targetSendTime = time.Now()
 				}
 			}
 		}
