@@ -48,8 +48,10 @@
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.detail || errJson.message || `HTTP ${res.status}`);
       }
-      const text = await res.text().catch(() => "");
-      throw new Error(text || `HTTP ${res.status}`);
+      if (res.status >= 500) {
+        throw new Error("Server sedang dalam pemeliharaan atau sedang sibuk. Silakan coba sesaat lagi.");
+      }
+      throw new Error(`Permintaan gagal (HTTP ${res.status}).`);
     }
     if (!ct.includes("application/json")) {
       return {};
@@ -89,8 +91,10 @@
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.detail || errJson.message || `HTTP ${res.status}`);
       }
-      const text = await res.text().catch(() => "");
-      throw new Error(text || `HTTP ${res.status}`);
+      if (res.status >= 500) {
+        throw new Error("Server sedang dalam pemeliharaan atau sedang sibuk. Silakan coba sesaat lagi.");
+      }
+      throw new Error(`Permintaan gagal (HTTP ${res.status}).`);
     }
     if (!ct.includes("application/json")) {
       return {};
@@ -119,7 +123,10 @@
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.detail || errJson.message || `HTTP ${res.status}`);
       }
-      throw new Error(`HTTP ${res.status}`);
+      if (res.status >= 500) {
+        throw new Error("Server sedang dalam pemeliharaan atau sedang sibuk. Silakan coba sesaat lagi.");
+      }
+      throw new Error(`Permintaan gagal (HTTP ${res.status}).`);
     }
     if (!ct.includes("application/json")) {
       return {};
@@ -162,7 +169,11 @@
 
   function _stripLeadingEmoji(text) {
     if (!text || typeof text !== "string") return "";
-    return text.replace(/^[\s\u{1F300}-\u{1FAD6}\u{2600}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u2713\u2715\u26A0\u2705\u274C\u2139\u{1F389}\u{1F4E1}\u26A1\u{1F50C}\u{1F512}\u{1F513}\u25B6\u23F9\u{1F504}\u{1F4E4}\u{1F9F9}\u2B05\u2794\u2022\u2013\u2014\-:\s]+/u, "").trim() || text;
+    let s = text.replace(/^[\s\u{1F300}-\u{1FAD6}\u{2600}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u2713\u2715\u26A0\u2705\u274C\u2139\u{1F389}\u{1F4E1}\u26A1\u{1F50C}\u{1F512}\u{1F513}\u25B6\u23F9\u{1F504}\u{1F4E4}\u{1F9F9}\u2B05\u2794\u2022\u2013\u2014\-:\s]+/u, "").trim() || text;
+    if (s.includes("<!DOCTYPE") || s.includes("is not valid JSON") || s.includes("Unexpected token '<'")) {
+      s = "Respon server tidak valid atau sedang dalam pemeliharaan. Silakan coba sesaat lagi.";
+    }
+    return s;
   }
 
   function _ensureToastContainer() {

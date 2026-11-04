@@ -6,6 +6,7 @@ import logging
 import re
 import secrets
 import uuid
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -475,6 +476,96 @@ async def chat_history_api(
         "max_id": max((int(item.get("id", 0)) for item in histories), default=after_id),
         "server_time": utc_now(),
     }
+
+
+@router.get("/api/chat-history/daily-recap")
+@router.get("/api/v1/chat/daily-recap")
+async def api_chat_daily_recap(
+    request: Request,
+    date: str = Query("today", max_length=20),
+    slot: Optional[str] = Query(None),
+):
+    """Option 3: Get daily activity recap for voice and web UI with request ID."""
+    req_id = f"recap_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    try:
+        user = require_user(request)
+        store = get_store()
+
+        selected_slot = None
+        if slot not in (None, "", "all", "0"):
+            try:
+                val = int(slot)
+                if val in (1, 2, 3):
+                    selected_slot = val
+            except (ValueError, TypeError):
+                pass
+
+        from xiaozhi.services.chat_memory_service import build_daily_chat_recap
+        data = build_daily_chat_recap(
+            store=store,
+            owner_id=int(user["id"]),
+            slot_number=selected_slot,
+            target_date=date,
+        )
+        data["request_id"] = data.get("req_id", req_id)
+        return JSONResponse(data)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Error building daily chat recap: %s", exc)
+        return JSONResponse(
+            {
+                "success": False,
+                "request_id": req_id,
+                "message": f"Gagal menghasilkan rekap harian: {exc}",
+            },
+            status_code=500,
+        )
+
+
+@router.get("/api/chat-history/action-items")
+@router.get("/api/v1/chat/action-items")
+async def api_chat_action_items(
+    request: Request,
+    date: str = Query("today", max_length=20),
+    slot: Optional[str] = Query(None),
+):
+    """Option 4: Extract action items and to-do lists from chat history with request ID."""
+    req_id = f"todo_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    try:
+        user = require_user(request)
+        store = get_store()
+
+        selected_slot = None
+        if slot not in (None, "", "all", "0"):
+            try:
+                val = int(slot)
+                if val in (1, 2, 3):
+                    selected_slot = val
+            except (ValueError, TypeError):
+                pass
+
+        from xiaozhi.services.chat_memory_service import extract_action_items_from_history
+        data = extract_action_items_from_history(
+            store=store,
+            owner_id=int(user["id"]),
+            slot_number=selected_slot,
+            target_date=date,
+        )
+        data["request_id"] = data.get("req_id", req_id)
+        return JSONResponse(data)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Error extracting action items: %s", exc)
+        return JSONResponse(
+            {
+                "success": False,
+                "request_id": req_id,
+                "message": f"Gagal mendeteksi tugas dari riwayat obrolan: {exc}",
+            },
+            status_code=500,
+        )
 
 
 @router.post("/riwayat-chat/clear")

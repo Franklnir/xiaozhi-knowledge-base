@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import gzip
 import hashlib
 import json
@@ -12,6 +12,7 @@ import os
 import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
+import uuid
 
 logger = logging.getLogger("xiaozhi.chat_memory")
 
@@ -422,3 +423,231 @@ def resolve_original_history_payload(
         return read_archived_payload_from_disk(pointer, base_dir=base_dir)
 
     return True, parsed, ""
+
+
+def resolve_target_date(date_str: str = "today") -> str:
+    """Resolve natural Indonesian/English date relative keyword to YYYY-MM-DD."""
+    now_utc = datetime.now(timezone.utc)
+    s = str(date_str or "today").strip().lower()
+    if s in ("today", "hari_ini", "hari ini", ""):
+        return now_utc.strftime("%Y-%m-%d")
+    elif s in ("yesterday", "kemarin"):
+        return (now_utc - timedelta(days=1)).strftime("%Y-%m-%d")
+    elif re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+        return s
+    return now_utc.strftime("%Y-%m-%d")
+
+
+def build_daily_chat_recap(
+    store: Any,
+    owner_id: int,
+    slot_number: Optional[int] = None,
+    target_date: Optional[str] = "today",
+) -> Dict[str, Any]:
+    """
+    Menyusun rekap aktivitas harian percakapan, musik, dan IoT terisolasi per user dan slot.
+    Menghasilkan req_id unik untuk pelacakan.
+    """
+    req_id = f"recap_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    clean_date = resolve_target_date(target_date or "today")
+    clean_slot = int(slot_number) if slot_number and str(slot_number).isdigit() and 1 <= int(slot_number) <= 3 else None
+
+    records = store.list_chat_history(
+        owner_id=int(owner_id),
+        limit=300,
+        date=clean_date,
+        slot_number=clean_slot,
+        strict_slot=bool(clean_slot),
+    )
+
+    songs_played: List[Dict[str, Any]] = []
+    seen_songs = set()
+    iot_commands: List[Dict[str, Any]] = []
+    topics: List[str] = []
+    seen_topics = set()
+    preview_items: List[Dict[str, Any]] = []
+
+    for r in records:
+        tool_name = str(r.get("tool_name") or "").strip()
+        user_msg = str(r.get("user_message") or "").strip()
+        ai_ans = str(r.get("xiaozhi_answer") or "").strip()
+        created_at = str(r.get("created_at") or "")
+        item_slot = r.get("slot_number") or 1
+
+        # Collect preview
+        preview_items.append({
+            "id": r.get("id"),
+            "tool_name": tool_name,
+            "user_message": user_msg,
+            "xiaozhi_answer": ai_ans[:140] + ("..." if len(ai_ans) > 140 else ""),
+            "created_at": created_at,
+            "slot_number": item_slot,
+        })
+
+        # Track songs played
+        if tool_name in ("play_youtube_song", "play_playlist_song"):
+            title = user_msg
+            if ai_ans and ("Memutar lagu" in ai_ans or "Ditemukan lagu" in ai_ans):
+                match = re.search(r"'(.*?)'", ai_ans)
+                if match:
+                    title = match.group(1)
+            song_key = title.lower()
+            if song_key and song_key not in seen_songs:
+                seen_songs.add(song_key)
+                songs_played.append({
+                    "title": title,
+                    "tool": tool_name,
+                    "time": created_at[11:16] if len(created_at) >= 16 else "",
+                })
+
+        # Track IoT / Relay commands
+        elif "relay" in tool_name or tool_name in ("control_relay", "set_relay_state", "toggle_relay", "smarthome"):
+            cmd_desc = user_msg or tool_name
+            iot_commands.append({
+                "command": cmd_desc,
+                "tool": tool_name,
+                "time": created_at[11:16] if len(created_at) >= 16 else "",
+            })
+
+        # Extract topics from user queries
+        if user_msg and not tool_name.startswith("xiaozhi_ws") and len(user_msg) >= 4:
+            clean_q = user_msg.strip()
+            if not any(clean_q.lower().startswith(x) for x in ["panggil tool", "play", "putar", "1", "2", "3"]):
+                topic_snippet = clean_q[:80]
+                if topic_snippet.lower() not in seen_topics:
+                    seen_topics.add(topic_snippet.lower())
+                    topics.append(topic_snippet)
+
+    total_chats = len(records)
+    slot_label = f"Slot {clean_slot}" if clean_slot else "Semua Slot"
+
+    # Generate friendly Indonesian summary for voice / TTS
+    parts = []
+    parts.append(f"Rekap aktivitas untuk {slot_label} pada tanggal {clean_date}: Terjadi total {total_chats} percakapan.")
+    if songs_played:
+        song_names = ", ".join(f"'{s['title']}'" for s in songs_played[:4])
+        parts.append(f"Memutar {len(songs_played)} lagu, di antaranya {song_names}.")
+    if iot_commands:
+        parts.append(f"Mengeksekusi {len(iot_commands)} perintah perangkat pintar atau saklar relay.")
+    if topics:
+        top_list = "; ".join(topics[:3])
+        parts.append(f"Topik obrolan meliputi: {top_list}.")
+    if not songs_played and not iot_commands and not topics and total_chats == 0:
+        summary_text = f"Belum ada aktivitas percakapan tercatat untuk {slot_label} pada tanggal {clean_date}."
+    else:
+        summary_text = " ".join(parts)
+
+    return {
+        "success": True,
+        "req_id": req_id,
+        "date": clean_date,
+        "slot_number": clean_slot,
+        "slot_label": slot_label,
+        "stats": {
+            "total_chats": total_chats,
+            "songs_count": len(songs_played),
+            "iot_count": len(iot_commands),
+            "topics_count": len(topics),
+        },
+        "summary_text": summary_text,
+        "songs_played": songs_played,
+        "iot_commands": iot_commands,
+        "key_topics": topics[:10],
+        "items_preview": preview_items[:15],
+    }
+
+
+def extract_action_items_from_history(
+    store: Any,
+    owner_id: int,
+    slot_number: Optional[int] = None,
+    target_date: Optional[str] = "today",
+) -> Dict[str, Any]:
+    """
+    Mendeteksi tugas, janji temu, dan to-do list dari riwayat percakapan pengguna secara otomatis.
+    Menghasilkan req_id unik untuk pelacakan.
+    """
+    req_id = f"todo_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    clean_date = resolve_target_date(target_date or "today")
+    clean_slot = int(slot_number) if slot_number and str(slot_number).isdigit() and 1 <= int(slot_number) <= 3 else None
+
+    records = store.list_chat_history(
+        owner_id=int(owner_id),
+        limit=300,
+        date=clean_date,
+        slot_number=clean_slot,
+        strict_slot=bool(clean_slot),
+    )
+
+    task_pattern = re.compile(
+        r"\b(ingatkan|ingat|jangan lupa|catat|harus|perlu|jadwal|tugas|deadline|meeting|rapat|kerjakan|selesaikan|hubungi|telpon|telepon|wa|whatsapp|chat|kirim|beli|bayar|pesan|siapkan)\b",
+        re.IGNORECASE,
+    )
+    skip_pattern = re.compile(
+        r"\b(play|putar lagu|nyalakan|matikan|cuaca|bmkg|buka|tutup|list playlist)\b",
+        re.IGNORECASE,
+    )
+
+    tasks: List[Dict[str, Any]] = []
+    seen_texts = set()
+
+    for idx, r in enumerate(reversed(records), 1):
+        user_msg = str(r.get("user_message") or "").strip()
+        if not user_msg or len(user_msg) < 5:
+            continue
+
+        # Skip hardware commands unless they explicitly contain reminder/task keywords
+        if skip_pattern.search(user_msg) and not any(k in user_msg.lower() for k in ["ingatkan", "jangan lupa", "catat", "harus", "jadwal"]):
+            continue
+
+        if task_pattern.search(user_msg):
+            low = user_msg.lower()
+            category = "Tugas"
+            if any(k in low for k in ["meeting", "rapat", "jadwal", "janji"]):
+                category = "Janji Temu"
+            elif any(k in low for k in ["ingatkan", "jangan lupa", "catat"]):
+                category = "Pengingat"
+            elif any(k in low for k in ["beli", "bayar", "pesan"]):
+                category = "Belanja & Finansial"
+            elif any(k in low for k in ["hubungi", "telpon", "telepon", "wa", "whatsapp", "kirim"]):
+                category = "Komunikasi"
+
+            clean_task = re.sub(r"^(tolong\s+)?(ingatkan\s+(saya\s+)?|catat\s+(bahwa\s+)?|jangan\s+lupa\s+)", "", user_msg, flags=re.IGNORECASE).strip()
+            clean_task = clean_task[0].upper() + clean_task[1:] if clean_task else user_msg
+
+            norm_key = clean_task.lower()
+            if norm_key in seen_texts:
+                continue
+            seen_texts.add(norm_key)
+
+            created_at = str(r.get("created_at") or "")
+            time_str = created_at[11:16] if len(created_at) >= 16 else ""
+
+            tasks.append({
+                "id": len(tasks) + 1,
+                "task": clean_task,
+                "category": category,
+                "raw_message": user_msg,
+                "source_chat_id": r.get("id"),
+                "time": time_str,
+                "created_at": created_at,
+                "slot_number": r.get("slot_number") or 1,
+            })
+
+    slot_label = f"Slot {clean_slot}" if clean_slot else "Semua Slot"
+    if tasks:
+        task_items_str = ", ".join(f"{t['id']}. {t['task']}" for t in tasks[:4])
+        summary_text = f"Ditemukan {len(tasks)} tugas atau janji dari percakapan {slot_label} pada tanggal {clean_date}: {task_items_str}."
+    else:
+        summary_text = f"Tidak ada komitmen tugas atau janji temu yang terdeteksi dari percakapan {slot_label} pada tanggal {clean_date}."
+
+    return {
+        "success": True,
+        "req_id": req_id,
+        "date": clean_date,
+        "slot_number": clean_slot,
+        "slot_label": slot_label,
+        "total_tasks": len(tasks),
+        "summary_text": summary_text,
+        "tasks": tasks,
+    }

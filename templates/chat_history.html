@@ -320,6 +320,14 @@
             <p class="app-subtitle">Log lengkap percakapan asisten suara Xiaozhi, pemanggilan MCP tools, dan respon sistem.</p>
         </div>
         <div class="app-toolbar">
+            <button type="button" class="app-button app-button-primary" onclick="openDailyRecapModal()" title="Rekap aktivitas hari ini / tanggal terpilih" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;">
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>Rekap Aktivitas</span>
+            </button>
+            <button type="button" class="app-button" onclick="openActionItemsModal()" title="Deteksi dan ekstrak daftar tugas dari percakapan" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;background:#fef08a;color:#854d0e;border:1.5px solid #ca8a04;">
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                <span>Deteksi Tugas</span>
+            </button>
             <span class="app-status-pill is-online" id="sseStatusPill" title="Koneksi SSE Real-Time Riwayat Chat">
                 <span class="app-status-dot"></span>
                 <span id="sseStatusText">SSE Live</span>
@@ -405,6 +413,138 @@
             </div>
         </div>
     </section>
+</div>
+
+<!-- ================= DAILY RECAP MODAL (OPTION 3) ================= -->
+<div class="app-modal" id="dailyRecapModal" style="display:none;">
+    <div class="app-modal-box" style="max-width: 680px; width: 95%;">
+        <div class="app-modal-header" style="align-items:flex-start;">
+            <div>
+                <h3 class="app-modal-title" style="display:flex;align-items:center;gap:8px;">
+                    <svg class="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    Rekap Aktivitas Harian
+                </h3>
+                <p style="font-size:12px;color:var(--app-muted);margin:4px 0 0 0;">
+                    Ringkasan percakapan, musik, dan kendali IoT Xiaozhi dengan Request ID terisolasi.
+                </p>
+            </div>
+            <button type="button" class="app-modal-close" onclick="closeDailyRecapModal()">&times;</button>
+        </div>
+
+        <!-- Filter Bar inside Modal -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;background:var(--app-surface-muted);padding:10px;border-radius:8px;border:1px solid var(--app-border);margin-bottom:14px;align-items:center;">
+            <div style="flex:1;min-width:130px;">
+                <label style="font-size:11px;font-weight:700;display:block;margin-bottom:3px;color:var(--app-muted);">Pilih Slot:</label>
+                <select id="modalRecapSlot" class="app-input" style="font-size:12px;padding:5px 8px;">
+                    <option value="1">Slot 1 ({{ s1_tok.device_label if s1_tok and s1_tok.device_label else 'XiaoZhi 1' }})</option>
+                    <option value="2">Slot 2 ({{ s2_tok.device_label if s2_tok and s2_tok.device_label else 'XiaoZhi 2' }})</option>
+                    <option value="3">Slot 3 ({{ s3_tok.device_label if s3_tok and s3_tok.device_label else 'XiaoZhi 3' }})</option>
+                    <option value="all">Semua Slot</option>
+                </select>
+            </div>
+            <div style="flex:1;min-width:140px;">
+                <label style="font-size:11px;font-weight:700;display:block;margin-bottom:3px;color:var(--app-muted);">Tanggal:</label>
+                <input type="date" id="modalRecapDate" class="app-input" style="font-size:12px;padding:5px 8px;" value="{{ active_date or today_date }}">
+            </div>
+            <div style="align-self:flex-end;">
+                <button type="button" class="app-button app-button-primary" id="btnFetchRecap" onclick="loadDailyRecap()" style="padding:6px 14px;font-size:12px;">
+                    Muat Rekap
+                </button>
+            </div>
+        </div>
+
+        <!-- Request ID & Metadata Badge -->
+        <div id="recapReqBadge" style="display:none;margin-bottom:12px;align-items:center;justify-content:space-between;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:6px;padding:6px 10px;font-size:11px;">
+            <div style="display:flex;align-items:center;gap:6px;font-family:ui-monospace, monospace;">
+                <span style="font-weight:800;color:#2563eb;">Req ID:</span>
+                <span id="recapReqIdText" style="color:var(--app-text);">-</span>
+                <span id="recapSlotText" class="app-chip app-chip-small" style="font-size:10px;background:#e0e7ff;color:#3730a3;font-weight:700;">-</span>
+            </div>
+            <button type="button" class="app-button app-button-small" onclick="copyText(document.getElementById('recapReqIdText').textContent)" style="padding:2px 8px;font-size:10.5px;">
+                Salin ID
+            </button>
+        </div>
+
+        <!-- Content Area -->
+        <div id="recapModalBody">
+            <div style="text-align:center;padding:30px;color:var(--app-muted);">
+                Klik "Muat Rekap" untuk memuat ringkasan aktivitas.
+            </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;border-top:1px solid var(--app-border);padding-top:12px;">
+            <button type="button" class="app-button" onclick="copyRecapSummary()" id="btnCopyRecap" style="display:none;">
+                Salin Ringkasan
+            </button>
+            <button type="button" class="app-button" onclick="closeDailyRecapModal()">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<!-- ================= ACTION ITEMS / TO-DO MODAL (OPTION 4) ================= -->
+<div class="app-modal" id="actionItemsModal" style="display:none;">
+    <div class="app-modal-box" style="max-width: 680px; width: 95%;">
+        <div class="app-modal-header" style="align-items:flex-start;">
+            <div>
+                <h3 class="app-modal-title" style="display:flex;align-items:center;gap:8px;">
+                    <svg class="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                    Deteksi Tugas & To-Do List
+                </h3>
+                <p style="font-size:12px;color:var(--app-muted);margin:4px 0 0 0;">
+                    Ekstraksi otomatis janji, komitmen, pengingat, dan to-do list dari percakapan Xiaozhi.
+                </p>
+            </div>
+            <button type="button" class="app-modal-close" onclick="closeActionItemsModal()">&times;</button>
+        </div>
+
+        <!-- Filter Bar inside Modal -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;background:var(--app-surface-muted);padding:10px;border-radius:8px;border:1px solid var(--app-border);margin-bottom:14px;align-items:center;">
+            <div style="flex:1;min-width:130px;">
+                <label style="font-size:11px;font-weight:700;display:block;margin-bottom:3px;color:var(--app-muted);">Pilih Slot:</label>
+                <select id="modalTodoSlot" class="app-input" style="font-size:12px;padding:5px 8px;">
+                    <option value="1">Slot 1 ({{ s1_tok.device_label if s1_tok and s1_tok.device_label else 'XiaoZhi 1' }})</option>
+                    <option value="2">Slot 2 ({{ s2_tok.device_label if s2_tok and s2_tok.device_label else 'XiaoZhi 2' }})</option>
+                    <option value="3">Slot 3 ({{ s3_tok.device_label if s3_tok and s3_tok.device_label else 'XiaoZhi 3' }})</option>
+                    <option value="all">Semua Slot</option>
+                </select>
+            </div>
+            <div style="flex:1;min-width:140px;">
+                <label style="font-size:11px;font-weight:700;display:block;margin-bottom:3px;color:var(--app-muted);">Tanggal:</label>
+                <input type="date" id="modalTodoDate" class="app-input" style="font-size:12px;padding:5px 8px;" value="{{ active_date or today_date }}">
+            </div>
+            <div style="align-self:flex-end;">
+                <button type="button" class="app-button" id="btnFetchTodo" onclick="loadActionItems()" style="padding:6px 14px;font-size:12px;background:#fef08a;color:#854d0e;border:1.5px solid #ca8a04;font-weight:700;">
+                    Pindai Percakapan
+                </button>
+            </div>
+        </div>
+
+        <!-- Request ID & Metadata Badge -->
+        <div id="todoReqBadge" style="display:none;margin-bottom:12px;align-items:center;justify-content:space-between;background:rgba(234,179,8,0.1);border:1px solid rgba(202,138,4,0.3);border-radius:6px;padding:6px 10px;font-size:11px;">
+            <div style="display:flex;align-items:center;gap:6px;font-family:ui-monospace, monospace;">
+                <span style="font-weight:800;color:#ca8a04;">Req ID:</span>
+                <span id="todoReqIdText" style="color:var(--app-text);">-</span>
+                <span id="todoSlotText" class="app-chip app-chip-small" style="font-size:10px;background:#fef3c7;color:#92400e;font-weight:700;">-</span>
+            </div>
+            <button type="button" class="app-button app-button-small" onclick="copyText(document.getElementById('todoReqIdText').textContent)" style="padding:2px 8px;font-size:10.5px;">
+                Salin ID
+            </button>
+        </div>
+
+        <!-- Content Area -->
+        <div id="todoModalBody">
+            <div style="text-align:center;padding:30px;color:var(--app-muted);">
+                Klik "Pindai Percakapan" untuk mendeteksi tugas dari riwayat obrolan.
+            </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;border-top:1px solid var(--app-border);padding-top:12px;">
+            <button type="button" class="app-button" onclick="copyAllTodos()" id="btnCopyTodos" style="display:none;">
+                Salin Semua Tugas
+            </button>
+            <button type="button" class="app-button" onclick="closeActionItemsModal()">Tutup</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -813,6 +953,279 @@
         } catch(e) {
             console.warn("SSE init error:", e);
         }
+    }
+
+    // ── Safe API Helper for Modals ──
+    async function safeHistoryApi(url) {
+        try {
+            var r = await fetch(url, {
+                headers: { "Accept": "application/json" },
+                credentials: "same-origin"
+            });
+            var ct = (r.headers.get("content-type") || "").toLowerCase();
+            if (!ct.includes("application/json")) {
+                var text = await r.text();
+                if (text.includes("<!DOCTYPE") || text.includes("<html") || r.status >= 500) {
+                    return { success: false, request_id: "http_" + r.status, message: "Server sedang dalam pemeliharaan atau sedang sibuk. Silakan coba sesaat lagi." };
+                }
+                return { success: false, request_id: "http_parse", message: "Format respon server tidak valid." };
+            }
+            return await r.json();
+        } catch (err) {
+            return { success: false, request_id: "client_err", message: err.message || "Gagal menghubungi server." };
+        }
+    }
+
+    // ── Daily Recap Modal Logic (Option 3) ──
+    var lastRecapData = null;
+    function openDailyRecapModal() {
+        var modal = document.getElementById("dailyRecapModal");
+        if (modal) {
+            modal.style.display = "flex";
+            modal.classList.add("is-open");
+            // Set default slot and date matching current page filter
+            if (selectedSlot) {
+                var sSelect = document.getElementById("modalRecapSlot");
+                if (sSelect) sSelect.value = String(selectedSlot);
+            }
+            if (AD) {
+                var dInput = document.getElementById("modalRecapDate");
+                if (dInput) dInput.value = AD;
+            }
+            loadDailyRecap();
+        }
+    }
+
+    function closeDailyRecapModal() {
+        var modal = document.getElementById("dailyRecapModal");
+        if (modal) {
+            modal.style.display = "none";
+            modal.classList.remove("is-open");
+        }
+    }
+
+    async function loadDailyRecap() {
+        var slotVal = document.getElementById("modalRecapSlot").value;
+        var dateVal = document.getElementById("modalRecapDate").value;
+        var btn = document.getElementById("btnFetchRecap");
+        var body = document.getElementById("recapModalBody");
+        var reqBadge = document.getElementById("recapReqBadge");
+        var copyBtn = document.getElementById("btnCopyRecap");
+
+        if (btn) btn.disabled = true;
+        body.innerHTML = '<div style="text-align:center;padding:30px;"><div style="display:inline-block;width:24px;height:24px;border:3px solid var(--app-border);border-top-color:var(--app-accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div><p style="margin-top:10px;font-size:12px;color:var(--app-muted);">Menganalisis riwayat percakapan...</p></div>';
+
+        var p = new URLSearchParams({ date: dateVal || "today", slot: slotVal });
+        var res = await safeHistoryApi("/api/chat-history/daily-recap?" + p);
+
+        if (btn) btn.disabled = false;
+        lastRecapData = res;
+
+        if (!res || !res.success) {
+            var errId = (res && (res.request_id || res.req_id)) || "recap_err";
+            body.innerHTML = '<div style="background:#fee2e2;border:1px solid #ef4444;border-radius:8px;padding:16px;color:#991b1b;font-size:13px;">' +
+                '<p style="font-weight:700;margin:0 0 6px 0;">Terjadi Kesalahan</p>' +
+                '<p style="margin:0 0 8px 0;">' + E(res.message || "Gagal memuat rekap harian.") + '</p>' +
+                '<div style="font-family:ui-monospace, monospace;font-size:11px;background:#fecaca;padding:4px 8px;border-radius:4px;display:inline-block;">Req ID: ' + E(errId) + '</div>' +
+                '</div>';
+            if (reqBadge) reqBadge.style.display = "none";
+            if (copyBtn) copyBtn.style.display = "none";
+            return;
+        }
+
+        // Show Request ID Badge
+        var rId = res.request_id || res.req_id || "-";
+        document.getElementById("recapReqIdText").textContent = rId;
+        document.getElementById("recapSlotText").textContent = res.slot_label || ("Slot " + slotVal);
+        if (reqBadge) reqBadge.style.display = "flex";
+        if (copyBtn) copyBtn.style.display = "inline-flex";
+
+        var stats = res.stats || {};
+        var h = '';
+
+        // Xiaozhi Voice Summary Banner
+        h += '<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:14px;margin-bottom:14px;">';
+        h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;color:#166534;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;">';
+        h += '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>';
+        h += 'Ringkasan Asisten Suara Xiaozhi';
+        h += '</div>';
+        h += '<p style="margin:0;font-size:13.5px;line-height:1.6;color:#14532d;font-weight:500;">' + E(res.summary_text || "Tidak ada aktivitas.") + '</p>';
+        h += '</div>';
+
+        // Stat Grid
+        h += '<div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:14px;">';
+        h += '<div style="background:var(--app-surface-muted);padding:10px;border-radius:6px;border:1px solid var(--app-border);text-align:center;"><div style="font-size:10.5px;color:var(--app-muted);font-weight:700;">Total Chat</div><div style="font-size:18px;font-weight:800;color:var(--app-text);">' + (stats.total_chats || 0) + '</div></div>';
+        h += '<div style="background:var(--app-surface-muted);padding:10px;border-radius:6px;border:1px solid var(--app-border);text-align:center;"><div style="font-size:10.5px;color:var(--app-muted);font-weight:700;">Lagu Diputar</div><div style="font-size:18px;font-weight:800;color:#2563eb;">' + (stats.songs_count || 0) + '</div></div>';
+        h += '<div style="background:var(--app-surface-muted);padding:10px;border-radius:6px;border:1px solid var(--app-border);text-align:center;"><div style="font-size:10.5px;color:var(--app-muted);font-weight:700;">Perintah IoT</div><div style="font-size:18px;font-weight:800;color:#16a34a;">' + (stats.iot_count || 0) + '</div></div>';
+        h += '<div style="background:var(--app-surface-muted);padding:10px;border-radius:6px;border:1px solid var(--app-border);text-align:center;"><div style="font-size:10.5px;color:var(--app-muted);font-weight:700;">Topik Diskusi</div><div style="font-size:18px;font-weight:800;color:#d97706;">' + (stats.topics_count || 0) + '</div></div>';
+        h += '</div>';
+
+        // Songs Played Section
+        if (res.songs_played && res.songs_played.length) {
+            h += '<div style="margin-bottom:12px;">';
+            h += '<h4 style="font-size:12px;font-weight:800;color:var(--app-muted);text-transform:uppercase;margin:0 0 6px 0;">🎵 Lagu yang Diputar</h4>';
+            h += '<div style="display:flex;flex-direction:column;gap:4px;">';
+            res.songs_played.forEach(function(s) {
+                h += '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--app-surface-muted);padding:6px 10px;border-radius:6px;font-size:12px;">';
+                h += '<span style="font-weight:600;color:var(--app-text);">' + E(s.title) + '</span>';
+                h += '<span style="color:var(--app-muted);font-size:11px;">' + E(s.time) + '</span>';
+                h += '</div>';
+            });
+            h += '</div></div>';
+        }
+
+        // IoT / Relay Commands Section
+        if (res.iot_commands && res.iot_commands.length) {
+            h += '<div style="margin-bottom:12px;">';
+            h += '<h4 style="font-size:12px;font-weight:800;color:var(--app-muted);text-transform:uppercase;margin:0 0 6px 0;">⚡ Perintah Saklar / Smart Home</h4>';
+            h += '<div style="display:flex;flex-direction:column;gap:4px;">';
+            res.iot_commands.forEach(function(c) {
+                h += '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--app-surface-muted);padding:6px 10px;border-radius:6px;font-size:12px;">';
+                h += '<span style="font-weight:600;color:var(--app-text);">' + E(c.command) + '</span>';
+                h += '<span style="color:var(--app-muted);font-size:11px;">' + E(c.time) + '</span>';
+                h += '</div>';
+            });
+            h += '</div></div>';
+        }
+
+        // Key Topics Section
+        if (res.key_topics && res.key_topics.length) {
+            h += '<div style="margin-bottom:12px;">';
+            h += '<h4 style="font-size:12px;font-weight:800;color:var(--app-muted);text-transform:uppercase;margin:0 0 6px 0;">💡 Topik Utama Obrolan</h4>';
+            h += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+            res.key_topics.forEach(function(t) {
+                h += '<span style="background:rgba(217,119,6,0.12);color:#b45309;padding:4px 8px;border-radius:4px;font-size:11.5px;font-weight:600;">' + E(t) + '</span>';
+            });
+            h += '</div></div>';
+        }
+
+        body.innerHTML = h;
+    }
+
+    function copyRecapSummary() {
+        if (!lastRecapData) return;
+        var text = (lastRecapData.summary_text || "") + "\n\n[Req ID: " + (lastRecapData.request_id || lastRecapData.req_id || "") + "]";
+        copyText(text);
+        if (window.App && App.toast) App.toast.success("Ringkasan rekap berhasil disalin!");
+    }
+
+    // ── Action Items / To-Do Modal Logic (Option 4) ──
+    var lastTodoData = null;
+    function openActionItemsModal() {
+        var modal = document.getElementById("actionItemsModal");
+        if (modal) {
+            modal.style.display = "flex";
+            modal.classList.add("is-open");
+            if (selectedSlot) {
+                var sSelect = document.getElementById("modalTodoSlot");
+                if (sSelect) sSelect.value = String(selectedSlot);
+            }
+            if (AD) {
+                var dInput = document.getElementById("modalTodoDate");
+                if (dInput) dInput.value = AD;
+            }
+            loadActionItems();
+        }
+    }
+
+    function closeActionItemsModal() {
+        var modal = document.getElementById("actionItemsModal");
+        if (modal) {
+            modal.style.display = "none";
+            modal.classList.remove("is-open");
+        }
+    }
+
+    async function loadActionItems() {
+        var slotVal = document.getElementById("modalTodoSlot").value;
+        var dateVal = document.getElementById("modalTodoDate").value;
+        var btn = document.getElementById("btnFetchTodo");
+        var body = document.getElementById("todoModalBody");
+        var reqBadge = document.getElementById("todoReqBadge");
+        var copyBtn = document.getElementById("btnCopyTodos");
+
+        if (btn) btn.disabled = true;
+        body.innerHTML = '<div style="text-align:center;padding:30px;"><div style="display:inline-block;width:24px;height:24px;border:3px solid var(--app-border);border-top-color:#ca8a04;border-radius:50%;animation:spin 0.8s linear infinite;"></div><p style="margin-top:10px;font-size:12px;color:var(--app-muted);">Memindai komitmen dan tugas dari riwayat obrolan...</p></div>';
+
+        var p = new URLSearchParams({ date: dateVal || "today", slot: slotVal });
+        var res = await safeHistoryApi("/api/chat-history/action-items?" + p);
+
+        if (btn) btn.disabled = false;
+        lastTodoData = res;
+
+        if (!res || !res.success) {
+            var errId = (res && (res.request_id || res.req_id)) || "todo_err";
+            body.innerHTML = '<div style="background:#fee2e2;border:1px solid #ef4444;border-radius:8px;padding:16px;color:#991b1b;font-size:13px;">' +
+                '<p style="font-weight:700;margin:0 0 6px 0;">Terjadi Kesalahan</p>' +
+                '<p style="margin:0 0 8px 0;">' + E(res.message || "Gagal mendeteksi tugas.") + '</p>' +
+                '<div style="font-family:ui-monospace, monospace;font-size:11px;background:#fecaca;padding:4px 8px;border-radius:4px;display:inline-block;">Req ID: ' + E(errId) + '</div>' +
+                '</div>';
+            if (reqBadge) reqBadge.style.display = "none";
+            if (copyBtn) copyBtn.style.display = "none";
+            return;
+        }
+
+        var rId = res.request_id || res.req_id || "-";
+        document.getElementById("todoReqIdText").textContent = rId;
+        document.getElementById("todoSlotText").textContent = res.slot_label || ("Slot " + slotVal);
+        if (reqBadge) reqBadge.style.display = "flex";
+        if (copyBtn) copyBtn.style.display = "inline-flex";
+
+        var tasks = res.tasks || [];
+        var h = '';
+
+        // Summary callout
+        h += '<div style="background:#fefce8;border:1.5px solid #fde047;border-radius:8px;padding:12px 14px;margin-bottom:14px;">';
+        h += '<p style="margin:0;font-size:13px;line-height:1.5;color:#854d0e;font-weight:600;">' + E(res.summary_text || "") + '</p>';
+        h += '</div>';
+
+        if (!tasks.length) {
+            h += '<div style="text-align:center;padding:24px 10px;color:var(--app-muted);border:1px dashed var(--app-border);border-radius:8px;">';
+            h += '<div style="font-size:24px;margin-bottom:6px;">✨</div>';
+            h += '<p style="font-size:13px;font-weight:600;margin:0;color:var(--app-text);">Tidak ada tugas atau janji terdeteksi</p>';
+            h += '<p style="font-size:11.5px;margin:4px 0 0 0;color:var(--app-muted);">Gunakan kata kunci seperti <i>"ingatkan saya..."</i>, <i>"jadwal rapat..."</i>, atau <i>"jangan lupa beli..."</i> saat mengobrol dengan Xiaozhi.</p>';
+            h += '</div>';
+        } else {
+            h += '<div style="display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;padding-right:4px;">';
+            var catColors = {
+                "Janji Temu": "background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;",
+                "Pengingat": "background:#fef3c7;color:#92400e;border:1px solid #fde68a;",
+                "Belanja & Finansial": "background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;",
+                "Komunikasi": "background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe;",
+                "Tugas": "background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;"
+            };
+
+            tasks.forEach(function(t) {
+                var cStyle = catColors[t.category] || catColors["Tugas"];
+                h += '<div style="display:flex;align-items:flex-start;gap:10px;background:var(--app-surface);border:1.5px solid var(--app-border);border-radius:8px;padding:10px 12px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">';
+                h += '<input type="checkbox" style="margin-top:3px;cursor:pointer;accent-color:#ca8a04;">';
+                h += '<div style="flex:1;min-width:0;">';
+                h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">';
+                h += '<span style="font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;' + cStyle + '">' + E(t.category) + '</span>';
+                if (t.time) h += '<span style="font-size:10.5px;color:var(--app-muted);">' + E(t.time) + '</span>';
+                h += '</div>';
+                h += '<div style="font-size:13px;font-weight:600;color:var(--app-text);line-height:1.4;">' + E(t.task) + '</div>';
+                if (t.raw_message && t.raw_message !== t.task) {
+                    h += '<div style="font-size:11px;color:var(--app-muted);margin-top:2px;">Konteks: "' + E(t.raw_message) + '"</div>';
+                }
+                h += '</div>';
+                h += '<button type="button" class="app-button app-button-small" onclick="copyText(`' + E(t.task).replace(/`/g, '\\`') + '`)" title="Salin tugas" style="padding:2px 6px;font-size:11px;">Salin</button>';
+                h += '</div>';
+            });
+            h += '</div>';
+        }
+
+        body.innerHTML = h;
+    }
+
+    function copyAllTodos() {
+        if (!lastTodoData || !lastTodoData.tasks || !lastTodoData.tasks.length) return;
+        var lines = lastTodoData.tasks.map(function(t, idx) {
+            return (idx + 1) + ". [" + t.category + "] " + t.task + (t.time ? " (" + t.time + ")" : "");
+        });
+        var text = lines.join("\n") + "\n\n[Req ID: " + (lastTodoData.request_id || lastTodoData.req_id || "") + "]";
+        copyText(text);
+        if (window.App && App.toast) App.toast.success("Daftar tugas berhasil disalin!");
     }
 
     renderSidebar();

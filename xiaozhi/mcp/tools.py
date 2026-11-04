@@ -1050,7 +1050,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         return response
 
     @mcp_server.tool()
-    def recall_chat_memory(query: str = "", limit: int = 5) -> dict:
+    def recall_chat_memory(query: str = "", waktu: str = "semua", limit: int = 5) -> dict:
         """
         Cari riwayat percakapan hanya pada akun dan slot aktif. Panggil sebelum menjawab jika pengguna merujuk
         percakapan sebelumnya, memakai kata seperti "tadi", "kemarin", "pernah", "yang itu", "lanjutkan",
@@ -1061,13 +1061,20 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             query: Kata kunci topik atau konsep yang ingin dicari (contoh: "keuangan", "tugas fisika", "resep", "koding"). Kosongkan untuk membaca percakapan paling terkini.
             limit: Jumlah cuplikan riwayat yang ingin diambil (default: 5, maksimal: 8).
         """
+        req_id = f"mem_{int(time.time())}_{uuid.uuid4().hex[:6]}"
         owner_id = mcp_active_owner_ctx.get()
         active_slot = int(mcp_active_slot_ctx.get() or 1)
         if owner_id is None:
-            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif.", "riwayat_percakapan": []}
+            return {"success": False, "request_id": req_id, "message": "Belum ada koneksi Xiaozhi aktif.", "riwayat_percakapan": []}
 
         limit_val = max(1, min(int(limit or 5), 8))
         query_clean = str(query or "").strip()
+
+        from xiaozhi.services.chat_memory_service import resolve_target_date
+        date_filter = ""
+        w_low = str(waktu or "").strip().lower()
+        if w_low in ("hari_ini", "today", "kemarin", "yesterday") or re.match(r"^\d{4}-\d{2}-\d{2}$", w_low):
+            date_filter = resolve_target_date(w_low)
 
         try:
             # Gunakan mode semantik cerdas jika user mencari berdasarkan topik/makna (terisolasi per slot aktif)
@@ -1076,6 +1083,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 owner_id,
                 query=query_clean,
                 limit=limit_val,
+                date=date_filter,
                 semantic=use_semantic,
                 slot_number=active_slot,
                 strict_slot=True,
@@ -1136,7 +1144,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
             response = {
                 "success": True,
+                "request_id": req_id,
                 "slot_aktif": active_slot,
+                "rentang_waktu": waktu or "semua",
                 "active_session_terdeteksi": has_active_session,
                 "pencarian": query_clean or "Percakapan Terkini",
                 "mode": "Semantic Long-Term Recall" if use_semantic else "Chronological",
@@ -1148,7 +1158,95 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return response
         except Exception:
             logger.exception("Error recalling chat memory")
-            return {"success": False, "message": "Gagal membaca memori percakapan.", "riwayat_percakapan": []}
+            return {"success": False, "request_id": req_id, "message": "Gagal membaca memori percakapan.", "riwayat_percakapan": []}
+
+    @mcp_server.tool()
+    def get_daily_activity_recap(date: str = "today") -> dict:
+        """
+        Dapatkan rekap lengkap aktivitas pengguna untuk hari ini atau tanggal tertentu (suara, musik, IoT, obrolan).
+        Panggil tool ini saat pengguna bertanya:
+        - 'Rekap aktivitas saya hari ini apa saja?'
+        - 'Tadi saya ngobrol dan mutar lagu apa saja?'
+        - 'Ada rekap kegiatan hari ini?'
+
+        Args:
+            date: Tanggal yang ingin direkap ('today', 'hari_ini', 'kemarin', 'yesterday', atau format YYYY-MM-DD). Default 'today'.
+        """
+        req_id = f"recap_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        owner_id = mcp_active_owner_ctx.get()
+        active_slot = int(mcp_active_slot_ctx.get() or 1)
+        if owner_id is None:
+            return {"success": False, "request_id": req_id, "message": "Belum ada koneksi Xiaozhi aktif."}
+
+        try:
+            from xiaozhi.services.chat_memory_service import build_daily_chat_recap
+            recap_data = build_daily_chat_recap(
+                store,
+                owner_id=int(owner_id),
+                slot_number=active_slot,
+                target_date=date,
+            )
+            return {
+                "success": True,
+                "request_id": recap_data["req_id"],
+                "slot_aktif": active_slot,
+                "tanggal": recap_data["date"],
+                "ringkasan_suara": recap_data["summary_text"],
+                "statistik": recap_data["stats"],
+                "lagu_diputar": recap_data["songs_played"],
+                "perintah_iot": recap_data["iot_commands"],
+                "topik_utama": recap_data["key_topics"],
+                "instruksi_xiaozhi": (
+                    f"Sampaikan ringkasan aktivitas di atas secara alami dan ramah kepada pengguna. "
+                    f"Rujuk data: {recap_data['summary_text']}. Jika pengguna menanyakan detail lagu atau perangkat, jelaskan dari daftar yang ada."
+                ),
+            }
+        except Exception as exc:
+            logger.exception("Error generating daily activity recap")
+            return {"success": False, "request_id": req_id, "message": f"Gagal menghasilkan rekap harian: {exc}"}
+
+    @mcp_server.tool()
+    def extract_action_items_from_chat(date: str = "today") -> dict:
+        """
+        Deteksi dan ekstrak daftar tugas (to-do list), komitmen, dan janji temu dari percakapan pengguna.
+        Panggil tool ini saat pengguna bertanya:
+        - 'Apa saja tugas atau janji saya dari obrolan tadi?'
+        - 'Cek apakah ada to-do list atau janji yang belum dicatat'
+        - 'Ingatkan saya apa saja komitmen obrolan hari ini'
+
+        Args:
+            date: Tanggal yang ingin dipindai ('today', 'hari_ini', 'kemarin', atau YYYY-MM-DD). Default 'today'.
+        """
+        req_id = f"todo_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        owner_id = mcp_active_owner_ctx.get()
+        active_slot = int(mcp_active_slot_ctx.get() or 1)
+        if owner_id is None:
+            return {"success": False, "request_id": req_id, "message": "Belum ada koneksi Xiaozhi aktif."}
+
+        try:
+            from xiaozhi.services.chat_memory_service import extract_action_items_from_history
+            action_data = extract_action_items_from_history(
+                store,
+                owner_id=int(owner_id),
+                slot_number=active_slot,
+                target_date=date,
+            )
+            return {
+                "success": True,
+                "request_id": action_data["req_id"],
+                "slot_aktif": active_slot,
+                "tanggal": action_data["date"],
+                "total_tugas": action_data["total_tasks"],
+                "ringkasan_suara": action_data["summary_text"],
+                "daftar_tugas": action_data["tasks"],
+                "instruksi_xiaozhi": (
+                    f"Sampaikan daftar tugas yang terdeteksi secara rapi ke pengguna. "
+                    f"Rujuk: {action_data['summary_text']}. Tanyakan apakah pengguna ingin menjadwalkan atau menambahkan detail pengingat untuk tugas tersebut."
+                ),
+            }
+        except Exception as exc:
+            logger.exception("Error extracting action items from chat")
+            return {"success": False, "request_id": req_id, "message": f"Gagal mengekstrak tugas dari riwayat obrolan: {exc}"}
 
     @mcp_server.tool()
     def remember_user_profile(

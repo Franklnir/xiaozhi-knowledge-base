@@ -190,7 +190,17 @@ async def api_add_playlist_track(request: Request):
     full_url = media_info["canonical_url"]
 
     # ── Duration Limit Check (Max 1 hour 10 min = 4200s absolute, max 10 min if user already has 1-hour version) ──
-    dur_info = check_media_duration_limit(full_url, max_seconds=4200, platform=platform)
+    try:
+        dur_info = await asyncio.wait_for(
+            asyncio.to_thread(check_media_duration_limit, full_url, 4200, platform),
+            timeout=12.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Duration check timed out for %s, proceeding with fallback", full_url)
+        dur_info = {"valid": True, "duration_sec": None, "formatted_duration": "", "title": None, "artist": None}
+    except Exception as d_exc:
+        logger.warning("Duration check error for %s: %s, proceeding with fallback", full_url, d_exc)
+        dur_info = {"valid": True, "duration_sec": None, "formatted_duration": "", "title": None, "artist": None}
     if not dur_info.get("valid", True):
         raise HTTPException(
             status_code=400,
@@ -299,7 +309,17 @@ async def api_update_playlist_track(track_id: int, request: Request):
         video_id = media_info["video_id"]
         raw_url = media_info["canonical_url"]
 
-        dur_info = check_media_duration_limit(raw_url, max_seconds=4200, platform=media_info["platform"])
+        try:
+            dur_info = await asyncio.wait_for(
+                asyncio.to_thread(check_media_duration_limit, raw_url, 4200, media_info["platform"]),
+                timeout=12.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Duration check timed out for %s, proceeding with fallback", raw_url)
+            dur_info = {"valid": True, "duration_sec": None, "formatted_duration": "", "title": None, "artist": None}
+        except Exception as d_exc:
+            logger.warning("Duration check error for %s: %s, proceeding with fallback", raw_url, d_exc)
+            dur_info = {"valid": True, "duration_sec": None, "formatted_duration": "", "title": None, "artist": None}
         if not dur_info.get("valid", True):
             raise HTTPException(
                 status_code=400,

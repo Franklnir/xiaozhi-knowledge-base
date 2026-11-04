@@ -828,6 +828,50 @@
         document.getElementById('modalAddTrack').classList.remove('is-active');
     }
 
+    // Safe API fetcher that guarantees JSON parsing and prevents unexpected token / HTML error crashes
+    async function safePlaylistApi(url, options = {}) {
+        options.headers = options.headers || {};
+        if (!options.headers['Accept']) {
+            options.headers['Accept'] = 'application/json';
+        }
+        if (!options.credentials) {
+            options.credentials = 'same-origin';
+        }
+        let resp;
+        try {
+            resp = await fetch(url, options);
+        } catch (netErr) {
+            throw new Error("Gagal terhubung ke server. Periksa koneksi internet Anda.");
+        }
+
+        if (resp.status === 401 || resp.redirected) {
+            if (window.App && App.toast) {
+                App.toast.error("Sesi login Anda telah berakhir. Mengarahkan ke halaman login...");
+            }
+            setTimeout(() => {
+                window.location.href = '/login?message=Sesi+login+telah+berakhir.+Silakan+masuk+kembali.';
+            }, 1200);
+            throw new Error("Sesi login telah berakhir.");
+        }
+
+        const ct = resp.headers.get("content-type") || "";
+        let data = {};
+        if (ct.includes("application/json")) {
+            data = await resp.json().catch(() => ({}));
+        } else {
+            const text = await resp.text().catch(() => "");
+            if (resp.status >= 500) {
+                throw new Error("Server sedang dalam pemeliharaan atau sedang sibuk. Silakan coba sesaat lagi.");
+            }
+            throw new Error(`Respon server tidak valid (${resp.status}).`);
+        }
+
+        if (!resp.ok || !data.success) {
+            throw new Error(data.detail || data.message || `Operasi gagal (HTTP ${resp.status}).`);
+        }
+        return data;
+    }
+
     // Submit Add Track
     async function submitAddTrack(e) {
         e.preventDefault();
@@ -842,7 +886,7 @@
         btn.textContent = "Menyimpan...";
 
         try {
-            const resp = await fetch('/api/v1/playlist', {
+            const data = await safePlaylistApi('/api/v1/playlist', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -854,10 +898,6 @@
                     artist: artist
                 })
             });
-            const data = await resp.json();
-            if (!resp.ok || !data.success) {
-                throw new Error(data.detail || data.message || "Gagal menambahkan lagu.");
-            }
 
             if (window.App && App.toast) App.toast.success(data.message || "Lagu berhasil ditambahkan!");
             closeAddTrackModal();
@@ -896,7 +936,7 @@
         btn.textContent = "Menyimpan...";
 
         try {
-            const resp = await fetch('/api/v1/playlist/' + trackId, {
+            const data = await safePlaylistApi('/api/v1/playlist/' + trackId, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -908,10 +948,6 @@
                     artist: artist
                 })
             });
-            const data = await resp.json();
-            if (!resp.ok || !data.success) {
-                throw new Error(data.detail || data.message || "Gagal memperbarui lagu.");
-            }
 
             if (window.App && App.toast) App.toast.success(data.message || "Perubahan disimpan!");
             closeEditTrackModal();
@@ -938,16 +974,12 @@
         if (!confirm("Hapus lagu '" + title + "' dari playlist Anda?")) return;
 
         try {
-            const resp = await fetch('/api/v1/playlist/' + trackId, {
+            const data = await safePlaylistApi('/api/v1/playlist/' + trackId, {
                 method: 'DELETE',
                 headers: {
                     'X-CSRF-Token': csrfToken
                 }
             });
-            const data = await resp.json();
-            if (!resp.ok || !data.success) {
-                throw new Error(data.detail || data.message || "Gagal menghapus lagu.");
-            }
 
             if (window.App && App.toast) App.toast.success(data.message || "Lagu berhasil dihapus.");
             const row = document.getElementById('track-row-' + trackId);
@@ -1067,11 +1099,10 @@
             if (cell) {
                 cell.innerHTML = renderCacheBadge({ status: 'downloading', is_cached: false, percent: 0 }, trackId, title);
             }
-            const resp = await fetch('/api/v1/playlist/' + trackId + '/cache', {
+            const data = await safePlaylistApi('/api/v1/playlist/' + trackId + '/cache', {
                 method: 'POST',
                 headers: { 'X-CSRF-Token': csrfToken }
             });
-            const data = await resp.json();
             if (window.App && App.toast && data.message) {
                 App.toast.success(data.message);
             }
@@ -1086,11 +1117,10 @@
             if (window.App && App.toast) {
                 App.toast.info("Memasukkan semua lagu yang belum di-cache ke antrean server...");
             }
-            const resp = await fetch('/api/v1/playlist/cache-all', {
+            const data = await safePlaylistApi('/api/v1/playlist/cache-all', {
                 method: 'POST',
                 headers: { 'X-CSRF-Token': csrfToken }
             });
-            const data = await resp.json();
             if (window.App && App.toast && data.message) {
                 App.toast.success(data.message);
             }
