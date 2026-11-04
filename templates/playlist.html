@@ -217,6 +217,7 @@
         width: 100%;
         overflow: hidden;
         animation: mcpPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
     :root[data-theme="neo"] .app-modal-card {
         border: 2.5px solid #111;
         box-shadow: 6px 6px 0 #111;
@@ -544,7 +545,7 @@
 <!-- ========================================== -->
 <!-- MODAL 1: TAMBAH LAGU KE PLAYLIST -->
 <!-- ========================================== -->
-<div class="app-modal-overlay" id="modalAddTrack" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
+<div class="app-modal-overlay" id="modalAddTrack" role="dialog" aria-modal="true" aria-labelledby="addModalTitle" onclick="if(event.target === this) closeAddTrackModal()">
     <div class="app-modal-card">
         <div style="height:5px; background:linear-gradient(90deg, #ef4444, #f97316, #eab308);"></div>
         <div style="padding:20px 24px;">
@@ -640,7 +641,7 @@
 <!-- ========================================== -->
 <!-- MODAL 2: EDIT LAGU PLAYLIST -->
 <!-- ========================================== -->
-<div class="app-modal-overlay" id="modalEditTrack" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+<div class="app-modal-overlay" id="modalEditTrack" role="dialog" aria-modal="true" aria-labelledby="editModalTitle" onclick="if(event.target === this) closeEditTrackModal()">
     <div class="app-modal-card">
         <div style="height:5px; background:linear-gradient(90deg, #3b82f6, #06b6d4, #10b981);"></div>
         <div style="padding:20px 24px;">
@@ -713,7 +714,7 @@
 <!-- ========================================== -->
 <!-- MODAL 3: PREVIEW VIDEO YOUTUBE EMBED -->
 <!-- ========================================== -->
-<div class="app-modal-overlay" id="modalPreviewVideo" role="dialog" aria-modal="true" aria-labelledby="previewVideoTitle">
+<div class="app-modal-overlay" id="modalPreviewVideo" role="dialog" aria-modal="true" aria-labelledby="previewVideoTitle" onclick="if(event.target === this) closePreviewVideoModal()">
     <div class="app-modal-card" style="max-width:640px;">
         <div style="padding:14px 18px; border-bottom:1px solid var(--app-border); display:flex; align-items:center; justify-content:space-between;">
             <h3 id="previewVideoTitle" style="font-size:15px; font-weight:800; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:500px;">
@@ -1023,21 +1024,6 @@
                 if (window.App && App.toast) App.toast.error(err.message);
                 else alert(err.message);
             }
-        }
-    }
-
-            if (window.App && App.toast) App.toast.success(data.message || "Lagu berhasil dihapus.");
-            const row = document.getElementById('track-row-' + trackId);
-            if (row) row.remove();
-
-            // Decrement counter
-            const totalEl = document.getElementById('statTotalTracks');
-            const tableTotalEl = document.getElementById('tableTrackCount');
-            if (totalEl) totalEl.textContent = Math.max(0, parseInt(totalEl.textContent || 0) - 1);
-            if (tableTotalEl) tableTotalEl.textContent = Math.max(0, parseInt(tableTotalEl.textContent || 0) - 1);
-        } catch (err) {
-            if (window.App && App.toast) App.toast.error(err.message);
-            else alert(err.message);
         }
     }
 
