@@ -1969,15 +1969,16 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     except Exception as e_c:
                         logger.debug("Cache check error in play_youtube_song: %s", e_c)
 
-                    instructions = f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' agar speaker XiaoZhi langsung memutar lagunya."
-                    if cache_status != "ready" and cache_note:
-                        instructions += f" PENTING: Sampaikan juga kepada pengguna dengan suara singkat dan ramah: '{cache_note}'"
+                    instructions = (
+                        f"Segera panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' "
+                        f"agar speaker XiaoZhi langsung memutar lagunya tanpa jeda. Katakan hanya 'Memutar {title}' secara singkat."
+                    )
 
                     response = {
                         "success": True,
                         "source": "playlist",
                         "cache_status": cache_status,
-                        "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}' ({cache_note}). Panggil tool perangkat self.audio.play_youtube.",
+                        "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}'. Panggil tool perangkat self.audio.play_youtube.",
                         "query": query,
                         "now_playing": {
                             "track_number": track_no,
@@ -2594,14 +2595,15 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             except Exception as e_c:
                 logger.debug("Cache check error in play_playlist_song: %s", e_c)
 
-            instructions = f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' agar speaker XiaoZhi langsung memutar lagunya."
-            if cache_status != "ready" and cache_note:
-                instructions += f" PENTING: Sampaikan juga kepada pengguna dengan suara singkat dan ramah: '{cache_note}'"
+            instructions = (
+                f"Segera panggil tool perangkat `self.audio.play_youtube` dengan query='{title}' dan video_id='{vid}' "
+                f"agar speaker XiaoZhi langsung memutar lagunya tanpa jeda. Katakan hanya 'Memutar {title}' secara singkat."
+            )
 
             response = {
                 "success": True,
                 "cache_status": cache_status,
-                "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}' ({cache_note}). Panggil tool perangkat self.audio.play_youtube.",
+                "message": f"Memutar lagu #{track_no} dari playlist Anda: '{title}'. Panggil tool perangkat self.audio.play_youtube.",
                 "query": query,
                 "track": {
                     "track_number": track_no,

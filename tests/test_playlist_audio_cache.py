@@ -622,14 +622,16 @@ def test_get_playlist_cache_status_tool(tmp_path):
             play_ready = mock_mcp.tools["play_playlist_song"]("1")
             assert play_ready["success"] is True
             assert play_ready["cache_status"] == "ready"
-            assert "siap diputar dengan sangat lancar" in play_ready["message"]
+            assert "Memutar lagu #1" in play_ready["message"]
+            assert "self.audio.play_youtube" in play_ready["instructions"]
 
-            # 5. Test play_playlist_song with uncached track -> warning given
+            # 5. Test play_playlist_song with uncached track -> instant playback without verbose TTS warning
             play_uncached = mock_mcp.tools["play_playlist_song"]("3")
             assert play_uncached["success"] is True
             assert play_uncached["cache_status"] == "uncached"
-            assert "putus-putus" in play_uncached["message"]
-            assert "putus-putus" in play_uncached["instructions"]
+            assert "Memutar lagu #3" in play_uncached["message"]
+            assert "self.audio.play_youtube" in play_uncached["instructions"]
+            assert "putus-putus" not in play_uncached["instructions"]
 
             # 6. Test list_user_playlist has cache tags
             list_res = mock_mcp.tools["list_user_playlist"]()
