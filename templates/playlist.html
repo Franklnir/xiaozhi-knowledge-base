@@ -812,7 +812,7 @@
                     badge.style.background = 'rgba(239, 68, 68, 0.15)';
                     badge.style.color = '#ef4444';
                     badge.style.border = '1px solid #ef4444';
-                    badge.textContent = '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg> YouTube Terdeteksi';
+                    badge.innerHTML = '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg> YouTube Terdeteksi';
                 }
             } else if (info.platform === 'tiktok') {
                 thumb.style.display = 'none';
@@ -824,7 +824,7 @@
                     badge.style.background = '#000';
                     badge.style.color = '#00f2fe';
                     badge.style.border = '1px solid #fe2c55';
-                    badge.textContent = '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> TikTok Terdeteksi';
+                    badge.innerHTML = '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> TikTok Terdeteksi';
                 }
             }
         } else {
@@ -883,7 +883,7 @@
             setTimeout(() => window.location.reload(), 600);
         } catch (err) {
             btn.disabled = false;
-            btn.textContent = "<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan ke Playlist</span>";
+            btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan ke Playlist</span>`;
             if (window.App && App.toast) App.toast.error(err.message);
             else alert(err.message);
         }
@@ -942,10 +942,10 @@
             if (artistEl) artistEl.textContent = artist || 'YouTube Audio';
             if (urlEl) urlEl.textContent = data.track.youtube_url || rawUrl;
             btn.disabled = false;
-            btn.textContent = "<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan Perubahan</span>";
+            btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan Perubahan</span>`;
         } catch (err) {
             btn.disabled = false;
-            btn.textContent = "<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan Perubahan</span>";
+            btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Simpan Perubahan</span>`;
             if (window.App && App.toast) App.toast.error(err.message);
             else alert(err.message);
         }
