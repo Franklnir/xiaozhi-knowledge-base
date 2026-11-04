@@ -556,36 +556,37 @@ def resolve_adaptive_bitrate(requested_br: str, rssi: Optional[int] = None, chip
     if br_str and br_str in valid_bitrates and br_str != "auto":
         return br_str
 
+    valid_rssi = int(rssi) if isinstance(rssi, (int, float)) else None
     is_s3 = bool(chip and "s3" in chip.lower())
     is_c3 = bool(chip and "c3" in chip.lower())
 
     if is_s3:
-        if rssi is not None and rssi < 0:
-            if rssi >= -65:
+        if valid_rssi is not None and valid_rssi < 0:
+            if valid_rssi >= -65:
                 return "48k"
-            elif rssi >= -75:
+            elif valid_rssi >= -75:
                 return "32k"
-            elif rssi >= -82:
+            elif valid_rssi >= -82:
                 return "24k"
-            elif rssi >= -88:
+            elif valid_rssi >= -88:
                 return "16k"
             else:
                 return "12k"
         return "48k"
 
     if is_c3:
-        if rssi is not None and rssi < 0:
-            if rssi >= -65:
+        if valid_rssi is not None and valid_rssi < 0:
+            if valid_rssi >= -65:
                 return "16k"
-            elif rssi >= -75:
+            elif valid_rssi >= -75:
                 return "12k"
-            elif rssi >= -85:
+            elif valid_rssi >= -85:
                 return "10k"
             else:
                 return "8k"
         return "16k"
 
-    if rssi is not None and rssi < 0:
+    if valid_rssi is not None and valid_rssi < 0:
         if rssi >= -65:
             return "24k"
         elif rssi >= -75:
@@ -925,16 +926,22 @@ async def audio_stream_ogg_opus(
     safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
     cache_file = _get_playlist_cache_path(video_id, sample_rate, selected_br)
     if is_playlist_track and not (cache_file.is_file() and cache_file.stat().st_size > 10240):
-        matches = list(AUDIO_CACHE_DIR.glob(f"{safe_vid}_*.opus")) if AUDIO_CACHE_DIR.exists() else []
-        valid = [f for f in matches if f.is_file() and f.stat().st_size > 10240]
-        if valid:
-            cache_file = valid[0]
-            m_sr = re.search(r"_(\d+)_\w+\.opus$", cache_file.name)
-            if m_sr:
-                try:
-                    sample_rate = int(m_sr.group(1))
-                except Exception:
-                    pass
+        # 1. Prioritize cache matching target chip sample_rate (16kHz for C3, 24kHz for S3)
+        matches_sr = list(AUDIO_CACHE_DIR.glob(f"{safe_vid}_{sample_rate}_*.opus")) if AUDIO_CACHE_DIR.exists() else []
+        valid_sr = [f for f in matches_sr if f.is_file() and f.stat().st_size > 10240 and ".tmp." not in f.name]
+        if valid_sr:
+            cache_file = valid_sr[0]
+        else:
+            matches = list(AUDIO_CACHE_DIR.glob(f"{safe_vid}_*.opus")) if AUDIO_CACHE_DIR.exists() else []
+            valid = [f for f in matches if f.is_file() and f.stat().st_size > 10240 and ".tmp." not in f.name]
+            if valid:
+                cache_file = valid[0]
+                m_sr = re.search(r"_(\d+)_\w+\.opus$", cache_file.name)
+                if m_sr:
+                    try:
+                        sample_rate = int(m_sr.group(1))
+                    except Exception:
+                        pass
 
     # Fast Path: Jika lagu ada di cache playlist dan diputar dari awal (start == 0)
     # Langsung stream dari disk (0% CPU, no yt-dlp, no FFmpeg)!

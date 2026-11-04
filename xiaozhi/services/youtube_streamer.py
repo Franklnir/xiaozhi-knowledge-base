@@ -188,7 +188,7 @@ async def stream_video_to_websocket(
         "-b:a", selected_br,
         "-vbr", "on",
         "-compression_level", "5",
-        "-application", "voip",
+        "-application", "audio",
         "-flush_packets", "1",
         "-frame_duration", "60",
         "-f", "ogg",

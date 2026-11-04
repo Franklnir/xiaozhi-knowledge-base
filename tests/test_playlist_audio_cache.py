@@ -642,3 +642,60 @@ def test_get_playlist_cache_status_tool(tmp_path):
         finally:
             audio_cache_worker._active_downloads.discard("VID_DL")
             audio_cache_worker._progress_state.pop("VID_DL", None)
+
+
+def test_dual_profile_cache_selection_c3_vs_s3(tmp_path):
+    """Verify that C3 receives the 16kHz profile and S3 receives the 24kHz HD profile from dual cache."""
+    async def _run():
+        from xiaozhi.routers import youtube
+        from xiaozhi.database.sqlite_store import SQLiteStore
+        from xiaozhi.services import audio_cache_worker
+        from xiaozhi.services.audio_cache_worker import get_track_cache_status
+        from starlette.requests import Request
+
+        db_file = tmp_path / "test_dual.db"
+        store = SQLiteStore(str(db_file))
+        user = store.create_user("dual_user", "password123")
+        uid = user["id"]
+
+        vid = "TEST_DUAL_VID"
+        store.add_playlist_track(owner_id=uid, title="Dual Song", youtube_url=f"https://www.youtube.com/watch?v={vid}", video_id=vid, artist="Artist")
+
+        # Create both cache files in tmp_path
+        c3_file = tmp_path / f"{vid}_16000_16k.opus"
+        s3_file = tmp_path / f"{vid}_24000_24k.opus"
+        c3_file.write_bytes(b"OggS" + (b"C3" * 8000))
+        s3_file.write_bytes(b"OggS" + (b"S3" * 12000))
+
+        with patch.object(youtube, "AUDIO_CACHE_DIR", tmp_path), patch.object(youtube, "get_store", return_value=store), patch.object(audio_cache_worker, "AUDIO_CACHE_DIR", tmp_path):
+            # Check cache status reflects both files
+            st = get_track_cache_status(vid)
+            assert st["status"] == "ready"
+            assert st["is_cached"] is True
+            assert len(st["profiles"]) == 2
+
+            # 1. Request as ESP32-C3
+            req_c3 = Request({
+                "type": "http",
+                "method": "GET",
+                "path": "/api/youtube/stream",
+                "query_string": f"v={vid}&chip=c3".encode(),
+                "headers": [(b"host", b"localhost"), (b"user-agent", b"ESP32-C3-Client")],
+            })
+            resp_c3 = await youtube.audio_stream_ogg_opus(video_id=vid, request=req_c3, chip="c3")
+            assert resp_c3.headers.get("X-Audio-Sample-Rate") == "16000"
+            assert resp_c3.headers.get("X-Device-Chip") == "c3"
+
+            # 2. Request as ESP32-S3
+            req_s3 = Request({
+                "type": "http",
+                "method": "GET",
+                "path": "/api/youtube/stream",
+                "query_string": f"v={vid}&chip=s3".encode(),
+                "headers": [(b"host", b"localhost"), (b"user-agent", b"ESP32-S3-Client")],
+            })
+            resp_s3 = await youtube.audio_stream_ogg_opus(video_id=vid, request=req_s3, chip="s3")
+            assert resp_s3.headers.get("X-Audio-Sample-Rate") == "24000"
+            assert resp_s3.headers.get("X-Device-Chip") == "s3"
+
+    asyncio.run(_run())

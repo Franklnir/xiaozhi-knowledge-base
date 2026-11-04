@@ -181,8 +181,9 @@ def get_track_cache_status(video_id: str) -> Dict[str, Any]:
         return {
             "status": "ready",
             "is_cached": True,
-            "size_bytes": valid[0].stat().st_size,
+            "size_bytes": sum(f.stat().st_size for f in valid),
             "filename": valid[0].name,
+            "profiles": [f.name for f in valid],
             "percent": 100,
         }
 
@@ -315,17 +316,25 @@ async def _execute_download_and_cache(
     duration_sec: Optional[int] = None,
 ):
     safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
-    safe_br = re.sub(r"[^a-zA-Z0-9]", "", str(bitrate or "").strip().lower())
-    target_cache_path = AUDIO_CACHE_DIR / f"{safe_vid}_{sample_rate}_{safe_br}.opus"
 
-    if target_cache_path.is_file() and target_cache_path.stat().st_size > 10240:
-        logger.info("Precache: %s already cached, skipping.", target_cache_path.name)
+    # Dual-Profile Target Paths for seamless support across both ESP32-C3 and ESP32-S3:
+    # 1. ESP32-C3: 16kHz Mono @ 16k (Lightweight, low CPU load, stable memory)
+    # 2. ESP32-S3: 24kHz Mono @ 24k (Hi-Fi HD Audio, crystal clear dynamics)
+    target_cache_path_16k = AUDIO_CACHE_DIR / f"{safe_vid}_16000_16k.opus"
+    target_cache_path_24k = AUDIO_CACHE_DIR / f"{safe_vid}_24000_24k.opus"
+
+    has_16k = target_cache_path_16k.is_file() and target_cache_path_16k.stat().st_size > 10240
+    has_24k = target_cache_path_24k.is_file() and target_cache_path_24k.stat().st_size > 10240
+
+    if has_16k and has_24k:
+        logger.info("Precache: %s already cached for both C3 (16kHz) and S3 (24kHz), skipping.", safe_vid)
         _progress_state[safe_vid] = {
             "status": "ready",
             "percent": 100,
             "is_cached": True,
-            "size_bytes": target_cache_path.stat().st_size,
-            "filename": target_cache_path.name,
+            "size_bytes": target_cache_path_16k.stat().st_size + target_cache_path_24k.stat().st_size,
+            "filename": target_cache_path_16k.name,
+            "profiles": [target_cache_path_16k.name, target_cache_path_24k.name],
         }
         return
 
@@ -361,7 +370,8 @@ async def _execute_download_and_cache(
         }
         return
 
-    tmp_cache_path = AUDIO_CACHE_DIR / f"{safe_vid}_{sample_rate}_{safe_br}.tmp.{os.getpid()}.opus"
+    tmp_cache_path_16k = AUDIO_CACHE_DIR / f"{safe_vid}_16000_16k.tmp.{os.getpid()}.opus"
+    tmp_cache_path_24k = AUDIO_CACHE_DIR / f"{safe_vid}_24000_24k.tmp.{os.getpid()}.opus"
 
     cmd = [
         ffmpeg_bin,
@@ -374,19 +384,31 @@ async def _execute_download_and_cache(
         "-reconnect_delay_max", "5",
         "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
         "-i", source_url,
+        # Profile 1: ESP32-C3 (16kHz Mono @ 16k, lightweight)
         "-vn",
         "-ac", "1",
-        "-ar", str(sample_rate),
+        "-ar", "16000",
         "-c:a", "libopus",
-        "-b:a", bitrate,
+        "-b:a", "16k",
         "-vbr", "on",
         "-compression_level", "5",
         "-application", "audio",
         "-threads", "1",
-        str(tmp_cache_path),
+        str(tmp_cache_path_16k),
+        # Profile 2: ESP32-S3 (24kHz Mono @ 24k HD, crystal clear)
+        "-vn",
+        "-ac", "1",
+        "-ar", "24000",
+        "-c:a", "libopus",
+        "-b:a", "24k",
+        "-vbr", "on",
+        "-compression_level", "5",
+        "-application", "audio",
+        "-threads", "1",
+        str(tmp_cache_path_24k),
     ]
 
-    logger.info("Precache transcoding started for %s -> %s", video_id, target_cache_path.name)
+    logger.info("Precache dual-profile transcoding started for %s (C3 16kHz + S3 24kHz HD)", video_id)
     _progress_state[safe_vid] = {
         "status": "downloading",
         "percent": 5,
@@ -445,25 +467,34 @@ async def _execute_download_and_cache(
 
         await proc.wait()
 
-        if proc.returncode == 0 and tmp_cache_path.exists() and tmp_cache_path.stat().st_size > 10240:
-            tmp_cache_path.replace(target_cache_path)
+        saved_paths = []
+        if tmp_cache_path_16k.exists() and tmp_cache_path_16k.stat().st_size > 10240:
+            tmp_cache_path_16k.replace(target_cache_path_16k)
+            saved_paths.append(target_cache_path_16k)
+        if tmp_cache_path_24k.exists() and tmp_cache_path_24k.stat().st_size > 10240:
+            tmp_cache_path_24k.replace(target_cache_path_24k)
+            saved_paths.append(target_cache_path_24k)
+
+        if proc.returncode == 0 and saved_paths:
             _progress_state[safe_vid] = {
                 "status": "ready",
                 "percent": 100,
                 "is_cached": True,
-                "size_bytes": target_cache_path.stat().st_size,
-                "filename": target_cache_path.name,
+                "size_bytes": sum(p.stat().st_size for p in saved_paths),
+                "filename": saved_paths[0].name,
+                "profiles": [p.name for p in saved_paths],
             }
             logger.info(
-                "Precache SUCCESS: %s cached to disk (%d bytes, %s, %dHz)",
+                "Precache SUCCESS: %s dual-profile cached to disk (C3: %s, S3: %s)",
                 video_id,
-                target_cache_path.stat().st_size,
-                bitrate,
-                sample_rate,
+                target_cache_path_16k.name if target_cache_path_16k.exists() else "none",
+                target_cache_path_24k.name if target_cache_path_24k.exists() else "none",
             )
         else:
-            if tmp_cache_path.exists():
-                tmp_cache_path.unlink(missing_ok=True)
+            if tmp_cache_path_16k.exists():
+                tmp_cache_path_16k.unlink(missing_ok=True)
+            if tmp_cache_path_24k.exists():
+                tmp_cache_path_24k.unlink(missing_ok=True)
             _progress_state[safe_vid] = {
                 "status": "error",
                 "percent": 0,
@@ -471,14 +502,15 @@ async def _execute_download_and_cache(
                 "error": f"Transcode failed (code {proc.returncode})",
             }
             logger.warning(
-                "Precache FAILED for %s (exit code %s, size=%s)",
+                "Precache FAILED for %s (exit code %s)",
                 video_id,
                 proc.returncode,
-                tmp_cache_path.stat().st_size if tmp_cache_path.exists() else 0,
             )
     except Exception as exc:
-        if tmp_cache_path.exists():
-            tmp_cache_path.unlink(missing_ok=True)
+        if tmp_cache_path_16k.exists():
+            tmp_cache_path_16k.unlink(missing_ok=True)
+        if tmp_cache_path_24k.exists():
+            tmp_cache_path_24k.unlink(missing_ok=True)
         _progress_state[safe_vid] = {
             "status": "error",
             "percent": 0,
