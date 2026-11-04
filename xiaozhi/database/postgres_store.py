@@ -2842,12 +2842,24 @@ class PostgresStore:
     def get_user_mac_address(self, user_id: int) -> Optional[str]:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
+                # 1. Registered devices (non-detached)
                 cur.execute(
-                    "SELECT device_id FROM registered_devices WHERE owner_id = %s ORDER BY id DESC LIMIT 1",
+                    "SELECT device_id FROM registered_devices WHERE owner_id = %s AND (status IS NULL OR status != 'DETACHED') ORDER BY id DESC LIMIT 1",
                     (int(user_id),),
                 )
                 row = cur.fetchone()
-                return str(row["device_id"]).upper() if row and row.get("device_id") else None
+                if row and row.get("device_id"):
+                    return str(row["device_id"]).upper()
+
+                # 2. Token slot MAC from xiaozhi_tokens
+                cur.execute(
+                    "SELECT board_mac FROM xiaozhi_tokens WHERE user_id = %s AND board_mac != '' AND board_mac IS NOT NULL AND COALESCE(is_active, TRUE) = TRUE ORDER BY slot_number ASC LIMIT 1",
+                    (int(user_id),),
+                )
+                row_t = cur.fetchone()
+                if row_t and row_t.get("board_mac"):
+                    return str(row_t["board_mac"]).upper()
+                return None
 
     def list_registered_devices(self, owner_id: int) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:

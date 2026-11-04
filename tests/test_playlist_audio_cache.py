@@ -699,3 +699,69 @@ def test_dual_profile_cache_selection_c3_vs_s3(tmp_path):
             assert resp_s3.headers.get("X-Device-Chip") == "s3"
 
     asyncio.run(_run())
+
+
+def test_internal_playback_start_auto_resolve_and_bind(tmp_path):
+    """Verify that internal_playback_start automatically resolves unassigned user_id=0 and auto-binds MAC."""
+    async def _run():
+        from xiaozhi.routers import youtube
+        from xiaozhi.database.sqlite_store import SQLiteStore
+        from starlette.requests import Request
+        import json
+
+        db_file = tmp_path / "test_autobind.db"
+        store = SQLiteStore(str(db_file))
+        user = store.create_user("irsyad_test", "password123")
+        uid = user["id"]
+
+        vid = "VID_AUTOBIND_TEST"
+        mac = "84:C7:BB:78:98:F8"
+
+        # 1. User queued an audio command in audio_queue
+        store.queue_audio_command(
+            owner_id=uid,
+            title="Auto Resolved Song",
+            stream_url=f"/api/audio/stream/{vid}",
+            video_url=f"https://www.youtube.com/watch?v={vid}",
+            video_id=vid,
+        )
+
+        # Ensure user has a token slot without board_mac
+        store.set_xiaozhi_token(uid, "wss://api.xiaozhi.me/mcp/?token=test_tok", slot=1, device_label="Slot 1")
+
+        with patch.object(youtube, "get_store", return_value=store):
+            # Gateway calls /internal/playback/start with user_id=0 (unassigned)
+            scope = {
+                "type": "http",
+                "method": "POST",
+                "path": "/internal/playback/start",
+                "headers": [(b"content-type", b"application/json")],
+            }
+            body_bytes = json.dumps({
+                "user_id": 0,
+                "video_id": vid,
+                "title": "Auto Resolved Song",
+                "device_mac": mac,
+                "bitrate": "24k",
+                "chip": "esp32s3",
+            }).encode()
+
+            async def receive():
+                return {"type": "http.request", "body": body_bytes}
+
+            req = Request(scope, receive)
+            res = await youtube.internal_playback_start(req)
+            assert res.get("success") is True
+
+            # Verify that session in playback_tracker was recorded with the resolved user!
+            from xiaozhi.services.playback_tracker import playback_tracker
+            session = playback_tracker.get_session_by_mac(mac)
+            assert session is not None
+            assert session.user_id == uid
+            assert session.username == "irsyad_test"
+
+            # Verify that MAC was auto-bound to user's token slot
+            tokens = store.list_user_xiaozhi_tokens(uid)
+            assert any(t.get("board_mac") == mac for t in tokens)
+
+    asyncio.run(_run())

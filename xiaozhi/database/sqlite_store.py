@@ -2442,11 +2442,17 @@ class SQLiteStore:
     def get_user_mac_address(self, user_id: int) -> Optional[str]:
         conn = self._get_conn()
         row = conn.execute(
-            "SELECT device_id FROM registered_devices WHERE owner_id = ? ORDER BY id DESC LIMIT 1",
+            "SELECT device_id FROM registered_devices WHERE owner_id = ? AND (status IS NULL OR status != 'DETACHED') ORDER BY id DESC LIMIT 1",
             (int(user_id),)
         ).fetchone()
         if row and row["device_id"]:
             return str(row["device_id"]).upper()
+        row_t = conn.execute(
+            "SELECT board_mac FROM xiaozhi_tokens WHERE user_id = ? AND board_mac != '' AND board_mac IS NOT NULL AND COALESCE(is_active, 1) = 1 ORDER BY slot_number ASC LIMIT 1",
+            (int(user_id),)
+        ).fetchone()
+        if row_t and row_t["board_mac"]:
+            return str(row_t["board_mac"]).upper()
         return None
 
     def list_registered_devices(self, owner_id: int) -> List[Dict[str, Any]]:

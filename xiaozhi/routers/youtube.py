@@ -103,6 +103,15 @@ def _resolve_owner_for_device(store, device_id: str, query: str = "", video_id: 
         except Exception as e:
             logger.debug("Audio queue correlation lookup failed: %s", e)
 
+    # 2b. RECENT AUDIO COMMAND BY VIDEO_ID (dalam 45 menit terakhir)
+    if video_id and hasattr(store, "find_recent_audio_command_by_video_id"):
+        try:
+            cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=45)
+            if cmd and cmd.get("owner_id"):
+                return int(cmd["owner_id"])
+        except Exception as e:
+            logger.debug("Audio queue video_id lookup failed: %s", e)
+
     # 3. REGISTERED_DEVICES (dengan verifikasi anti-stale)
     try:
         dev = None
@@ -1121,8 +1130,84 @@ async def internal_playback_start(request: Request):
     chip = str(body.get("chip") or "").strip()
 
     store = get_store()
+
+    # ── AUTO-RESOLVE UNASSIGNED USER (Fix: ESP32 Board ID 0) ─────────────────
+    if not user_id:
+        try:
+            # 1. Cek recent audio_queue berdasarkan video_id (paling akurat: siapa yang baru saja minta lagu ini diputar)
+            if video_id and hasattr(store, "find_recent_audio_command_by_video_id"):
+                cmd = store.find_recent_audio_command_by_video_id(video_id, minutes=45)
+                if cmd and cmd.get("owner_id"):
+                    user_id = int(cmd["owner_id"])
+                    if not title and cmd.get("title"):
+                        title = cmd["title"]
+                    logger.info(f"[AUTO-RESOLVE] User {user_id} resolved from audio_queue for video_id {video_id}")
+
+            # 2. Cek recent audio_queue berdasarkan device_mac (jika board ini pernah memutar lagu sebelumnya)
+            if not user_id and device_mac and hasattr(store, "find_recent_audio_command_by_mac"):
+                cmd_mac = store.find_recent_audio_command_by_mac(device_mac, minutes=60)
+                if cmd_mac and cmd_mac.get("owner_id"):
+                    user_id = int(cmd_mac["owner_id"])
+                    if not title and cmd_mac.get("title"):
+                        title = cmd_mac["title"]
+                    logger.info(f"[AUTO-RESOLVE] User {user_id} resolved from audio_queue for MAC {device_mac}")
+
+            # 3. Cek lewat _resolve_owner_for_device (token slot / registered_devices)
+            if not user_id and device_mac:
+                resolved = _resolve_owner_for_device(store, device_mac, video_id=video_id)
+                if resolved:
+                    user_id = int(resolved)
+                    logger.info(f"[AUTO-RESOLVE] User {user_id} resolved from device mapping for MAC {device_mac}")
+
+            # 4. Cek apakah lagu ini adalah lagu dari playlist salah satu user
+            if not user_id and video_id and hasattr(store, "find_playlist_track_by_video_id"):
+                pl_item = store.find_playlist_track_by_video_id(video_id)
+                if pl_item and pl_item.get("owner_id"):
+                    user_id = int(pl_item["owner_id"])
+                    if not title and pl_item.get("title"):
+                        title = pl_item["title"]
+                    logger.info(f"[AUTO-RESOLVE] User {user_id} resolved from user playlist for video_id {video_id}")
+        except Exception as exc:
+            logger.warning("[AUTO-RESOLVE ERROR] Error resolving playback owner: %s", exc)
+
     user = store.get_user(user_id) if user_id else None
     username = user["username"] if user else (f"user-{user_id}" if user_id else "ESP32 Board")
+
+    # ── AUTO-BIND DEVICE MAC TO USER SLOT & REGISTERED_DEVICES ──────────────
+    if user_id and user and device_mac:
+        clean_mac = device_mac[6:] if device_mac.lower().startswith("esp32-") else device_mac
+        clean_mac = clean_mac.strip().upper()
+        if len(clean_mac) >= 11:
+            try:
+                # 1. Auto-bind ke slot MCP user jika user punya slot kosong atau slot cocok
+                if hasattr(store, "list_user_xiaozhi_tokens") and hasattr(store, "bind_board_to_slot"):
+                    user_tokens = store.list_user_xiaozhi_tokens(user_id)
+                    target_slot = None
+                    for t in user_tokens:
+                        if (t.get("board_mac") or "").replace(":", "").upper() == clean_mac.replace(":", ""):
+                            target_slot = t.get("slot_number", 1)
+                            break
+                    if not target_slot:
+                        for t in user_tokens:
+                            if not (t.get("board_mac") or "").strip():
+                                target_slot = t.get("slot_number", 1)
+                                break
+                    if target_slot:
+                        bind_res = store.bind_board_to_slot(user_id, slot=target_slot, device_mac=clean_mac, request_id="auto_stream")
+                        logger.info(f"[AUTO-BIND SLOT] MAC {clean_mac} auto-bound to User {user_id} ({username}) Slot {target_slot} -> {bind_res}")
+
+                # 2. Register ke registered_devices jika belum ada
+                if hasattr(store, "register_device"):
+                    dev_name, dev_type = _format_chip_name_and_type(chip, clean_mac)
+                    store.register_device(
+                        user_id,
+                        device_id=clean_mac,
+                        name=dev_name,
+                        device_type=dev_type,
+                        notes="Auto-bound saat pemutaran stream YouTube"
+                    )
+            except Exception as bind_err:
+                logger.warning(f"[AUTO-BIND ERROR] Gagal mengikat MAC {clean_mac} ke user {user_id}: {bind_err}")
 
     session = playback_tracker.start_session(
         user_id=user_id,
