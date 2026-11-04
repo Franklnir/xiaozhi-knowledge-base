@@ -461,137 +461,15 @@ def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True
             "PANDUAN MENJAWAB SPEAKER XIAOZHI (VOICE TTS RAMAH PENGGUNA):\n"
             "1. Jawab secara RINGKAS, PADAT, dan BERSIH (maksimal 2-3 kalimat penjelasan langsung ke intinya).\n"
             "2. Jika menyebutkan daftar prodi, fakultas, atau rincian poin, sebutkan HANYA 3-4 yang paling penting atau sebutkan fakultas besarnya, jangan sebutkan puluhan baris agar tidak membosankan di speaker.\n"
-            "3. Sampaikan di akhir kalimat secara santun: 'Rincian lengkapnya sudah otomatis saya simpan ke database memori kamu, jadi bisa kamu tanyakan lagi kapan saja.'"
+            "3. Jawab pertanyaan pengguna secara akurat, ramah, dan solutif tanpa menyatakan data otomatis disimpan ke database."
         ),
         "results": results[:max_results]
     }
 
 
 def _auto_save_to_knowledge_base(store, owner_id: int, title: str, category: str, content: str, keywords: str = "") -> Optional[int]:
-    """Simpan ringkasan bersih hasil riset atau rekomendasi tempat ke Knowledge Base (tabel materials)."""
-    if not store or not owner_id or not content or len(content.strip()) < 80:
-        return None
-    try:
-        clean_title = title.strip()[:100]
-        clean_cat = category.strip()[:50] or "Riset & Rekomendasi"
-        # Cek apakah judul serupa sudah pernah disimpan untuk mencegah duplikasi
-        existing = store.search_materials(owner_id, clean_title[:40], limit=3)
-        for m in existing:
-            if clean_title.lower() in m.get("title", "").lower() or m.get("title", "").lower() in clean_title.lower():
-                return m.get("id")
-
-        # OPSI C: Cek apakah materi terbaru adalah materi Video YouTube / Riset terkait topik serupa
-        # Jika iya, satukan ke dalam 1 materi gabungan (Riset & Video YouTube)
-        if hasattr(store, "list_materials") and hasattr(store, "update_material"):
-            recent_mats = store.list_materials(owner_id) or []
-            if recent_mats:
-                latest_m = recent_mats[0]
-                l_cat = latest_m.get("category", "")
-                if "video" in l_cat.lower() or "riset" in l_cat.lower():
-                    from xiaozhi.services.semantic_memory_service import clean_and_tokenize
-                    q_words = set(clean_and_tokenize(f"{clean_title} {keywords}"))
-                    m_words = set(clean_and_tokenize(f"{latest_m.get('title', '')} {latest_m.get('keywords', '')}"))
-                    if q_words.intersection(m_words):
-                        merged_content = f"### 🌐 Temuan Riset Web:\n{content.strip()[:10000]}\n\n---\n" + latest_m.get("content", "")
-                        merged_title = latest_m.get("title", "")
-                        if "Riset" not in merged_title:
-                            merged_title = f"Riset & {merged_title}"[:160]
-                        merged_cat = "Riset & Video YouTube"
-                        merged_kw = f"{latest_m.get('keywords', '')}, {keywords}"[:200]
-                        store.update_material(
-                            owner_id=owner_id,
-                            material_id=latest_m["id"],
-                            title=merged_title,
-                            category=merged_cat,
-                            content=merged_content,
-                            keywords=merged_kw,
-                            api_url=latest_m.get("api_url", "")
-                        )
-                        logger.info("Merged research into existing material id=%s ('%s') for owner_id=%s", latest_m["id"], merged_title, owner_id)
-                        return latest_m["id"]
-
-        mat_id = store.add_material(
-            owner_id=owner_id,
-            title=clean_title,
-            category=clean_cat,
-            content=content.strip()[:10000],
-            keywords=keywords.strip()[:200],
-            source_type="auto_search_cache"
-        )
-        logger.info("Auto-saved knowledge material id=%s ('%s') for owner_id=%s", mat_id, clean_title, owner_id)
-        try:
-            from xiaozhi.services.sse_service import broadcast_material_event
-            broadcast_material_event(int(owner_id), "material_created", {
-                "action": "create",
-                "material": {
-                    "id": mat_id,
-                    "title": clean_title,
-                    "category": clean_cat,
-                    "content": content.strip()[:10000],
-                    "keywords": keywords.strip()[:200],
-                    "api_url": "",
-                    "source_type": "auto_search_cache",
-                },
-                "message": f"Riset '{clean_title}' otomatis disimpan ke Database Materi Belajar.",
-            })
-        except Exception as _b_err:
-            logger.debug("Failed broadcasting material_created event: %s", _b_err)
-        return mat_id
-    except Exception as exc:
-        if "Batas materi" in str(exc) and hasattr(store, "_get_conn"):
-            try:
-                # Pangkas cache pencarian/OSINT terlama untuk memberi ruang bagi pencarian baru
-                with store._get_conn() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            "SELECT id FROM materials WHERE owner_id = %s AND source_type = 'auto_search_cache' ORDER BY created_at ASC LIMIT 1",
-                            (int(owner_id),)
-                        )
-                        row = cur.fetchone()
-                        if row:
-                            del_id = row["id"]
-                            cur.execute("DELETE FROM materials WHERE id = %s AND owner_id = %s", (del_id, int(owner_id)))
-                            conn.commit()
-                            logger.info("Pruned oldest auto_search_cache id=%s for owner_id=%s", del_id, owner_id)
-                            try:
-                                from xiaozhi.services.sse_service import broadcast_material_event
-                                broadcast_material_event(int(owner_id), "material_deleted", {
-                                    "action": "delete",
-                                    "material_id": int(del_id),
-                                    "message": "Cache riset materi lama otomatis dibersihkan.",
-                                })
-                            except Exception:
-                                pass
-                            retry_id = store.add_material(
-                                owner_id=owner_id,
-                                title=clean_title,
-                                category=clean_cat,
-                                content=content.strip()[:10000],
-                                keywords=keywords.strip()[:200],
-                                source_type="auto_search_cache"
-                            )
-                            try:
-                                from xiaozhi.services.sse_service import broadcast_material_event
-                                broadcast_material_event(int(owner_id), "material_created", {
-                                    "action": "create",
-                                    "material": {
-                                        "id": retry_id,
-                                        "title": clean_title,
-                                        "category": clean_cat,
-                                        "content": content.strip()[:10000],
-                                        "keywords": keywords.strip()[:200],
-                                        "api_url": "",
-                                        "source_type": "auto_search_cache",
-                                    },
-                                    "message": f"Riset '{clean_title}' otomatis disimpan ke Database Materi Belajar.",
-                                })
-                            except Exception:
-                                pass
-                            return retry_id
-            except Exception as e2:
-                logger.debug("Prune cache retry error: %s", e2)
-        logger.warning("Gagal auto-save ke knowledge base: %s", exc)
-        return None
+    """Auto-save hasil riset/scraping dinonaktifkan: Database Materi Belajar murni untuk input manual pengguna."""
+    return None
 
 
 VERIFIED_LOCAL_PLACES = {
@@ -2314,9 +2192,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         saved_status = False
         is_consolidated = False
 
-        # 1. Simpan OTOMATIS ke database memori jika pengguna setuju memutar video (atau eksplisit save_to_materials=True)
-        # Jika pengguna membatalkan (play_now=False), tidak disimpan kecuali eksplisit diminta simpan
-        should_save = bool(play_now) if save_to_materials is None else bool(save_to_materials)
+        # Hanya simpan ke Database Materi Belajar jika pengguna secara EKSPLISIT meminta simpan (save_to_materials=True)
+        should_save = bool(save_to_materials) if save_to_materials is not None else False
         if should_save and owner_id:
             try:
                 # Cek apakah sudah pernah tersimpan di Database Materi sebelumnya untuk mencegah duplikasi
@@ -3860,8 +3737,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def scrape_and_save_to_knowledge(url: str, title: str = "", category: str = "Web Scraping") -> dict:
         """
-        Scrape artikel web, dokumen PDF, atau transkrip video YouTube dari link URL dan langsung simpan ke Knowledge Base (RAG) milik user.
-        Gunakan tool ini saat user meminta menyimpan materi dari link web, PDF, atau video edukasi ke perpustakaan/knowledge base mereka.
+        Simpan artikel web, dokumen PDF, atau transkrip video YouTube ke Knowledge Base (Database Materi Belajar) milik user.
+        PENTING: Gunakan tool ini HANYA jika pengguna secara gamblang/eksplisit meminta untuk MENYIMPAN artikel/link tersebut ke database materi belajar (contoh: 'simpan artikel ini ke materiku', 'masukkan ke database materi').
+        Jika pengguna hanya ingin membaca, mengecek, mencari tahu, atau merangkum isi link web/PDF, gunakan tool scrape_webpage (JANGAN gunakan tool ini agar Database Materi Belajar tidak terisi otomatis).
 
         Args:
             url: Link URL halaman web, dokumen PDF, atau video YouTube yang ingin disimpan.
