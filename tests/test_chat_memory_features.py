@@ -124,3 +124,4 @@ def test_extract_action_items():
     categories = [t["category"] for t in todos["tasks"]]
     assert "Pengingat" in categories or "Belanja & Finansial" in categories
     assert "Janji Temu" in categories
+

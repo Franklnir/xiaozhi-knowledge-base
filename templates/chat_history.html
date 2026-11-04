@@ -4,10 +4,10 @@
 <style>
     .chat-shell {
         display: grid;
-        grid-template-columns: 380px 1fr;
-        height: calc(100vh - 250px);
-        min-height: 680px;
-        max-height: 900px;
+        grid-template-columns: 360px 1fr;
+        height: calc(100vh - 240px);
+        min-height: 700px;
+        max-height: 920px;
         overflow: hidden;
         border: 1px solid var(--app-border);
         border-radius: var(--app-radius);
@@ -31,7 +31,7 @@
         border-right: 2.5px solid #111;
     }
     .chat-sidebar-header {
-        padding: 14px;
+        padding: 12px;
         border-bottom: 1px solid var(--app-border);
         background: var(--app-surface-muted);
         flex-shrink: 0;
@@ -42,7 +42,7 @@
     .chat-type-tabs {
         display: flex;
         gap: 4px;
-        margin-top: 8px;
+        margin-top: 6px;
         background: rgba(0,0,0,0.05);
         padding: 3px;
         border-radius: 6px;
@@ -88,99 +88,108 @@
         background: var(--app-border-strong, #cbd5e1);
         border-radius: 4px;
     }
-    .chat-date-group { margin-bottom: 8px; }
-    .chat-date-label {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 10px 4px;
-        font-size: 11px;
-        font-weight: 750;
-        color: var(--app-muted);
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        cursor: pointer;
-    }
-    .chat-date-label:hover { color: var(--app-accent); }
-    .chat-date-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 20px;
-        height: 18px;
-        padding: 0 6px;
-        border-radius: 9px;
-        background: var(--app-surface-muted);
-        font-size: 10px;
-        font-weight: 800;
-        color: var(--app-text);
-        border: 1px solid var(--app-border);
-    }
-    .chat-date-label.is-active { color: var(--app-accent); }
-    .chat-date-label.is-active .chat-date-badge { background: var(--app-accent); color: #fff; border-color: transparent; }
-    .chat-sessions { display: grid; gap: 4px; }
-    .chat-sessions.collapsed { display: none; }
-    .chat-item {
-        position: relative;
-        width: 100%;
-        border: 1.5px solid transparent;
+
+    /* Day Card in Sidebar */
+    .chat-day-card {
+        border: 1.5px solid var(--app-border);
         border-radius: 8px;
-        background: transparent;
-        padding: 9px 12px;
-        text-align: left;
-        color: var(--app-text);
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        background: var(--app-surface);
+        cursor: pointer;
         transition: all 0.15s ease;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
     }
-    .chat-item:hover {
+    .chat-day-card:hover {
         background: var(--app-surface-muted, #f8fafc);
-        border-color: var(--app-border);
+        border-color: var(--app-accent, #2563eb);
     }
-    .chat-item.active {
-        border-color: #38bdf8;
-        background: #e0f2fe;
+    .chat-day-card.active {
+        background: #f0f9ff;
+        border-color: #0284c7;
+        box-shadow: 0 2px 4px rgba(2, 132, 199, 0.12);
     }
-    :root[data-theme="neo"] .chat-item.active {
+    :root[data-theme="neo"] .chat-day-card.active {
         border: 2px solid #111;
-        box-shadow: 2px 2px 0 #111;
+        box-shadow: 3px 3px 0 #111;
         background: #e0f2fe;
     }
-    .chat-item-title {
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1.4;
-    }
-    .chat-item-meta {
+    .chat-day-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-top: 2px;
+        gap: 6px;
+    }
+    .chat-day-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--app-text);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .chat-day-badge {
+        font-size: 10px;
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 99px;
+        background: var(--app-surface-muted);
+        color: var(--app-muted);
+        border: 1px solid var(--app-border);
+    }
+    .chat-day-card.active .chat-day-badge {
+        background: #0284c7;
+        color: #ffffff;
+        border-color: transparent;
+    }
+    .chat-day-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 4px;
         font-size: 11px;
         color: var(--app-muted);
     }
-    .chat-item-badge {
+    .chat-day-tags {
+        display: flex;
+        gap: 4px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+    }
+    .chat-day-tag {
         font-size: 9.5px;
-        font-weight: 800;
-        padding: 1px 5px;
+        font-weight: 700;
+        padding: 1px 6px;
         border-radius: 4px;
-        background: rgba(0,0,0,0.06);
+        background: rgba(0,0,0,0.04);
+        color: var(--app-muted);
     }
-    .chat-date-input { display: flex; gap: 6px; margin-top: 8px; }
-    .chat-date-input input[type="date"] {
-        flex: 1;
-        padding: 6px 8px;
-        border: 1px solid var(--app-border);
-        border-radius: var(--app-radius);
-        font-size: 12px;
-        background: var(--app-surface);
-        color: var(--app-text);
+    .chat-day-sessions-list {
+        margin-top: 8px;
+        padding-top: 6px;
+        border-top: 1px dashed var(--app-border);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
     }
+    .chat-session-jump-btn {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 10.5px;
+        padding: 3px 6px;
+        border-radius: 4px;
+        background: rgba(2, 132, 199, 0.06);
+        color: #0369a1;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+        transition: background 0.1s;
+    }
+    .chat-session-jump-btn:hover {
+        background: rgba(2, 132, 199, 0.15);
+    }
+
+    /* Thread Main Container */
     .chat-thread {
         display: flex;
         flex-direction: column;
@@ -188,13 +197,14 @@
         min-height: 0;
         min-width: 0;
         overflow: hidden;
+        background: var(--app-surface);
     }
     .chat-thread-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
-        padding: 14px 18px;
+        gap: 12px;
+        padding: 12px 18px;
         border-bottom: 1px solid var(--app-border);
         background: var(--app-surface);
         flex-shrink: 0;
@@ -206,96 +216,233 @@
     .chat-thread-actions {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
     }
     .chat-thread-body {
         flex: 1;
         overflow-y: auto;
         padding: 20px;
-        background: var(--app-surface);
+        background: var(--app-surface-muted, #f8fafc);
         scroll-behavior: smooth;
     }
-    .chat-msg { display: block; margin-bottom: 20px; }
-    .chat-bubble {
-        width: min(100%, 820px);
-        border-radius: 10px;
-        padding: 14px 16px;
-        box-shadow: var(--app-shadow);
+
+    /* Session Divider */
+    .chat-session-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 24px 0 16px 0;
+    }
+    .chat-session-divider::before,
+    .chat-session-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--app-border);
+    }
+    :root[data-theme="neo"] .chat-session-divider::before,
+    :root[data-theme="neo"] .chat-session-divider::after {
+        height: 1.5px;
+        background: #111;
+    }
+    .chat-session-badge {
+        font-size: 11px;
+        font-weight: 800;
+        padding: 3px 12px;
+        border-radius: 99px;
+        background: var(--app-surface);
+        color: var(--app-muted);
         border: 1px solid var(--app-border);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        letter-spacing: 0.02em;
+        white-space: nowrap;
     }
-    :root[data-theme="neo"] .chat-bubble {
+    :root[data-theme="neo"] .chat-session-badge {
+        border: 1.5px solid #111;
+        box-shadow: 2px 2px 0 #111;
+        color: #111;
+    }
+
+    /* Rows & Bubbles (Pagi ke Malam WhatsApp/ChatGPT Style) */
+    .chat-row {
+        display: flex;
+        width: 100%;
+        margin-bottom: 14px;
+    }
+    .chat-row-user {
+        justify-content: flex-end;
+    }
+    .chat-row-ai {
+        justify-content: flex-start;
+    }
+    .chat-row-tool {
+        justify-content: center;
+    }
+
+    .chat-bubble-user {
+        max-width: min(85%, 680px);
+        background: #e0f2fe;
+        color: #0c4a6e;
+        border: 1px solid #bae6fd;
+        border-radius: 14px 14px 3px 14px;
+        padding: 10px 14px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    :root[data-theme="neo"] .chat-bubble-user {
+        background: #e0f2fe;
+        color: #111;
         border: 2px solid #111;
-        box-shadow: 3px 3px 0 #111;
+        box-shadow: 2px 2px 0 #111;
     }
-    .chat-bubble-user { background: #e0f2fe; }
-    .chat-bubble-ai { background: var(--app-surface-muted, #f8fafc); }
-    .chat-bubble-tool { background: #fdf4ff; border-color: #f0abfc; }
-    :root[data-theme="dark"] .chat-bubble-tool { background: #2e1065; border-color: #7e22ce; }
+    .chat-bubble-ai {
+        max-width: min(88%, 740px);
+        background: var(--app-surface, #ffffff);
+        color: var(--app-text);
+        border: 1px solid var(--app-border);
+        border-radius: 14px 14px 14px 3px;
+        padding: 12px 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    :root[data-theme="neo"] .chat-bubble-ai {
+        background: #ffffff;
+        color: #111;
+        border: 2px solid #111;
+        box-shadow: 2.5px 2.5px 0 #111;
+    }
+
     .chat-bubble-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
-        margin-bottom: 10px;
-        font-size: 11.5px;
+        gap: 12px;
+        margin-bottom: 6px;
+        font-size: 11px;
+    }
+    .chat-bubble-user .chat-bubble-head {
+        color: #0369a1;
+    }
+    .chat-bubble-ai .chat-bubble-head {
         color: var(--app-muted);
     }
-    .chat-bubble-role { font-weight: 800; display: flex; align-items: center; gap: 6px; }
-    .chat-bubble-time { white-space: nowrap; font-weight: 600; }
     .chat-bubble-body {
-        color: var(--app-text);
-        font-size: 14px;
-        line-height: 1.65;
+        font-size: 13.5px;
+        line-height: 1.6;
         white-space: pre-wrap;
         word-break: break-word;
     }
     .chat-bubble-foot {
-        margin-top: 10px;
+        margin-top: 6px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-size: 11px;
-        color: var(--app-muted);
-        border-top: 1px dashed var(--app-border);
-        padding-top: 8px;
+        font-size: 10.5px;
+        border-top: 1px dashed rgba(0,0,0,0.07);
+        padding-top: 5px;
     }
-    .chat-json-box {
-        background: #0b1120;
-        color: #38bdf8;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 12px;
-        line-height: 1.5;
-        padding: 12px;
-        border-radius: 6px;
-        overflow-x: auto;
-        max-height: 280px;
-        margin-top: 8px;
-        white-space: pre-wrap;
-        word-break: break-all;
+
+    /* Tool Call Collapsible Card (Pilihan 2 Pengguna) */
+    .chat-tool-card {
+        width: 100%;
+        max-width: 740px;
+        background: var(--app-surface);
+        border: 1.5px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
-    .chat-collapse-toggle {
-        display: inline-flex;
+    :root[data-theme="neo"] .chat-tool-card {
+        border: 2px solid #111;
+        box-shadow: 2px 2px 0 #111;
+    }
+    .chat-tool-header {
+        display: flex;
         align-items: center;
-        gap: 5px;
-        font-size: 11.5px;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: #faf5ff;
+        border-bottom: 1px solid #f3e8ff;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.12s;
+    }
+    .chat-tool-header:hover {
+        background: #f3e8ff;
+    }
+    :root[data-theme="neo"] .chat-tool-header {
+        background: #fdf4ff;
+        border-bottom: 1.5px solid #111;
+    }
+    .chat-tool-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 750;
+        color: #6b21a8;
+    }
+    .chat-tool-badge {
+        font-size: 9.5px;
+        font-weight: 800;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #f3e8ff;
+        color: #7e22ce;
+        border: 1px solid #d8b4fe;
+    }
+    .chat-tool-toggle-btn {
+        font-size: 11px;
         font-weight: 700;
-        color: var(--app-accent, #059669);
+        color: #7e22ce;
         background: transparent;
         border: none;
         cursor: pointer;
-        padding: 4px 0;
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
-    .chat-collapse-toggle:hover {
-        text-decoration: underline;
+    .chat-tool-body {
+        padding: 10px 12px;
+        background: #0f172a;
+        color: #38bdf8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 11.5px;
+        line-height: 1.5;
+        overflow-x: auto;
+        max-height: 240px;
     }
-    .chat-empty {
-        display: grid;
-        height: 100%;
-        min-height: 380px;
-        place-items: center;
-        text-align: center;
-        color: var(--app-muted);
+
+    .chat-scroll-controls {
+        position: fixed;
+        bottom: 24px;
+        right: 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        z-index: 100;
     }
+    .chat-scroll-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--app-surface);
+        border: 1.5px solid var(--app-border);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: var(--app-text);
+        transition: transform 0.15s, background 0.15s;
+    }
+    :root[data-theme="neo"] .chat-scroll-btn {
+        border: 2px solid #111;
+        box-shadow: 2px 2px 0 #111;
+    }
+    .chat-scroll-btn:hover {
+        transform: scale(1.08);
+        background: var(--app-surface-muted);
+    }
+
     @media (max-width: 900px) {
         .chat-shell {
             grid-template-columns: 1fr;
@@ -307,8 +454,8 @@
             border-bottom: 1px solid var(--app-border);
             height: auto;
         }
-        .chat-sidebar-scroll { max-height: 340px; }
-        .chat-thread-body { max-height: 500px; }
+        .chat-sidebar-scroll { max-height: 300px; }
+        .chat-thread-body { max-height: 520px; }
     }
 </style>
 
@@ -317,7 +464,7 @@
         <div>
             <p class="app-eyebrow">Riwayat Percakapan & MCP</p>
             <h1 class="app-title">Riwayat Chat & Tool MCP</h1>
-            <p class="app-subtitle">Log lengkap percakapan asisten suara Xiaozhi, pemanggilan MCP tools, dan respon sistem.</p>
+            <p class="app-subtitle">Timeline lengkap percakapan harian asisten suara Xiaozhi (Pagi ke Malam), musik YouTube, dan kendali smart home.</p>
         </div>
         <div class="app-toolbar">
             <button type="button" class="app-button app-button-primary" onclick="openDailyRecapModal()" title="Rekap aktivitas hari ini / tanggal terpilih" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;">
@@ -342,22 +489,24 @@
 
     <section class="app-stat-grid">
         <div class="app-stat-card"><p class="app-stat-label">Total Keseluruhan</p><p class="app-stat-value" id="statAllTotal">{{ all_stats.total if all_stats else stats.total }}</p></div>
-        <div class="app-stat-card"><p class="app-stat-label">Riwayat Filter</p><p class="app-stat-value" id="statTotal">{{ stats.total }}</p></div>
-        <div class="app-stat-card"><p class="app-stat-label">Ditampilkan</p><p class="app-stat-value" id="statShown">{{ histories|length }}</p></div>
-        <div class="app-stat-card"><p class="app-stat-label">Filter Tanggal</p><p class="app-stat-value" id="statFilter">{% if active_date == today_date %}Hari Ini ({{ today_date }}){% elif active_date %}{{ active_date }}{% else %}Semua Tanggal{% endif %}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Riwayat Hari Terpilih</p><p class="app-stat-value" id="statTotal">{{ stats.total }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Ditampilkan di Timeline</p><p class="app-stat-value" id="statShown">{{ histories|length }}</p></div>
+        <div class="app-stat-card"><p class="app-stat-label">Hari / Tanggal Aktif</p><p class="app-stat-value" id="statFilter">{% if active_date == today_date %}Hari Ini ({{ today_date }}){% elif active_date %}{{ active_date }}{% else %}Semua Tanggal{% endif %}</p></div>
     </section>
 
     <section class="chat-shell">
+        <!-- SIDEBAR: DAFTAR HARI (7 HARI TERAKHIR & ARSIP) -->
         <aside class="chat-sidebar">
             <div class="chat-sidebar-header">
                 <form action="/riwayat-chat" method="GET" class="grid gap-2">
                     {% if selected_slot %}<input type="hidden" name="slot" value="{{ selected_slot }}">{% endif %}
-                    <input type="search" name="q" id="chatSearchInput" value="{{ query }}" placeholder="Cari pesan atau tool..." class="app-input" style="font-size:13px;padding:8px 10px;">
-                    <div class="chat-date-input">
-                        <input type="date" name="date" value="{{ active_date }}">
-                        <button type="submit" class="app-button app-button-primary" style="padding:6px 12px;font-size:12px;">Filter</button>
+                    <input type="search" name="q" id="chatSearchInput" value="{{ query }}" placeholder="Cari percakapan..." class="app-input" style="font-size:12.5px;padding:6px 9px;">
+                    <div style="display:flex;gap:4px;">
+                        <input type="date" name="date" value="{{ active_date }}" class="app-input" style="font-size:11.5px;padding:4px 6px;flex:1;">
+                        <button type="submit" class="app-button app-button-primary" style="padding:4px 10px;font-size:11.5px;">Filter</button>
                     </div>
                 </form>
+
                 <!-- Dedicated Per-Slot Filter Tabs (Khusus Per-Slot) -->
                 {% set s1_tok = (user_tokens | selectattr("slot_number", "equalto", 1) | list | first) if user_tokens else none %}
                 {% set s2_tok = (user_tokens | selectattr("slot_number", "equalto", 2) | list | first) if user_tokens else none %}
@@ -368,51 +517,63 @@
                     <a href="/riwayat-chat?slot=3{% if active_date %}&date={{ active_date }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chat-type-tab {% if selected_slot == 3 %}active{% endif %}" style="flex:1;text-align:center;text-decoration:none;padding:5px 3px;font-size:11px;font-weight:800;" title="Riwayat Khusus Slot 3: {{ s3_tok.device_label if s3_tok and s3_tok.device_label else 'XiaoZhi 3' }}">Slot 3{% if s3_tok and s3_tok.device_label %} <span style="font-weight:500;font-size:9.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ s3_tok.device_label }}</span>{% endif %}</a>
                     <a href="/riwayat-chat?slot=all{% if active_date %}&date={{ active_date }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chat-type-tab {% if not selected_slot %}active{% endif %}" style="text-align:center;text-decoration:none;padding:5px 7px;font-size:11px;font-weight:700;" title="Tampilkan riwayat dari semua slot token gabungan">Semua</a>
                 </div>
+
                 <div class="chat-type-tabs" style="margin-top:4px;">
-                    <a href="/riwayat-chat?{% if selected_slot %}slot={{ selected_slot }}&{% endif %}" class="chat-type-tab {% if active_date == today_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Hari Ini</span></a>
-                    <a href="/riwayat-chat?date=all{% if selected_slot %}&slot={{ selected_slot }}{% endif %}" class="chat-type-tab {% if not active_date %}active{% endif %}" style="text-decoration:none;display:inline-block;padding:5px 6px;"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Semua Tanggal</span></a>
-                </div>
-                <div class="chat-type-tabs">
-                    <button type="button" class="chat-type-tab active" data-type="all" onclick="setTypeFilter('all')">Semua</button>
+                    <button type="button" class="chat-type-tab active" data-type="all" onclick="setTypeFilter('all')">Semua Dialog</button>
                     <button type="button" class="chat-type-tab" data-type="tool" onclick="setTypeFilter('tool')"><span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Tool MCP</span></button>
                 </div>
-                <div style="display:flex;gap:6px;margin-top:8px;">
-                    <a href="/riwayat-chat?date=all{% if selected_slot %}&slot={{ selected_slot }}{% endif %}" class="app-button" style="flex:1;font-size:12px;padding:6px 8px;text-align:center;">Reset</a>
+
+                <div style="display:flex;gap:4px;margin-top:6px;">
+                    <a href="/riwayat-chat?date=all{% if selected_slot %}&slot={{ selected_slot }}{% endif %}" class="app-button" style="flex:1;font-size:11px;padding:4px 6px;text-align:center;">Reset</a>
                     <form action="/riwayat-chat/clear" method="POST" onsubmit="return confirm('Hapus semua riwayat chat? Tindakan ini tidak dapat dibatalkan.');" style="flex:1;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="app-button app-button-danger" style="width:100%;font-size:12px;padding:6px 8px;">Hapus Semua</button>
+                        {% if selected_slot %}<input type="hidden" name="slot_number" value="{{ selected_slot }}">{% endif %}
+                        <button type="submit" class="app-button app-button-danger" style="width:100%;font-size:11px;padding:4px 6px;">Hapus Slot</button>
                     </form>
                 </div>
             </div>
-            <div class="chat-sidebar-scroll" id="sidebarList"></div>
+
+            <!-- List of Days (Hari Ini, Kemarin, ..., 7 Hari Lalu) -->
+            <div class="chat-sidebar-scroll" id="sidebarDaysList"></div>
         </aside>
 
-        <div class="chat-thread">
+        <!-- MAIN COLUMN: FULL-DAY CHAT TIMELINE STREAM -->
+        <main class="chat-thread">
             <div class="chat-thread-head">
                 <div style="min-width:0; flex:1;">
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <h2 class="app-section-title" id="threadTitle" style="font-size:16px; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Pilih riwayat</h2>
-                        <span class="app-chip app-chip-small app-chip-neutral" id="threadBadge">-</span>
+                        <h2 class="app-section-title" id="threadDayTitle" style="font-size:15px; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Memuat Percakapan...</h2>
+                        <span class="app-chip app-chip-small" id="threadDayBadge" style="background:#e0f2fe;color:#0369a1;font-weight:700;">-</span>
                     </div>
-                    <p class="app-section-subtitle" id="threadMeta" style="margin:2px 0 0 0; font-size:11.5px;">Klik salah satu chat di sidebar untuk melihat isi lengkap.</p>
+                    <p class="app-section-subtitle" id="threadDayMeta" style="margin:2px 0 0 0; font-size:11px;">Alur dialog interaktif Xiaozhi (Pagi ke Malam).</p>
                 </div>
-                <div class="chat-thread-actions" id="threadActionButtons" style="display:none;">
-                    <button type="button" class="app-button app-button-small" onclick="copyCurrentChat()" title="Salin seluruh isi percakapan">
-                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Salin
+                <div class="chat-thread-actions">
+                    <button type="button" class="app-button app-button-small" onclick="copyFullDayChat()" title="Salin seluruh percakapan hari ini">
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Salin Hari Ini
+                    </button>
+                    <button type="button" class="app-button app-button-small" onclick="scrollToBottom()" title="Gulir ke pesan terbaru paling bawah">
+                        ⬇ Terbaru
                     </button>
                 </div>
             </div>
-            <div class="chat-thread-body" id="threadBody">
+
+            <div class="chat-thread-body" id="threadTimelineBody">
                 <div class="chat-empty">
                     <div>
                         <div style="display:flex; justify-content:center; margin-bottom:10px; color:var(--app-muted);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-                        <p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih Riwayat Chat</p>
-                        <p class="mt-2 text-sm" style="color:var(--app-muted);">Pilih salah satu item di sidebar kiri untuk memeriksa prompt dan respon lengkap.</p>
+                        <p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih Hari di Sidebar</p>
+                        <p class="mt-2 text-sm" style="color:var(--app-muted);">Pilih salah satu tanggal untuk membaca seluruh sesi obrolan hari itu.</p>
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     </section>
+</div>
+
+<!-- Quick Scroll Controls Floating -->
+<div class="chat-scroll-controls">
+    <button type="button" class="chat-scroll-btn" onclick="scrollToTop()" title="Gulir ke awal pagi">⬆</button>
+    <button type="button" class="chat-scroll-btn" onclick="scrollToBottom()" title="Gulir ke pesan terbaru">⬇</button>
 </div>
 
 <!-- ================= DAILY RECAP MODAL (OPTION 3) ================= -->
@@ -555,9 +716,7 @@
     var selectedSlot = {{ selected_slot|tojson }};
     var CSRF_TOKEN = {{ csrf_token|tojson }};
     var currentTypeFilter = 'all';
-    var sel = H.length ? Number(H[0].id) : null;
     var maxId = H.reduce(function(m,i){ return Math.max(m, Number(i.id||0)); }, 0);
-    var collapsed = {};
 
     function escapeHtml(value) {
         return String(value ?? "")
@@ -577,7 +736,12 @@
         });
     }
 
-    function fmtShort(v){
+    function fmtTime(v){
+        var d = new Date(v);
+        return isNaN(d) ? "" : d.toLocaleTimeString("id-ID", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+    }
+
+    function fmtShortTime(v){
         var d = new Date(v);
         return isNaN(d) ? "" : d.toLocaleTimeString("id-ID", {hour: "2-digit", minute: "2-digit"});
     }
@@ -590,7 +754,7 @@
         if (diff === 0) return "Hari Ini";
         if (diff === 1) return "Kemarin";
         if (diff < 7) return diff + " hari lalu";
-        return d.toLocaleDateString("id-ID", {weekday: "long", day: "numeric", month: "long", year: "numeric"});
+        return d.toLocaleDateString("id-ID", {weekday: "short", day: "numeric", month: "short", year: "numeric"});
     }
 
     function isToolItem(i) {
@@ -601,74 +765,146 @@
         return (tool && !tool.startsWith("xiaozhi_ws") && tool !== "save_chat_history") || src === "mcp_tool";
     }
 
-    function kind(i){
-        if (!i) return "-";
-        if (isToolItem(i)) return "Tool MCP";
-        if (i.source === "chat_transcript") return "Transcript Suara";
-        if (String(i.tool_name || "").startsWith("xiaozhi_ws")) return "WebSocket MCP";
-        return "Percakapan";
-    }
-
     function setTypeFilter(t) {
         currentTypeFilter = t;
         document.querySelectorAll('.chat-type-tab').forEach(function(btn) {
             btn.classList.toggle('active', btn.dataset.type === t);
         });
-        renderSidebar();
+        renderTimeline();
     }
 
-    function groupByDate(items) {
-        var g = {};
-        items.forEach(function(i) {
-            if (currentTypeFilter === 'chat' && isToolItem(i)) return;
-            if (currentTypeFilter === 'tool' && !isToolItem(i)) return;
-            var d = (i.created_at || "").slice(0, 10) || "?";
-            if (!g[d]) g[d] = [];
-            g[d].push(i);
+    // ── Session Clustering Logic (Time Gap > 8 Menit) ──
+    function clusterIntoSessions(items, gapMinutes) {
+        gapMinutes = gapMinutes || 8;
+        // Pagi ke Malam: urutkan dari waktu paling awal ke paling akhir
+        var sorted = items.slice().sort(function(a,b){
+            var ta = (a.created_at || "");
+            var tb = (b.created_at || "");
+            if (ta === tb) return Number(a.id || 0) - Number(b.id || 0);
+            return ta.localeCompare(tb);
         });
-        return g;
+
+        var sessions = [];
+        var curSession = [];
+        var lastTime = null;
+
+        sorted.forEach(function(item) {
+            var dt = item.created_at ? new Date(item.created_at) : null;
+            if (lastTime && dt && !isNaN(dt.getTime()) && !isNaN(lastTime.getTime())) {
+                var diffMin = (dt.getTime() - lastTime.getTime()) / 60000;
+                if (diffMin > gapMinutes) {
+                    if (curSession.length) {
+                        sessions.push(curSession);
+                        curSession = [];
+                    }
+                }
+            }
+            curSession.push(item);
+            if (dt && !isNaN(dt.getTime())) {
+                lastTime = dt;
+            }
+        });
+
+        if (curSession.length) {
+            sessions.push(curSession);
+        }
+        return sessions;
     }
 
+    function getSessionTitle(sessionItems) {
+        if (!sessionItems || !sessionItems.length) return "Sesi Obrolan";
+        for (var i = 0; i < sessionItems.length; i++) {
+            var it = sessionItems[i];
+            var u = (it.user_message || "").trim();
+            if (u && u.length >= 3 && !/^[0-9]+$/.test(u)) {
+                if (u.toLowerCase().startsWith("putar") || u.toLowerCase().startsWith("play")) {
+                    return "Memutar Lagu " + u.replace(/^(putar(kan)?|play)\s+(lagu\s+)?/i, "").slice(0, 32);
+                }
+                if (u.toLowerCase().includes("lampu") || u.toLowerCase().includes("relay")) {
+                    return "Kontrol Smart Home / Relay";
+                }
+                return u.slice(0, 36) + (u.length > 36 ? "..." : "");
+            }
+            var tool = (it.tool_name || "").trim();
+            if (tool && tool !== "xiaozhi_ws") {
+                if (tool.includes("playlist") || tool.includes("youtube")) return "Pemutaran Musik YouTube";
+                if (tool.includes("relay") || tool.includes("smarthome")) return "Kontrol Relay";
+                return "Panggilan Tool " + tool;
+            }
+        }
+        var first = sessionItems[0];
+        return "Percakapan " + (first.created_at ? fmtShortTime(first.created_at) : "");
+    }
+
+    // ── Render Sidebar: Daftar Hari (7 Hari Terakhir & Arsip) ──
     function renderSidebar() {
-        var el = document.getElementById("sidebarList");
-        var grouped = groupByDate(H);
-        var dates = Object.keys(grouped).sort().reverse();
+        var el = document.getElementById("sidebarDaysList");
+        if (!el) return;
+
+        // Kumpulkan daftar tanggal dari DL dan H
+        var datesMap = {};
+        if (Array.isArray(DL)) {
+            DL.forEach(function(d){
+                if (d.date) datesMap[d.date] = Number(d.count || 0);
+            });
+        }
+        // Pastikan tanggal aktif terdaftar
+        if (AD && !datesMap[AD]) {
+            datesMap[AD] = H.length;
+        }
+
+        var dates = Object.keys(datesMap).sort().reverse();
 
         if (!dates.length) {
-            el.innerHTML = '<div style="padding:24px 14px;text-align:center;font-size:13px;color:var(--app-muted);">Tidak ada riwayat untuk filter ini.</div>';
+            el.innerHTML = '<div style="padding:24px 14px;text-align:center;font-size:13px;color:var(--app-muted);">Belum ada riwayat percakapan.</div>';
             return;
         }
 
         var html = "";
         dates.forEach(function(d) {
-            var isActive = d === AD;
-            var isCol = collapsed[d] && !isActive;
-            var items = grouped[d] || [];
-            html += '<div class="chat-date-group">';
-            html += '<div class="chat-date-label ' + (isActive ? 'is-active' : '') + '" onclick="navDate(\'' + E(d) + '\')">';
-            html += '<span>' + E(relDay(d) || d) + '</span>';
-            html += '<span class="chat-date-badge">' + items.length + '</span>';
+            var isActive = (d === AD);
+            var count = datesMap[d] || (isActive ? H.length : 0);
+            var isToday = (d === "{{ today_date }}");
+            var label = relDay(d);
+
+            html += '<div class="chat-day-card ' + (isActive ? 'active' : '') + '" onclick="navDate(\'' + E(d) + '\')">';
+            html += '<div class="chat-day-head">';
+            html += '<span class="chat-day-title">';
+            if (isToday) {
+                html += '<span style="color:#0284c7;">●</span> ';
+            }
+            html += E(label);
+            html += '</span>';
+            html += '<span class="chat-day-badge">' + count + ' pesan</span>';
             html += '</div>';
-            html += '<div class="chat-sessions ' + (isCol ? 'collapsed' : '') + '">';
-            items.forEach(function(i) {
-                var id = Number(i.id);
-                var isSelected = (id === sel);
-                var previewTitle = i.user_message || i.xiaozhi_answer || i.tool_name || ("Pesan #" + id);
-                var isTool = isToolItem(i);
-                var slotNum = i.slot_number || 1;
-                var devLabel = i.device_label || ('Slot ' + slotNum);
-                var macShort = i.device_mac ? (' · ' + i.device_mac) : '';
-                html += '<button type="button" class="chat-item ' + (isSelected ? 'active' : '') + '" onclick="selChat(' + id + ')">';
-                html += '<span class="chat-item-title">' + E(previewTitle) + '</span>';
-                html += '<div class="chat-item-meta">';
-                html += '<span class="chat-item-badge" style="' + (isTool ? 'color:#9333ea;background:#f5d0fe;' : '') + '">' + E(kind(i)) + '</span>';
-                html += '<span class="chat-item-badge" style="background:#e0e7ff;color:#3730a3;font-weight:700;" title="' + E(devLabel + (i.device_mac ? ' (MAC: ' + i.device_mac + ')' : '')) + '">' + E(devLabel) + E(macShort) + '</span>';
-                html += '<span>' + E(fmtShort(i.created_at)) + '</span>';
-                html += '</div>';
-                html += '</button>';
-            });
-            html += '</div></div>';
+
+            html += '<div class="chat-day-meta">';
+            html += '<span>' + E(d) + '</span>';
+            if (isActive) {
+                html += '<span style="font-weight:700;color:#0284c7;">Sedang dibuka</span>';
+            }
+            html += '</div>';
+
+            // Jika ini hari aktif, tampilkan sub-sesi untuk navigasi cepat
+            if (isActive && H.length) {
+                var sessions = clusterIntoSessions(H, 8);
+                if (sessions.length > 1) {
+                    html += '<div class="chat-day-sessions-list" onclick="event.stopPropagation()">';
+                    sessions.forEach(function(sess, idx) {
+                        var sTitle = getSessionTitle(sess);
+                        var sTime = sess[0].created_at ? fmtShortTime(sess[0].created_at) : "";
+                        html += '<button type="button" class="chat-session-jump-btn" onclick="scrollToSession(' + idx + ')" title="Lompat ke sesi ' + E(sTime) + '">';
+                        html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">⏱️ ' + E(sTime) + ' · ' + E(sTitle) + '</span>';
+                        html += '<span style="font-size:9.5px;opacity:0.75;">' + sess.length + 'p</span>';
+                        html += '</button>';
+                    });
+                    html += '</div>';
+                }
+            }
+
+            html += '</div>';
         });
+
         el.innerHTML = html;
     }
 
@@ -681,277 +917,208 @@
         window.location = url;
     }
 
-    function selChat(id) {
-        sel = id;
-        renderSidebar();
-        renderThread();
-    }
+    // ── Render Timeline Obrolan Harian (Pagi ke Malam WhatsApp/ChatGPT Style) ──
+    function renderTimeline() {
+        var body = document.getElementById("threadTimelineBody");
+        var titleEl = document.getElementById("threadDayTitle");
+        var badgeEl = document.getElementById("threadDayBadge");
+        var metaEl = document.getElementById("threadDayMeta");
 
-    function renderThread() {
-        var item = H.find(function(i){ return Number(i.id) === sel; });
-        var body = document.getElementById("threadBody");
-        var actions = document.getElementById("threadActionButtons");
+        var activeItems = H.filter(function(i) {
+            if (currentTypeFilter === 'tool' && !isToolItem(i)) return false;
+            return true;
+        });
 
-        if (!item) {
-            document.getElementById("threadTitle").textContent = AD ? relDay(AD) : "Pilih riwayat";
-            document.getElementById("threadMeta").textContent = "Klik chat dari sidebar untuk melihat detail.";
-            document.getElementById("threadBadge").textContent = "-";
-            if (actions) actions.style.display = "none";
-            body.innerHTML = '<div class="chat-empty"><div><div style="display:flex; justify-content:center; margin-bottom:10px; color:var(--app-muted);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><p style="font-size:15px;font-weight:700;color:var(--app-text);">Pilih Chat</p><p class="mt-2 text-sm" style="color:var(--app-muted);">Klik salah satu item di sidebar kiri.</p></div></div>';
+        var displayDate = AD || "{{ today_date }}";
+        var devLabel = (selectedSlot ? ("Slot " + selectedSlot) : "Semua Slot");
+        if (H.length && H[0].device_label) {
+            devLabel = H[0].device_label;
+        }
+
+        titleEl.textContent = "📅 Percakapan " + relDay(displayDate) + " (" + displayDate + ")";
+        badgeEl.textContent = activeItems.length + " interaksi";
+        metaEl.textContent = devLabel + " · Alur dialog mengalir kronologis (Pagi ke Malam)";
+
+        if (!activeItems.length) {
+            body.innerHTML = '<div class="chat-empty"><div><div style="font-size:36px;margin-bottom:10px;">💬</div><p style="font-size:15px;font-weight:700;color:var(--app-text);">Tidak ada percakapan pada hari ini</p><p class="mt-2 text-sm" style="color:var(--app-muted);">Bicaralah dengan Xiaozhi melalui speaker atau pilih tanggal lain di sidebar.</p></div></div>';
             return;
         }
 
-        if (actions) actions.style.display = "flex";
-        var fullTitle = item.user_message || item.xiaozhi_answer || item.tool_name || ("Chat #" + item.id);
-        var slotNum = item.slot_number || 1;
-        var devLabel = item.device_label || ('Slot ' + slotNum);
-        var macMeta = item.device_mac ? (" · MAC: " + item.device_mac) : "";
-        var reqMeta = item.request_id ? (" · Req ID: " + item.request_id) : "";
-        document.getElementById("threadTitle").textContent = fullTitle;
-        document.getElementById("threadBadge").textContent = kind(item);
-        document.getElementById("threadMeta").textContent = "ID #" + item.id + " · " + fmt(item.created_at) + (item.source ? " · Sumber: " + item.source : "") + " · " + devLabel + macMeta + reqMeta;
+        // Kelompokkan menjadi sesi (jeda > 8 menit)
+        var sessions = clusterIntoSessions(activeItems, 8);
+        var html = '';
 
-        var m = "";
+        sessions.forEach(function(sess, sIdx) {
+            var sTitle = getSessionTitle(sess);
+            var startTime = sess[0].created_at ? fmtShortTime(sess[0].created_at) : "";
+            var endTime = sess[sess.length - 1].created_at ? fmtShortTime(sess[sess.length - 1].created_at) : "";
+            var timeRange = startTime === endTime ? startTime : (startTime + " - " + endTime);
 
-        // 1. Pesan User (Jika ada)
-        if (item.user_message) {
-            m += '<div class="chat-msg">';
-            m += '<div class="chat-bubble chat-bubble-user">';
-            m += '<div class="chat-bubble-head">';
-            m += '<span class="chat-bubble-role">User <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">' + E(devLabel) + (item.device_mac ? ' (' + E(item.device_mac) + ')' : '') + '</span></span>';
-            m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
-            m += '</div>';
-            m += '<div class="chat-bubble-body">' + E(item.user_message) + '</div>';
-            m += '<div class="chat-bubble-foot">';
-            m += '<span>Input Pengguna</span>';
-            m += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(item.user_message).replace(/`/g, '\\`') + '`)"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Salin Teks</button>';
-            m += '</div>';
-            m += '</div></div>';
-        }
+            // Divider Pemisah Sesi Elegan
+            html += '<div class="chat-session-divider" id="session-divider-' + sIdx + '">';
+            html += '<span class="chat-session-badge">⏱️ Sesi ' + E(timeRange) + ' · ' + E(sTitle) + ' (' + sess.length + ' pesan)</span>';
+            html += '</div>';
 
-        // 2. Request Payload (Argumen Tool jika ada)
-        var reqPayload = item.request_payload;
-        if (reqPayload) {
-            var reqStr = "";
-            try {
-                reqStr = typeof reqPayload === "string" ? JSON.stringify(JSON.parse(reqPayload), null, 2) : JSON.stringify(reqPayload, null, 2);
-            } catch(e) {
-                reqStr = String(reqPayload);
-            }
-            if (reqStr && reqStr !== "{}" && reqStr !== "null") {
-                m += '<div class="chat-msg">';
-                m += '<div class="chat-bubble chat-bubble-tool">';
-                m += '<div class="chat-bubble-head">';
-                m += '<span class="chat-bubble-role">Parameter Tool (' + E(item.tool_name || "Tool") + ')</span>';
-                m += '<span class="app-chip app-chip-small" style="font-size:10px;">Input Request</span>';
-                m += '</div>';
-                m += '<div class="chat-json-box">' + E(reqStr) + '</div>';
-                m += '</div></div>';
-            }
-        }
+            sess.forEach(function(item) {
+                var id = Number(item.id);
+                var isTool = isToolItem(item);
+                var timeStr = item.created_at ? fmtTime(item.created_at) : "";
+                var dLabel = item.device_label || ('Slot ' + (item.slot_number || 1));
+                var userMsg = (item.user_message || "").trim();
+                var aiAns = (item.xiaozhi_answer || "").trim();
+                var toolName = (item.tool_name || "").trim();
 
-        // 3. Jawaban AI / Hasil Respon Tool
-        var aiAnswer = item.xiaozhi_answer;
-        var rawResponseStr = "";
-        if (item.response_payload) {
-            try {
-                var rp = typeof item.response_payload === "string" ? JSON.parse(item.response_payload) : item.response_payload;
-                rawResponseStr = JSON.stringify(rp, null, 2);
-                if (!aiAnswer) {
-                    aiAnswer = rp.message || rp.result || rp.text || (typeof rp === "object" ? JSON.stringify(rp, null, 2) : String(rp));
+                // 1. Pesan User (Kanan, Biru Muda)
+                if (userMsg) {
+                    html += '<div class="chat-row chat-row-user">';
+                    html += '<div class="chat-bubble-user">';
+                    html += '<div class="chat-bubble-head">';
+                    html += '<span style="font-weight:800;">User <span class="app-chip app-chip-small" style="font-size:9.5px;margin-left:4px;background:#bae6fd;color:#0369a1;">' + E(dLabel) + '</span></span>';
+                    html += '<time style="font-weight:600;font-size:11px;">' + E(timeStr) + '</time>';
+                    html += '</div>';
+                    html += '<div class="chat-bubble-body">' + E(userMsg) + '</div>';
+                    html += '<div class="chat-bubble-foot">';
+                    html += '<span>🎙️ Transcript Suara</span>';
+                    html += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(userMsg).replace(/`/g, '\\`') + '`)">Salin</button>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
                 }
-            } catch(e) {
-                rawResponseStr = String(item.response_payload);
-                if (!aiAnswer) aiAnswer = rawResponseStr;
-            }
-        }
 
-        if (aiAnswer) {
-            var label = item.tool_name ? 'Xiaozhi AI · Tool: ' + E(item.tool_name) : 'Xiaozhi AI';
-            m += '<div class="chat-msg">';
-            m += '<div class="chat-bubble chat-bubble-ai">';
-            m += '<div class="chat-bubble-head">';
-            m += '<span class="chat-bubble-role">' + label + ' <span class="app-chip app-chip-small" style="font-size:10px;margin-left:6px;background:#e0e7ff;color:#3730a3;font-weight:700;">' + E(devLabel) + '</span></span>';
-            m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
-            m += '</div>';
-            m += '<div class="chat-bubble-body">' + E(aiAnswer) + '</div>';
+                // 2. Kartu Pemanggilan Alat MCP (Tengah, Collapsible - Pilihan 2)
+                if (isTool && toolName) {
+                    var reqStr = "";
+                    try {
+                        reqStr = typeof item.request_payload === "string" ? JSON.stringify(JSON.parse(item.request_payload), null, 2) : JSON.stringify(item.request_payload || {}, null, 2);
+                    } catch(e) { reqStr = String(item.request_payload || "{}"); }
 
-            if (rawResponseStr && rawResponseStr !== "{}" && rawResponseStr !== JSON.stringify(aiAnswer)) {
-                m += '<div style="margin-top:12px;padding:8px 12px;background:rgba(0,0,0,0.03);border:1px solid var(--app-border);border-radius:8px;">';
-                m += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-                m += '<button type="button" class="chat-collapse-toggle" onclick="toggleRawResponse(' + item.id + ')">Tampilkan Raw JSON Response ▾</button>';
-                m += '<button type="button" class="chat-collapse-toggle" style="color:var(--app-muted);font-size:11.5px;" onclick="copyRawResponse(' + item.id + ')"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Salin Raw JSON</button>';
-                m += '</div>';
-                m += '<div id="rawResponse-' + item.id + '" class="chat-json-box" style="display:none;margin-top:6px;">' + E(rawResponseStr) + '</div>';
-                m += '</div>';
-            }
+                    var respStr = "";
+                    try {
+                        respStr = typeof item.response_payload === "string" ? JSON.stringify(JSON.parse(item.response_payload), null, 2) : JSON.stringify(item.response_payload || {}, null, 2);
+                    } catch(e) { respStr = String(item.response_payload || "{}"); }
 
-            m += '<div class="chat-bubble-foot">';
-            m += '<span>Respon Lengkap AI & MCP</span>';
-            m += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(aiAnswer).replace(/`/g, '\\`') + '`)"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Salin Jawaban</button>';
-            m += '</div>';
-            m += '</div></div>';
-        } else if (item.tool_name) {
-            m += '<div class="chat-msg">';
-            m += '<div class="chat-bubble chat-bubble-tool">';
-            m += '<div class="chat-bubble-head">';
-            m += '<span class="chat-bubble-role">Eksekusi Tool: ' + E(item.tool_name) + '</span>';
-            m += '<time class="chat-bubble-time">' + E(fmt(item.created_at)) + '</time>';
-            m += '</div>';
-            m += '<div class="chat-bubble-body">Tool berhasil dipanggil dan dieksekusi oleh sistem Xiaozhi.</div>';
-            m += '</div></div>';
-        }
+                    html += '<div class="chat-row chat-row-tool">';
+                    html += '<div class="chat-tool-card">';
+                    html += '<div class="chat-tool-header" onclick="toggleTool(' + id + ')">';
+                    html += '<div class="chat-tool-title">';
+                    html += '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+                    html += '<span>Panggilan alat: <b>' + E(toolName) + '</b></span>';
+                    html += '<span class="chat-tool-badge">Sukses</span>';
+                    html += '</div>';
+                    html += '<button type="button" class="chat-tool-toggle-btn" id="btn-tool-' + id + '">▼ Detail</button>';
+                    html += '</div>';
 
-        if (!m) {
-            m = '<div class="chat-empty"><p>Percakapan kosong.</p></div>';
-        }
+                    // Body Collapsible (Default tersembunyi sesuai pilihan 2 pengguna)
+                    html += '<div class="chat-tool-body" id="body-tool-' + id + '" style="display:none;">';
+                    html += '<div style="color:#94a3b8;font-size:10px;margin-bottom:4px;">// Parameter Input:</div>';
+                    html += '<pre style="margin:0 0 8px 0;">' + E(reqStr) + '</pre>';
+                    html += '<div style="color:#94a3b8;font-size:10px;margin-bottom:4px;">// Hasil Respon Tool:</div>';
+                    html += '<pre style="margin:0;">' + E(respStr) + '</pre>';
+                    html += '</div>';
 
-        body.innerHTML = m;
-        body.scrollTop = 0;
-    }
+                    html += '</div>';
+                    html += '</div>';
+                }
 
-    function toggleRawResponse(id) {
-        var el = document.getElementById("rawResponse-" + id);
-        if (!el) return;
-        el.style.display = (el.style.display === "none") ? "block" : "none";
-    }
-
-    function copyRawResponse(id) {
-        var item = H.find(function(i){ return Number(i.id) === Number(id); });
-        if (!item) return;
-        var p = item.response_payload || item.request_payload;
-        if (!p) return;
-        var str = "";
-        try {
-            str = typeof p === "string" ? JSON.stringify(JSON.parse(p), null, 2) : JSON.stringify(p, null, 2);
-        } catch(e) {
-            str = String(p);
-        }
-        copyText(str);
-    }
-
-    function copyText(str) {
-        if (!str) return;
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(str).then(function() {
-                if (window.App && App.toast) App.toast.success("Teks berhasil disalin!");
-                else alert("Teks berhasil disalin!");
-            }).catch(function() {
-                alert("Gagal menyalin otomatis.");
+                // 3. Respon Asisten Xiaozhi (Kiri, Permukaan Putih Bersih)
+                if (aiAns) {
+                    html += '<div class="chat-row chat-row-ai">';
+                    html += '<div class="chat-bubble-ai">';
+                    html += '<div class="chat-bubble-head">';
+                    html += '<span style="font-weight:800;display:flex;align-items:center;gap:5px;">😊 Xiaozhi AI <span class="app-chip app-chip-small" style="font-size:9.5px;background:#f3f4f6;color:#374151;">' + E(dLabel) + '</span></span>';
+                    html += '<time style="font-weight:600;font-size:11px;">' + E(timeStr) + '</time>';
+                    html += '</div>';
+                    html += '<div class="chat-bubble-body">' + E(aiAns) + '</div>';
+                    html += '<div class="chat-bubble-foot">';
+                    html += '<span>✨ Konten dihasilkan oleh AI</span>';
+                    html += '<button type="button" class="chat-collapse-toggle" onclick="copyText(`' + E(aiAns).replace(/`/g, '\\`') + '`)">Salin</button>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                }
             });
-        }
-    }
-
-    function copyCurrentChat() {
-        var item = H.find(function(i){ return Number(i.id) === sel; });
-        if (!item) return;
-        var full = "";
-        if (item.user_message) full += "User: " + item.user_message + "\n\n";
-        if (item.tool_name) full += "Tool: " + item.tool_name + "\n\n";
-        if (item.xiaozhi_answer) full += "Xiaozhi AI: " + item.xiaozhi_answer + "\n";
-        copyText(full.trim());
-    }
-
-
-    function merge(items) {
-        if (!Array.isArray(items) || !items.length) return false;
-        var byId = new Map(H.map(function(i){ return [Number(i.id), i]; }));
-        var ch = false;
-        items.forEach(function(i){
-            var id = Number(i.id || 0);
-            var ex = byId.get(id);
-            if (!ex || JSON.stringify(ex) !== JSON.stringify(i)) {
-                byId.set(id, i);
-                ch = true;
-            }
         });
-        if (!ch) return false;
-        H = Array.from(byId.values()).sort(function(a,b){ return Number(b.id||0) - Number(a.id||0); }).slice(0, {{ limit }});
-        maxId = Math.max.apply(null, [maxId].concat(items.map(function(i){ return Number(i.id || 0); })));
-        return true;
+
+        body.innerHTML = html;
     }
 
-    async function poll() {
-        try {
-            var p = new URLSearchParams({after_id: String(maxId), q: MQ || "", limit: "{{ limit }}", date: AD || ""});
-            if (selectedSlot) {
-                p.set("slot", String(selectedSlot));
-            }
-            var r = await fetch("/api/chat-history?" + p, {headers: {Accept: "application/json"}, credentials: "same-origin"});
-            var d = await r.json().catch(function(){ return {}; });
-            if (!r.ok || !d.success) return;
-            if (d.date_list) DL = d.date_list;
-            if (merge(d.items)) {
-                renderSidebar();
-                renderThread();
-            } else if (d.date_list) {
-                renderSidebar();
-            }
-            if (d.stats && document.getElementById("statTotal")) {
-                document.getElementById("statTotal").textContent = d.stats.total;
-            }
-            if (document.getElementById("statShown")) {
-                document.getElementById("statShown").textContent = H.length;
-            }
-        } catch(e){}
+    // ── Toggle Tool Accordion Detail ──
+    function toggleTool(id) {
+        var body = document.getElementById("body-tool-" + id);
+        var btn = document.getElementById("btn-tool-" + id);
+        if (!body) return;
+        if (body.style.display === "none" || !body.style.display) {
+            body.style.display = "block";
+            if (btn) btn.innerHTML = "▲ Tutup";
+        } else {
+            body.style.display = "none";
+            if (btn) btn.innerHTML = "▼ Detail";
+        }
     }
 
-    // ── Real-Time SSE Chat History Listener ──
-    function initSSE() {
-        if (!window.EventSource) return;
-        var sseParams = [];
-        if (AD) sseParams.push("date=" + encodeURIComponent(AD));
-        if (selectedSlot) sseParams.push("slot=" + encodeURIComponent(selectedSlot));
-        var sseParam = sseParams.length ? "?" + sseParams.join("&") : "";
-        try {
-            var es = new EventSource("/api/chat-history/stream" + sseParam);
+    // ── Scroll Controls ──
+    function scrollToSession(idx) {
+        var el = document.getElementById("session-divider-" + idx);
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    }
 
-            es.onopen = function() {
-                var pill = document.getElementById("sseStatusPill");
-                var txt = document.getElementById("sseStatusText");
-                if (pill) pill.className = "app-status-pill is-online";
-                if (txt) txt.textContent = "SSE Live";
-            };
+    function scrollToBottom() {
+        var body = document.getElementById("threadTimelineBody");
+        if (body) {
+            body.scrollTo({ top: body.scrollHeight, behavior: "smooth" });
+        }
+    }
 
-            es.addEventListener("new_chat", function(e) {
-                try {
-                    var item = JSON.parse(e.data);
-                    if (item && item.id) {
-                        if (merge([item])) {
-                            renderSidebar();
-                            renderThread();
-                            if (document.getElementById("statShown")) {
-                                document.getElementById("statShown").textContent = H.length;
-                            }
-                            if (document.getElementById("statTotal")) {
-                                var curT = parseInt(document.getElementById("statTotal").textContent || "0", 10);
-                                document.getElementById("statTotal").textContent = curT + 1;
-                            }
-                        }
-                    }
-                } catch(err){}
-            });
+    function scrollToTop() {
+        var body = document.getElementById("threadTimelineBody");
+        if (body) {
+            body.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    }
 
-            es.addEventListener("update_chat", function(e) {
-                try {
-                    var item = JSON.parse(e.data);
-                    if (item && item.id) {
-                        if (merge([item])) {
-                            renderSidebar();
-                            renderThread();
-                        }
-                    }
-                } catch(err){}
-            });
+    // ── Salin Seluruh Percakapan Hari Ini ──
+    function copyFullDayChat() {
+        if (!H || !H.length) {
+            alert("Tidak ada obrolan untuk disalin.");
+            return;
+        }
+        var sorted = H.slice().sort(function(a,b){
+            return String(a.created_at||"").localeCompare(String(b.created_at||""));
+        });
+        var lines = ["=== RIWAYAT OBROLAN XIAOZHI (" + (AD || "HARI INI") + ") ===", ""];
+        sorted.forEach(function(item) {
+            var t = item.created_at ? fmtShortTime(item.created_at) : "";
+            if (item.user_message) {
+                lines.push("[" + t + "] User: " + item.user_message);
+            }
+            if (item.tool_name && isToolItem(item)) {
+                lines.push("[" + t + "] Tool: " + item.tool_name);
+            }
+            if (item.xiaozhi_answer) {
+                lines.push("[" + t + "] Xiaozhi AI: " + item.xiaozhi_answer);
+            }
+            lines.push("");
+        });
+        copyText(lines.join("\n").trim());
+        if (window.App && App.toast) {
+            App.toast.success("Seluruh obrolan hari ini berhasil disalin!");
+        } else {
+            alert("Seluruh obrolan hari ini berhasil disalin!");
+        }
+    }
 
-            es.onerror = function() {
-                var pill = document.getElementById("sseStatusPill");
-                var txt = document.getElementById("sseStatusText");
-                if (pill) pill.className = "app-status-pill is-offline";
-                if (txt) txt.textContent = "Reconnecting...";
-            };
-        } catch(e) {
-            console.warn("SSE init error:", e);
+    function copyText(val) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(val);
+        } else {
+            var ta = document.createElement("textarea");
+            ta.value = val;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
         }
     }
 
@@ -983,7 +1150,6 @@
         if (modal) {
             modal.style.display = "flex";
             modal.classList.add("is-open");
-            // Set default slot and date matching current page filter
             if (selectedSlot) {
                 var sSelect = document.getElementById("modalRecapSlot");
                 if (sSelect) sSelect.value = String(selectedSlot);
@@ -1033,7 +1199,6 @@
             return;
         }
 
-        // Show Request ID Badge
         var rId = res.request_id || res.req_id || "-";
         document.getElementById("recapReqIdText").textContent = rId;
         document.getElementById("recapSlotText").textContent = res.slot_label || ("Slot " + slotVal);
@@ -1043,7 +1208,6 @@
         var stats = res.stats || {};
         var h = '';
 
-        // Xiaozhi Voice Summary Banner
         h += '<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:14px;margin-bottom:14px;">';
         h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;color:#166534;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;">';
         h += '<svg class="app-icon app-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>';
@@ -1052,7 +1216,6 @@
         h += '<p style="margin:0;font-size:13.5px;line-height:1.6;color:#14532d;font-weight:500;">' + E(res.summary_text || "Tidak ada aktivitas.") + '</p>';
         h += '</div>';
 
-        // Stat Grid
         h += '<div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:14px;">';
         h += '<div style="background:var(--app-surface-muted);padding:10px;border-radius:6px;border:1px solid var(--app-border);text-align:center;"><div style="font-size:10.5px;color:var(--app-muted);font-weight:700;">Total Chat</div><div style="font-size:18px;font-weight:800;color:var(--app-text);">' + (stats.total_chats || 0) + '</div></div>';
         h += '<div style="background:var(--app-surface-muted);padding:10px;border-radius:6px;border:1px solid var(--app-border);text-align:center;"><div style="font-size:10.5px;color:var(--app-muted);font-weight:700;">Lagu Diputar</div><div style="font-size:18px;font-weight:800;color:#2563eb;">' + (stats.songs_count || 0) + '</div></div>';
@@ -1060,7 +1223,6 @@
         h += '<div style="background:var(--app-surface-muted);padding:10px;border-radius:6px;border:1px solid var(--app-border);text-align:center;"><div style="font-size:10.5px;color:var(--app-muted);font-weight:700;">Topik Diskusi</div><div style="font-size:18px;font-weight:800;color:#d97706;">' + (stats.topics_count || 0) + '</div></div>';
         h += '</div>';
 
-        // Songs Played Section
         if (res.songs_played && res.songs_played.length) {
             h += '<div style="margin-bottom:12px;">';
             h += '<h4 style="font-size:12px;font-weight:800;color:var(--app-muted);text-transform:uppercase;margin:0 0 6px 0;">🎵 Lagu yang Diputar</h4>';
@@ -1074,7 +1236,6 @@
             h += '</div></div>';
         }
 
-        // IoT / Relay Commands Section
         if (res.iot_commands && res.iot_commands.length) {
             h += '<div style="margin-bottom:12px;">';
             h += '<h4 style="font-size:12px;font-weight:800;color:var(--app-muted);text-transform:uppercase;margin:0 0 6px 0;">⚡ Perintah Saklar / Smart Home</h4>';
@@ -1088,7 +1249,6 @@
             h += '</div></div>';
         }
 
-        // Key Topics Section
         if (res.key_topics && res.key_topics.length) {
             h += '<div style="margin-bottom:12px;">';
             h += '<h4 style="font-size:12px;font-weight:800;color:var(--app-muted);text-transform:uppercase;margin:0 0 6px 0;">💡 Topik Utama Obrolan</h4>';
@@ -1174,7 +1334,6 @@
         var tasks = res.tasks || [];
         var h = '';
 
-        // Summary callout
         h += '<div style="background:#fefce8;border:1.5px solid #fde047;border-radius:8px;padding:12px 14px;margin-bottom:14px;">';
         h += '<p style="margin:0;font-size:13px;line-height:1.5;color:#854d0e;font-weight:600;">' + E(res.summary_text || "") + '</p>';
         h += '</div>';
@@ -1228,9 +1387,115 @@
         if (window.App && App.toast) App.toast.success("Daftar tugas berhasil disalin!");
     }
 
+    // ── Real-Time SSE Chat History Listener ──
+    function merge(items) {
+        if (!Array.isArray(items) || !items.length) return false;
+        var byId = new Map(H.map(function(i){ return [Number(i.id), i]; }));
+        var ch = false;
+        items.forEach(function(i){
+            var id = Number(i.id || 0);
+            var ex = byId.get(id);
+            if (!ex || JSON.stringify(ex) !== JSON.stringify(i)) {
+                byId.set(id, i);
+                ch = true;
+            }
+        });
+        if (!ch) return false;
+        H = Array.from(byId.values());
+        maxId = Math.max.apply(null, [maxId].concat(items.map(function(i){ return Number(i.id || 0); })));
+        return true;
+    }
+
+    async function poll() {
+        try {
+            var p = new URLSearchParams({after_id: String(maxId), q: MQ || "", limit: "500", date: AD || ""});
+            if (selectedSlot) {
+                p.set("slot", String(selectedSlot));
+            }
+            var r = await fetch("/api/chat-history?" + p, {headers: {Accept: "application/json"}, credentials: "same-origin"});
+            var d = await r.json().catch(function(){ return {}; });
+            if (!r.ok || !d.success) return;
+            if (d.date_list) DL = d.date_list;
+            if (merge(d.items)) {
+                renderSidebar();
+                renderTimeline();
+            } else if (d.date_list) {
+                renderSidebar();
+            }
+            if (d.stats && document.getElementById("statTotal")) {
+                document.getElementById("statTotal").textContent = d.stats.total;
+            }
+            if (document.getElementById("statShown")) {
+                document.getElementById("statShown").textContent = H.length;
+            }
+        } catch(e){}
+    }
+
+    function initSSE() {
+        if (!window.EventSource) return;
+        var sseParams = [];
+        if (AD) sseParams.push("date=" + encodeURIComponent(AD));
+        if (selectedSlot) sseParams.push("slot=" + encodeURIComponent(selectedSlot));
+        var sseParam = sseParams.length ? "?" + sseParams.join("&") : "";
+        try {
+            var es = new EventSource("/api/chat-history/stream" + sseParam);
+
+            es.onopen = function() {
+                var pill = document.getElementById("sseStatusPill");
+                var txt = document.getElementById("sseStatusText");
+                if (pill) pill.className = "app-status-pill is-online";
+                if (txt) txt.textContent = "SSE Live";
+            };
+
+            es.addEventListener("new_chat", function(e) {
+                try {
+                    var item = JSON.parse(e.data);
+                    if (item && item.id) {
+                        if (merge([item])) {
+                            renderSidebar();
+                            renderTimeline();
+                            scrollToBottom();
+                            if (document.getElementById("statShown")) {
+                                document.getElementById("statShown").textContent = H.length;
+                            }
+                            if (document.getElementById("statTotal")) {
+                                var curT = parseInt(document.getElementById("statTotal").textContent || "0", 10);
+                                document.getElementById("statTotal").textContent = curT + 1;
+                            }
+                        }
+                    }
+                } catch(err){}
+            });
+
+            es.addEventListener("update_chat", function(e) {
+                try {
+                    var item = JSON.parse(e.data);
+                    if (item && item.id) {
+                        if (merge([item])) {
+                            renderSidebar();
+                            renderTimeline();
+                        }
+                    }
+                } catch(err){}
+            });
+
+            es.onerror = function() {
+                var pill = document.getElementById("sseStatusPill");
+                var txt = document.getElementById("sseStatusText");
+                if (pill) pill.className = "app-status-pill is-offline";
+                if (txt) txt.textContent = "Reconnecting...";
+            };
+        } catch(e) {
+            console.warn("SSE init error:", e);
+        }
+    }
+
+    // Initial render
     renderSidebar();
-    renderThread();
+    renderTimeline();
+    scrollToBottom();
     initSSE();
+
     if (window.App && App.startPolling) {
         App.startPolling("chat", poll, 6000);
     } else {
@@ -1238,4 +1503,3 @@
     }
 </script>
 {% endblock %}
-

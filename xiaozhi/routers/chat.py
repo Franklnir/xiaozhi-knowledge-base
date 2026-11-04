@@ -272,10 +272,11 @@ async def chat_history_page(
             effective_date = today_str
             active_date_val = today_str
 
+    fetch_limit = max(limit, 500) if (effective_date and not q) else limit
     histories = store.list_chat_history(
         user["id"],
         q,
-        limit,
+        fetch_limit,
         token_hash=token_hash,
         date=effective_date,
         slot_number=selected_slot,
@@ -414,10 +415,11 @@ async def chat_history_api(
         token_hash = target.get("token_hash", "") if target else ""
 
     req_date = "" if date == "all" else date
+    fetch_limit = max(limit, 500) if (req_date and not q) else limit
     histories = store.list_chat_history(
         user["id"],
         q,
-        limit,
+        fetch_limit,
         token_hash=token_hash,
         date=req_date,
         slot_number=selected_slot,
