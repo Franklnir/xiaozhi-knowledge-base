@@ -1632,6 +1632,7 @@
                             <option value="esp32_classic">📦 ESP32 Klasik (WROOM-32 / WROVER)</option>
                             <option value="esp32_c3" selected>🌱 ESP32-C3 (RISC-V Architecture)</option>
                             <option value="esp8266">💡 ESP8266 (NodeMCU / D1 Mini)</option>
+                            <option value="esp01">🔌 ESP-01 / ESP-01S (Wajib 1 Relay - GPIO 0)</option>
                         </select>
                     </div>
                     <div>
@@ -2198,6 +2199,19 @@
             cdcBoot: false,
             ledPin: 2,
             ledActiveLow: true
+        },
+        esp01: {
+            name: "ESP-01 / ESP-01S (1 Channel Relay Khusus)",
+            headerTitle: "ESP-01 / ESP-01S",
+            arduinoBoard: "Generic ESP8266 Module",
+            pins: [0],
+            pinLabels: ["GPIO 0 (Pin Relay ESP-01 Shield)"],
+            maxRelays: 1,
+            note: "KHUSUS ESP-01 / ESP-01S: WAJIB HANYA 1 RELAY (GPIO 0). Modul relay shield ESP-01 di pasaran dikontrol oleh GPIO 0 (Active Low). Karena keterbatasan pin fisik pada board ESP-01, sistem mengunci maksimal 1 relay.",
+            includeWifi: "#include <ESP8266WiFi.h>",
+            cdcBoot: false,
+            ledPin: 2,
+            ledActiveLow: true
         }
     };
 
@@ -2231,6 +2245,17 @@
         // Deriving it from the display name drops the random suffix and breaks routing.
         const slug = room.api_slug || room.slug || String(room.nama_tempat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
         const isMqtt = (protocol === 'mqtt' || !protocol);
+
+        const relaySectionHeader = (profile.maxRelays === 1)
+            ? `// ============================================================
+// 3. KONFIGURASI PIN RELAY ${profile.headerTitle} (WAJIB HANYA 1 CHANNEL)
+// PERHATIAN: Board ESP-01 / ESP-01S memiliki pinout terbatas sehingga
+// WAJIB dan HANYA mendukung 1 channel relay pada GPIO 0 (Relay Shield).
+// Tidak bisa dikonfigurasi lebih dari 1 relay!
+// ============================================================`
+            : `// ============================================================
+// 3. KONFIGURASI PIN RELAY ${profile.headerTitle}
+// ============================================================`;
 
         const pinComments = Array.from({ length: numRelays }, (_, i) => {
             const r = (room.relays && room.relays[i]) ? room.relays[i] : { relay_number: i + 1, nama_relay: `Relay ${i + 1}` };
@@ -2285,9 +2310,7 @@ const char* TOPIC_STATE        = "xiaozhi/relay/${slug}/state";
 const char* TOPIC_AVAILABILITY = "xiaozhi/relay/${slug}/availability";
 const char* TOPIC_ERROR        = "xiaozhi/relay/${slug}/err";
 
-// ============================================================
-// 3. KONFIGURASI PIN RELAY ${profile.headerTitle}
-// ============================================================
+${relaySectionHeader}
 const int NUM_RELAYS = ${numRelays};
 ${pinArray}
 
@@ -3363,7 +3386,8 @@ void loop() {
         const profile = BOARD_PROFILES[boardKey] || BOARD_PROFILES.esp32_c3;
 
         // Update Pinout Guide in UI dynamically
-        const numRelays = Math.max(1, Math.min(Number(currentConfigRoom.jumlah_relay || (currentConfigRoom.relays ? currentConfigRoom.relays.length : 1)), profile.pins.length));
+        const roomTotalRelays = Number(currentConfigRoom.jumlah_relay || (currentConfigRoom.relays ? currentConfigRoom.relays.length : 1));
+        const numRelays = Math.max(1, Math.min(roomTotalRelays, profile.pins.length));
         const pinPills = Array.from({ length: numRelays }, (_, i) => {
             const label = profile.pinLabels ? profile.pinLabels[i] : `GPIO ${profile.pins[i]}`;
             return `<span class="guide-pill">CH ${i + 1}: ${label}</span>`;
@@ -3376,7 +3400,13 @@ void loop() {
         if (pinoutTitleEl) pinoutTitleEl.textContent = `📌 Pemetaan Pin Fisik GPIO ${profile.headerTitle} Aman (1-${numRelays} Channel):`;
 
         const pinoutNoteEl = document.getElementById("cfgPinoutNote");
-        if (pinoutNoteEl) pinoutNoteEl.textContent = `⚠️ ${profile.note}`;
+        if (pinoutNoteEl) {
+            if (profile.maxRelays === 1 && roomTotalRelays > 1) {
+                pinoutNoteEl.innerHTML = `<span style="color:#ef4444; font-weight:800;">🚫 WAJIB HANYA 1 RELAY:</span> Board ESP-01 / ESP-01S memiliki keterbatasan pin fisik sehingga <strong>WAJIB hanya 1 relay (GPIO 0)</strong>. Ruangan '${currentConfigRoom.nama_tempat || 'ini'}' memiliki ${roomTotalRelays} relay di dashboard, namun kodingan ESP-01 otomatis dikunci HANYA untuk Channel 1. Channel 2 s/d ${roomTotalRelays} tidak bisa digunakan pada board ESP-01.`;
+            } else {
+                pinoutNoteEl.textContent = `⚠️ ${profile.note}`;
+            }
+        }
 
         const box = document.getElementById("arduinoCodeBox");
         if (box) {

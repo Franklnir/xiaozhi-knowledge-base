@@ -26,6 +26,13 @@
 // Import file konfigurasi modular
 #include "xiaozhi_relay_config.h"
 
+// Validasi Compile-time khusus ESP-01 / ESP-01S (Wajib HANYA 1 Relay)
+#if defined(TARGET_ESP01) || defined(ARDUINO_ESP8266_ESP01)
+  #if NUM_RELAYS > 1
+    #error "Board ESP-01 / ESP-01S WAJIB HANYA 1 Relay! Tidak bisa lebih dari 1 channel karena keterbatasan pin fisik GPIO."
+  #endif
+#endif
+
 // Variabel status & ring buffer deduplikasi command ID
 bool relayStates[NUM_RELAYS];
 const int DEDUP_SLOTS = 10;

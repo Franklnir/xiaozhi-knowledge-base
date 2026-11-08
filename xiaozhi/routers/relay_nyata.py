@@ -1184,7 +1184,11 @@ async def download_arduino_project_zip(room_id: int, request: Request):
 
     if not code:
         board_lower = board_name.lower()
-        if "n16r8" in board_lower or ("s3" in board_lower and "16" in board_lower):
+        if "esp01" in board_lower or "esp-01" in board_lower or "01s" in board_lower:
+            default_pins = [0]  # ESP-01 / ESP-01S WAJIB HANYA 1 RELAY (GPIO 0)
+            led_pin = 2
+            led_active_low = "true"
+        elif "n16r8" in board_lower or ("s3" in board_lower and "16" in board_lower):
             default_pins = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21]
             led_pin = 21
             led_active_low = "false"
@@ -1201,7 +1205,7 @@ async def download_arduino_project_zip(room_id: int, request: Request):
             led_pin = 8
             led_active_low = "true"
         elif "8266" in board_lower:
-            default_pins = [5, 4, 14, 12, 13, 15]
+            default_pins = [5, 4, 14, 12, 13]  # Pin aman ESP8266 (bebas strapping 0, 2, 15)
             led_pin = 2
             led_active_low = "true"
         else:
@@ -1209,6 +1213,7 @@ async def download_arduino_project_zip(room_id: int, request: Request):
             led_pin = 2
             led_active_low = "false"
 
+        wifi_include = "#include <ESP8266WiFi.h>" if ("8266" in board_lower or "esp01" in board_lower or "esp-01" in board_lower or "01s" in board_lower) else "#include <WiFi.h>"
         num_relays = max(1, min(len(room.get("relays", [])) or int(room.get("jumlah_relay", 2) or 2), len(default_pins)))
         pins_str = ", ".join(str(p) for p in default_pins[:num_relays])
         states_str = ", ".join(["false"] * num_relays)
@@ -1227,7 +1232,7 @@ async def download_arduino_project_zip(room_id: int, request: Request):
  * ============================================================
  */
 
-#include <WiFi.h>
+{wifi_include}
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #if defined(ESP32)
