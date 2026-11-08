@@ -86,6 +86,8 @@ services:
       - APP_SECRET_KEY=${APP_SECRET_KEY}
       - GATEWAY_INTERNAL_KEY=${GATEWAY_INTERNAL_KEY:-}
       - MQTT_BROKER_URL=${MQTT_BROKER_URL:-tcp://xiaozhi-mosquitto:1883}
+      - MQTT_USERNAME=${MQTT_USERNAME:-xiaozhi_gateway}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
     volumes:
       - ./data/audio_cache:/app/data/audio_cache:ro
     depends_on:

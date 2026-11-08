@@ -73,6 +73,10 @@ func (s *RelayMQTTService) Start(ctx context.Context) error {
 	opts.SetMaxReconnectInterval(5 * time.Second)
 	opts.SetKeepAlive(15 * time.Second)
 	opts.SetPingTimeout(3 * time.Second)
+	if s.cfg.MQTTUsername != "" {
+		opts.SetUsername(s.cfg.MQTTUsername)
+		opts.SetPassword(s.cfg.MQTTPassword)
+	}
 
 	opts.SetOnConnectHandler(func(c mqtt.Client) {
 		log.Printf("[MQTT] Terhubung ke Broker Mosquitto di %s", broker)

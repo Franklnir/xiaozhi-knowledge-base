@@ -16,6 +16,10 @@ const char* WIFI_PASSWORD = "PASSWORD_WIFI";
 const char* MQTT_BROKER   = "mqtt.xiaozhiscig.biz.id";
 const int   MQTT_PORT     = 1883;
 
+// Kredensial Autentikasi Broker MQTT (Opsional, kosongkan jika broker tanpa auth)
+const char* MQTT_USER     = "xiaozhi_device";
+const char* MQTT_PASSWORD = "";
+
 // Kredensial Perangkat (Cocokkan dengan yang ada di menu Relay Nyata Web UI)
 const char* CLIENT_ID     = "device-ruangan-anda";
 const char* DEVICE_TOKEN  = "TOKEN_PERANGKAT_DARI_WEB";

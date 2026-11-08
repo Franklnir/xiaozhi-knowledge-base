@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagram Alur Kerja & Arsitektur XiaoZhi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070b14;
+      --card-bg: #0f172a;
+      --card-border: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #059669;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 30px 16px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .top-bar {
+      max-width: 900px;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 18px;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      border-radius: 9999px;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    }
+    h1 {
+      font-size: 30px;
+      font-weight: 900;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p.subtitle {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .action-panel {
+      display: flex;
+      gap: 12px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 12px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    }
+    .btn-primary:hover {
+      background: #1d4ed8;
+      transform: translateY(-2px);
+    }
+    .btn-outline {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+    }
+    .btn-outline:hover {
+      background: #334155;
+      transform: translateY(-2px);
+    }
+    .image-card {
+      max-width: 1000px;
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+      margin-top: 10px;
+    }
+    .image-card img {
+      width: 100%;
+      height: auto;
+      border-radius: 14px;
+      display: block;
+    }
+    .tips-box {
+      margin-top: 24px;
+      font-size: 13px;
+      color: #64748b;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <div class="badge">🚀 Versi Baru: Jelas & Tajam</div>
+    <h1>Diagram Alur Kerja & Arsitektur XiaoZhi</h1>
+    <p class="subtitle">Format infografis vertikal beresolusi tinggi dengan tipografi besar dan jelas, memvisualisasikan bagaimana perintah suara diproses seketika hingga audio dialirkan mulus.</p>
+
+    <div class="action-panel">
+      <a href="diagram_alur_kerja_xiaozhi.png" download="diagram_alur_kerja_xiaozhi.png" class="btn btn-primary">
+        📥 Unduh Gambar PNG (Ukuran Penuh & Jelas)
+      </a>
+      <a href="diagram_alur_kerja_xiaozhi.png" target="_blank" class="btn btn-outline">
+        🔍 Buka di Tab Baru / Zoom
+      </a>
+    </div>
+  </div>
+
+  <div class="image-card">
+    <img src="diagram_alur_kerja_xiaozhi.png" alt="Diagram Alur Kerja XiaoZhi Jelas dan Tajam">
+  </div>
+
+  <div class="tips-box">
+    💡 <b>Tips:</b> Klik tombol <i>"Unduh Gambar PNG"</i> di atas atau klik kanan gambar lalu pilih <i>"Save image as..."</i> untuk menyimpannya.
+  </div>
+
+</body>
+</html>

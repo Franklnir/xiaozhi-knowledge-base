@@ -267,7 +267,14 @@ void reconnectMQTT() {
     #endif
 
     // LWT: Jika koneksi putus tiba-tiba, Mosquitto otomatis broadcast status offline
-    if (mqttClient.connect(dynamicClientId, TOPIC_AVAILABILITY, 1, true, "offline")) {
+    bool isConnected = false;
+    if (MQTT_USER != nullptr && strlen(MQTT_USER) > 0) {
+        isConnected = mqttClient.connect(dynamicClientId, MQTT_USER, MQTT_PASSWORD, TOPIC_AVAILABILITY, 1, true, "offline");
+    } else {
+        isConnected = mqttClient.connect(dynamicClientId, TOPIC_AVAILABILITY, 1, true, "offline");
+    }
+
+    if (isConnected) {
         triggerActivityLed(3);
         Serial.printf("[MQTT] ✅ BERHASIL TERHUBUNG! (ID: %s)\n", dynamicClientId);
         mqttClient.publish(TOPIC_AVAILABILITY, "online", true);

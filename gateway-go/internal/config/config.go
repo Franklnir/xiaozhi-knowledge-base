@@ -15,6 +15,8 @@ type Config struct {
 	PythonBackendURL string
 	AudioCacheDir    string
 	MQTTBrokerURL    string
+	MQTTUsername     string
+	MQTTPassword     string
 	AppSecretKey     string
 	InternalAPIKey   string
 }
@@ -55,6 +57,8 @@ func LoadConfig() *Config {
 	pythonURL := getEnvOrDefault("PYTHON_BACKEND_URL", "http://127.0.0.1:8080")
 	audioCacheDir := getEnvOrDefault("AUDIO_CACHE_DIR", "/app/data/audio_cache")
 	mqttURL := getEnvOrDefault("MQTT_BROKER_URL", "tcp://xiaozhi-mosquitto:1883")
+	mqttUser := os.Getenv("MQTT_USERNAME")
+	mqttPass := os.Getenv("MQTT_PASSWORD")
 	appSecret := getEnvOrDefault("APP_SECRET_KEY", "")
 	internalKey := getEnvOrDefault("GATEWAY_INTERNAL_KEY", appSecret)
 
@@ -65,6 +69,8 @@ func LoadConfig() *Config {
 		PythonBackendURL: pythonURL,
 		AudioCacheDir:    audioCacheDir,
 		MQTTBrokerURL:    mqttURL,
+		MQTTUsername:     mqttUser,
+		MQTTPassword:     mqttPass,
 		AppSecretKey:     appSecret,
 		InternalAPIKey:   internalKey,
 	}
