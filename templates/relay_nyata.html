@@ -1591,6 +1591,15 @@
             </div>
         </div>
 
+        <!-- 💡 Edukasi & Tips Manajemen Perintah Suara -->
+        <div style="background:#f0fdf4; border:1.5px solid #16a34a; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:12px; color:#166534; display:flex; align-items:flex-start; gap:8px;">
+            <span style="font-size:16px; line-height:1;">💡</span>
+            <div>
+                <strong>Tips Perintah Suara &amp; Nama Saklar:</strong>
+                Nama lampu/saklar dan perintah suara AI (misal: <em>"Lampu 1"</em>, <em>"Lampu Kamar"</em>) dikelola langsung di Web Dashboard ini (melalui tombol <strong>Edit</strong> pada kartu ruangan). Board fisik mikrokontroler bertugas menjalankan pin hardware. Jika ingin mengubah nama lampu/saklar, cukup edit di Web Dashboard tanpa perlu flash ulang board fisik.
+            </div>
+        </div>
+
         <!-- Tab Bar -->
         <div class="relay-cfg-tabs" style="flex-wrap:wrap;">
             <button type="button" class="relay-cfg-tab active" id="tabBtnArduino" onclick="switchConfigTab('arduino')">
@@ -2182,9 +2191,9 @@
             name: "ESP8266 (NodeMCU / D1 Mini)",
             headerTitle: "ESP8266",
             arduinoBoard: "NodeMCU 1.0 (ESP-12E Module) / WeMos D1 Mini",
-            pins: [5, 4, 14, 12, 13, 15],
-            pinLabels: ["D1 (GPIO 5)", "D2 (GPIO 4)", "D5 (GPIO 14)", "D6 (GPIO 12)", "D7 (GPIO 13)", "D8 (GPIO 15)"],
-            note: "Pinout ESP8266 memakai D1(5), D2(4), D5(14), D6(12), D7(13), D8(15). Hindari D3/D4/D0 saat boot.",
+            pins: [5, 4, 14, 12, 13],
+            pinLabels: ["D1 (GPIO 5)", "D2 (GPIO 4)", "D5 (GPIO 14)", "D6 (GPIO 12)", "D7 (GPIO 13)"],
+            note: "Pinout aman ESP8266: D1(5), D2(4), D5(14), D6(12), D7(13). PERINGATAN: Dilarang memakai D3 (GPIO 0), D4 (GPIO 2), atau D8 (GPIO 15) untuk relay karena merupakan pin boot-strapping yang menyebabkan ESP8266 gagal booting / offline saat relay terhubung ke 5V.",
             includeWifi: "#include <ESP8266WiFi.h>",
             cdcBoot: false,
             ledPin: 2,
