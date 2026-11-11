@@ -319,8 +319,11 @@ async def admin_activity_monitor_page(
     user_id: Optional[str] = None,
     type: str = "all",
     q: str = "",
+    status: str = "all",
+    range: str = "1d",
+    tool: str = "",
 ):
-    """Halaman monitor harian: panggilan tools & pemutaran lagu YouTube per user."""
+    """Halaman monitor harian & mingguan: panggilan tools lengkap status sukses/gagal, ranking tools 1 minggu, dan aktivitas musik YouTube per user."""
     admin = require_admin(request)
     store = get_store()
 
@@ -339,6 +342,9 @@ async def admin_activity_monitor_page(
         owner_id=clean_uid,
         activity_type=type,
         search_query=q,
+        status_filter=status,
+        range_filter=range,
+        tool_filter=tool,
     )
 
     return render(
@@ -348,9 +354,13 @@ async def admin_activity_monitor_page(
             "user": admin,
             "csrf_token": make_csrf_token(admin),
             "target_date": clean_date,
+            "today_date": now_wib.strftime("%Y-%m-%d"),
             "selected_user_id": clean_uid,
             "selected_type": type,
             "search_query": q,
+            "selected_status": status,
+            "selected_range": range,
+            "selected_tool": tool,
             "monitor": monitor_data,
             "active_page": "admin_activity_monitor",
             "page": "admin_activity_monitor",
@@ -366,6 +376,9 @@ async def admin_api_activity_monitor(
     user_id: Optional[str] = None,
     type: str = "all",
     q: str = "",
+    status: str = "all",
+    range: str = "1d",
+    tool: str = "",
 ):
     """Endpoint API JSON untuk filter interaktif & live polling monitor aktivitas."""
     require_admin(request)
@@ -386,11 +399,23 @@ async def admin_api_activity_monitor(
         owner_id=clean_uid,
         activity_type=type,
         search_query=q,
+        status_filter=status,
+        range_filter=range,
+        tool_filter=tool,
     )
 
     return {
         "success": True,
         "data": monitor_data,
+        "filters": {
+            "date": clean_date,
+            "user_id": clean_uid,
+            "type": type,
+            "q": q,
+            "status": status,
+            "range": range,
+            "tool": tool,
+        }
     }
 
 

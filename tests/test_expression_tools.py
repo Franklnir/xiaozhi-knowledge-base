@@ -210,3 +210,34 @@ def test_tools_py_registration(tmp_path):
     assert res_avail["success"] is True
     assert res_avail["total_ekspresi"] >= 15
     assert res_avail["total_mood_persona"] >= 8
+
+    # Test pendaftaran tool baru
+    assert "read_emotion_tone" in server.tools
+    assert "get_character_persona" in server.tools
+    assert "get_chat_history" in server.tools
+
+    # Test eksekusi read_emotion_tone
+    res_tone = server.tools["read_emotion_tone"](user_speech="Hahaha lucu banget sumpah kocak parah!")
+    assert res_tone["success"] is True
+    assert res_tone["detected_emotion"] == "ketawa"
+    assert res_tone["emoji"] == "😆"
+    assert "recommended_persona_response" in res_tone
+
+    # Test eksekusi read_emotion_tone sedih
+    res_sad = server.tools["read_emotion_tone"](user_speech="Aku sedih banget hari ini, gagal ujian dan patah hati...")
+    assert res_sad["success"] is True
+    assert res_sad["detected_emotion"] == "sedih"
+    assert res_sad["recommended_persona_response"] == "hangat_penyayang"
+
+    # Test eksekusi get_character_persona
+    res_persona = server.tools["get_character_persona"](user_speech="Wah asyik banget nih, terima kasih banyak!")
+    assert res_persona["success"] is True
+    assert "karakter_persona" in res_persona
+    assert "mood_aktif" in res_persona["karakter_persona"]
+    assert "analisis_nada_emosi_user" in res_persona
+    assert res_persona["analisis_nada_emosi_user"]["detected_emotion"] in ["senang", "senyum", "bahagia"]
+
+    # Test eksekusi get_chat_history
+    res_history = server.tools["get_chat_history"](query="obrolan tadi")
+    assert res_history["success"] is True
+    assert "riwayat_percakapan" in res_history

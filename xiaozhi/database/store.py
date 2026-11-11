@@ -1871,9 +1871,13 @@ class HFJsonStore:
         activity_type: str = "all",
         search_query: str = "",
         limit: int = 500,
+        status_filter: str = "all",
+        range_filter: str = "1d",
+        tool_filter: str = "",
     ) -> Dict[str, Any]:
-        """Ambil detail aktivitas per hari (alat/tool yang dipanggil, lagu youtube yang diputar) di Base Store."""
+        """Ambil detail aktivitas per hari atau rentang 7 hari (panggilan tool lengkap status sukses/gagal, ranking tools 1 minggu, lagu youtube) di Base Store."""
         import re
+        import json
         from datetime import datetime, timezone, timedelta
 
         wib = timezone(timedelta(hours=7))
@@ -1882,6 +1886,55 @@ class HFJsonStore:
             target_date = now_wib.strftime("%Y-%m-%d")
         else:
             target_date = str(target_date).strip()
+
+        is_7d_range = str(range_filter).strip().lower() in ["7d", "week", "seminggu", "7_days"]
+        target_dt = datetime.strptime(target_date, "%Y-%m-%d")
+        seven_days_ago_str = (target_dt - timedelta(days=6)).strftime("%Y-%m-%d")
+
+        def _parse_tool_action_status(response_payload: Any, xiaozhi_answer: str = "") -> Tuple[str, str, str]:
+            resp_obj = None
+            if isinstance(response_payload, dict):
+                resp_obj = response_payload
+            elif isinstance(response_payload, str) and response_payload.strip():
+                try:
+                    resp_obj = json.loads(response_payload)
+                except Exception:
+                    resp_obj = None
+
+            if isinstance(resp_obj, dict):
+                if resp_obj.get("is_error") is True:
+                    err = str(resp_obj.get("error") or resp_obj.get("message") or resp_obj.get("detail") or "Eksekusi tool error")
+                    return "failed", "GAGAL", err
+                if resp_obj.get("success") is False:
+                    err = str(resp_obj.get("message") or resp_obj.get("error") or resp_obj.get("detail") or "Eksekusi tool gagal")
+                    return "failed", "GAGAL", err
+                if str(resp_obj.get("status", "")).lower() in ["error", "failed", "gagal"]:
+                    err = str(resp_obj.get("message") or resp_obj.get("error") or resp_obj.get("detail") or "Status failed")
+                    return "failed", "GAGAL", err
+                if resp_obj.get("error"):
+                    return "failed", "GAGAL", str(resp_obj.get("error"))
+                return "success", "BERHASIL", ""
+
+            ans_check = str(xiaozhi_answer or "").lower()
+            if any(k in ans_check for k in ["gagal", "terjadi kesalahan saat", "belum ada koneksi xiaozhi", "error:"]):
+                return "failed", "GAGAL", str(xiaozhi_answer)[:140]
+
+            return "success", "BERHASIL", ""
+
+        def _normalize_music_status(raw_status: str) -> Tuple[str, str, str]:
+            s = str(raw_status or "pending").strip().lower()
+            if s in ["error", "failed"]:
+                return "failed", "GAGAL", "Audio stream gagal diputar / error stream"
+            elif s in ["playing", "memutar"]:
+                return "playing", "MEMUTAR", "Sedang diputar ke perangkat speaker"
+            elif s in ["done", "played", "completed", "selesai"]:
+                return "completed", "SELESAI", "Lagu selesai diputar"
+            elif s in ["stopped", "berhenti"]:
+                return "stopped", "BERHENTI", "Pemutaran dihentikan pengguna"
+            elif s in ["cancelled", "dibatalkan"]:
+                return "cancelled", "DIBATALKAN", "Antrean lagu dibatalkan"
+            else:
+                return "pending", "ANTREAN", "Dalam antrean pemutaran"
 
         data = self._load()
         users_map = {int(u["id"]): dict(u) for u in data.get("users", [])}
@@ -1904,8 +1957,13 @@ class HFJsonStore:
         music_items: List[Dict[str, Any]] = []
         for a in data.get("audio_queue", []):
             created_at = str(a.get("created_at") or "")
-            if not created_at.startswith(target_date):
-                continue
+            created_date = created_at[:10]
+            if is_7d_range:
+                if not (seven_days_ago_str <= created_date <= target_date):
+                    continue
+            else:
+                if not created_at.startswith(target_date):
+                    continue
             uid = int(a.get("owner_id") or 0)
             if owner_id and uid != int(owner_id):
                 continue
@@ -1918,6 +1976,8 @@ class HFJsonStore:
             mac_match = re.search(r"[?&]mac=([0-9a-fA-F:_-]+)", stream_url)
             mac_str = mac_match.group(1).upper() if mac_match else ""
             dev_name = device_map.get((uid, mac_str)) or device_map.get(mac_str) or (mac_str if mac_str else "-")
+
+            m_status, m_label, m_reason = _normalize_music_status(a.get("status"))
 
             music_items.append({
                 "id": f"music_{a.get('id', 0)}",
@@ -1934,7 +1994,9 @@ class HFJsonStore:
                 "video_url": a.get("video_url") or (f"https://www.youtube.com/watch?v={vid}" if vid else ""),
                 "thumbnail_url": f"https://img.youtube.com/vi/{vid}/mqdefault.jpg" if vid else "",
                 "stream_url": stream_url,
-                "status": a.get("status") or "pending",
+                "status": m_status,
+                "status_label": m_label,
+                "status_reason": m_reason,
                 "device_mac": mac_str,
                 "device_name": dev_name,
                 "time_wib": created_at,
@@ -1945,8 +2007,13 @@ class HFJsonStore:
         tool_items: List[Dict[str, Any]] = []
         for c in data.get("chat_history", []):
             created_at = str(c.get("created_at") or "")
-            if not created_at.startswith(target_date):
-                continue
+            created_date = created_at[:10]
+            if is_7d_range:
+                if not (seven_days_ago_str <= created_date <= target_date):
+                    continue
+            else:
+                if not created_at.startswith(target_date):
+                    continue
             tname = str(c.get("tool_name") or "").strip()
             source = str(c.get("source") or "").strip()
             if not tname and source != "mcp":
@@ -1963,6 +2030,8 @@ class HFJsonStore:
             dev_name = device_map.get((uid, mac_str)) or device_map.get(mac_str) or (mac_str if mac_str else "-")
             is_music_tool = any(m in tname.lower() for m in ["youtube", "playlist", "audio", "music", "playback"])
 
+            t_status, t_label, t_reason = _parse_tool_action_status(c.get("response_payload"), ans)
+
             tool_items.append({
                 "id": f"tool_{c.get('id', 0)}",
                 "raw_id": c.get("id", 0),
@@ -1977,6 +2046,9 @@ class HFJsonStore:
                 "source": source or "mcp",
                 "user_message": umsg,
                 "xiaozhi_answer": ans,
+                "status": t_status,
+                "status_label": t_label,
+                "status_reason": t_reason,
                 "device_mac": mac_str,
                 "device_name": dev_name,
                 "time_wib": created_at,
@@ -1984,12 +2056,75 @@ class HFJsonStore:
                 "epoch": 0.0,
             })
 
+        # Agregasi urutan tools 7 hari (1 Minggu)
+        weekly_tools_map: Dict[str, Dict[str, Any]] = {}
+        total_weekly_calls = 0
+        for c in data.get("chat_history", []):
+            created_at = str(c.get("created_at") or "")
+            created_date = created_at[:10]
+            if not (seven_days_ago_str <= created_date <= target_date):
+                continue
+            tname = str(c.get("tool_name") or "").strip()
+            source = str(c.get("source") or "").strip()
+            if not tname and source != "mcp":
+                continue
+            uid = int(c.get("owner_id") or 0)
+            if owner_id and uid != int(owner_id):
+                continue
+            if not tname:
+                tname = "mcp_tool"
+
+            total_weekly_calls += 1
+            if tname not in weekly_tools_map:
+                weekly_tools_map[tname] = {
+                    "tool_name": tname,
+                    "total_calls": 0,
+                    "success_count": 0,
+                    "failed_count": 0,
+                    "success_calls": 0,
+                    "failed_calls": 0,
+                    "last_called_time": created_at[11:19] if len(created_at) >= 19 else created_at,
+                    "last_called_full": created_at,
+                }
+            entry = weekly_tools_map[tname]
+            entry["total_calls"] += 1
+            w_status, _, _ = _parse_tool_action_status(c.get("response_payload"), c.get("xiaozhi_answer"))
+            if w_status == "failed":
+                entry["failed_count"] += 1
+                entry["failed_calls"] += 1
+            else:
+                entry["success_count"] += 1
+                entry["success_calls"] += 1
+
+        weekly_tools_ranking = list(weekly_tools_map.values())
+        weekly_tools_ranking.sort(key=lambda x: x["total_calls"], reverse=True)
+        max_calls = weekly_tools_ranking[0]["total_calls"] if weekly_tools_ranking else 1
+        for idx, item in enumerate(weekly_tools_ranking, 1):
+            item["rank"] = idx
+            item["percentage"] = round((item["total_calls"] / max_calls * 100), 1) if max_calls > 0 else 100.0
+
         if activity_type == "music":
             timeline = list(music_items)
         elif activity_type == "tools":
             timeline = list(tool_items)
         else:
             timeline = music_items + tool_items
+
+        total_activities_all = len(timeline)
+        total_success_all = sum(1 for x in timeline if x.get("status") in ["success", "completed"])
+        total_failed_all = sum(1 for x in timeline if x.get("status") in ["failed", "error"])
+
+        if tool_filter:
+            tf_clean = str(tool_filter).strip().lower()
+            timeline = [x for x in timeline if x.get("category") == "tool" and tf_clean in str(x.get("tool_name", "")).lower()]
+
+        sf_clean = str(status_filter or "all").strip().lower()
+        if sf_clean in ["failed", "gagal", "error"]:
+            timeline = [x for x in timeline if x.get("status") in ["failed", "error"]]
+        elif sf_clean in ["success", "berhasil", "selesai", "completed"]:
+            timeline = [x for x in timeline if x.get("status") in ["success", "completed"]]
+        elif sf_clean in ["active", "aktif", "playing", "pending"]:
+            timeline = [x for x in timeline if x.get("status") in ["playing", "pending"]]
 
         user_stats_dict: Dict[int, Dict[str, Any]] = {}
         tool_popularity: Dict[str, int] = {}
@@ -2004,6 +2139,7 @@ class HFJsonStore:
                     "email": m["email"],
                     "music_count": 0,
                     "tools_count": 0,
+                    "failed_count": 0,
                     "total_events": 0,
                     "devices": list(user_devices_map.get(uid, [])),
                     "last_active_time": m["time_short"],
@@ -2013,6 +2149,8 @@ class HFJsonStore:
             st = user_stats_dict[uid]
             st["music_count"] += 1
             st["total_events"] += 1
+            if m.get("status") in ["failed", "error"]:
+                st["failed_count"] += 1
             if m["title"] not in st["recent_songs"] and len(st["recent_songs"]) < 5:
                 st["recent_songs"].append(m["title"])
             song_popularity[m["title"]] = song_popularity.get(m["title"], 0) + 1
@@ -2026,6 +2164,7 @@ class HFJsonStore:
                     "email": t["email"],
                     "music_count": 0,
                     "tools_count": 0,
+                    "failed_count": 0,
                     "total_events": 0,
                     "devices": list(user_devices_map.get(uid, [])),
                     "last_active_time": t["time_short"],
@@ -2035,6 +2174,8 @@ class HFJsonStore:
             st = user_stats_dict[uid]
             st["tools_count"] += 1
             st["total_events"] += 1
+            if t.get("status") in ["failed", "error"]:
+                st["failed_count"] += 1
             tname = t["tool_name"] or "mcp"
             st["tools_called"][tname] = st["tools_called"].get(tname, 0) + 1
             tool_popularity[tname] = tool_popularity.get(tname, 0) + 1
@@ -2042,16 +2183,35 @@ class HFJsonStore:
         user_summaries = list(user_stats_dict.values())
         user_summaries.sort(key=lambda u: u["total_events"], reverse=True)
 
+        formatted_date = target_date
+        try:
+            d_obj = datetime.strptime(target_date, "%Y-%m-%d")
+            if is_7d_range:
+                start_7d = (d_obj - timedelta(days=6)).strftime("%d %b")
+                formatted_date = f"7 Hari ({start_7d} - {d_obj.strftime('%d %b %Y')})"
+            else:
+                formatted_date = d_obj.strftime("%d %b %Y")
+        except Exception:
+            pass
+
         return {
             "target_date": target_date,
-            "target_date_formatted": target_date,
+            "target_date_formatted": formatted_date,
+            "range_filter": range_filter,
+            "status_filter": status_filter,
+            "tool_filter": tool_filter,
             "totals": {
                 "total_activities": len(timeline),
+                "total_activities_all": total_activities_all,
                 "total_music": len(music_items),
                 "total_tools": len(tool_items),
+                "total_success": total_success_all,
+                "total_failed": total_failed_all,
                 "active_users": len(user_summaries),
+                "weekly_total_tool_calls": total_weekly_calls,
             },
             "user_summaries": user_summaries,
+            "weekly_tools_ranking": weekly_tools_ranking,
             "timeline": timeline,
             "popular_tools": [{"tool": k, "count": v} for k, v in sorted(tool_popularity.items(), key=lambda x: x[1], reverse=True)[:10]],
             "popular_songs": [{"song": k, "count": v} for k, v in sorted(song_popularity.items(), key=lambda x: x[1], reverse=True)[:10]],

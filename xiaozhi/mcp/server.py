@@ -46,7 +46,12 @@ def init_mcp_server(store, youtube_search_fn=None):
 
 
 def handle_virtual_tool_with_real_relay(owner_id: int, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    from xiaozhi.routers.relay_nyata import control_real_relay, control_all_real_relays, real_relay_status_payload, match_real_relay_for_target
+    from xiaozhi.routers.relay_nyata import (
+        control_all_real_relays,
+        control_real_relay,
+        match_real_relay_for_target_detailed,
+        real_relay_status_payload,
+    )
     from xiaozhi.services.mcp_service import record_mcp_tool_history_to_store as record_mcp_tool_history
     from xiaozhi.config import SMART_HOME_RELAYS
     from xiaozhi.services.smarthome_service import smart_home_room_name
@@ -78,9 +83,13 @@ def handle_virtual_tool_with_real_relay(owner_id: int, name: str, arguments: Dic
             channel_text = str(channel or "").strip()
             if channel_text in SMART_HOME_RELAYS:
                 target = smart_home_room_name(channel_text)
-    matched = match_real_relay_for_target(owner_id, target=target, action=action, channel=channel)
+    matched = match_real_relay_for_target_detailed(owner_id, target=target, action=action, channel=channel)
     if not matched:
         response = {"success": False, "message": "Perintah suara tidak cocok dengan daftar Relay Nyata yang tersimpan."}
+        record_mcp_tool_history(owner_id, name, f"{target} {action}".strip(), arguments, response)
+        return response
+    if matched.get("ambiguous"):
+        response = {"success": False, "ambiguous": True, "message": matched["message"]}
         record_mcp_tool_history(owner_id, name, f"{target} {action}".strip(), arguments, response)
         return response
     if matched.get("is_all"):
@@ -211,6 +220,21 @@ def setup_mode_filtering(store):
         return [tool for tool in tools if is_tool_allowed_for_user(owner_id, tool.name)]
 
     async def call_mode_filtered_tool(name: str, arguments: Dict[str, Any]):
+        # Tool name alias resolution agar LLM fleksibel memanggil fungsi
+        tool_aliases = {
+            "get_conversation_history": "get_chat_history",
+            "riwayat_percakapan": "get_chat_history",
+            "baca_riwayat_chat": "get_chat_history",
+            "read_chat_history": "get_chat_history",
+            "baca_nada_emosi": "read_emotion_tone",
+            "analyze_emotion_tone": "read_emotion_tone",
+            "detect_emotion": "read_emotion_tone",
+            "pesona_karakter": "get_character_persona",
+            "character_persona": "get_character_persona",
+        }
+        if name in tool_aliases:
+            name = tool_aliases[name]
+
         owner_id = mcp_active_owner_ctx.get()
         if owner_id is not None:
             features = store.get_user_features(owner_id)

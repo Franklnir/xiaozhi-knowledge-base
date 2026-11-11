@@ -1817,9 +1817,13 @@ class SQLiteStore:
         activity_type: str = "all",
         search_query: str = "",
         limit: int = 500,
+        status_filter: str = "all",
+        range_filter: str = "1d",
+        tool_filter: str = "",
     ) -> Dict[str, Any]:
-        """Ambil detail aktivitas per hari (alat/tool yang dipanggil, lagu youtube yang diputar) di SQLite."""
+        """Ambil detail aktivitas per hari atau rentang 7 hari (panggilan tool lengkap status sukses/gagal, ranking tools 1 minggu, lagu youtube) di SQLite."""
         import re
+        import json
         from datetime import datetime, timezone, timedelta
 
         wib = timezone(timedelta(hours=7))
@@ -1829,8 +1833,54 @@ class SQLiteStore:
         else:
             target_date = str(target_date).strip()
 
+        is_7d_range = str(range_filter).strip().lower() in ["7d", "week", "seminggu", "7_days"]
         search_clean = str(search_query or "").strip()
         search_pattern = f"%{search_clean}%" if search_clean else ""
+
+        def _parse_tool_action_status(response_payload: Any, xiaozhi_answer: str = "") -> Tuple[str, str, str]:
+            resp_obj = None
+            if isinstance(response_payload, dict):
+                resp_obj = response_payload
+            elif isinstance(response_payload, str) and response_payload.strip():
+                try:
+                    resp_obj = json.loads(response_payload)
+                except Exception:
+                    resp_obj = None
+
+            if isinstance(resp_obj, dict):
+                if resp_obj.get("is_error") is True:
+                    err = str(resp_obj.get("error") or resp_obj.get("message") or resp_obj.get("detail") or "Eksekusi tool error")
+                    return "failed", "GAGAL", err
+                if resp_obj.get("success") is False:
+                    err = str(resp_obj.get("message") or resp_obj.get("error") or resp_obj.get("detail") or "Eksekusi tool gagal")
+                    return "failed", "GAGAL", err
+                if str(resp_obj.get("status", "")).lower() in ["error", "failed", "gagal"]:
+                    err = str(resp_obj.get("message") or resp_obj.get("error") or resp_obj.get("detail") or "Status failed")
+                    return "failed", "GAGAL", err
+                if resp_obj.get("error"):
+                    return "failed", "GAGAL", str(resp_obj.get("error"))
+                return "success", "BERHASIL", ""
+
+            ans_check = str(xiaozhi_answer or "").lower()
+            if any(k in ans_check for k in ["gagal", "terjadi kesalahan saat", "belum ada koneksi xiaozhi", "error:"]):
+                return "failed", "GAGAL", str(xiaozhi_answer)[:140]
+
+            return "success", "BERHASIL", ""
+
+        def _normalize_music_status(raw_status: str) -> Tuple[str, str, str]:
+            s = str(raw_status or "pending").strip().lower()
+            if s in ["error", "failed"]:
+                return "failed", "GAGAL", "Audio stream gagal diputar / error stream"
+            elif s in ["playing", "memutar"]:
+                return "playing", "MEMUTAR", "Sedang diputar ke perangkat speaker"
+            elif s in ["done", "played", "completed", "selesai"]:
+                return "completed", "SELESAI", "Lagu selesai diputar"
+            elif s in ["stopped", "berhenti"]:
+                return "stopped", "BERHENTI", "Pemutaran dihentikan pengguna"
+            elif s in ["cancelled", "dibatalkan"]:
+                return "cancelled", "DIBATALKAN", "Antrean lagu dibatalkan"
+            else:
+                return "pending", "ANTREAN", "Dalam antrean pemutaran"
 
         conn = self._get_conn()
 
@@ -1857,13 +1907,24 @@ class SQLiteStore:
                 device_map[mac] = name
 
         # 3. Audio queue query
-        audio_sql = """
-            SELECT aq.id, aq.owner_id, aq.title, aq.video_id, aq.video_url, aq.stream_url, aq.status,
-                   aq.created_at as time_wib, strftime('%s', aq.created_at) as epoch
-            FROM audio_queue aq
-            WHERE (DATE(aq.created_at) = ? OR aq.created_at LIKE ?)
-        """
-        audio_params: List[Any] = [target_date, f"{target_date}%"]
+        if is_7d_range:
+            audio_sql = """
+                SELECT aq.id, aq.owner_id, aq.title, aq.video_id, aq.video_url, aq.stream_url, aq.status,
+                       aq.created_at as time_wib, strftime('%s', aq.created_at) as epoch
+                FROM audio_queue aq
+                WHERE ((DATE(aq.created_at) >= DATE(?, '-6 days') AND DATE(aq.created_at) <= DATE(?))
+                    OR (DATE(datetime(aq.created_at, '+7 hours')) >= DATE(?, '-6 days') AND DATE(datetime(aq.created_at, '+7 hours')) <= DATE(?)))
+            """
+            audio_params: List[Any] = [target_date, target_date, target_date, target_date]
+        else:
+            audio_sql = """
+                SELECT aq.id, aq.owner_id, aq.title, aq.video_id, aq.video_url, aq.stream_url, aq.status,
+                       aq.created_at as time_wib, strftime('%s', aq.created_at) as epoch
+                FROM audio_queue aq
+                WHERE (DATE(aq.created_at) = ? OR DATE(datetime(aq.created_at, '+7 hours')) = ? OR aq.created_at LIKE ?)
+            """
+            audio_params = [target_date, target_date, f"{target_date}%"]
+
         if owner_id:
             audio_sql += " AND aq.owner_id = ?"
             audio_params.append(int(owner_id))
@@ -1876,15 +1937,28 @@ class SQLiteStore:
         raw_audio_rows = [dict(r) for r in conn.execute(audio_sql, tuple(audio_params)).fetchall()]
 
         # 4. Chat history tool calls query
-        chat_sql = """
-            SELECT ch.id, ch.owner_id, ch.device_mac, ch.tool_name, ch.source,
-                   ch.user_message, ch.xiaozhi_answer, ch.request_payload, ch.response_payload,
-                   ch.created_at as time_wib, strftime('%s', ch.created_at) as epoch
-            FROM chat_history ch
-            WHERE (DATE(ch.created_at) = ? OR ch.created_at LIKE ?)
-              AND ((ch.tool_name IS NOT NULL AND ch.tool_name != '') OR ch.source = 'mcp')
-        """
-        chat_params: List[Any] = [target_date, f"{target_date}%"]
+        if is_7d_range:
+            chat_sql = """
+                SELECT ch.id, ch.owner_id, ch.device_mac, ch.tool_name, ch.source,
+                       ch.user_message, ch.xiaozhi_answer, ch.request_payload, ch.response_payload,
+                       ch.created_at as time_wib, strftime('%s', ch.created_at) as epoch
+                FROM chat_history ch
+                WHERE ((DATE(ch.created_at) >= DATE(?, '-6 days') AND DATE(ch.created_at) <= DATE(?))
+                    OR (DATE(datetime(ch.created_at, '+7 hours')) >= DATE(?, '-6 days') AND DATE(datetime(ch.created_at, '+7 hours')) <= DATE(?)))
+                  AND ((ch.tool_name IS NOT NULL AND ch.tool_name != '') OR ch.source = 'mcp')
+            """
+            chat_params: List[Any] = [target_date, target_date, target_date, target_date]
+        else:
+            chat_sql = """
+                SELECT ch.id, ch.owner_id, ch.device_mac, ch.tool_name, ch.source,
+                       ch.user_message, ch.xiaozhi_answer, ch.request_payload, ch.response_payload,
+                       ch.created_at as time_wib, strftime('%s', ch.created_at) as epoch
+                FROM chat_history ch
+                WHERE (DATE(ch.created_at) = ? OR DATE(datetime(ch.created_at, '+7 hours')) = ? OR ch.created_at LIKE ?)
+                  AND ((ch.tool_name IS NOT NULL AND ch.tool_name != '') OR ch.source = 'mcp')
+            """
+            chat_params = [target_date, target_date, f"{target_date}%"]
+
         if owner_id:
             chat_sql += " AND ch.owner_id = ?"
             chat_params.append(int(owner_id))
@@ -1896,6 +1970,23 @@ class SQLiteStore:
 
         raw_chat_rows = [dict(r) for r in conn.execute(chat_sql, tuple(chat_params)).fetchall()]
 
+        # 5. Query urutan tools terbanyak dipanggil selama 7 hari terakhir (1 Minggu)
+        weekly_sql = """
+            SELECT ch.tool_name, ch.response_payload, ch.xiaozhi_answer, ch.created_at as time_wib
+            FROM chat_history ch
+            WHERE ((DATE(ch.created_at) >= DATE(?, '-6 days') AND DATE(ch.created_at) <= DATE(?))
+                OR (DATE(datetime(ch.created_at, '+7 hours')) >= DATE(?, '-6 days') AND DATE(datetime(ch.created_at, '+7 hours')) <= DATE(?)))
+              AND ((ch.tool_name IS NOT NULL AND ch.tool_name != '') OR ch.source = 'mcp')
+        """
+        weekly_params: List[Any] = [target_date, target_date, target_date, target_date]
+        if owner_id:
+            weekly_sql += " AND ch.owner_id = ?"
+            weekly_params.append(int(owner_id))
+        weekly_sql += " ORDER BY ch.id DESC LIMIT 2000"
+
+        raw_weekly_rows = [dict(r) for r in conn.execute(weekly_sql, tuple(weekly_params)).fetchall()]
+
+        # Format audio items dengan status lengkap
         music_items: List[Dict[str, Any]] = []
         for a in raw_audio_rows:
             uid = int(a["owner_id"]) if a.get("owner_id") is not None else 0
@@ -1904,6 +1995,8 @@ class SQLiteStore:
             mac_match = re.search(r"[?&]mac=([0-9a-fA-F:_-]+)", stream_url)
             mac_str = mac_match.group(1).upper() if mac_match else ""
             dev_name = device_map.get((uid, mac_str)) or device_map.get(mac_str) or (mac_str if mac_str else "-")
+
+            m_status, m_label, m_reason = _normalize_music_status(a.get("status"))
 
             music_items.append({
                 "id": f"music_{a['id']}",
@@ -1920,7 +2013,9 @@ class SQLiteStore:
                 "video_url": a.get("video_url") or (f"https://www.youtube.com/watch?v={a['video_id']}" if a.get("video_id") else ""),
                 "thumbnail_url": f"https://img.youtube.com/vi/{a['video_id']}/mqdefault.jpg" if a.get("video_id") else "",
                 "stream_url": stream_url,
-                "status": a.get("status") or "pending",
+                "status": m_status,
+                "status_label": m_label,
+                "status_reason": m_reason,
                 "device_mac": mac_str,
                 "device_name": dev_name,
                 "time_wib": str(a.get("time_wib") or ""),
@@ -1928,6 +2023,7 @@ class SQLiteStore:
                 "epoch": float(a.get("epoch") or 0),
             })
 
+        # Format tool items dengan status eksekusi lengkap (termasuk gagal/error)
         tool_items: List[Dict[str, Any]] = []
         for c in raw_chat_rows:
             uid = int(c["owner_id"]) if c.get("owner_id") is not None else 0
@@ -1936,6 +2032,8 @@ class SQLiteStore:
             mac_str = str(c.get("device_mac") or "").strip().upper()
             dev_name = device_map.get((uid, mac_str)) or device_map.get(mac_str) or (mac_str if mac_str else "-")
             is_music_tool = any(m in tname.lower() for m in ["youtube", "playlist", "audio", "music", "playback"])
+
+            t_status, t_label, t_reason = _parse_tool_action_status(c.get("response_payload"), c.get("xiaozhi_answer"))
 
             tool_items.append({
                 "id": f"tool_{c['id']}",
@@ -1951,6 +2049,9 @@ class SQLiteStore:
                 "source": c.get("source") or "mcp",
                 "user_message": c.get("user_message") or "",
                 "xiaozhi_answer": c.get("xiaozhi_answer") or "",
+                "status": t_status,
+                "status_label": t_label,
+                "status_reason": t_reason,
                 "device_mac": mac_str,
                 "device_name": dev_name,
                 "time_wib": str(c.get("time_wib") or ""),
@@ -1958,6 +2059,43 @@ class SQLiteStore:
                 "epoch": float(c.get("epoch") or 0),
             })
 
+        # Proses Agregasi Peringkat Tools Terbanyak Dipanggil Selama 7 Hari (1 Minggu)
+        weekly_tools_map: Dict[str, Dict[str, Any]] = {}
+        total_weekly_calls = 0
+        for r in raw_weekly_rows:
+            tname = str(r.get("tool_name") or "mcp_tool").strip()
+            if not tname:
+                tname = "mcp_tool"
+            total_weekly_calls += 1
+            if tname not in weekly_tools_map:
+                weekly_tools_map[tname] = {
+                    "tool_name": tname,
+                    "total_calls": 0,
+                    "success_count": 0,
+                    "failed_count": 0,
+                    "success_calls": 0,
+                    "failed_calls": 0,
+                    "last_called_time": str(r.get("time_wib") or "")[11:19],
+                    "last_called_full": str(r.get("time_wib") or ""),
+                }
+            entry = weekly_tools_map[tname]
+            entry["total_calls"] += 1
+            w_status, _, _ = _parse_tool_action_status(r.get("response_payload"), r.get("xiaozhi_answer"))
+            if w_status == "failed":
+                entry["failed_count"] += 1
+                entry["failed_calls"] += 1
+            else:
+                entry["success_count"] += 1
+                entry["success_calls"] += 1
+
+        weekly_tools_ranking = list(weekly_tools_map.values())
+        weekly_tools_ranking.sort(key=lambda x: x["total_calls"], reverse=True)
+        max_calls = weekly_tools_ranking[0]["total_calls"] if weekly_tools_ranking else 1
+        for idx, item in enumerate(weekly_tools_ranking, 1):
+            item["rank"] = idx
+            item["percentage"] = round((item["total_calls"] / max_calls * 100), 1) if max_calls > 0 else 100.0
+
+        # Unified timeline
         if activity_type == "music":
             timeline = list(music_items)
         elif activity_type == "tools":
@@ -1965,6 +2103,25 @@ class SQLiteStore:
         else:
             timeline = music_items + tool_items
             timeline.sort(key=lambda x: x["epoch"], reverse=True)
+
+        # Hitung statistik sebelum filter status/tool agar counter metrik akurat
+        total_activities_all = len(timeline)
+        total_success_all = sum(1 for x in timeline if x.get("status") in ["success", "completed"])
+        total_failed_all = sum(1 for x in timeline if x.get("status") in ["failed", "error"])
+
+        # Filter Tool Spesifik jika ada tool_filter
+        if tool_filter:
+            tf_clean = str(tool_filter).strip().lower()
+            timeline = [x for x in timeline if x.get("category") == "tool" and tf_clean in str(x.get("tool_name", "")).lower()]
+
+        # Filter Status (all, failed, success, active)
+        sf_clean = str(status_filter or "all").strip().lower()
+        if sf_clean in ["failed", "gagal", "error"]:
+            timeline = [x for x in timeline if x.get("status") in ["failed", "error"]]
+        elif sf_clean in ["success", "berhasil", "selesai", "completed"]:
+            timeline = [x for x in timeline if x.get("status") in ["success", "completed"]]
+        elif sf_clean in ["active", "aktif", "playing", "pending"]:
+            timeline = [x for x in timeline if x.get("status") in ["playing", "pending"]]
 
         user_stats_dict: Dict[int, Dict[str, Any]] = {}
         tool_popularity: Dict[str, int] = {}
@@ -1979,6 +2136,7 @@ class SQLiteStore:
                     "email": m["email"],
                     "music_count": 0,
                     "tools_count": 0,
+                    "failed_count": 0,
                     "total_events": 0,
                     "devices": list(user_devices_map.get(uid, [])),
                     "last_active_time": m["time_short"],
@@ -1989,6 +2147,8 @@ class SQLiteStore:
             st = user_stats_dict[uid]
             st["music_count"] += 1
             st["total_events"] += 1
+            if m.get("status") in ["failed", "error"]:
+                st["failed_count"] += 1
             if m["epoch"] > st["last_epoch"]:
                 st["last_epoch"] = m["epoch"]
                 st["last_active_time"] = m["time_short"]
@@ -2008,6 +2168,7 @@ class SQLiteStore:
                     "email": t["email"],
                     "music_count": 0,
                     "tools_count": 0,
+                    "failed_count": 0,
                     "total_events": 0,
                     "devices": list(user_devices_map.get(uid, [])),
                     "last_active_time": t["time_short"],
@@ -2018,6 +2179,8 @@ class SQLiteStore:
             st = user_stats_dict[uid]
             st["tools_count"] += 1
             st["total_events"] += 1
+            if t.get("status") in ["failed", "error"]:
+                st["failed_count"] += 1
             if t["epoch"] > st["last_epoch"]:
                 st["last_epoch"] = t["epoch"]
                 st["last_active_time"] = t["time_short"]
@@ -2045,20 +2208,33 @@ class SQLiteStore:
 
         formatted_date = target_date
         try:
-            formatted_date = datetime.strptime(target_date, "%Y-%m-%d").strftime("%d %b %Y")
+            d_obj = datetime.strptime(target_date, "%Y-%m-%d")
+            if is_7d_range:
+                start_7d = (d_obj - timedelta(days=6)).strftime("%d %b")
+                formatted_date = f"7 Hari ({start_7d} - {d_obj.strftime('%d %b %Y')})"
+            else:
+                formatted_date = d_obj.strftime("%d %b %Y")
         except Exception:
             pass
 
         return {
             "target_date": target_date,
             "target_date_formatted": formatted_date,
+            "range_filter": range_filter,
+            "status_filter": status_filter,
+            "tool_filter": tool_filter,
             "totals": {
                 "total_activities": len(timeline),
+                "total_activities_all": total_activities_all,
                 "total_music": len(music_items),
                 "total_tools": len(tool_items),
+                "total_success": total_success_all,
+                "total_failed": total_failed_all,
                 "active_users": len(user_summaries),
+                "weekly_total_tool_calls": total_weekly_calls,
             },
             "user_summaries": user_summaries,
+            "weekly_tools_ranking": weekly_tools_ranking,
             "timeline": timeline,
             "popular_tools": popular_tools_list,
             "popular_songs": popular_songs_list,

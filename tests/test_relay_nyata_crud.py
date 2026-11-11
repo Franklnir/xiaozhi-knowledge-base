@@ -426,3 +426,207 @@ def test_multi_room_voice_disambiguation_and_graceful_ack(tmp_path):
     batch_resp = control_all_real_relays(owner_id, "OFF", room_id=r1_id, source="mcp_voice")
     assert batch_resp["success"] is True
     assert batch_resp["count"] == 8
+
+
+def test_real_relay_voice_identification_multi_room_and_numbered_names(tmp_path):
+    """
+    Regression suite matching real multi-room user configurations where:
+    - Relay names contain trailing digits (Garasi 1/2, Sanggar 1/2, Balkon 1/2)
+      that differ from their channel index.
+    - Another room name collides with part of a relay name (room 'SANGGAR' vs
+      relay 'Sanggar 1' in 'Rumah') or has generic numbered names ('Lampu 1..8'
+      in 'Papan').
+    - Single-word relay names ('Taman', 'Ontel') and short names ('A'..'H', 'AC')
+      are commanded with optional generic fillers ('lampu') or omitted room names.
+    """
+    from xiaozhi.routers.relay_nyata import (
+        generate_relay_voice_commands,
+        smart_match_real_relay,
+        smart_match_real_relay_detailed,
+        smart_match_real_relay_commands,
+        smart_match_real_relay_for_target,
+    )
+    from xiaozhi.mcp.tools import register_tools
+    from xiaozhi.mcp.context import mcp_active_owner_ctx
+    from xiaozhi import dependencies
+
+    class _DummyMCP:
+        def __init__(self):
+            self.tools = {}
+
+        def tool(self, *args, **kwargs):
+            def _dec(fn):
+                self.tools[fn.__name__] = fn
+                return fn
+            return _dec
+
+    db_file = str(tmp_path / "test_sanggar_regression.db")
+    os.environ["DB_BACKEND"] = "sqlite"
+    os.environ["SQLITE_DB_PATH"] = db_file
+    store = SQLiteStore(db_path=db_file)
+    dependencies._store = store
+    user = store.create_user("sanggar_tester", "secret12345")
+    owner_id = user["id"]
+    store.set_feature_setting(owner_id, "virtual_smarthome_enabled", False)
+
+    def _build_relays(room_name: str, names: list[str]) -> list[dict]:
+        items = []
+        for idx, name in enumerate(names, start=1):
+            v_on, v_off = generate_relay_voice_commands(room_name, name, idx)
+            items.append({
+                "relay_number": idx,
+                "nama_relay": name,
+                "voice_command_on": v_on,
+                "voice_command_off": v_off,
+                "status": "OFF",
+            })
+        return items
+
+    rumah_names = ["Taman", "Garasi 1", "Garasi 2", "Ontel", "Sanggar 1", "Sanggar 2", "Balkon 1", "Balkon 2"]
+    sanggar_names = ["A", "B", "C", "D", "E", "F", "G", "H"]
+    papan_names = [f"Lampu {i}" for i in range(1, 9)]
+
+    cfg_s = generate_real_relay_api_config("SANGGAR")
+    sanggar_id = store.add_relay_room(
+        owner_id, "SANGGAR", cfg_s["api_slug"], cfg_s["api_token"], cfg_s["api_client_id"],
+        _build_relays("SANGGAR", sanggar_names),
+    )
+    cfg_r = generate_real_relay_api_config("Rumah")
+    rumah_id = store.add_relay_room(
+        owner_id, "Rumah", cfg_r["api_slug"], cfg_r["api_token"], cfg_r["api_client_id"],
+        _build_relays("Rumah", rumah_names),
+    )
+
+    rooms_a = store.list_relay_rooms(owner_id)
+
+    # Config A cases: SANGGAR (A..H) + Rumah (Taman..Balkon 2)
+    m = smart_match_real_relay(rooms_a, "nyalakan lampu Sanggar 1 di rumah")
+    assert m and m["room"]["id"] == rumah_id and m["relay"]["relay_number"] == 5 and m["command"] == "ON"
+
+    m = smart_match_real_relay(rooms_a, "Nyalakan lampu sanggar satu rumah")
+    assert m and m["room"]["id"] == rumah_id and m["relay"]["relay_number"] == 5 and m["command"] == "ON"
+
+    m = smart_match_real_relay(rooms_a, "nyalakan Balkon 1")
+    assert m and m["room"]["id"] == rumah_id and m["relay"]["relay_number"] == 7 and m["command"] == "ON"
+
+    for phrase, exp_cmd in [("matikan lampu taman", "OFF"), ("matikan lampu Taman", "OFF"), ("Nyalakan lampu taman", "ON")]:
+        m = smart_match_real_relay(rooms_a, phrase)
+        assert m and m["room"]["id"] == rumah_id and m["relay"]["relay_number"] == 1 and m["command"] == exp_cmd
+
+    m = smart_match_real_relay(rooms_a, "nyalakan lampu ontel")
+    assert m and m["room"]["id"] == rumah_id and m["relay"]["relay_number"] == 4 and m["command"] == "ON"
+
+    # Short 1-char relays including 'D' in SANGGAR must not collide with shorthand 'd' preposition
+    m = smart_match_real_relay(rooms_a, "nyalakan a di sanggar")
+    assert m and m["room"]["id"] == sanggar_id and m["relay"]["relay_number"] == 1 and m["command"] == "ON"
+
+    m = smart_match_real_relay(rooms_a, "matikan lampu d di sanggar")
+    assert m and m["room"]["id"] == sanggar_id and m["relay"]["relay_number"] == 4 and m["command"] == "OFF"
+
+    m = smart_match_real_relay(rooms_a, "matikan d sanggar")
+    assert m and m["room"]["id"] == sanggar_id and m["relay"]["relay_number"] == 4 and m["command"] == "OFF"
+
+    # Config B cases: replace SANGGAR with Papan (Lampu 1..8) + Rumah (Taman..Balkon 2)
+    store.delete_relay_room(owner_id, sanggar_id)
+    cfg_p = generate_real_relay_api_config("Papan")
+    papan_id = store.add_relay_room(
+        owner_id, "Papan", cfg_p["api_slug"], cfg_p["api_token"], cfg_p["api_client_id"],
+        _build_relays("Papan", papan_names),
+    )
+    rooms_b = store.list_relay_rooms(owner_id)
+
+    expected_b = [
+        ("nyalakan lampu sanggar 2", rumah_id, 6, "ON"),
+        ("nyalakan lampu balkon 1", rumah_id, 7, "ON"),
+        ("nyalakan lampu balkon dua", rumah_id, 8, "ON"),
+        ("nyalakan balkon 1", rumah_id, 7, "ON"),
+        ("nyalakan lampu balkon 2 di rumah", rumah_id, 8, "ON"),
+        ("matikan garasi 1", rumah_id, 2, "OFF"),
+        ("matikan lampu garasi satu di rumah", rumah_id, 2, "OFF"),
+        ("nyalakan lampu 1", papan_id, 1, "ON"),
+        ("matikan lampu 2 di papan", papan_id, 2, "OFF"),
+        ("nyalakan relay 3 di papan", papan_id, 3, "ON"),
+    ]
+    for phrase, exp_room, exp_num, exp_cmd in expected_b:
+        m = smart_match_real_relay(rooms_b, phrase)
+        assert m is not None, f"Expected match for '{phrase}'"
+        assert m["room"]["id"] == exp_room, f"Wrong room for '{phrase}': {m['room']['nama_tempat']}"
+        assert m["relay"]["relay_number"] == exp_num, f"Wrong relay #{m['relay']['relay_number']} ({m['relay']['nama_relay']}) for '{phrase}'"
+        assert m["command"] == exp_cmd
+
+    # Unmatched & wrong-digit safety: never trigger adjacent or wrong relay
+    assert smart_match_real_relay(rooms_b, "nyalakan lampu garasi 3") is None
+    assert smart_match_real_relay(rooms_b, "nyalakan kamar 1") is None
+    assert smart_match_real_relay(rooms_b, "nyalakan lampu xyz di rumah") is None
+
+    # Ambiguous request ("Nyalakan lampu balkon" when Balkon 1 & Balkon 2 both exist):
+    # Must NOT blindly pick one, and MCP tool must report ambiguity cleanly
+    assert smart_match_real_relay(rooms_b, "Nyalakan lampu balkon") is None
+    amb = smart_match_real_relay_detailed(rooms_b, "Nyalakan lampu balkon")
+    assert amb is not None and amb.get("ambiguous") is True
+
+    mock_mcp = _DummyMCP()
+    register_tools(mock_mcp, store, lambda *a, **k: None)
+    token = mcp_active_owner_ctx.set(owner_id)
+    try:
+        res_amb = mock_mcp.tools["control_real_relay_by_voice"]("Nyalakan lampu balkon")
+        assert res_amb["success"] is False
+        assert res_amb.get("ambiguous") is True
+        assert "Balkon 1" in res_amb["message"] and "Balkon 2" in res_amb["message"]
+
+        # Compound voice commands separated by "dan"
+        for multi_phrase, exp_nums in [
+            ("nyalakan lampu sanggar 1 dan sanggar 2", [5, 6]),
+            ("nyalakan lampu balkon 1 dan balkon 2", [7, 8]),
+        ]:
+            resolved = smart_match_real_relay_commands(rooms_b, multi_phrase)
+            assert [item["relay"]["relay_number"] for item in resolved] == exp_nums
+            res_multi = mock_mcp.tools["control_real_relay_by_voice"](multi_phrase)
+            assert res_multi["success"] is True
+            assert res_multi.get("multi") is True
+            assert res_multi.get("count") == 2
+    finally:
+        mcp_active_owner_ctx.reset(token)
+
+    # Extra edge cases: teens (12-16), short 2-char names (AC/TV), custom voice phrase, longest room target
+    cfg_e = generate_real_relay_api_config("Ruang 10")
+    relays_16 = []
+    for idx in range(1, 17):
+        name = "AC" if idx == 2 else ("Kipas dan Exhaust" if idx == 3 else f"Lampu {idx}")
+        v_on, v_off = generate_relay_voice_commands("Ruang 10", name, idx)
+        if idx == 12:
+            v_on = "buka tirai barat"
+        relays_16.append({
+            "relay_number": idx,
+            "nama_relay": name,
+            "voice_command_on": v_on,
+            "voice_command_off": v_off,
+            "status": "OFF",
+        })
+    r10_id = store.add_relay_room(
+        owner_id, "Ruang 10", cfg_e["api_slug"], cfg_e["api_token"], cfg_e["api_client_id"], relays_16
+    )
+    cfg_r1 = generate_real_relay_api_config("Ruang 1")
+    store.add_relay_room(
+        owner_id, "Ruang 1", cfg_r1["api_slug"], cfg_r1["api_token"], cfg_r1["api_client_id"],
+        _build_relays("Ruang 1", ["Lampu 1"]),
+    )
+    all_rooms = store.list_relay_rooms(owner_id)
+
+    m_ac = smart_match_real_relay(all_rooms, "nyalakan ac di ruang 10")
+    assert m_ac and m_ac["room"]["id"] == r10_id and m_ac["relay"]["relay_number"] == 2
+
+    m_12 = smart_match_real_relay(all_rooms, "nyalakan lampu dua belas di ruang 10")
+    assert m_12 and m_12["room"]["id"] == r10_id and m_12["relay"]["relay_number"] == 12
+
+    m_16 = smart_match_real_relay(all_rooms, "matikan lampu enam belas di ruang 10")
+    assert m_16 and m_16["room"]["id"] == r10_id and m_16["relay"]["relay_number"] == 16 and m_16["command"] == "OFF"
+
+    m_custom = smart_match_real_relay(all_rooms, "tolong buka tirai barat sekarang")
+    assert m_custom and m_custom["room"]["id"] == r10_id and m_custom["relay"]["relay_number"] == 12
+
+    m_dan = smart_match_real_relay_commands(all_rooms, "nyalakan kipas dan exhaust di ruang 10")
+    assert len(m_dan) == 1 and m_dan[0]["relay"]["relay_number"] == 3
+
+    m_target_10 = smart_match_real_relay_for_target(all_rooms, target="Ruang 10", action="nyalakan", channel=1)
+    assert m_target_10 and m_target_10["room"]["id"] == r10_id and m_target_10["relay"]["relay_number"] == 1

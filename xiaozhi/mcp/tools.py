@@ -1063,12 +1063,30 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         """
         req_id = f"mem_{int(time.time())}_{uuid.uuid4().hex[:6]}"
         owner_id = mcp_active_owner_ctx.get()
-        active_slot = int(mcp_active_slot_ctx.get() or 1)
+        if owner_id is None and hasattr(store, "list_xiaozhi_tokens"):
+            try:
+                tokens = store.list_xiaozhi_tokens()
+                if tokens:
+                    owner_id = int(tokens[0].get("user_id", 1))
+            except Exception:
+                pass
         if owner_id is None:
-            return {"success": False, "request_id": req_id, "message": "Belum ada koneksi Xiaozhi aktif.", "riwayat_percakapan": []}
+            owner_id = 1
+
+        active_slot = int(mcp_active_slot_ctx.get() or 1)
 
         limit_val = max(1, min(int(limit or 5), 8))
         query_clean = str(query or "").strip()
+
+        # Deteksi pertanyaan umum seputar riwayat obrolan agar tidak memfilter kata harfiah
+        inquiry_patterns = [
+            r"^(apa yang tadi|tadi kita|tadi ngomong apa|ingat obrolan|riwayat percakapan|riwayat chat|obrolan tadi|kita bahas apa|percakapan sebelumnya|obrolan sebelumnya|cerita tadi)",
+            r"^(apa obrolan|tadi bahas apa|tadi ngobrol apa|sebelumnya kita bahas|apa saja riwayat|baca riwayat)"
+        ]
+        is_generic_inquiry = any(re.search(pat, query_clean.lower()) for pat in inquiry_patterns) or query_clean.lower() in [
+            "riwayat", "chat", "obrolan", "percakapan", "tadi", "kemarin", "sebelumnya", "semua"
+        ]
+        effective_query = "" if is_generic_inquiry else query_clean
 
         from xiaozhi.services.chat_memory_service import resolve_target_date
         date_filter = ""
@@ -1078,16 +1096,40 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
         try:
             # Gunakan mode semantik cerdas jika user mencari berdasarkan topik/makna (terisolasi per slot aktif)
-            use_semantic = bool(query_clean)
+            use_semantic = bool(effective_query)
             records = store.list_chat_history(
                 owner_id,
-                query=query_clean,
+                query=effective_query,
                 limit=limit_val,
                 date=date_filter,
                 semantic=use_semantic,
                 slot_number=active_slot,
                 strict_slot=True,
             )
+
+            # Fallback 1: Jika strict_slot kosong pada slot 1, ambil tanpa pembatasan slot ketat
+            if not records and active_slot == 1:
+                records = store.list_chat_history(
+                    owner_id,
+                    query=effective_query,
+                    limit=limit_val,
+                    date=date_filter,
+                    semantic=False,
+                    slot_number=1,
+                    strict_slot=False,
+                )
+
+            # Fallback 2: Jika masih kosong, ambil riwayat umum akun tanpa slot
+            if not records:
+                records = store.list_chat_history(
+                    owner_id,
+                    query=effective_query,
+                    limit=limit_val,
+                    date=date_filter,
+                    semantic=False,
+                    strict_slot=False,
+                )
+
             parsed_history = []
             has_active_session = False
             from xiaozhi.core.utils import calculate_seconds_ago
@@ -1130,11 +1172,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 parsed_history.append(item_dict)
 
             instruksi = (
-                f"Riwayat di bawah ini hanya berasal dari akun dan Slot {active_slot}. "
-                "Jika ada kecocokan yang kuat, gunakan waktu dan isi yang tercatat untuk merujuk percakapan secara alami, misalnya 'kayaknya kita pernah bahas ini pada ...'. "
-                "Jika kecocokannya lemah atau ambigu, sampaikan bahwa itu dugaan dan minta konfirmasi. "
-                "Jangan mengklaim pernah membahas sesuatu tanpa bukti di riwayat. "
-                "Jika tidak ada riwayat yang cocok, cari jawaban dengan tool lain yang sesuai atau jelaskan bahwa riwayat tidak menemukannya."
+                f"Riwayat di bawah ini berasal dari akun Anda (Slot {active_slot}). "
+                "Gunakan waktu dan isi percakapan yang tercatat untuk merespons secara alami, misalnya 'tadi kita membahas ...' atau 'kemarin kamu cerita tentang ...'. "
+                "Rujuk poin-poin yang ada di riwayat ini dengan jujur dan akurat."
             )
             if has_active_session:
                 instruksi += (
@@ -1142,23 +1182,48 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     "Pengguna kemungkinan besar sedang melanjutkan percakapan ini secara langsung! Utamakan dan rujuk konteks obrolan aktif ini terlebih dahulu."
                 )
 
+            # Rangkuman percakapan terkini yang ringkas dan ramah LLM
+            dialog_summary_lines = []
+            for item in parsed_history[:5]:
+                dialog_summary_lines.append(f"- User: \"{item['pesan_user']}\" -> XiaoZhi: \"{item['jawaban_xiaozhi'][:120]}\" ({item['waktu']})")
+            ringkasan_dialog = "\n".join(dialog_summary_lines) if dialog_summary_lines else "Belum ada percakapan sebelumnya."
+
             response = {
                 "success": True,
                 "request_id": req_id,
                 "slot_aktif": active_slot,
                 "rentang_waktu": waktu or "semua",
                 "active_session_terdeteksi": has_active_session,
-                "pencarian": query_clean or "Percakapan Terkini",
+                "pencarian": effective_query or "Percakapan Terkini",
                 "mode": "Semantic Long-Term Recall" if use_semantic else "Chronological",
                 "total_ditemukan": len(parsed_history),
-                "sumber": "chat_history akun-slot aktif",
+                "sumber": "chat_history akun aktif",
                 "riwayat_percakapan": parsed_history,
+                "ringkasan_percakapan_terakhir": ringkasan_dialog,
                 "instruksi_xiaozhi": instruksi,
             }
             return response
         except Exception:
             logger.exception("Error recalling chat memory")
             return {"success": False, "request_id": req_id, "message": "Gagal membaca memori percakapan.", "riwayat_percakapan": []}
+
+    @mcp_server.tool()
+    def get_chat_history(query: str = "", limit: int = 5, waktu: str = "semua") -> dict:
+        """
+        Membaca dan memanggil riwayat percakapan sebelumnya antara pengguna dan XiaoZhi.
+        Panggil tool ini saat pengguna bertanya:
+        - "Apa yang tadi kita bicarakan?"
+        - "Ingat obrolan kemarin?"
+        - "Tadi kita ngomong apa ya?"
+        - "Lanjutkan percakapan yang tadi"
+        - "Riwayat chat kita apa saja?"
+
+        Args:
+            query: Kata kunci topik atau konsep yang ingin dicari (contoh: "keuangan", "tugas fisika", "resep", "koding"). Kosongkan untuk membaca percakapan paling terkini.
+            limit: Jumlah riwayat percakapan yang ingin diambil (default: 5, maksimal: 8).
+            waktu: Filter waktu percakapan ('semua', 'hari_ini', 'kemarin', atau format YYYY-MM-DD).
+        """
+        return recall_chat_memory(query=query, waktu=waktu, limit=limit)
 
     @mcp_server.tool()
     def get_daily_activity_recap(date: str = "today") -> dict:
@@ -1568,6 +1633,129 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         return response
 
     @mcp_server.tool()
+    def read_emotion_tone(user_speech: str = "", context: str = "") -> dict:
+        """
+        Membaca dan menganalisis nada emosi serta suasana hati pengguna (marah, senyum, bahagia, bingung, senang, teriak, ketawa, sedih, kaget, bisik, sarkas, bangga, ngantuk, tenang, takut).
+        Panggil tool ini ketika:
+        - Ingin membaca nada emosi atau perasaan dari ucapan pengguna terkini: "coba baca nada emosiku", "baca perasaan aku dong", "aku lagi kesel nih"
+        - Pengguna bercerita tentang masalah emosional, kabar gembira, lelucon, atau hal menyedihkan
+        - Ingin mendapatkan rekomendasi respon intonasi suara, modulasi nada, dan reaksi vokal empati yang tepat.
+
+        Args:
+            user_speech: Kalimat atau ucapan pengguna yang ingin dibaca nada emosinya. Kosongkan untuk membaca ucapan terakhir dari konteks.
+            context: Konteks tambahan situasi percakapan (opsional).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        from xiaozhi.services.expression_service import analyze_user_emotion_and_tone
+
+        clean_speech = str(user_speech or "").strip()
+        if not clean_speech and owner_id and hasattr(store, "list_chat_history"):
+            try:
+                active_slot = int(mcp_active_slot_ctx.get() or 1)
+                last_chats = store.list_chat_history(owner_id, limit=2, slot_number=active_slot, strict_slot=False)
+                for c in last_chats:
+                    umsg = str(c.get("user_message") or "").strip()
+                    if umsg and not umsg.startswith("Panggil tool") and not umsg.startswith("("):
+                        clean_speech = umsg
+                        break
+            except Exception:
+                pass
+
+        result = analyze_user_emotion_and_tone(clean_speech, context=context)
+        if owner_id:
+            record_mcp_tool_history(owner_id, "read_emotion_tone", clean_speech or "analisis emosi", {
+                "user_speech": clean_speech,
+                "context": context,
+            }, result)
+        return result
+
+    @mcp_server.tool()
+    def get_character_persona(user_speech: str = "", include_emotion_reading: bool = True) -> dict:
+        """
+        Membaca dan memanggil profil pesona karakter XiaoZhi secara lengkap, meliputi kepribadian, gaya bicara, emosi dasar, preferensi pengguna, dan kemampuan membaca nada emosi lawan bicara secara realtime.
+        Gunakan tool ini ketika:
+        - Pengguna bertanya tentang karakter atau kepribadian XiaoZhi: "kamu karakternya seperti apa?", "bisa bicara dengan nada emosi apa?", "pesona karakter kamu apa?"
+        - Ingin menyelaraskan respon XiaoZhi dengan nada emosi pengguna dan persona yang disukai pengguna.
+        - Membaca suasana hati pengguna sekaligus menerapkan karakter yang cocok.
+
+        Args:
+            user_speech: Kalimat atau ucapan pengguna terkini untuk dibaca nada emosinya (opsional).
+            include_emotion_reading: Jika True, otomatis membaca nada emosi dari ucapan pengguna dan memberikan panduan respon (default: True).
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        active_slot = int(mcp_active_slot_ctx.get() or 1)
+        from xiaozhi.services.expression_service import (
+            format_persona_mood_guidelines,
+            analyze_user_emotion_and_tone,
+            SUPPORTED_PERSONA_MOODS,
+        )
+
+        # 1. Ambil preferensi persona pengguna jika ada di store
+        active_mood = "ceria_humoris"
+        active_expressiveness = "tinggi"
+        if owner_id and hasattr(store, "get_user_preference"):
+            try:
+                mood_p = store.get_user_preference(owner_id, "gaya_bicara", "mood_persona")
+                if mood_p:
+                    for k in SUPPORTED_PERSONA_MOODS:
+                        if k in str(mood_p).lower():
+                            active_mood = k
+                            break
+                exp_p = store.get_user_preference(owner_id, "gaya_bicara", "tingkat_ekspresif_vokal")
+                if exp_p:
+                    active_expressiveness = str(exp_p)
+            except Exception:
+                pass
+
+        guidelines = format_persona_mood_guidelines(active_mood, expressiveness=active_expressiveness)
+
+        # 2. Analisis nada emosi pengguna jika diminta
+        emotion_analysis = None
+        clean_speech = str(user_speech or "").strip()
+        if include_emotion_reading:
+            if not clean_speech and owner_id and hasattr(store, "list_chat_history"):
+                try:
+                    last_chats = store.list_chat_history(owner_id, limit=2, slot_number=active_slot, strict_slot=False)
+                    for c in last_chats:
+                        umsg = str(c.get("user_message") or "").strip()
+                        if umsg and not umsg.startswith("Panggil tool") and not umsg.startswith("("):
+                            clean_speech = umsg
+                            break
+                except Exception:
+                    pass
+            emotion_analysis = analyze_user_emotion_and_tone(clean_speech)
+
+        result = {
+            "success": True,
+            "karakter_persona": {
+                "mood_aktif": guidelines["mood_key"],
+                "nama_karakter": guidelines["title"],
+                "icon": guidelines["icon"],
+                "gaya_suara": guidelines["voice_style"],
+                "tingkat_ekspresif": active_expressiveness,
+                "deskripsi": guidelines["description"],
+                "emosi_dasar": guidelines["base_emotion"],
+                "emoji_dasar": guidelines["base_emoji"],
+            },
+            "panduan_nada_vokal": guidelines["prompt_context"],
+            "analisis_nada_emosi_user": emotion_analysis,
+            "instruksi_xiaozhi": (
+                f"Kamu adalah XiaoZhi dengan kepribadian '{guidelines['title']}' {guidelines['icon']}. "
+                f"Gunakan gaya bicara: {guidelines['voice_style']}. "
+                + (f"Pengguna terdeteksi memiliki nada emosi '{emotion_analysis['emotion_label']}' ({emotion_analysis['intensity']}). "
+                   f"Responlah dengan nada {emotion_analysis['recommended_persona_response']}, "
+                   f"gunakan vokal cue '{emotion_analysis['recommended_vocal_cue']}' dan ikuti saran: {emotion_analysis['response_advice']}"
+                   if emotion_analysis else "Tunjukkan reaksi emosi nyata secara konsisten.")
+            )
+        }
+        if owner_id:
+            record_mcp_tool_history(owner_id, "get_character_persona", f"Pesona: {guidelines['title']}", {
+                "user_speech": clean_speech,
+                "mood": active_mood,
+            }, result)
+        return result
+
+    @mcp_server.tool()
     def control_relay(channel: int, action: str) -> dict:
         """
         Kontrol relay pada simulasi smarthome virtual.
@@ -1765,13 +1953,43 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         owner_id = mcp_active_owner_ctx.get()
         if owner_id is None:
             return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif."}
-        from xiaozhi.routers.relay_nyata import control_real_relay, control_all_real_relays, match_real_relay_command
-        matched = match_real_relay_command(owner_id, user_message)
-        if not matched:
-            response = {"success": False, "message": "Perintah suara tidak cocok dengan Relay Nyata yang tersimpan."}
+        from xiaozhi.routers.relay_nyata import (
+            control_all_real_relays,
+            control_real_relay,
+            match_real_relay_actions,
+        )
+        matches = match_real_relay_actions(owner_id, user_message)
+        if not matches:
+            rooms = store.list_relay_rooms(owner_id)
+            available_labels = [
+                f"{relay.get('nama_relay', '')} ({room.get('nama_tempat', '')})"
+                for room in rooms
+                for relay in room.get("relays", [])
+                if relay.get("nama_relay")
+            ][:12]
+            hint = f" Perangkat tersimpan: {', '.join(available_labels)}." if available_labels else ""
+            response = {"success": False, "message": f"Perintah suara tidak cocok dengan Relay Nyata yang tersimpan.{hint}"}
             record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message}, response)
             return response
-        if matched.get("is_all"):
+        if len(matches) == 1 and matches[0].get("ambiguous"):
+            ambiguous_match = matches[0]
+            response = {
+                "success": False,
+                "ambiguous": True,
+                "message": ambiguous_match["message"],
+                "candidates": [
+                    {
+                        "room": c["room"].get("nama_tempat", ""),
+                        "relay": c["relay"].get("nama_relay", ""),
+                        "relay_number": c["relay"].get("relay_number"),
+                    }
+                    for c in ambiguous_match.get("candidates", [])
+                ],
+            }
+            record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message, "ambiguous": True}, response)
+            return response
+        if len(matches) == 1 and matches[0].get("is_all"):
+            matched = matches[0]
             target_room = matched.get("room")
             target_room_id = target_room["id"] if target_room else None
             try:
@@ -1781,20 +1999,51 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             except Exception:
                 logger.exception("Error MCP real relay batch")
                 return {"success": False, "message": "Gagal menjalankan kontrol seluruh relay."}
-        room = matched["room"]
-        relay = matched["relay"]
-        command = matched["command"]
-        try:
-            response = control_real_relay(owner_id, room, relay, command, source="mcp_voice")
-            record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message, "room_id": room["id"], "relay": relay["relay_number"], "command": command}, response)
-            return response
-        except ValueError as exc:
-            response = {"success": False, "message": str(exc)}
-            record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message, "room_id": room["id"], "relay": relay["relay_number"], "command": command}, response)
-            return response
-        except Exception:
-            logger.exception("Error MCP real relay")
-            return {"success": False, "message": "Gagal membuat antrean perintah API Relay Nyata."}
+        if len(matches) == 1:
+            matched = matches[0]
+            room = matched["room"]
+            relay = matched["relay"]
+            command = matched["command"]
+            try:
+                response = control_real_relay(owner_id, room, relay, command, source="mcp_voice")
+                record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message, "room_id": room["id"], "relay": relay["relay_number"], "command": command}, response)
+                return response
+            except ValueError as exc:
+                response = {"success": False, "message": str(exc)}
+                record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message, "room_id": room["id"], "relay": relay["relay_number"], "command": command}, response)
+                return response
+            except Exception:
+                logger.exception("Error MCP real relay")
+                return {"success": False, "message": "Gagal membuat antrean perintah API Relay Nyata."}
+
+        results = []
+        any_error = None
+        for item in matches:
+            room = item["room"]
+            relay = item["relay"]
+            command = item["command"]
+            try:
+                res = control_real_relay(owner_id, room, relay, command, source="mcp_voice")
+                record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message, "room_id": room["id"], "relay": relay["relay_number"], "command": command}, res)
+                results.append(res)
+            except ValueError as exc:
+                any_error = str(exc)
+                res = {"success": False, "message": any_error, "room": room.get("nama_tempat", ""), "relay": relay.get("nama_relay", "")}
+                record_mcp_tool_history(owner_id, "control_real_relay_by_voice", user_message, {"user_message": user_message, "room_id": room["id"], "relay": relay["relay_number"], "command": command}, res)
+                results.append(res)
+            except Exception:
+                logger.exception("Error MCP real relay compound")
+                return {"success": False, "message": "Gagal membuat antrean perintah API Relay Nyata."}
+
+        all_ok = all(r.get("success") for r in results)
+        summary_parts = [r.get("message", "") for r in results if r.get("message")]
+        return {
+            "success": all_ok,
+            "multi": True,
+            "count": len(results),
+            "message": " ".join(summary_parts) if summary_parts else (any_error or "Perintah multi-relay diproses."),
+            "results": results,
+        }
 
     @mcp_server.tool()
     def get_real_relay_status() -> dict:

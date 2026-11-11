@@ -384,62 +384,306 @@ NUMBER_WORDS_MAP = {
     "empat belas": "14", "lima belas": "15", "enam belas": "16",
 }
 
+_NUMBER_WORDS_DESC = sorted(NUMBER_WORDS_MAP.items(), key=lambda item: len(item[0]), reverse=True)
+_ON_ACTION_WORDS = {
+    "nyalakan", "nyala", "nyalain", "hidupkan", "hidup", "hidupin",
+    "aktifkan", "aktifin", "buka", "fungsikan", "operasikan", "bunyikan",
+    "dinginkan", "on",
+}
+_OFF_ACTION_WORDS = {
+    "matikan", "mati", "matiin", "padamkan", "padam", "padamin",
+    "nonaktifkan", "nonaktifin", "tutup", "hentikan", "senyapkan", "diamkan", "off",
+}
+_FILLER_WORDS = {"tolong", "dong", "xiaozhi", "coba", "mohon", "silakan", "sekarang", "ya", "yah", "turn"}
+_ACTION_AND_FILLER_WORDS = _ON_ACTION_WORDS | _OFF_ACTION_WORDS | _FILLER_WORDS
+_GENERIC_DEVICE_WORDS = {
+    "lampu", "lamp", "saklar", "switch", "relay", "channel", "ch",
+    "saluran", "nomor", "stopkontak", "kontak", "perangkat", "alat",
+}
+_CHANNEL_SPECIFIER_WORDS = {"relay", "channel", "ch", "saluran", "nomor", "saklar", "pin", "tombol", "port"}
+_CONNECTOR_WORDS = {"di", "pada", "ke", "dalam"}
+_COMPOUND_SPLIT_RE = re.compile(r"\s*(?:,|\b(?:dan|serta|lalu|kemudian|terus)\b)\s*")
+
 
 def normalize_smart_text(text: str) -> str:
     t = (text or "").lower()
     t = re.sub(r"[^\w\s]", " ", t)
-    # Normalize colloquial Indonesian abbreviations
-    t = re.sub(r"\bd\b", "di", t)
-    t = re.sub(r"\bno\b", "nomor", t)
+    t = re.sub(r"\b(?:no|nomer)\b", "nomor", t)
     t = re.sub(r"\btdk\b", "tidak", t)
     t = re.sub(r"\bsdh\b", "sudah", t)
     t = re.sub(r"\bsy\b", "saya", t)
     t = re.sub(r"\bdong\b", "", t)
     t = re.sub(r"\btolong\b", "", t)
-    
-    # Replace spelled-out Indonesian numbers with digits
-    for word, digit in NUMBER_WORDS_MAP.items():
-        t = re.sub(r"\b" + word + r"\b", digit, t)
-    
+
+    # Replace longer spelled-out numbers (12-16) before base units (1-9).
+    for word, digit in _NUMBER_WORDS_DESC:
+        t = re.sub(r"\b" + re.escape(word) + r"\b", digit, t)
+
     return re.sub(r"\s+", " ", t).strip()
 
 
 def detect_relay_action(text: str) -> str:
     norm = normalize_smart_text(text)
     words = norm.split()
-    on_words = {"nyalakan", "nyala", "hidupkan", "hidup", "aktifkan", "buka", "on"}
-    off_words = {"matikan", "mati", "padamkan", "padam", "nonaktifkan", "tutup", "off"}
     for w in words:
-        if w in off_words:
+        if w in _OFF_ACTION_WORDS:
             return "OFF"
-        if w in on_words:
+        if w in _ON_ACTION_WORDS:
             return "ON"
     return "ON"
 
 
-def smart_match_real_relay(rooms: list, user_message: str) -> dict:
-    norm_msg = normalize_smart_text(user_message)
-    if not norm_msg:
-        return None
-        
-    action = detect_relay_action(norm_msg)
-    is_all = any(w in norm_msg.split() for w in ["semua", "seluruh", "all"])
+def _has_explicit_action(text: str) -> bool:
+    words = normalize_smart_text(text).split()
+    return any(w in _ON_ACTION_WORDS or w in _OFF_ACTION_WORDS for w in words)
 
-    # 1. Room Disambiguation: check if any room is explicitly mentioned in user voice command
-    matched_rooms = []
-    # Sort rooms by length descending to match longest room name first
-    sorted_rooms = sorted(rooms, key=lambda r: len(r.get("nama_tempat", "")), reverse=True)
+
+def _has_phrase(haystack: str, needle: str) -> bool:
+    if not haystack or not needle:
+        return False
+    return f" {needle} " in f" {haystack} "
+
+
+def _room_has_standalone_d_relay(room: dict) -> bool:
+    for relay in room.get("relays", []):
+        r_tokens = normalize_smart_text(relay.get("nama_relay", "")).split()
+        if "d" in r_tokens:
+            return True
+    return False
+
+
+def _strip_optional_nya(tokens: list[str], known_tokens: set[str]) -> list[str]:
+    result = []
+    for tok in tokens:
+        if tok.endswith("nya") and len(tok) > 4 and tok[:-3] in known_tokens:
+            result.append(tok[:-3])
+        else:
+            result.append(tok)
+    return result
+
+
+def _extract_room_mentions(rooms: list, norm_msg: str) -> tuple[list, list, list[str]]:
+    """
+    Identify rooms mentioned in norm_msg, separating explicit prepositional
+    references ('di rumah', 'd ruang 1', 'pada papan') from unprefixed mentions.
+    Matches longest room names first without overlapping spans.
+    """
+    explicit_rooms = []
+    unprefixed_rooms = []
+    explicit_phrases: list[str] = []
+    occupied_spans: list[tuple[int, int]] = []
+
+    def _overlaps(start: int, end: int) -> bool:
+        return any(not (end <= s or start >= e) for s, e in occupied_spans)
+
+    sorted_rooms = sorted(
+        rooms,
+        key=lambda r: (len(normalize_smart_text(r.get("nama_tempat", ""))), r.get("id", 0)),
+        reverse=True,
+    )
+
     for room in sorted_rooms:
         r_name = normalize_smart_text(room.get("nama_tempat", ""))
         r_slug = normalize_smart_text(room.get("api_slug", ""))
-        if r_name and (r_name in norm_msg or f"di {r_name}" in norm_msg):
-            matched_rooms.append(room)
-        elif r_slug and r_slug in norm_msg:
-            matched_rooms.append(room)
+        matched_explicit = False
+        matched_unprefixed = False
 
-    # 2. Handle "all relays" command (e.g. "matikan semua lampu di ruang 1" or "nyalakan semua lampu")
+        if r_name:
+            # Allow 'd <room>' as shorthand for 'di <room>' unless the room has a relay literally named 'D'.
+            preps = ["di", "pada", "ke", "dalam"]
+            if not _room_has_standalone_d_relay(room):
+                preps.append("d")
+            prep_group = "|".join(preps)
+            prep_re = re.compile(
+                rf"(?<!\w)(?:{prep_group})\s+(?:ruangan?\s+)?{re.escape(r_name)}(?!\w)"
+            )
+            for m in prep_re.finditer(norm_msg):
+                if not _overlaps(m.start(), m.end()):
+                    occupied_spans.append((m.start(), m.end()))
+                    explicit_phrases.append(m.group(0))
+                    matched_explicit = True
+                    break
+
+            if not matched_explicit:
+                bare_re = re.compile(rf"(?<!\w){re.escape(r_name)}(?!\w)")
+                for m in bare_re.finditer(norm_msg):
+                    if not _overlaps(m.start(), m.end()):
+                        occupied_spans.append((m.start(), m.end()))
+                        matched_unprefixed = True
+                        break
+
+        if not matched_explicit and not matched_unprefixed and r_slug:
+            if _has_phrase(norm_msg, r_slug):
+                matched_unprefixed = True
+
+        if matched_explicit:
+            explicit_rooms.append(room)
+        elif matched_unprefixed:
+            unprefixed_rooms.append(room)
+
+    return explicit_rooms, unprefixed_rooms, explicit_phrases
+
+
+def _replace_phrases_with_sentinel(text: str, phrases: list[str], sentinel: str = " __room__ ") -> str:
+    updated = f" {text} "
+    for phrase in sorted(set(phrases), key=len, reverse=True):
+        if phrase:
+            updated = re.sub(rf"(?<!\w){re.escape(phrase)}(?!\w)", sentinel, updated)
+    return re.sub(r"\s+", " ", updated).strip()
+
+
+def _score_relay_candidate(
+    *,
+    norm_msg: str,
+    room: dict,
+    relay: dict,
+    action: str,
+    has_explicit_rooms: bool,
+    is_explicit_room: bool,
+    is_unprefixed_room: bool,
+    explicit_phrases: list[str],
+    known_tokens: set[str],
+) -> int:
+    """
+    Score a single (room, relay) candidate for a voice utterance.
+    Full relay-name phrases and explicit channel specifiers strictly outrank
+    incidental digits inside unrelated relay names or cross-room mentions.
+    """
+    r_name = normalize_smart_text(room.get("nama_tempat", ""))
+    r_slug = normalize_smart_text(room.get("api_slug", ""))
+    room_tokens = set(r_name.split())
+
+    relay_num = str(relay.get("relay_number", "")).strip()
+    relay_name = normalize_smart_text(relay.get("nama_relay", ""))
+    voice_on = normalize_smart_text(relay.get("voice_command_on", ""))
+    voice_off = normalize_smart_text(relay.get("voice_command_off", ""))
+    target_voice = voice_on if action == "ON" else voice_off
+
+    if has_explicit_rooms and not is_explicit_room:
+        return -9999
+
+    room_score = 200 if is_explicit_room else (80 if is_unprefixed_room else 0)
+
+    # Normalize optional possessive '-nya' only when the stem is a known room/relay token.
+    norm_tokens = _strip_optional_nya(norm_msg.split(), known_tokens)
+    norm_clean = " ".join(norm_tokens)
+
+    # Isolate digits that aren't part of room names when matching channel numbers.
+    room_phrases_to_mask = list(explicit_phrases)
+    if r_name:
+        room_phrases_to_mask.append(r_name)
+    if r_slug:
+        room_phrases_to_mask.append(r_slug)
+    rem_msg = _replace_phrases_with_sentinel(norm_clean, room_phrases_to_mask)
+    rem_tokens = rem_msg.split()
+
+    # Keep the room name when the relay's own name contains it (e.g. "Lampu Dapur" in "Dapur").
+    name_mask = list(explicit_phrases)
+    if r_name and not _has_phrase(relay_name, r_name):
+        name_mask.append(r_name)
+    msg_for_name = _replace_phrases_with_sentinel(norm_clean, name_mask)
+    msg_no_nomor = re.sub(r"\bnomor\s+(?=\d+\b)", "", msg_for_name)
+    msg_no_nomor = re.sub(r"\s+", " ", msg_no_nomor).strip()
+
+    # 1. Relay name scoring
+    name_score = 0
+    relay_tokens = relay_name.split() if relay_name else []
+    non_generic_relay = [t for t in relay_tokens if t not in _GENERIC_DEVICE_WORDS]
+    generic_count = len(relay_tokens) - len(non_generic_relay)
+
+    if relay_name:
+        if _has_phrase(msg_for_name, relay_name) or _has_phrase(msg_no_nomor, relay_name):
+            if non_generic_relay:
+                name_score = 220 + (25 * len(non_generic_relay)) + (10 * generic_count)
+            else:
+                name_score = 100
+        elif non_generic_relay:
+            name_tokens_pool = set(rem_tokens) | set(msg_for_name.split())
+            matched_ng = [t for t in non_generic_relay if t in name_tokens_pool]
+            # Require at least one alphabetic identifier so a bare digit never poses as a name match.
+            if matched_ng and any(not t.isdigit() for t in matched_ng):
+                if len(matched_ng) == len(non_generic_relay):
+                    name_score = 170 + (20 * len(non_generic_relay))
+                else:
+                    name_score = 90 + (15 * (len(matched_ng) - 1))
+
+    # 2. Voice command phrase scoring
+    voice_score = 0
+    if target_voice:
+        target_tokens = target_voice.split()
+        # Strip optional connectors/generic words only when they are absent from the saved command.
+        optional_skip = (_CONNECTOR_WORDS | (_GENERIC_DEVICE_WORDS - set(target_tokens)))
+        filtered_msg_for_voice = " ".join(
+            t for t in norm_clean.split() if t not in optional_skip and t != "__room__"
+        )
+        filtered_voice = " ".join(t for t in target_tokens if t not in _CONNECTOR_WORDS)
+
+        if target_voice == norm_clean:
+            voice_score = 350
+        elif filtered_voice and filtered_msg_for_voice == filtered_voice:
+            voice_score = 260
+        elif _has_phrase(norm_clean, target_voice):
+            voice_score = 240
+        elif filtered_voice and _has_phrase(filtered_msg_for_voice, filtered_voice):
+            voice_score = 220
+        else:
+            core_voice_tokens = [
+                t for t in target_tokens
+                if t not in _ACTION_AND_FILLER_WORDS
+                and t not in room_tokens
+                and t not in _CONNECTOR_WORDS
+            ]
+            has_substance = any(t not in _GENERIC_DEVICE_WORDS for t in core_voice_tokens)
+            core_voice = " ".join(core_voice_tokens)
+            if core_voice and has_substance:
+                if _has_phrase(msg_for_name, core_voice) or _has_phrase(msg_no_nomor, core_voice):
+                    voice_score = 210
+
+    # 3. Channel number scoring (strictly distinguish explicit cues vs bare vs noun-bound digits)
+    number_score = 0
+    if relay_num:
+        for idx, tok in enumerate(rem_tokens):
+            if tok != relay_num:
+                continue
+            prev_tok = rem_tokens[idx - 1] if idx > 0 else ""
+            if prev_tok in _CHANNEL_SPECIFIER_WORDS:
+                number_score = max(number_score, 150)
+            elif prev_tok == "" or prev_tok in _ACTION_AND_FILLER_WORDS or prev_tok in _GENERIC_DEVICE_WORDS:
+                number_score = max(number_score, 65)
+
+    # 4. Prevent digit conflict (e.g., "nyalakan garasi 2" must not hit "Garasi 1")
+    conflict_penalty = 0
+    relay_digits = {t for t in relay_tokens if t.isdigit()}
+    rem_digits = {t for t in rem_tokens if t.isdigit()}
+    if number_score < 150 and relay_digits and rem_digits and not (relay_digits & rem_digits):
+        conflict_penalty = 200
+
+    relay_signal_score = name_score + voice_score + number_score - conflict_penalty
+    if relay_signal_score < 60:
+        return -9999
+
+    return relay_signal_score + room_score
+
+
+def smart_match_real_relay_detailed(rooms: list, user_message: str) -> dict:
+    """
+    Match user_message to a real relay room/channel, returning either:
+    - single match dict {'room', 'relay', 'command', 'score'}
+    - all-room batch dict {'is_all': True, 'room', 'relay': None, 'command'}
+    - ambiguous tie dict {'ambiguous': True, 'command', 'candidates', 'message'}
+    - None when no candidate matches confidently.
+    """
+    norm_msg = normalize_smart_text(user_message)
+    if not norm_msg or not rooms:
+        return None
+
+    action = detect_relay_action(norm_msg)
+    is_all = any(w in norm_msg.split() for w in ("semua", "seluruh", "all"))
+
+    explicit_rooms, unprefixed_rooms, explicit_phrases = _extract_room_mentions(rooms, norm_msg)
+
     if is_all:
-        target_room = matched_rooms[0] if matched_rooms else None
+        target_room = explicit_rooms[0] if explicit_rooms else (unprefixed_rooms[0] if unprefixed_rooms else None)
         return {
             "is_all": True,
             "room": target_room,
@@ -447,99 +691,168 @@ def smart_match_real_relay(rooms: list, user_message: str) -> dict:
             "command": action,
         }
 
-    # Restrict candidates to mentioned room(s) if explicitly specified!
-    candidate_rooms = matched_rooms if matched_rooms else rooms
-
-    best_match = None
-    best_score = -9999
-
+    known_tokens: set[str] = set()
     for room in rooms:
-        is_candidate_room = (room in candidate_rooms)
-        r_name = normalize_smart_text(room.get("nama_tempat", ""))
-        
-        # Strip room name when searching for relay channel numbers
-        rem_msg = norm_msg
-        if r_name:
-            rem_msg = re.sub(r"\b" + re.escape(r_name) + r"\b", " ", rem_msg)
-            rem_msg = re.sub(r"\bdi\s+" + re.escape(r_name) + r"\b", " ", rem_msg)
-        msg_numbers = set(re.findall(r"\d+", rem_msg))
-
+        known_tokens.update(normalize_smart_text(room.get("nama_tempat", "")).split())
         for relay in room.get("relays", []):
-            relay_num = str(relay.get("relay_number", ""))
-            relay_name = normalize_smart_text(relay.get("nama_relay", ""))
-            voice_on = normalize_smart_text(relay.get("voice_command_on", ""))
-            voice_off = normalize_smart_text(relay.get("voice_command_off", ""))
-            
-            score = 0
-            if not is_candidate_room:
-                score -= 1000  # Hard penalty for other rooms when a specific room is requested
-            else:
-                if matched_rooms:
-                    score += 150  # Room match bonus
+            known_tokens.update(normalize_smart_text(relay.get("nama_relay", "")).split())
 
-            # Check number match
-            if relay_num and relay_num in msg_numbers:
-                score += 120
-                
-            # Check relay name match
-            if relay_name:
-                relay_words = [w for w in relay_name.split() if len(w) > 2]
-                for rw in relay_words:
-                    if rw in rem_msg:
-                        score += 35
+    has_explicit_rooms = bool(explicit_rooms)
+    explicit_ids = {id(r) for r in explicit_rooms}
+    unprefixed_ids = {id(r) for r in unprefixed_rooms}
 
-            # Check voice command phrase match
-            target_voice = voice_on if action == "ON" else voice_off
-            if target_voice:
-                if target_voice == norm_msg:
-                    score += 300
-                elif target_voice in norm_msg:
-                    score += 100
-                elif norm_msg in target_voice:
-                    score += 70
-                    
-            if score > best_score:
-                best_score = score
-                best_match = {
+    scored_candidates = []
+    seen_keys = set()
+    for room in rooms:
+        is_exp = id(room) in explicit_ids
+        is_unp = id(room) in unprefixed_ids
+        if has_explicit_rooms and not is_exp:
+            continue
+        for relay in room.get("relays", []):
+            key = (room.get("id", id(room)), relay.get("relay_number"))
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            score = _score_relay_candidate(
+                norm_msg=norm_msg,
+                room=room,
+                relay=relay,
+                action=action,
+                has_explicit_rooms=has_explicit_rooms,
+                is_explicit_room=is_exp,
+                is_unprefixed_room=is_unp,
+                explicit_phrases=explicit_phrases,
+                known_tokens=known_tokens,
+            )
+            if score >= 60:
+                scored_candidates.append({
                     "room": room,
                     "relay": relay,
                     "command": action,
                     "score": score,
-                }
+                })
 
-    if best_match and best_match["score"] >= 50:
-        return best_match
-    return None
+    if not scored_candidates:
+        return None
+
+    scored_candidates.sort(key=lambda item: item["score"], reverse=True)
+    top_score = scored_candidates[0]["score"]
+    tied_top = [item for item in scored_candidates if item["score"] == top_score]
+    if len(tied_top) > 1:
+        options_text = ", ".join(
+            f"{item['relay'].get('nama_relay', 'Relay')} ({item['room'].get('nama_tempat', '')})"
+            for item in tied_top[:4]
+        )
+        return {
+            "ambiguous": True,
+            "command": action,
+            "candidates": tied_top,
+            "message": f"Perintah suara masih ambigu antara: {options_text}. Sebutkan nama lengkap atau nomornya.",
+        }
+
+    return scored_candidates[0]
+
+
+def smart_match_real_relay(rooms: list, user_message: str) -> dict:
+    result = smart_match_real_relay_detailed(rooms, user_message)
+    if result and result.get("ambiguous"):
+        return None
+    return result
+
+
+def smart_match_real_relay_commands(rooms: list, user_message: str) -> list[dict]:
+    """
+    Resolve either a single relay utterance or a compound command joined by
+    connectors like 'dan'/'lalu' (e.g. 'nyalakan lampu sanggar 1 dan sanggar 2').
+    """
+    norm_msg = normalize_smart_text(user_message)
+    if not norm_msg or not rooms:
+        return []
+
+    has_literal_connector_name = False
+    for room in rooms:
+        r_name = normalize_smart_text(room.get("nama_tempat", ""))
+        if _COMPOUND_SPLIT_RE.search(r_name) and _has_phrase(norm_msg, r_name):
+            has_literal_connector_name = True
+            break
+        for relay in room.get("relays", []):
+            r_relay = normalize_smart_text(relay.get("nama_relay", ""))
+            if _COMPOUND_SPLIT_RE.search(r_relay) and _has_phrase(norm_msg, r_relay):
+                has_literal_connector_name = True
+                break
+
+    if not has_literal_connector_name and _COMPOUND_SPLIT_RE.search(user_message or ""):
+        raw_parts = [p.strip() for p in _COMPOUND_SPLIT_RE.split(user_message) if p and p.strip()]
+        if len(raw_parts) >= 2:
+            clause_rooms = [_extract_room_mentions(rooms, normalize_smart_text(p))[0] for p in raw_parts]
+            unique_exp_rooms = {r.get("id", id(r)): r for rs in clause_rooms for r in rs}
+            shared_room_suffix = ""
+            if len(unique_exp_rooms) == 1:
+                only_room = next(iter(unique_exp_rooms.values()))
+                shared_room_suffix = f" di {only_room.get('nama_tempat', '')}"
+
+            resolved_parts = []
+            seen_targets = set()
+            last_action = detect_relay_action(norm_msg)
+            all_valid = True
+            for idx, part in enumerate(raw_parts):
+                clause = part
+                if _has_explicit_action(clause):
+                    last_action = detect_relay_action(clause)
+                else:
+                    verb = "nyalakan" if last_action == "ON" else "matikan"
+                    clause = f"{verb} {clause}"
+                if shared_room_suffix and not clause_rooms[idx]:
+                    clause = f"{clause}{shared_room_suffix}"
+
+                res = smart_match_real_relay_detailed(rooms, clause)
+                if not res or res.get("ambiguous") or res.get("is_all"):
+                    all_valid = False
+                    break
+                key = (res["room"].get("id", id(res["room"])), res["relay"].get("relay_number"))
+                if key in seen_targets:
+                    all_valid = False
+                    break
+                seen_targets.add(key)
+                resolved_parts.append(res)
+
+            if all_valid and len(resolved_parts) >= 2:
+                return resolved_parts
+
+    single = smart_match_real_relay_detailed(rooms, user_message)
+    return [single] if single else []
 
 
 def smart_match_real_relay_for_target(rooms: list, *, target: str = "", action: str = "", channel: int = None) -> dict:
     cmd = detect_relay_action(action or target)
     norm_target = normalize_smart_text(target)
-    
-    # 1. If channel is specified, find matching room and relay
+
     if channel is not None:
         try:
             ch_num = int(channel)
         except (ValueError, TypeError):
             ch_num = None
-            
+
         if ch_num is not None:
-            # Check if target specifies a room
             target_room = None
             if norm_target:
-                for r in rooms:
+                sorted_rooms = sorted(
+                    rooms,
+                    key=lambda r: len(normalize_smart_text(r.get("nama_tempat", ""))),
+                    reverse=True,
+                )
+                for r in sorted_rooms:
                     r_name = normalize_smart_text(r.get("nama_tempat", ""))
-                    if r_name and (r_name in norm_target or norm_target in r_name):
+                    if r_name and (_has_phrase(norm_target, r_name) or _has_phrase(r_name, norm_target)):
                         target_room = r
                         break
-            
+
             search_rooms = [target_room] if target_room else rooms
             for r in search_rooms:
                 for relay in r.get("relays", []):
                     if int(relay.get("relay_number", 0)) == ch_num:
                         return {"room": r, "relay": relay, "command": cmd}
 
-    # 2. Fallback to smart matching user text
     return smart_match_real_relay(rooms, f"{action} {target}".strip())
 
 
@@ -549,10 +862,26 @@ def match_real_relay_command(owner_id: int, user_message: str) -> dict:
     return smart_match_real_relay(rooms, user_message)
 
 
+def match_real_relay_actions(owner_id: int, user_message: str) -> list[dict]:
+    store = get_store()
+    rooms = store.list_relay_rooms(owner_id)
+    return smart_match_real_relay_commands(rooms, user_message)
+
+
 def match_real_relay_for_target(owner_id: int, *, target: str = "", action: str = "", channel: int = None) -> dict:
     store = get_store()
     rooms = store.list_relay_rooms(owner_id)
     return smart_match_real_relay_for_target(rooms, target=target, action=action, channel=channel)
+
+
+def match_real_relay_for_target_detailed(owner_id: int, *, target: str = "", action: str = "", channel: int = None) -> dict:
+    store = get_store()
+    rooms = store.list_relay_rooms(owner_id)
+    if channel is not None:
+        direct = smart_match_real_relay_for_target(rooms, target=target, action=action, channel=channel)
+        if direct:
+            return direct
+    return smart_match_real_relay_detailed(rooms, f"{action} {target}".strip())
 
 
 def real_relay_status_payload(owner_id: int) -> dict:

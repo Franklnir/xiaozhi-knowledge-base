@@ -516,3 +516,188 @@ def format_persona_mood_guidelines(mood_key: str, expressiveness: str = "tinggi"
         "expressiveness": expressiveness,
         "prompt_context": prompt_context,
     }
+
+
+def analyze_user_emotion_and_tone(
+    text: str,
+    context: str = "",
+) -> Dict[str, Any]:
+    """
+    Menganalisis nada emosi, suasana hati, dan perasaan dari ucapan pengguna secara cerdas.
+    Mendeteksi emosi (marah, senyum, bahagia, bingung, senang, teriak, ketawa, sedih, kaget, bisik, sarkas, bangga, ngantuk, tenang, takut).
+    Menghasilkan panduan respon vokal karakter persona yang paling empati, nada bicara, serta reaksi audio untuk XiaoZhi.
+    """
+    import re
+    cleaned = (text or "").strip().lower()
+
+    if not cleaned:
+        emo_data = SUPPORTED_EMOTIONS["senyum"]
+        return {
+            "success": True,
+            "detected_emotion": "senyum",
+            "emotion_label": emo_data["title"],
+            "emoji": emo_data["emoji"],
+            "intensity": "sedang",
+            "tone_characteristics": "Nada netral, santai, dan bersahabat.",
+            "recommended_persona_response": "hangat_penyayang",
+            "recommended_vocal_cue": "Hehe...",
+            "tone_guidance_for_xiaozhi": emo_data["tone_guidance"],
+            "pitch_and_speed": emo_data["pitch_and_speed"],
+            "sample_reply": "Hehe... Halo sahabatku! Ada yang bisa aku bantu untukmu hari ini?",
+            "metadata": {
+                "face": "senyum",
+                "emoji": emo_data["emoji"],
+                "emotion": "senyum",
+                "intensity": "sedang",
+            }
+        }
+
+    scores: Dict[str, int] = {k: 0 for k in SUPPORTED_EMOTIONS}
+
+    # 1. Ketawa / Lucu
+    for w in ["wkwk", "haha", "hihi", "hehe", "ngakak", "kocak", "lucu", "lawak", "canda", "rofl", "lmao", "komedi", "humor"]:
+        if w in cleaned:
+            scores["ketawa"] += 3
+
+    # 2. Marah / Kesal
+    for w in ["marah", "kesal", "jengkel", "ngamuk", "murka", "benci", "sialan", "brengsek", "kurang ajar", "muak", "kesel", "argh", "capek bener", "nyebelin", "parah lu", "jangan bikin emosi"]:
+        if w in cleaned:
+            scores["marah"] += 4
+
+    # 3. Sedih / Menangis / Galau
+    for w in ["sedih", "nangis", "menangis", "hiks", "galau", "patah hati", "hancur", "terluka", "kehilangan", "duka", "kasihan", "down", "terharu", "kecewa", "nyesek", "merana"]:
+        if w in cleaned:
+            scores["sedih"] += 4
+
+    # 4. Bahagia / Bersyukur
+    for w in ["bahagia", "alhamdulillah", "puji tuhan", "bersyukur", "senang sekali", "sukacita", "lulus", "menang", "sukses", "gembira", "terima kasih banyak", "beruntung", "berkah", "diterima"]:
+        if w in cleaned:
+            scores["bahagia"] += 4
+
+    # 5. Teriak / Berseru keras
+    for w in ["teriak", "woi", "tolong", "astaga naga", "kebakaran", "heboh", "histeris", "allahu akbar"]:
+        if w in cleaned:
+            scores["teriak"] += 3
+    if text.isupper() and len(text) > 8:
+        scores["teriak"] += 4
+
+    # 6. Senang / Antusias
+    for w in ["senang", "asik", "asyik", "hore", "yess", "mantap", "keren", "seru", "semangat", "gass", "gas", "top", "luar biasa", "mantul", "hebat", "asyik banget"]:
+        if w in cleaned:
+            scores["senang"] += 3
+
+    # 7. Bingung / Heran
+    for w in ["bingung", "kok bisa", "hah", "gimana ya", "maksudnya", "heran", "gak paham", "gak ngerti", "aneh", "linglung", "kenapa", "kok gitu", "bisa tolong jelaskan", "gimana sih"]:
+        if w in cleaned:
+            scores["bingung"] += 3
+
+    # 8. Kaget / Terkejut
+    for w in ["kaget", "terkejut", "syok", "shock", "demi apa", "astaga", "beneran", "masa sih", "kaget banget", "waduh"]:
+        if w in cleaned:
+            scores["kaget"] += 3
+
+    # 9. Takut / Cemas
+    for w in ["takut", "seram", "merinding", "panik", "cemas", "khawatir", "deg-degan", "ngeri", "horor", "genting", "awas"]:
+        if w in cleaned:
+            scores["takut"] += 4
+
+    # 10. Ngantuk / Lelah
+    for w in ["ngantuk", "capek", "lelah", "letih", "tidur", "rebahan", "hoam", "lemas", "kurang tidur", "tepar", "istirahat", "ngantuk berat"]:
+        if w in cleaned:
+            scores["ngantuk"] += 4
+
+    # 11. Bangga / Percaya Diri
+    for w in ["bangga", "pede", "percaya diri", "siapa dulu", "juara", "unggul", "terbukti", "prestasi", "terbaik", "bisa kan"]:
+        if w in cleaned:
+            scores["bangga"] += 3
+
+    # 12. Tenang / Rileks
+    for w in ["tenang", "damai", "santai", "rileks", "adem", "sejuk", "meditasi", "hening", "pasrah", "nyaman"]:
+        if w in cleaned:
+            scores["tenang"] += 3
+
+    # 13. Bisik / Rahasia
+    for w in ["rahasia", "bisik", "ssst", "jangan bilang", "privat", "diam-diam", "jangan kasih tahu siapa-siapa"]:
+        if w in cleaned:
+            scores["bisik"] += 4
+
+    # 14. Sarkas / Teasing
+    for w in ["cie", "ciee", "julid", "caper", "paling jago", "sultan", "nyindir", "hebat deh kamu", "iyadeh"]:
+        if w in cleaned:
+            scores["sarkas"] += 3
+
+    # 15. Senyum / Ramah (general positive/courteous)
+    for w in ["senyum", "halo", "hai", "makasih", "terima kasih", "pagi", "siang", "sore", "malam", "sahabat", "teman", "tolong"]:
+        if w in cleaned:
+            scores["senyum"] += 1
+
+    # Deteksi intensitas
+    intensity = "sedang"
+    exclamation_count = text.count("!")
+    question_count = text.count("?")
+    has_extreme_words = any(w in cleaned for w in ["banget", "parah", "ekstrem", "sekali", "sungguh", "gila", "bener-bener", "parah banget"])
+
+    if (exclamation_count >= 3 or text.isupper()) and has_extreme_words:
+        intensity = "ekstrem"
+    elif exclamation_count >= 2 or has_extreme_words or (text.isupper() and len(text) > 6):
+        intensity = "tinggi"
+    elif any(w in cleaned for w in ["sedikit", "agak", "halus", "...", "dikit"]):
+        intensity = "ringan"
+
+    # Pilih emosi dengan skor tertinggi
+    best_emotion = max(scores.keys(), key=lambda k: scores[k])
+    if scores[best_emotion] == 0:
+        if exclamation_count > 0:
+            best_emotion = "senang"
+        elif question_count > 0:
+            best_emotion = "bingung"
+        else:
+            best_emotion = "senyum"
+
+    emo_data = SUPPORTED_EMOTIONS[best_emotion]
+
+    # Pasangkan persona mood & gaya respons XiaoZhi
+    persona_mapping = {
+        "ketawa": ("ceria_humoris", "Tanggapi dengan ikut tertawa renyah dan santai ('Hahaha!')."),
+        "marah": ("hangat_penyayang", "Redakan emosi pengguna dengan suara lembut, penuh kesabaran, tanpa membantah kasar."),
+        "sedih": ("hangat_penyayang", "Berikan empati mendalam, pelukan vokal hangat, dan kata-kata penghibur yang menguatkan hati."),
+        "bahagia": ("antusias_eksploratif", "Ikut bersukacita penuh syukur dan rayakan kabar baik ini dengan nada cerah ('Alhamdulillah! Wah bahagianya!')."),
+        "teriak": ("antusias_eksploratif", "Respons dengan energi setara dan seruan kagum ('WAAAH! Keren banget!')."),
+        "senang": ("antusias_eksploratif", "Dukung antusiasme pengguna dengan nada lincah dan bersemangat ('Yesss, mantap jiwa!')."),
+        "bingung": ("bijak_tenang", "Jelaskan dengan runtut, sabar, dan terstruktur tanpa kata-kata rumit ('Tenang saja, mari kita urai pelan-pelan ya.')."),
+        "kaget": ("ceria_humoris", "Tunjukkan keterkejutan yang bersahabat lalu jelaskan duduk perkaranya ('Astaga! Demi apa?!')."),
+        "takut": ("bijak_tenang", "Beri rasa aman dan tenang ('Tarik nafas dulu... tenang saja, aku ada di sini bersamamu.')."),
+        "ngantuk": ("hangat_penyayang", "Ajak istirahat dengan nada lembut menyejukkan ('Hoaam... kamu sudah berjuang hebat hari ini, yuk istirahat dulu.')."),
+        "bangga": ("santai_cuek", "Apresiasi pencapaian pengguna dengan nada kagum mantap ('Tuh kan, siapa dulu dong! Keren abis!')."),
+        "tenang": ("bijak_tenang", "Pertahankan kedamaian dialog dengan intonasi stabil dan sejuk."),
+        "bisik": ("hangat_penyayang", "Bicaralah dengan nada pelan berbisik rahasia ('Ssst... ini rahasia kita berdua ya.')."),
+        "sarkas": ("santai_cuek", "Balas dengan godaan jenaka yang asyik tanpa tersinggung ('Cieee... iya deh si paling mantul, hehe!')."),
+        "senyum": ("hangat_penyayang", "Sambut dengan senyuman ramah dan keramahan tulus."),
+    }
+
+    rec_mood, response_advice = persona_mapping.get(best_emotion, ("ceria_humoris", "Bicaralah dengan ceria dan ramah."))
+    vocal_cues = emo_data.get("vocal_cues", {}).get(intensity, ["Wah!"])
+    selected_cue = vocal_cues[0] if vocal_cues else "Wah!"
+
+    return {
+        "success": True,
+        "detected_emotion": best_emotion,
+        "emotion_label": emo_data["title"],
+        "emoji": emo_data["emoji"],
+        "intensity": intensity,
+        "tone_characteristics": f"Pengguna terdeteksi mengekspresikan nada '{emo_data['title']}' dengan intensitas '{intensity}'.",
+        "recommended_persona_response": rec_mood,
+        "recommended_vocal_cue": selected_cue,
+        "response_advice": response_advice,
+        "tone_guidance_for_xiaozhi": emo_data["tone_guidance"],
+        "pitch_and_speed": emo_data["pitch_and_speed"],
+        "sample_dialogue": f"{selected_cue} {emo_data['sample_dialogue']}",
+        "metadata": {
+            "face": best_emotion,
+            "emoji": emo_data["emoji"],
+            "emotion": best_emotion,
+            "intensity": intensity,
+            "recommended_mood": rec_mood,
+        }
+    }
+

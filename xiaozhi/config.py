@@ -130,6 +130,14 @@ ALL_MCP_TOOLS_CATALOG = [
         "icon": "🧠",
         "description": "Mengingat percakapan lampau menggunakan vektor semantik RAG.",
     },
+    {
+        "name": "get_chat_history",
+        "title": "Riwayat Percakapan Chat",
+        "category": "knowledge",
+        "category_label": "Knowledge & Memori",
+        "icon": "💬",
+        "description": "Membaca dan memanggil riwayat percakapan sebelumnya antara pengguna dan XiaoZhi.",
+    },
 
     # 2. Karakter, Persona & Device
     {
@@ -147,6 +155,22 @@ ALL_MCP_TOOLS_CATALOG = [
         "category_label": "Karakter & Device",
         "icon": "🧬",
         "description": "Membaca kepribadian (Introvert/Extrovert), hobi, dan tantangan hidup pengguna.",
+    },
+    {
+        "name": "get_character_persona",
+        "title": "Pesona Karakter & Nada Emosi",
+        "category": "persona",
+        "category_label": "Karakter & Device",
+        "icon": "✨",
+        "description": "Membaca kepribadian aktif XiaoZhi, gaya bicara, serta menyelaraskan nada emosi karakter.",
+    },
+    {
+        "name": "read_emotion_tone",
+        "title": "Baca Nada Emosi Pengguna",
+        "category": "persona",
+        "category_label": "Karakter & Device",
+        "icon": "🎯",
+        "description": "Mendeteksi dan menganalisis nada emosi, perasaan, dan suasana hati dari kalimat pengguna.",
     },
     {
         "name": "get_registered_devices",
