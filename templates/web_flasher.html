@@ -474,6 +474,188 @@
         box-shadow: 0 0 16px rgba(250, 204, 21, 0.25);
     }
 
+    /* Version Option Cards (Step 3 - Gray indicator for user's last flashed version) */
+    .version-cards-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 6px;
+    }
+    .version-option-card {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1.5px solid var(--app-border-strong);
+        background: var(--app-surface);
+        cursor: pointer;
+        transition: all 0.18s ease;
+        text-align: left;
+    }
+    .version-option-card:hover {
+        border-color: var(--app-accent, #059669);
+        background: var(--app-surface-muted);
+    }
+    .version-option-card.is-selected {
+        border-color: #059669 !important;
+        background: rgba(5, 150, 105, 0.06) !important;
+        box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+    }
+    :root[data-theme="neo"] .version-option-card {
+        border: 2px solid #111;
+    }
+    :root[data-theme="neo"] .version-option-card.is-selected {
+        border-color: #111 !important;
+        background: #fffde7 !important;
+        box-shadow: 3px 3px 0 #111;
+    }
+    :root[data-theme="dark"] .version-option-card {
+        background: var(--app-surface);
+        border-color: var(--app-border);
+    }
+    :root[data-theme="dark"] .version-option-card:hover {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: var(--app-border-strong);
+    }
+    :root[data-theme="dark"] .version-option-card.is-selected {
+        background: rgba(16, 185, 129, 0.12) !important;
+        border-color: #10b981 !important;
+        box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
+    }
+
+    /* Last Flashed Version -> Unmistakable Gray Muted Appearance, Yet Clickable */
+    .version-option-card.is-last-flashed {
+        background: #e5e7eb !important;
+        border-color: #9ca3af !important;
+        color: #4b5563 !important;
+        opacity: 0.9;
+    }
+    .version-option-card.is-last-flashed:hover {
+        background: #dfe3e8 !important;
+        border-color: #6b7280 !important;
+        opacity: 1;
+    }
+    .version-option-card.is-last-flashed.is-selected {
+        background: #e5e7eb !important;
+        border-color: #4b5563 !important;
+        box-shadow: inset 0 0 0 1px #4b5563 !important;
+        opacity: 1;
+    }
+    :root[data-theme="neo"] .version-option-card.is-last-flashed,
+    :root[data-theme="neo"] .version-option-card.is-last-flashed.is-selected {
+        background: #e2e8f0 !important;
+        border: 2px solid #64748b !important;
+        color: #475569 !important;
+        box-shadow: 2px 2px 0 #64748b !important;
+    }
+    :root[data-theme="dark"] .version-option-card.is-last-flashed {
+        background: rgba(148, 163, 184, 0.14) !important;
+        border-color: rgba(148, 163, 184, 0.35) !important;
+        color: #94a3b8 !important;
+    }
+    :root[data-theme="dark"] .version-option-card.is-last-flashed:hover {
+        background: rgba(148, 163, 184, 0.2) !important;
+        border-color: rgba(148, 163, 184, 0.55) !important;
+    }
+    :root[data-theme="dark"] .version-option-card.is-last-flashed.is-selected {
+        background: rgba(148, 163, 184, 0.18) !important;
+        border-color: #94a3b8 !important;
+        box-shadow: inset 0 0 0 1px #94a3b8 !important;
+    }
+    .version-option-card.is-last-flashed .version-card-title {
+        color: #4b5563 !important;
+    }
+    :root[data-theme="dark"] .version-option-card.is-last-flashed .version-card-title {
+        color: #cbd5e1 !important;
+    }
+    .version-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .version-card-left {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        flex-wrap: wrap;
+    }
+    .version-radio-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid var(--app-border-strong);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background: var(--app-surface);
+    }
+    .version-option-card.is-selected .version-radio-dot {
+        border-color: #059669;
+    }
+    .version-option-card.is-selected .version-radio-dot::after {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #059669;
+    }
+    .version-option-card.is-last-flashed.is-selected .version-radio-dot {
+        border-color: #4b5563;
+    }
+    .version-option-card.is-last-flashed.is-selected .version-radio-dot::after {
+        background: #4b5563;
+    }
+    .version-card-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--app-text);
+    }
+    .version-card-meta {
+        font-size: 11px;
+        color: var(--app-muted);
+        white-space: nowrap;
+    }
+    .version-card-summary {
+        font-size: 11.5px;
+        color: var(--app-muted);
+        line-height: 1.4;
+        padding-left: 21px;
+    }
+    .version-last-flashed-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        background: #6b7280;
+        color: #f9fafb;
+    }
+    :root[data-theme="dark"] .version-last-flashed-chip {
+        background: #475569;
+        color: #e2e8f0;
+    }
+    .version-last-flashed-note {
+        padding: 7px 10px;
+        border-radius: 8px;
+        background: #f3f4f6;
+        border: 1px solid #9ca3af;
+        color: #374151;
+        font-size: 11.5px;
+        font-weight: 600;
+        line-height: 1.45;
+    }
+    :root[data-theme="dark"] .version-last-flashed-note {
+        background: rgba(148, 163, 184, 0.14);
+        border-color: rgba(148, 163, 184, 0.35);
+        color: #cbd5e1;
+    }
+
     .source-radio-indicator {
         width: 22px;
         height: 22px;
@@ -936,7 +1118,8 @@
                             </div>
 
                             {% set init_ver = selected_version or (preset_status.active_version if preset_status else 'v001') %}
-                            <select id="userPresetVersionSelect" class="app-input" onchange="onUserPresetVersionChange(this.value)" style="width:100%; font-size:12.5px; padding:8px 10px; font-weight:700;">
+                            <div id="versionCardsList" class="version-cards-list" role="radiogroup" aria-label="Pilih versi rilis firmware"></div>
+                            <select id="userPresetVersionSelect" class="app-input" onchange="onUserPresetVersionChange(this.value)" style="display:none;">
                                 {% if preset_status and preset_status.preset and preset_status.preset.versions %}
                                     {% for v in preset_status.preset.versions %}
                                     <option value="{{ v.version }}" {% if v.version == init_ver %}selected{% endif %}>
@@ -955,6 +1138,7 @@
                             </div>
 
                             <div id="versionDetailBox" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--app-border); display:flex; flex-direction:column; gap:6px; font-size:11.5px; color:var(--app-muted);">
+                                <div id="verLastFlashedBanner" class="version-last-flashed-note" style="display:none;"></div>
                                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
                                     <strong style="font-size:11.5px; color:var(--app-text);">Catatan Rilis / Changelog:</strong>
                                     <span id="verDetailDate" style="font-size:11px; color:var(--app-muted);">-</span>
@@ -1519,6 +1703,7 @@
     let presetStatusFetchSeq = 0;
     let PRESETS_CACHE = {{ presets|tojson }};
     const AUTHORIZED_PRESETS_SET = new Set({{ authorized_presets|default([])|tojson }});
+    const userFlashHistory = {{ user_flash_history|default({})|tojson }};
     const userAuthStatus = {
         isLoggedIn: {{ 'true' if user else 'false' }},
         role: "{{ user.role if user else '' }}",
@@ -1875,6 +2060,11 @@
                 userAuthStatus.status = st.status || 'NONE';
                 userAuthStatus.isLoggedIn = (userAuthStatus.status !== 'ANONYMOUS');
                 userAuthStatus.activeVersion = st.active_version || 'v001';
+                if (st.last_flashed && st.last_flashed.version) {
+                    userFlashHistory[presetId] = st.last_flashed;
+                } else {
+                    delete userFlashHistory[presetId];
+                }
 
                 if (st.preset) {
                     const idx = PRESETS_CACHE.findIndex(p => p.id === presetId);
@@ -1894,8 +2084,50 @@
         }
     };
 
+    function getLastFlashedEntry(presetId) {
+        if (!presetId || typeof userFlashHistory !== 'object' || !userFlashHistory) return null;
+        const entry = userFlashHistory[presetId];
+        return (entry && entry.version) ? entry : null;
+    }
+
+    function formatFlashDateTime(isoStr) {
+        if (!isoStr) return '';
+        const parsed = new Date(isoStr);
+        if (isNaN(parsed.getTime())) return String(isoStr).substring(0, 16);
+        return parsed.toLocaleString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }
+
+    async function reportPresetFlashComplete(presetId, versionCode) {
+        if (!presetId || !versionCode || !userAuthStatus.isLoggedIn) return;
+        try {
+            const resp = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(presetId) + '/flash-complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ version: versionCode })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json().catch(() => null);
+            if (data && data.success && data.last_flashed) {
+                userFlashHistory[presetId] = data.last_flashed;
+                if (currentPresetId === presetId) {
+                    renderPresetVersions(presetId, null, userAuthStatus.activeVersion, currentSelectedVersion || versionCode);
+                }
+            }
+        } catch (err) {
+            console.warn('Gagal menyimpan riwayat flash preset:', err);
+        }
+    }
+
     window.renderPresetVersions = function(presetId, versionsList, activeVer, preferredVer) {
         const vSelect = document.getElementById('userPresetVersionSelect');
+        const cardsWrap = document.getElementById('versionCardsList');
         if (!vSelect) return;
 
         let presetObj = PRESETS_CACHE.find(p => p.id === presetId);
@@ -1925,12 +2157,108 @@
             });
         }
 
-        currentSelectedVersion = vSelect.value || chosenVer || defActive;
+        const resolvedSelected = vSelect.value || chosenVer || defActive;
+        const effectiveList = versions.length > 0
+            ? versions
+            : [{ version: defActive, changelog: 'Rilis firmware versi ' + defActive }];
+        const lastFlashed = getLastFlashedEntry(presetId);
+        const lastFlashedVer = lastFlashed ? lastFlashed.version : '';
+
+        if (cardsWrap) {
+            cardsWrap.innerHTML = '';
+            effectiveList.forEach(v => {
+                const verCode = v.version || defActive;
+                const isAct = (verCode === defActive);
+                const isLastFlashed = !!(lastFlashedVer && lastFlashedVer === verCode);
+                const isSelected = (verCode === resolvedSelected);
+
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = 'version-option-card'
+                    + (isLastFlashed ? ' is-last-flashed' : '')
+                    + (isSelected ? ' is-selected' : '');
+                card.dataset.version = verCode;
+                card.setAttribute('role', 'radio');
+                card.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+
+                const topRow = document.createElement('div');
+                topRow.className = 'version-card-top';
+
+                const leftSide = document.createElement('div');
+                leftSide.className = 'version-card-left';
+
+                const radioDot = document.createElement('span');
+                radioDot.className = 'version-radio-dot';
+                leftSide.appendChild(radioDot);
+
+                const titleEl = document.createElement('span');
+                titleEl.className = 'version-card-title';
+                titleEl.textContent = verCode;
+                leftSide.appendChild(titleEl);
+
+                const roleChip = document.createElement('span');
+                roleChip.className = isAct ? 'app-chip app-chip-success' : 'app-chip';
+                roleChip.style.fontSize = '10px';
+                roleChip.style.fontWeight = '800';
+                roleChip.textContent = isAct ? 'Versi Utama' : 'Rilis Lama';
+                leftSide.appendChild(roleChip);
+
+                if (isLastFlashed) {
+                    const flashChip = document.createElement('span');
+                    flashChip.className = 'version-last-flashed-chip';
+                    flashChip.textContent = 'Terakhir Di-Flash';
+                    leftSide.appendChild(flashChip);
+                }
+
+                const metaEl = document.createElement('span');
+                metaEl.className = 'version-card-meta';
+                const parts = [];
+                if (v.uploaded_at) {
+                    const parsed = new Date(v.uploaded_at);
+                    parts.push(!isNaN(parsed.getTime())
+                        ? parsed.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : String(v.uploaded_at).substring(0, 10));
+                }
+                if (v.size_bytes) {
+                    parts.push((v.size_bytes / (1024 * 1024)).toFixed(2) + ' MB');
+                }
+                metaEl.textContent = parts.join(' • ');
+
+                topRow.appendChild(leftSide);
+                topRow.appendChild(metaEl);
+                card.appendChild(topRow);
+
+                const summaryEl = document.createElement('div');
+                summaryEl.className = 'version-card-summary';
+                const rawCl = String(v.changelog || ('Rilis firmware versi ' + verCode)).replace(/\s+/g, ' ').trim();
+                summaryEl.textContent = rawCl.length > 90 ? rawCl.substring(0, 87) + '...' : rawCl;
+                card.appendChild(summaryEl);
+
+                card.addEventListener('click', () => {
+                    vSelect.value = verCode;
+                    onUserPresetVersionChange(verCode);
+                });
+
+                cardsWrap.appendChild(card);
+            });
+        }
+
+        currentSelectedVersion = resolvedSelected;
         onUserPresetVersionChange(currentSelectedVersion);
     };
 
     window.onUserPresetVersionChange = function(versionCode) {
         currentSelectedVersion = versionCode;
+        const vSelect = document.getElementById('userPresetVersionSelect');
+        if (vSelect && vSelect.value !== versionCode) {
+            vSelect.value = versionCode;
+        }
+        document.querySelectorAll('#versionCardsList .version-option-card').forEach(card => {
+            const matched = (card.dataset.version === versionCode);
+            card.classList.toggle('is-selected', matched);
+            card.setAttribute('aria-checked', matched ? 'true' : 'false');
+        });
+
         if (loadedBufferMeta && (loadedBufferMeta.presetId !== currentPresetId || loadedBufferMeta.version !== versionCode)) {
             resetPresetLoadedBuffer();
         }
@@ -1949,6 +2277,8 @@
         const pill = document.getElementById('versionStatusPill');
         const alertBox = document.getElementById('olderVersionAlert');
         const alertName = document.getElementById('alertVersionName');
+        const lastFlashBanner = document.getElementById('verLastFlashedBanner');
+        const lastFlashed = getLastFlashedEntry(currentPresetId);
 
         if (pill) {
             pill.textContent = isOlder ? 'Versi Sebelumnya (' + versionCode + ')' : 'Versi Aktif (' + versionCode + ')';
@@ -1959,6 +2289,17 @@
         }
         if (alertName) {
             alertName.textContent = versionCode;
+        }
+        if (lastFlashBanner) {
+            if (lastFlashed && lastFlashed.version === versionCode) {
+                const whenText = lastFlashed.flashed_at ? formatFlashDateTime(lastFlashed.flashed_at) : '';
+                lastFlashBanner.textContent = 'Versi ini adalah firmware yang terakhir Anda flash'
+                    + (whenText ? ' (' + whenText + ')' : '')
+                    + '. Anda tetap dapat membaca detail keterangan rilis di bawah atau me-flash ulang kapan saja.';
+                lastFlashBanner.style.display = 'block';
+            } else {
+                lastFlashBanner.style.display = 'none';
+            }
         }
 
         // Update Detail Box
@@ -1988,6 +2329,7 @@
             if (fnEl) fnEl.textContent = currentPresetId + '_' + versionCode + '.bin';
             if (dtEl) dtEl.textContent = '-';
             if (clEl) clEl.textContent = 'Rilis firmware versi ' + versionCode;
+            if (szEl) szEl.textContent = 'Ukuran: -';
         }
 
         // Reset tombol agar siap memuat binary versi terpilih
@@ -2338,6 +2680,7 @@
 
     window.clearSelectedFile = function() {
         selectedFileBuffer = null;
+        loadedBufferMeta = null;
         if (firmwareFileInput) firmwareFileInput.value = '';
         if (selectedFileInfo) selectedFileInfo.style.display = 'none';
         if (offsetPreset) offsetPreset.disabled = false;
@@ -2361,6 +2704,7 @@
         const reader = new FileReader();
         reader.onload = function(e) {
             selectedFileBuffer = ensureBinaryString(e.target.result);
+            loadedBufferMeta = null;
             selectedFileInfo.style.display = 'block';
             selectedFileName.textContent = file.name;
             const mb = (selectedFileBuffer.length / (1024 * 1024)).toFixed(2);
@@ -2705,6 +3049,13 @@
             logToConsole('[SUKSES] Seluruh data firmware berhasil ditulis ke ESP32!');
             logToConsole('============================================================');
             isFlashCompleted = true;
+            if (loadedBufferMeta && loadedBufferMeta.presetId && loadedBufferMeta.version) {
+                try {
+                    await reportPresetFlashComplete(loadedBufferMeta.presetId, loadedBufferMeta.version);
+                } catch (histErr) {
+                    console.warn('Gagal mencatat riwayat flash:', histErr);
+                }
+            }
             if (typeof updateStepperUI === 'function') updateStepperUI();
             if (typeof saveWizardState === 'function') saveWizardState();
             if (typeof showWizardNotice === 'function') {

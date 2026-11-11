@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict
 
@@ -212,4 +213,107 @@ def test_admin_approvals_page_clean_without_changelog_tab(isolated_env, monkeypa
     assert page_resp.status_code == 200
     assert "tabBtnServerChangelog" not in page_resp.text
     assert "/admin/firmware/server-changelog" not in page_resp.text
+
+
+def test_user_flash_history_service_and_per_user_isolation(isolated_env):
+    owner = {"id": 42, "username": "BETA_OWNER", "role": "user"}
+    stranger = {"id": 99, "username": "stranger", "role": "user"}
+    admin = {"id": 1, "username": "admin_user", "role": "admin"}
+
+    # Unauthenticated & unauthorized validation
+    assert preset_approval_service.get_user_flash_history(None) == {}
+    res_unauth = preset_approval_service.record_user_flash(None, "board_beta", "v001")
+    assert res_unauth["success"] is False
+    assert res_unauth["error_code"] == "UNAUTHORIZED"
+
+    res_forb = preset_approval_service.record_user_flash(stranger, "board_beta", "v001")
+    assert res_forb["success"] is False
+    assert res_forb["error_code"] == "FORBIDDEN"
+
+    res_missing_ver = preset_approval_service.record_user_flash(owner, "board_beta", "v999")
+    assert res_missing_ver["success"] is False
+    assert res_missing_ver["error_code"] == "VERSION_NOT_FOUND"
+
+    res_missing_preset = preset_approval_service.record_user_flash(admin, "tidak_ada", "v001")
+    assert res_missing_preset["success"] is False
+    assert res_missing_preset["error_code"] == "NOT_FOUND"
+
+    # Initial status has no last_flashed
+    assert preset_approval_service.get_user_status(owner, "board_beta")["last_flashed"] is None
+
+    # Record v001 flash for beta_owner
+    res_v1 = preset_approval_service.record_user_flash(owner, "board_beta", "v001")
+    assert res_v1["success"] is True
+    assert res_v1["last_flashed"]["version"] == "v001"
+    assert res_v1["last_flashed"]["flashed_at"]
+
+    st_owner = preset_approval_service.get_user_status(owner, "board_beta")
+    assert st_owner["last_flashed"]["version"] == "v001"
+
+    # Per-user isolation: admin has separate flash history
+    assert preset_approval_service.get_user_status(admin, "board_beta")["last_flashed"] is None
+
+    # Flashing v002 moves the user's last_flashed marker to v002
+    res_v2 = preset_approval_service.record_user_flash(owner, "board_beta", "v002")
+    assert res_v2["success"] is True
+    st_owner_v2 = preset_approval_service.get_user_status(owner, "board_beta")
+    assert st_owner_v2["last_flashed"]["version"] == "v002"
+
+
+def test_web_flasher_last_flashed_endpoint_and_ui_markers(isolated_env, monkeypatch):
+    app = _build_test_app()
+    client = TestClient(app)
+
+    owner = {"id": 42, "username": "beta_owner", "role": "user"}
+    stranger = {"id": 99, "username": "stranger", "role": "user"}
+    admin = {"id": 1, "username": "admin_user", "role": "admin"}
+
+    # 1. Anonymous rejected with 401
+    monkeypatch.setattr(chat_router_mod, "get_current_user", lambda req: None)
+    r_anon = client.post("/api/v1/flasher/preset/board_beta/flash-complete", json={"version": "v001"})
+    assert r_anon.status_code == 401
+
+    # 2. Stranger (unauthorized for board_beta) rejected with 403
+    monkeypatch.setattr(chat_router_mod, "get_current_user", lambda req: stranger)
+    r_forb = client.post("/api/v1/flasher/preset/board_beta/flash-complete", json={"version": "v001"})
+    assert r_forb.status_code == 403
+
+    # 3. Authorized owner invalid payload -> 400, non-existent version -> 404
+    monkeypatch.setattr(chat_router_mod, "get_current_user", lambda req: owner)
+    r_bad = client.post("/api/v1/flasher/preset/board_beta/flash-complete", json={"version": "v1 invalid!"})
+    assert r_bad.status_code == 400
+    r_missing = client.post("/api/v1/flasher/preset/board_beta/flash-complete", json={"version": "v999"})
+    assert r_missing.status_code == 404
+
+    # 4. Authorized owner records v001 flash -> 200 & reflected in status API
+    r_ok = client.post("/api/v1/flasher/preset/board_beta/flash-complete", json={"version": "v001"})
+    assert r_ok.status_code == 200
+    data_ok = r_ok.json()
+    assert data_ok["success"] is True
+    assert data_ok["last_flashed"]["version"] == "v001"
+
+    st_resp = client.get("/api/v1/flasher/preset/board_beta/status")
+    assert st_resp.status_code == 200
+    assert st_resp.json()["last_flashed"]["version"] == "v001"
+
+    # 5. HTML page includes version cards, last-flashed banner, gray CSS class & owner's flash history JSON
+    page_owner = client.get("/web-flasher")
+    assert page_owner.status_code == 200
+    html_owner = page_owner.text
+    assert 'id="versionCardsList"' in html_owner
+    assert 'id="verLastFlashedBanner"' in html_owner
+    assert 'is-last-flashed' in html_owner
+    assert 'Terakhir Di-Flash' in html_owner
+    m_hist = re.search(r'const userFlashHistory = (\{.*?\});', html_owner)
+    assert m_hist is not None
+    parsed_hist = json.loads(m_hist.group(1))
+    assert parsed_hist["board_beta"]["version"] == "v001"
+    assert parsed_hist["board_beta"]["flashed_at"]
+
+    # 6. Different user does not see beta_owner's flash history
+    monkeypatch.setattr(chat_router_mod, "get_current_user", lambda req: admin)
+    st_admin = client.get("/api/v1/flasher/preset/board_beta/status")
+    assert st_admin.status_code == 200
+    assert st_admin.json()["last_flashed"] is None
+
 

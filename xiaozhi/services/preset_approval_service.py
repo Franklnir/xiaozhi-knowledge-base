@@ -810,12 +810,126 @@ def is_user_authorized(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3
     return False
 
 
+def _extract_user_flash_history(
+    data: Dict[str, Any],
+    user: Optional[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Ambil peta riwayat flash terakhir milik user: {preset_id: {version, flashed_at}}."""
+    if not user:
+        return {}
+    uname = str(user.get("username") or "").strip().lower()
+    if not uname:
+        return {}
+    raw_history = data.get("user_flash_history", {})
+    if not isinstance(raw_history, dict):
+        return {}
+    user_map = raw_history.get(uname, {})
+    if not isinstance(user_map, dict):
+        return {}
+    result: Dict[str, Dict[str, Any]] = {}
+    for pid, entry in user_map.items():
+        if isinstance(entry, dict) and entry.get("version"):
+            result[str(pid)] = {
+                "version": str(entry.get("version") or ""),
+                "flashed_at": str(entry.get("flashed_at") or ""),
+            }
+    return result
+
+
+def get_user_flash_history(user: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Ambil riwayat versi firmware yang terakhir di-flash oleh user pada tiap preset."""
+    if not user:
+        return {}
+    data = _load_data()
+    return _extract_user_flash_history(data, user)
+
+
+def record_user_flash(
+    user: Optional[Dict[str, Any]],
+    preset_id: str,
+    version: str,
+) -> Dict[str, Any]:
+    """Catat versi firmware yang baru saja berhasil di-flash oleh user berizin."""
+    if not user or not str(user.get("username") or "").strip():
+        return {
+            "success": False,
+            "error_code": "UNAUTHORIZED",
+            "message": "Silakan masuk terlebih dahulu untuk mencatat riwayat flash.",
+        }
+
+    clean_pid = str(preset_id or "").strip()
+    clean_ver = str(version or "").strip()
+    if not clean_pid or not clean_ver:
+        return {
+            "success": False,
+            "error_code": "INVALID_PARAMS",
+            "message": "ID preset atau versi firmware tidak valid.",
+        }
+
+    if not is_user_authorized(user, clean_pid):
+        return {
+            "success": False,
+            "error_code": "FORBIDDEN",
+            "message": "Akses Ditolak: Anda belum memiliki izin lisensi untuk preset ini.",
+        }
+
+    data = _load_data()
+    presets_dict = data.get("presets", {})
+    preset_raw = presets_dict.get(clean_pid) or DEFAULT_PRESETS.get(clean_pid)
+    if not preset_raw:
+        return {
+            "success": False,
+            "error_code": "NOT_FOUND",
+            "message": f"Preset '{clean_pid}' tidak ditemukan.",
+        }
+
+    versions = preset_raw.get("versions") or []
+    version_exists = any(
+        isinstance(v, dict) and str(v.get("version") or "").strip() == clean_ver
+        for v in versions
+    )
+    if not version_exists:
+        fallback_active = str(preset_raw.get("active_version") or "v001").strip()
+        if versions or clean_ver != fallback_active:
+            return {
+                "success": False,
+                "error_code": "VERSION_NOT_FOUND",
+                "message": f"Versi '{clean_ver}' tidak ditemukan pada preset '{clean_pid}'.",
+            }
+
+    uname = str(user.get("username") or "").strip().lower()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    history_root = data.setdefault("user_flash_history", {})
+    if not isinstance(history_root, dict):
+        history_root = {}
+        data["user_flash_history"] = history_root
+    user_history = history_root.setdefault(uname, {})
+    if not isinstance(user_history, dict):
+        user_history = {}
+        history_root[uname] = user_history
+
+    entry = {
+        "version": clean_ver,
+        "flashed_at": now_iso,
+    }
+    user_history[clean_pid] = entry
+    _save_data(data)
+
+    return {
+        "success": True,
+        "preset_id": clean_pid,
+        "last_flashed": entry,
+        "message": f"Riwayat flash preset '{clean_pid}' versi {clean_ver} tercatat.",
+    }
+
+
 def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_cam") -> Dict[str, Any]:
     data = _load_data()
     presets_dict = data.get("presets", {})
     preset_raw = presets_dict.get(preset_id) or DEFAULT_PRESETS.get(preset_id)
     preset_info = sanitize_preset_for_client(preset_raw) if preset_raw else None
     active_version = (preset_raw or {}).get("active_version", "v001")
+    last_flashed = _extract_user_flash_history(data, user).get(preset_id)
 
     if not user:
         return {
@@ -823,6 +937,7 @@ def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_ca
             "status": "ANONYMOUS",
             "preset": preset_info,
             "active_version": active_version,
+            "last_flashed": None,
             "message": "Silakan masuk untuk mengakses preset berlisensi ini.",
         }
 
@@ -832,6 +947,7 @@ def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_ca
             "status": "ADMIN",
             "preset": preset_info,
             "active_version": active_version,
+            "last_flashed": last_flashed,
             "message": "Akses Penuh Administrator Resmi",
         }
 
@@ -841,6 +957,7 @@ def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_ca
             "status": "APPROVED",
             "preset": preset_info,
             "active_version": active_version,
+            "last_flashed": last_flashed,
             "message": "Izin akses preset resmi aktif",
         }
 
@@ -849,6 +966,7 @@ def get_user_status(user: Optional[Dict[str, Any]], preset_id: str = "esp32s3_ca
         "status": "NONE",
         "preset": preset_info,
         "active_version": active_version,
+        "last_flashed": last_flashed,
         "message": "Preset berlisensi ini memerlukan klaim Kode Lisensi sekali pakai atau akses langsung dari Admin.",
     }
 

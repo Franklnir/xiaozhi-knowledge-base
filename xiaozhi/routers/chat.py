@@ -13,6 +13,7 @@ from typing import Optional
 from xiaozhi.services.preset_approval_service import (
     get_user_status,
     get_user_authorized_presets,
+    get_user_flash_history,
     is_user_authorized,
     get_decrypted_preset_binary,
     get_preset_version_binary,
@@ -20,6 +21,7 @@ from xiaozhi.services.preset_approval_service import (
     get_preset,
     list_presets,
     redeem_claim_code,
+    record_user_flash,
     PRESETS,
 )
 
@@ -672,6 +674,7 @@ async def web_flasher_page(
         requested_version = ""
 
     preset_status = get_user_status(user, default_preset_id)
+    user_flash_history = get_user_flash_history(user)
     return render(
         request,
         "web_flasher.html",
@@ -682,6 +685,7 @@ async def web_flasher_page(
             "preset_status": preset_status,
             "presets": safe_presets,
             "authorized_presets": authorized_presets,
+            "user_flash_history": user_flash_history,
             "selected_preset_id": default_preset_id,
             "selected_version": requested_version,
             "mcp_required": False,
@@ -693,6 +697,51 @@ async def web_flasher_page(
 async def get_preset_status_api(request: Request, preset_id: str):
     user = get_current_user(request)
     return get_user_status(user, preset_id)
+
+
+@router.post("/api/v1/flasher/preset/{preset_id}/flash-complete")
+async def record_preset_flash_complete_api(request: Request, preset_id: str):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "success": False,
+                "error_code": "UNAUTHORIZED",
+                "message": "Silakan masuk terlebih dahulu untuk mencatat riwayat flash.",
+            },
+        )
+    if not is_user_authorized(user, preset_id):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "success": False,
+                "error_code": "FORBIDDEN",
+                "message": "Akses Ditolak: Anda tidak memiliki izin lisensi untuk preset ini.",
+            },
+        )
+    try:
+        body = await request.json()
+        version = str((body or {}).get("version") or "").strip()
+    except Exception:
+        version = ""
+
+    if not version or not re.match(r"^[a-zA-Z0-9_\.-]+$", version):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "INVALID_PARAMS",
+                "message": "Parameter versi firmware tidak valid.",
+            },
+        )
+
+    res = record_user_flash(user, preset_id, version)
+    if not res.get("success"):
+        code = res.get("error_code")
+        status_code = 404 if code in ("NOT_FOUND", "VERSION_NOT_FOUND") else (403 if code == "FORBIDDEN" else 400)
+        raise HTTPException(status_code=status_code, detail=res)
+    return res
 
 
 @router.post("/api/v1/flasher/preset/claim")
