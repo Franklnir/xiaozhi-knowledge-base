@@ -12,6 +12,7 @@ from typing import Optional
 
 from xiaozhi.services.preset_approval_service import (
     get_user_status,
+    get_user_authorized_presets,
     is_user_authorized,
     get_decrypted_preset_binary,
     get_preset_version_binary,
@@ -21,6 +22,7 @@ from xiaozhi.services.preset_approval_service import (
     redeem_claim_code,
     PRESETS,
 )
+from xiaozhi.services.changelog_service import get_unified_changelog_payload
 
 from xiaozhi.config import CHAT_HISTORY_DEFAULT_LIMIT, ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
@@ -647,11 +649,29 @@ async def delete_chat_history_api(request: Request, chat_id: int):
 
 
 @router.get("/web-flasher", response_class=HTMLResponse)
-async def web_flasher_page(request: Request):
+async def web_flasher_page(
+    request: Request,
+    preset: Optional[str] = Query(None),
+    version: Optional[str] = Query(None),
+):
     user = get_current_user(request)
     all_presets = list_presets()
-    safe_presets = [sanitize_preset_for_client(p) for p in all_presets]
-    default_preset_id = all_presets[0]["id"] if all_presets else "esp32s3_cam"
+    safe_presets = [p for p in (sanitize_preset_for_client(item) for item in all_presets) if p]
+    preset_ids = [p["id"] for p in safe_presets if p.get("id")]
+    authorized_presets = get_user_authorized_presets(user, preset_ids=preset_ids)
+
+    requested_preset = (preset or "").strip().lower()
+    if requested_preset and requested_preset in preset_ids:
+        default_preset_id = requested_preset
+    elif authorized_presets:
+        default_preset_id = authorized_presets[0]
+    else:
+        default_preset_id = preset_ids[0] if preset_ids else "esp32s3_cam"
+
+    requested_version = (version or "").strip()
+    if requested_version and not re.match(r"^[a-zA-Z0-9_\.-]+$", requested_version):
+        requested_version = ""
+
     preset_status = get_user_status(user, default_preset_id)
     return render(
         request,
@@ -662,9 +682,41 @@ async def web_flasher_page(request: Request):
             "active_page": "web_flasher",
             "preset_status": preset_status,
             "presets": safe_presets,
+            "authorized_presets": authorized_presets,
+            "selected_preset_id": default_preset_id,
+            "selected_version": requested_version,
             "mcp_required": False,
         },
     )
+
+
+@router.get("/changelog", response_class=HTMLResponse)
+@router.get("/info-update", response_class=HTMLResponse)
+async def changelog_page(request: Request):
+    user = get_current_user(request)
+    payload = get_unified_changelog_payload()
+    preset_ids = [p["id"] for p in payload.get("presets", []) if p.get("id")]
+    authorized_presets = get_user_authorized_presets(user, preset_ids=preset_ids)
+    return render(
+        request,
+        "changelog.html",
+        {
+            "user": user,
+            "page": "changelog",
+            "active_page": "changelog",
+            "changelog_presets": payload.get("presets", []),
+            "server_updates": payload.get("server_updates", []),
+            "changelog_stats": payload.get("stats", {}),
+            "authorized_presets": authorized_presets,
+            "mcp_required": False,
+        },
+    )
+
+
+@router.get("/api/v1/changelog")
+async def get_changelog_api():
+    payload = get_unified_changelog_payload()
+    return JSONResponse({"success": True, **payload})
 
 
 @router.get("/api/v1/flasher/preset/{preset_id}/status")

@@ -2491,6 +2491,10 @@
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
                 Web Flasher ESP32
             </a>
+            <a href="/changelog" class="app-sidebar-link {% if page == 'changelog' or active_page == 'changelog' %}is-active{% endif %}">
+                <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/><path d="M3 12a9 9 0 0 1 9-9"/></svg></span>
+                Info Update & Changelog
+            </a>
             <a href="/profil" class="app-sidebar-link {% if page == 'profile' or active_page == 'profile' %}is-active{% endif %}">
                 <span class="app-sidebar-link-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                 Profil Saya
@@ -2566,6 +2570,7 @@
         </a>
         <div class="app-guest-nav">
             <a href="/web-flasher" class="app-button" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Flasher</a>
+            <a href="/changelog" class="app-button" style="text-decoration:none;">Changelog</a>
             <a href="/dokumentasi" class="app-button" style="text-decoration:none;">Dokumentasi</a>
             <a href="/login" class="app-button app-button-primary" style="text-decoration:none;">Masuk</a>
         </div>

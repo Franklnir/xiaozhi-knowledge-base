@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+
+{% block title %}Info Update & Changelog Firmware ESP32 & Server MCP | xiaozhiscig{% endblock %}
+{% block meta_title %}Info Update & Changelog Firmware ESP32 & Server MCP | xiaozhiscig{% endblock %}
+{% block meta_desc %}Riwayat pembaruan resmi firmware ESP32 Xiaozhi, catatan rilis lengkap per preset & versi, serta info apakah update wajib flash ulang (.bin) atau cukup reconnect server/MCP.{% endblock %}
+{% block og_title %}Info Update & Changelog Firmware ESP32 & Server MCP | xiaozhiscig{% endblock %}
+{% block og_desc %}Cek catatan rilis terbaru firmware ESP32 Xiaozhi dan pembaruan server MCP beserta status Wajib Flash Ulang vs Cukup Reconnect.{% endblock %}
+
+{% block content %}
+<style>
+    .cl-shell {
+        max-width: 1120px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .cl-hero {
+        background: var(--app-surface);
+        border: 1.5px solid var(--app-border-strong);
+        border-radius: var(--app-radius-lg, 14px);
+        padding: 22px 24px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+    }
+    .cl-guide-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+    }
+    .cl-guide-card {
+        border-radius: var(--app-radius, 12px);
+        padding: 16px 18px;
+        border: 1.5px solid var(--app-border-strong);
+        background: var(--app-surface);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .cl-guide-card.is-reflash {
+        border-color: rgba(217, 119, 6, 0.45);
+        background: rgba(245, 158, 11, 0.06);
+    }
+    .cl-guide-card.is-reconnect {
+        border-color: rgba(5, 150, 105, 0.45);
+        background: rgba(16, 185, 129, 0.06);
+    }
+    .cl-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        font-weight: 800;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+    .cl-badge-reflash {
+        background: rgba(245, 158, 11, 0.16);
+        color: #b45309;
+        border: 1px solid rgba(217, 119, 6, 0.35);
+    }
+    .cl-badge-reconnect {
+        background: rgba(16, 185, 129, 0.16);
+        color: #047857;
+        border: 1px solid rgba(5, 150, 105, 0.35);
+    }
+    .cl-badge-device {
+        background: rgba(14, 165, 233, 0.15);
+        color: #0369a1;
+        border: 1px solid rgba(2, 132, 199, 0.35);
+    }
+    .cl-badge-active {
+        background: rgba(99, 102, 241, 0.15);
+        color: #4338ca;
+        border: 1px solid rgba(79, 70, 229, 0.3);
+    }
+    .cl-badge-neutral {
+        background: var(--app-surface-muted);
+        color: var(--app-muted);
+        border: 1px solid var(--app-border-strong);
+    }
+    @media (prefers-color-scheme: dark) {
+        .cl-badge-reflash { color: #fbbf24; }
+        .cl-badge-reconnect { color: #34d399; }
+        .cl-badge-device { color: #38bdf8; }
+        .cl-badge-active { color: #a5b4fc; }
+    }
+    [data-theme="dark"] .cl-badge-reflash { color: #fbbf24; }
+    [data-theme="dark"] .cl-badge-reconnect { color: #34d399; }
+    [data-theme="dark"] .cl-badge-device { color: #38bdf8; }
+    [data-theme="dark"] .cl-badge-active { color: #a5b4fc; }
+
+    .cl-filter-bar {
+        background: var(--app-surface);
+        border: 1.5px solid var(--app-border-strong);
+        border-radius: var(--app-radius, 12px);
+        padding: 14px 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .cl-filter-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .cl-tab-btn {
+        padding: 7px 14px;
+        border-radius: 999px;
+        border: 1.5px solid var(--app-border-strong);
+        background: var(--app-surface-muted);
+        color: var(--app-text);
+        font-size: 12.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .cl-tab-btn.is-active {
+        background: var(--app-accent, #059669);
+        color: #ffffff;
+        border-color: transparent;
+    }
+    .cl-filter-inputs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        flex: 1;
+        justify-content: flex-end;
+        min-width: 260px;
+    }
+    .cl-section-title {
+        font-size: 16px;
+        font-weight: 850;
+        color: var(--app-text);
+        margin: 0 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .cl-entry-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .cl-server-card, .cl-preset-card {
+        background: var(--app-surface);
+        border: 1.5px solid var(--app-border-strong);
+        border-radius: var(--app-radius, 12px);
+        padding: 18px 20px;
+    }
+    .cl-preset-head {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--app-border);
+        margin-bottom: 14px;
+    }
+    .cl-version-item {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 10px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .cl-version-item.is-active-ver {
+        border-color: rgba(5, 150, 105, 0.45);
+        box-shadow: inset 3px 0 0 #059669;
+    }
+    .cl-version-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .cl-changelog-body {
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: var(--app-text);
+        white-space: pre-line;
+        margin: 0;
+    }
+    .cl-tech-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 11.5px;
+        color: var(--app-muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    @media (max-width: 768px) {
+        .cl-guide-grid {
+            grid-template-columns: 1fr;
+        }
+        .cl-hero, .cl-server-card, .cl-preset-card {
+            padding: 16px;
+        }
+        .cl-filter-inputs {
+            justify-content: stretch;
+        }
+        .cl-filter-inputs > * {
+            flex: 1 1 100%;
+        }
+    }
+</style>
+
+<div class="cl-shell">
+    <!-- Hero Header -->
+    <section class="cl-hero">
+        <div style="flex:1; min-width:260px;">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px;">
+                <span class="cl-badge cl-badge-active">Info Rilis & Pemeliharaan</span>
+                <span class="cl-badge cl-badge-neutral">{{ changelog_stats.total_presets or 0 }} Preset Firmware</span>
+                <span class="cl-badge cl-badge-neutral">{{ changelog_stats.total_firmware_releases or 0 }} Rilis Binary</span>
+                <span class="cl-badge cl-badge-neutral">{{ changelog_stats.total_server_updates or 0 }} Update Server/MCP</span>
+            </div>
+            <h1 style="margin:0 0 6px; font-size:22px; font-weight:900; color:var(--app-text);">Info Update & Changelog</h1>
+            <p style="margin:0; font-size:13.5px; color:var(--app-muted); line-height:1.55; max-width:720px;">
+                Pantau seluruh catatan rilis terbaru <strong>Firmware ESP32 (.bin)</strong> maupun pembaruan <strong>Server &amp; MCP Tools</strong>, lengkap dengan keterangan apakah perangkat Anda <strong>Wajib Flash Ulang</strong> atau <strong>Otomatis / Cukup Reconnect</strong>.
+            </p>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <a href="/web-flasher" class="app-button app-button-primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:7px; font-weight:800;">
+                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Buka Web Flasher
+            </a>
+        </div>
+    </section>
+
+    <!-- Panduan Tindakan -->
+    <section class="cl-guide-grid" aria-label="Panduan Tindakan Update">
+        <div class="cl-guide-card is-reflash">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span class="cl-badge cl-badge-reflash">Wajib Flash Ulang (.bin)</span>
+                <span style="font-size:11.5px; font-weight:700; color:var(--app-muted);">Update Firmware ESP32</span>
+            </div>
+            <p style="margin:0; font-size:13px; color:var(--app-text); line-height:1.5;">
+                Diperlukan jika pembaruan menyentuh kode di dalam chip ESP32 (pipeline audio I2S/Opus, driver layar LCD/OLED, wakeword, perbaikan bug Wi-Fi/memori MCU, atau pinout board).
+            </p>
+            <div style="font-size:12px; color:var(--app-muted);">
+                <strong>Cara Update:</strong> Colokkan ESP32 via kabel USB &rarr; buka <a href="/web-flasher" style="font-weight:700;">Web Flasher</a> &rarr; pilih preset &amp; versi terbaru &rarr; klik <em>Mulai Flash Firmware</em>.
+            </div>
+        </div>
+        <div class="cl-guide-card is-reconnect">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span class="cl-badge cl-badge-reconnect">Otomatis / Cukup Reconnect (Server/MCP)</span>
+                <span style="font-size:11.5px; font-weight:700; color:var(--app-muted);">Update Cloud &amp; Tools AI</span>
+            </div>
+            <p style="margin:0; font-size:13px; color:var(--app-text); line-height:1.5;">
+                Untuk pembaruan pada server AI, 66 FastMCP tools, memori percakapan, backend musik YouTube, atau logika kontrol smart home. Semua berjalan di sisi cloud server.
+            </p>
+            <div style="font-size:12px; color:var(--app-muted);">
+                <strong>Cara Update:</strong> <strong>Tidak perlu flash ulang (.bin)</strong>. Perangkat langsung menikmati update; cukup matikan-nyalakan ulang atau reconnect Wi-Fi/WebSocket jika sesi lama masih tersambung.
+            </div>
+        </div>
+    </section>
+
+    {% if active_announcement and active_announcement.content %}
+    <section class="cl-server-card" style="border-color:rgba(99, 102, 241, 0.45); background:rgba(99, 102, 241, 0.06);">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span class="cl-badge cl-badge-active">Pengumuman Aktif ({{ (active_announcement.category or 'info')|upper }})</span>
+                <strong style="font-size:14.5px; color:var(--app-text);">{{ active_announcement.title or 'Pengumuman Sistem' }}</strong>
+            </div>
+            {% if active_announcement.updated_at %}
+            <span class="cl-tech-meta" data-iso-date="{{ active_announcement.updated_at }}">{{ active_announcement.updated_at[:10] }}</span>
+            {% endif %}
+        </div>
+        <p class="cl-changelog-body">{{ active_announcement.content }}</p>
+    </section>
+    {% endif %}
+
+    <!-- Filter Bar -->
+    <section class="cl-filter-bar" aria-label="Filter Changelog">
+        <div class="cl-filter-tabs" role="tablist">
+            <button type="button" class="cl-tab-btn is-active" data-cat-filter="all" onclick="setChangelogCategory('all', this)">Semua Update</button>
+            <button type="button" class="cl-tab-btn" data-cat-filter="firmware" onclick="setChangelogCategory('firmware', this)">Firmware ESP32 (.bin)</button>
+            <button type="button" class="cl-tab-btn" data-cat-filter="server" onclick="setChangelogCategory('server', this)">Server &amp; MCP</button>
+        </div>
+        <div class="cl-filter-inputs">
+            <select id="changelogPresetFilter" class="app-input" onchange="filterChangelogEntries()" style="min-width:175px; font-size:12.5px; padding:7px 10px;">
+                <option value="all">Semua Board / Preset</option>
+                {% for p in changelog_presets %}
+                <option value="{{ p.id }}">{{ p.title }} ({{ p.chip }})</option>
+                {% endfor %}
+            </select>
+            <select id="changelogActionFilter" class="app-input" onchange="filterChangelogEntries()" style="min-width:185px; font-size:12.5px; padding:7px 10px;">
+                <option value="all">Semua Status Tindakan</option>
+                <option value="reflash">Wajib Flash Ulang (.bin)</option>
+                <option value="reconnect">Otomatis / Cukup Reconnect</option>
+            </select>
+            <input type="text" id="changelogSearchInput" class="app-input" oninput="filterChangelogEntries()" placeholder="Cari fitur, versi, atau preset..." style="min-width:200px; font-size:12.5px; padding:7px 10px;">
+        </div>
+    </section>
+
+    <!-- Section: Server & MCP Updates -->
+    <section id="changelogServerSection">
+        <h2 class="cl-section-title">
+            <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            Pembaruan Server &amp; MCP Tools
+        </h2>
+        {% if not server_updates %}
+        <div class="cl-server-card" style="color:var(--app-muted); font-size:13px;">
+            Belum ada catatan pembaruan server yang diterbitkan.
+        </div>
+        {% else %}
+        <div class="cl-entry-list">
+            {% for srv in server_updates %}
+            {% set srv_action = 'reflash' if srv.update_type == 'reflash' else 'reconnect' %}
+            <article class="cl-server-card cl-filter-entry" data-entry-kind="server" data-preset-id="server" data-action-type="{{ srv_action }}" data-search="{{ (srv.title ~ ' ' ~ srv.description ~ ' ' ~ srv.target)|lower }}">
+                <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px;">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                        {% if srv.update_type == 'reflash' %}
+                        <span class="cl-badge cl-badge-reflash">Wajib Flash Ulang (.bin)</span>
+                        {% elif srv.update_type == 'device_reconnect' %}
+                        <span class="cl-badge cl-badge-device">Cukup Reconnect / Restart Perangkat</span>
+                        {% else %}
+                        <span class="cl-badge cl-badge-reconnect">Otomatis / Cukup Reconnect (Server/MCP)</span>
+                        {% endif %}
+                        <span class="cl-badge cl-badge-neutral">{{ srv.target or 'Server & MCP' }}</span>
+                    </div>
+                    <span class="cl-tech-meta" data-iso-date="{{ srv.created_at }}">{{ srv.created_at[:10] if srv.created_at else '-' }}</span>
+                </div>
+                <h3 style="margin:0 0 6px; font-size:15px; font-weight:850; color:var(--app-text);">{{ srv.title }}</h3>
+                <p class="cl-changelog-body">{{ srv.description }}</p>
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Section: Firmware Releases per Preset -->
+    <section id="changelogFirmwareSection">
+        <h2 class="cl-section-title">
+            <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Riwayat Rilis Firmware ESP32 (Per Preset)
+        </h2>
+        {% if not changelog_presets %}
+        <div class="cl-preset-card" style="color:var(--app-muted); font-size:13px;">
+            Belum ada preset firmware yang terdaftar.
+        </div>
+        {% else %}
+        <div class="cl-entry-list">
+            {% for p in changelog_presets %}
+            <article class="cl-preset-card cl-preset-group" data-preset-id="{{ p.id }}">
+                <div class="cl-preset-head">
+                    <div style="flex:1; min-width:230px;">
+                        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:6px;">
+                            <h3 style="margin:0; font-size:16px; font-weight:900; color:var(--app-text);">{{ p.title }}</h3>
+                            <span class="cl-badge cl-badge-neutral">{{ p.chip or 'ESP32' }}</span>
+                            <span class="cl-badge cl-badge-active">Aktif: {{ p.active_version or 'v001' }}</span>
+                            {% if user and p.id in authorized_presets %}
+                            <span class="cl-badge cl-badge-reconnect">Lisensi Akun Aktif</span>
+                            {% elif user %}
+                            <span class="cl-badge cl-badge-neutral">Memerlukan Lisensi</span>
+                            {% endif %}
+                        </div>
+                        {% if p.description %}
+                        <p style="margin:0; font-size:13px; color:var(--app-muted); line-height:1.5;">{{ p.description }}</p>
+                        {% endif %}
+                        <div class="cl-tech-meta" style="margin-top:6px;">
+                            <span>Preset ID: {{ p.id }}</span>
+                            <span>Offset Flash: {{ p.offset or '0x0' }}</span>
+                            <span>Total Versi: {{ (p.versions or [])|length }}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="/web-flasher?preset={{ p.id }}" class="app-button" style="text-decoration:none; font-size:12.5px; font-weight:800; display:inline-flex; align-items:center; gap:6px;">
+                            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            Flash Preset Ini
+                        </a>
+                    </div>
+                </div>
+
+                {% if not p.versions %}
+                <div style="font-size:12.5px; color:var(--app-muted); padding:6px 0;">
+                    Belum ada riwayat rilis versi untuk preset ini.
+                </div>
+                {% else %}
+                <div class="cl-entry-list">
+                    {% for v in p.versions %}
+                    {% set ver_action = 'reconnect' if v.update_type == 'reconnect' else 'reflash' %}
+                    <div class="cl-version-item cl-filter-entry {% if v.is_active %}is-active-ver{% endif %}"
+                         data-entry-kind="firmware"
+                         data-preset-id="{{ p.id }}"
+                         data-action-type="{{ ver_action }}"
+                         data-search="{{ (p.title ~ ' ' ~ p.id ~ ' ' ~ p.chip ~ ' ' ~ v.version ~ ' ' ~ v.filename ~ ' ' ~ v.changelog)|lower }}">
+                        <div class="cl-version-meta">
+                            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:7px;">
+                                <span style="font-size:14px; font-weight:900; color:var(--app-text); font-family:ui-monospace,monospace;">{{ v.version }}</span>
+                                {% if v.is_active %}
+                                <span class="cl-badge cl-badge-active">Rilis Aktif Saat Ini</span>
+                                {% endif %}
+                                {% if ver_action == 'reconnect' %}
+                                <span class="cl-badge cl-badge-reconnect">Cukup Reconnect / Opsional Flash</span>
+                                {% else %}
+                                <span class="cl-badge cl-badge-reflash">Wajib Flash Ulang (.bin)</span>
+                                {% endif %}
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <span class="cl-tech-meta" data-iso-date="{{ v.uploaded_at }}">{{ v.uploaded_at[:10] if v.uploaded_at else '-' }}</span>
+                                <a href="/web-flasher?preset={{ p.id }}&version={{ v.version }}" class="app-button" style="text-decoration:none; font-size:11.5px; padding:5px 10px; font-weight:750;">
+                                    Flash {{ v.version }}
+                                </a>
+                            </div>
+                        </div>
+
+                        <p class="cl-changelog-body">{{ v.changelog or 'Tidak ada catatan perubahan tambahan.' }}</p>
+
+                        <div class="cl-tech-meta">
+                            <span>File: {{ v.filename or (p.id ~ '_' ~ v.version ~ '.bin') }}</span>
+                            <span>Ukuran: {{ (v.size_bytes / (1024*1024))|round(2) if v.size_bytes else '0' }} MB</span>
+                            {% if v.sha256_short %}
+                            <span>SHA256: {{ v.sha256_short }}...</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    <div id="changelogEmptyFilter" class="cl-server-card" style="display:none; text-align:center; padding:32px 20px; color:var(--app-muted);">
+        <strong style="display:block; font-size:14.5px; color:var(--app-text); margin-bottom:4px;">Tidak ada catatan changelog yang cocok dengan filter Anda</strong>
+        <span style="font-size:12.5px;">Coba reset kata kunci pencarian, pilihan board, atau status tindakan.</span>
+    </div>
+</div>
+
+<script>
+(function() {
+    var activeCategory = 'all';
+
+    function formatIsoDates() {
+        var nodes = document.querySelectorAll('[data-iso-date]');
+        nodes.forEach(function(el) {
+            var raw = el.getAttribute('data-iso-date');
+            if (!raw) return;
+            try {
+                var dt = new Date(raw);
+                if (!isNaN(dt.getTime())) {
+                    el.textContent = dt.toLocaleDateString('id-ID', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                    });
+                    el.title = dt.toLocaleString('id-ID');
+                }
+            } catch (e) {}
+        });
+    }
+
+    window.setChangelogCategory = function(category, btnEl) {
+        activeCategory = category || 'all';
+        document.querySelectorAll('.cl-tab-btn').forEach(function(btn) {
+            btn.classList.toggle('is-active', btn.getAttribute('data-cat-filter') === activeCategory);
+        });
+        window.filterChangelogEntries();
+    };
+
+    window.filterChangelogEntries = function() {
+        var presetFilter = (document.getElementById('changelogPresetFilter') || {}).value || 'all';
+        var actionFilter = (document.getElementById('changelogActionFilter') || {}).value || 'all';
+        var searchVal = ((document.getElementById('changelogSearchInput') || {}).value || '').trim().toLowerCase();
+
+        var entries = document.querySelectorAll('.cl-filter-entry');
+        var visibleServer = 0;
+        var visibleFirmware = 0;
+
+        entries.forEach(function(entry) {
+            var kind = entry.getAttribute('data-entry-kind') || '';
+            var presetId = entry.getAttribute('data-preset-id') || '';
+            var actionType = entry.getAttribute('data-action-type') || '';
+            var searchBlob = entry.getAttribute('data-search') || '';
+
+            var matchCat = (activeCategory === 'all') || (kind === activeCategory);
+            var matchPreset = (presetFilter === 'all') || (kind === 'firmware' && presetId === presetFilter);
+            var matchAction = (actionFilter === 'all') || (actionType === actionFilter);
+            var matchQuery = (!searchVal) || (searchBlob.indexOf(searchVal) !== -1);
+
+            var show = matchCat && matchPreset && matchAction && matchQuery;
+            entry.style.display = show ? '' : 'none';
+            if (show) {
+                if (kind === 'server') visibleServer++;
+                else if (kind === 'firmware') visibleFirmware++;
+            }
+        });
+
+        document.querySelectorAll('.cl-preset-group').forEach(function(group) {
+            var hasVisibleChild = false;
+            group.querySelectorAll('.cl-filter-entry').forEach(function(child) {
+                if (child.style.display !== 'none') hasVisibleChild = true;
+            });
+            var groupPreset = group.getAttribute('data-preset-id') || '';
+            var showEmptyPreset = (!searchVal && actionFilter === 'all' && activeCategory !== 'server' && (presetFilter === 'all' || presetFilter === groupPreset) && group.querySelectorAll('.cl-filter-entry').length === 0);
+            group.style.display = (hasVisibleChild || showEmptyPreset) ? '' : 'none';
+        });
+
+        var serverSec = document.getElementById('changelogServerSection');
+        var fwSec = document.getElementById('changelogFirmwareSection');
+        var emptyBanner = document.getElementById('changelogEmptyFilter');
+
+        if (serverSec) {
+            serverSec.style.display = (activeCategory === 'firmware' || presetFilter !== 'all' || visibleServer === 0) ? 'none' : '';
+        }
+        if (fwSec) {
+            fwSec.style.display = (activeCategory === 'server' || visibleFirmware === 0) ? 'none' : '';
+            if (activeCategory !== 'server' && presetFilter !== 'all') {
+                document.querySelectorAll('.cl-preset-group').forEach(function(g) {
+                    if (g.style.display !== 'none') fwSec.style.display = '';
+                });
+            }
+        }
+        if (emptyBanner) {
+            emptyBanner.style.display = (visibleServer === 0 && visibleFirmware === 0) ? '' : 'none';
+        }
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', formatIsoDates);
+    } else {
+        formatIsoDates();
+    }
+})();
+</script>
+{% endblock %}

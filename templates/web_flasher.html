@@ -805,18 +805,29 @@
                         <div style="display:grid; gap:10px; margin-top:8px;">
                             {% if presets %}
                                 {% for p in presets %}
-                                <div class="source-option-card preset-board-card {% if loop.first %}is-selected{% endif %}" id="cardBoard_{{ p.id }}" onclick="selectPreset('{{ p.id }}')" style="padding:14px;">
+                                {% set is_selected_board = (p.id == selected_preset_id) if selected_preset_id else loop.first %}
+                                {% set is_card_unlocked = user and (p.id in (authorized_presets or [])) %}
+                                <div class="source-option-card preset-board-card {% if is_selected_board %}is-selected{% endif %}" id="cardBoard_{{ p.id }}" onclick="selectPreset('{{ p.id }}')" style="padding:14px;">
                                     <div style="display:flex; align-items:center; justify-content:center; color:var(--app-brand);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div>
                                     <div style="flex:1;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
                                             <strong style="font-size:14px; color:var(--app-text);">{{ p.title }}</strong>
-                                            <span class="app-chip app-chip-info" style="font-size:10.5px; font-weight:800;">{{ p.chip }}</span>
+                                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                                {% if is_card_unlocked %}
+                                                <span class="app-chip app-chip-success" id="badgeBoardAuth_{{ p.id }}" style="font-size:10.5px; font-weight:800;">Lisensi Aktif</span>
+                                                {% elif user %}
+                                                <span class="app-chip app-chip-neutral" id="badgeBoardAuth_{{ p.id }}" style="font-size:10.5px; font-weight:700;">Terkunci</span>
+                                                {% else %}
+                                                <span class="app-chip app-chip-warning" id="badgeBoardAuth_{{ p.id }}" style="font-size:10.5px; font-weight:750;">Perlu Masuk Akun</span>
+                                                {% endif %}
+                                                <span class="app-chip app-chip-info" style="font-size:10.5px; font-weight:800;">{{ p.chip }}</span>
+                                            </div>
                                         </div>
                                         <p style="font-size:12px; color:var(--app-muted); margin:4px 0 0; line-height:1.4;">
                                             {{ p.description or 'Firmware resmi Xiaozhi.' }}
                                         </p>
                                     </div>
-                                    <div class="source-radio-indicator {% if loop.first %}is-checked{% endif %}" id="radioBoard_{{ p.id }}">
+                                    <div class="source-radio-indicator {% if is_selected_board %}is-checked{% endif %}" id="radioBoard_{{ p.id }}">
                                         <span class="radio-dot"></span>
                                     </div>
                                 </div>
@@ -839,7 +850,8 @@
                         <select id="userPresetSelect" style="display:none;" onchange="onUserPresetChange(this.value)">
                             {% if presets %}
                                 {% for p in presets %}
-                                <option value="{{ p.id }}" data-title="{{ p.title }}" data-chip="{{ p.chip }}" data-offset="{{ p.offset }}" data-desc="{{ p.description }}" data-activever="{{ p.active_version }}" data-size="{{ (p.size_bytes / (1024*1024))|round(2) if p.size_bytes else '0' }}">
+                                {% set is_selected_board = (p.id == selected_preset_id) if selected_preset_id else loop.first %}
+                                <option value="{{ p.id }}" {% if is_selected_board %}selected{% endif %} data-title="{{ p.title }}" data-chip="{{ p.chip }}" data-offset="{{ p.offset }}" data-desc="{{ p.description }}" data-activever="{{ p.active_version }}" data-size="{{ (p.size_bytes / (1024*1024))|round(2) if p.size_bytes else '0' }}">
                                     {{ p.title }}
                                 </option>
                                 {% endfor %}
@@ -905,49 +917,89 @@
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 14px; background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); margin-bottom:12px; flex-wrap:wrap;">
                             <div>
                                 <span style="font-size:11px; color:var(--app-muted); font-weight:700; text-transform:uppercase;">Varian Terpilih:</span>
-                                <strong id="lblPresetTitle" style="font-size:13.5px; color:var(--app-text); display:block;">ESP32-S3 CAM Full Factory</strong>
-                                <span id="lblPresetDesc" style="display:none;"></span>
+                                <strong id="lblPresetTitle" style="font-size:13.5px; color:var(--app-text); display:block;">{{ preset_status.preset.title if preset_status and preset_status.preset else 'ESP32-S3 CAM Full Factory' }}</strong>
+                                <span id="lblPresetDesc" style="display:none;">{{ preset_status.preset.description if preset_status and preset_status.preset else '' }}</span>
                             </div>
-                            <div style="display:flex; gap:6px; align-items:center;">
-                                <span class="app-chip app-chip-neutral" id="lblPresetVersion" style="font-size:11px; font-weight:900;">Versi: v001</span>
-                                <span class="app-chip app-chip-success" id="lblPresetOffset" style="font-size:10.5px; font-weight:800;">Offset Otomatis: 0x0</span>
+                            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                                <span class="app-chip app-chip-neutral" id="lblPresetVersion" style="font-size:11px; font-weight:900;">Versi: {{ selected_version or (preset_status.active_version if preset_status else 'v001') }}</span>
+                                <span class="app-chip app-chip-success" id="lblPresetOffset" style="font-size:10.5px; font-weight:800;">Offset Otomatis: {{ preset_status.preset.offset if preset_status and preset_status.preset else '0x0' }}</span>
                             </div>
                         </div>
 
-                        <!-- Version Selector (Clean) -->
+                        <!-- Version Selector & Full Changelog (Clean) -->
                         <div id="presetVersionSection" style="margin-bottom: 12px; background: var(--app-surface); border: 1.5px solid var(--app-border-strong); border-radius: var(--app-radius); padding: 12px 14px;">
-                            <label for="userPresetVersionSelect" style="font-size:12px; font-weight:800; color:var(--app-text); display:block; margin-bottom:6px;">
-                                <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> Versi Rilis Firmware:
-                            </label>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+                                <label for="userPresetVersionSelect" style="font-size:12px; font-weight:800; color:var(--app-text); display:inline-flex; align-items:center; gap:5px; margin:0;">
+                                    <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> Versi Rilis Firmware:
+                                </label>
+                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <span id="versionStatusPill" class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">Versi Aktif</span>
+                                    <span id="verUpdateActionBadge" class="app-chip app-chip-warning" style="font-size:10.5px; font-weight:800;">Wajib Flash Ulang (.bin)</span>
+                                </div>
+                            </div>
+
+                            {% set init_ver = selected_version or (preset_status.active_version if preset_status else 'v001') %}
                             <select id="userPresetVersionSelect" class="app-input" onchange="onUserPresetVersionChange(this.value)" style="width:100%; font-size:12.5px; padding:8px 10px; font-weight:700;">
                                 {% if preset_status and preset_status.preset and preset_status.preset.versions %}
                                     {% for v in preset_status.preset.versions %}
-                                    <option value="{{ v.version }}" {% if v.version == preset_status.active_version %}selected{% endif %}>
+                                    <option value="{{ v.version }}" {% if v.version == init_ver %}selected{% endif %}>
                                         {{ v.version }} {% if v.version == preset_status.active_version %}(Rekomendasi / Utama){% else %}(Versi Lama){% endif %}{% if v.changelog %} • {{ v.changelog[:35] }}{% endif %}
                                     </option>
                                     {% endfor %}
                                 {% else %}
-                                    <option value="{{ preset_status.active_version if preset_status else 'v001' }}">
-                                        {{ preset_status.active_version if preset_status else 'v001' }} (Rekomendasi / Utama)
+                                    <option value="{{ init_ver }}">
+                                        {{ init_ver }} (Rekomendasi / Utama)
                                     </option>
                                 {% endif %}
                             </select>
-                            <div id="versionDetailBox" style="margin-top:8px; display:flex; justify-content:space-between; align-items:center; font-size:11.5px; color:var(--app-muted);">
-                                <span id="verDetailFilename">firmware.bin</span>
-                                <span id="verDetailSize">Ukuran: 0 MB</span>
+
+                            <div id="olderVersionAlert" class="wizard-notice-banner wizard-notice-warning" style="display:none; margin-top:8px; padding:8px 10px; font-size:11.5px;">
+                                Anda memilih rilis terdahulu (<strong id="alertVersionName">-</strong>). Untuk fitur &amp; stabilitas terbaru, gunakan versi aktif utama.
+                            </div>
+
+                            <div id="versionDetailBox" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--app-border); display:flex; flex-direction:column; gap:6px; font-size:11.5px; color:var(--app-muted);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <strong style="font-size:11.5px; color:var(--app-text);">Catatan Rilis / Changelog:</strong>
+                                    <span id="verDetailDate" style="font-size:11px; color:var(--app-muted);">-</span>
+                                </div>
+                                <div id="verDetailChangelog" style="font-size:12.5px; line-height:1.5; color:var(--app-text); white-space:pre-line; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:8px; padding:8px 10px;">Memuat catatan rilis firmware...</div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <span id="verDetailFilename">firmware.bin</span>
+                                    <span id="verDetailSize">Ukuran: 0 MB</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:2px;">
+                                    <span style="font-size:11px; color:var(--app-muted);">Bingung kapan flash ulang vs reconnect?</span>
+                                    <a href="/changelog" target="_blank" rel="noopener" style="font-size:11.5px; font-weight:750; color:var(--app-brand, #059669); text-decoration:none;">Lihat Semua Info Update &amp; Changelog &rarr;</a>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Status Box: Gembok Terbuka vs Terkunci -->
+                        <!-- Status Box: Login Required vs Unlocked vs Locked -->
                         <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border-strong); border-radius:var(--app-radius); padding:12px 14px;">
+                            <!-- KONDISI 0: BELUM MASUK AKUN / SESI BERAKHIR -->
+                            <div id="boxPresetLoginRequired" style="{% if user %}display:none;{% endif %}">
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                                    <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:220px;">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                                        <div>
+                                            <strong style="font-size:13px; color:#b45309; display:block;">Anda Belum Masuk / Sesi Login Berakhir</strong>
+                                            <span style="font-size:11.5px; color:var(--app-muted);">Lisensi tersimpan di akun Anda. Masuk terlebih dahulu untuk memeriksa izin lisensi atau mengklaim kode baru.</span>
+                                        </div>
+                                    </div>
+                                    <a href="/login?next=/web-flasher" class="app-button app-button-primary" style="text-decoration:none; font-weight:850; font-size:12.5px; padding:8px 16px; white-space:nowrap;">
+                                        Masuk ke Akun Sekarang
+                                    </a>
+                                </div>
+                            </div>
+
                             <!-- KONDISI 1: LISENSI RESMI AKTIF -->
-                            <div id="boxPresetUnlocked" style="{% if not preset_status or not preset_status.authorized %}display:none;{% endif %}">
+                            <div id="boxPresetUnlocked" style="{% if not user or not preset_status or not preset_status.authorized %}display:none;{% endif %}">
                                 <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
                                     <div style="display:flex; align-items:center; gap:8px;">
                                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
                                         <div>
                                             <strong style="font-size:13px; color:var(--app-text); display:block;">Lisensi Resmi Aktif</strong>
-                                            <span style="font-size:11.5px; color:var(--app-muted);">Akses terbuka. Klik tombol di kanan untuk memuat binary.</span>
+                                            <span style="font-size:11.5px; color:var(--app-muted);">Akses terbuka untuk akun <strong>{{ user.username if user else '' }}</strong>. Klik tombol di kanan untuk memuat binary.</span>
                                         </div>
                                     </div>
                                     <button type="button" id="btnLoadPreset" onclick="loadOfficialPreset()" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:8px 16px;">
@@ -956,13 +1008,15 @@
                                 </div>
                             </div>
 
-                            <!-- KONDISI 2: LISENSI DIPERLUKAN -->
-                            <div id="boxPresetLocked" style="{% if preset_status and preset_status.authorized %}display:none;{% endif %}">
+                            <!-- KONDISI 2: LISENSI DIPERLUKAN (SUDAH LOGIN, PRESET BELUM TERBUKA) -->
+                            <div id="boxPresetLocked" style="{% if not user or (preset_status and preset_status.authorized) %}display:none;{% endif %}">
                                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                                     <div>
-                                        <strong style="font-size:13px; color:#dc2626; display:block;">Gembok Terkunci • Lisensi Diperlukan</strong>
-                                        <span style="font-size:11.5px; color:var(--app-muted);">Masukkan Kode Lisensi Anda untuk membuka akses firmware:</span>
+                                        <strong style="font-size:13px; color:#dc2626; display:block;">Gembok Terkunci • Lisensi Board Belum Aktif</strong>
+                                        <span style="font-size:11.5px; color:var(--app-muted);">
+                                            Akun aktif saat ini: <strong>{{ user.username if user else '' }}</strong>. Masukkan Kode Lisensi Anda untuk membuka preset board ini, atau pastikan Anda login dengan akun yang sudah pernah klaim / memilih Varian Board yang tepat di Step 2.
+                                        </span>
                                     </div>
                                 </div>
                                 <form onsubmit="submitInlineClaimCode(event)" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
@@ -1465,9 +1519,13 @@
     }
 
     // USER AUTHORIZATION STATE
-    let currentPresetId = "{{ preset_status.preset.id if preset_status and preset_status.preset else 'esp32s3_cam' }}";
-    let currentSelectedVersion = "{{ preset_status.active_version if preset_status and preset_status.active_version else 'v001' }}";
+    const initialSelectedVersion = "{{ selected_version or '' }}";
+    let currentPresetId = "{{ selected_preset_id or (preset_status.preset.id if preset_status and preset_status.preset else 'esp32s3_cam') }}";
+    let currentSelectedVersion = initialSelectedVersion || "{{ preset_status.active_version if preset_status and preset_status.active_version else 'v001' }}";
+    let loadedBufferMeta = null;
+    let presetStatusFetchSeq = 0;
     let PRESETS_CACHE = {{ presets|tojson }};
+    const AUTHORIZED_PRESETS_SET = new Set({{ authorized_presets|default([])|tojson }});
     const userAuthStatus = {
         isLoggedIn: {{ 'true' if user else 'false' }},
         role: "{{ user.role if user else '' }}",
@@ -1655,6 +1713,60 @@
         await executeClaimCode(code);
     };
 
+    function syncPresetAuthBoxes() {
+        const loginBox = document.getElementById('boxPresetLoginRequired');
+        const unlockedBox = document.getElementById('boxPresetUnlocked');
+        const lockedBox = document.getElementById('boxPresetLocked');
+        const needsLogin = (!userAuthStatus.isLoggedIn || userAuthStatus.status === 'ANONYMOUS');
+
+        if (loginBox) loginBox.style.display = needsLogin ? 'block' : 'none';
+        if (unlockedBox) unlockedBox.style.display = (!needsLogin && userAuthStatus.authorized) ? 'block' : 'none';
+        if (lockedBox) lockedBox.style.display = (!needsLogin && !userAuthStatus.authorized) ? 'block' : 'none';
+
+        const cardAuthBadge = document.getElementById('badgeBoardAuth_' + currentPresetId);
+        if (cardAuthBadge) {
+            if (needsLogin) {
+                cardAuthBadge.textContent = 'Perlu Masuk Akun';
+                cardAuthBadge.className = 'app-chip app-chip-warning';
+            } else if (userAuthStatus.authorized) {
+                cardAuthBadge.textContent = 'Lisensi Aktif';
+                cardAuthBadge.className = 'app-chip app-chip-success';
+                AUTHORIZED_PRESETS_SET.add(currentPresetId);
+            } else {
+                cardAuthBadge.textContent = 'Terkunci';
+                cardAuthBadge.className = 'app-chip app-chip-neutral';
+            }
+        }
+
+        const badge = document.getElementById('sourceBadge');
+        if (badge && currentSourceMode === 'preset') {
+            if (needsLogin) {
+                badge.textContent = 'Perlu Login';
+                badge.className = 'app-chip app-chip-warning';
+            } else if (userAuthStatus.authorized) {
+                badge.innerHTML = '<span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Official Preset</span>';
+                badge.className = 'app-chip app-chip-success';
+            } else {
+                badge.innerHTML = '<span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Locked Preset</span>';
+                badge.className = 'app-chip app-chip-danger';
+            }
+        }
+    }
+
+    function resetPresetLoadedBuffer() {
+        selectedFileBuffer = null;
+        loadedBufferMeta = null;
+        if (typeof selectedFileInfo !== 'undefined' && selectedFileInfo) {
+            selectedFileInfo.style.display = 'none';
+        }
+        if (typeof offsetPreset !== 'undefined' && offsetPreset) {
+            offsetPreset.disabled = false;
+        }
+        if (typeof updateFlashButtonState === 'function') {
+            updateFlashButtonState();
+        }
+    }
+
     async function executeClaimCode(code, btnEl, originalText) {
         try {
             const resp = await fetch('/api/v1/flasher/preset/claim', {
@@ -1663,15 +1775,40 @@
                 credentials: 'same-origin',
                 body: JSON.stringify({ code: code })
             });
-            const data = await resp.json();
+            const data = await resp.json().catch(() => ({}));
+            if (resp.status === 401) {
+                userAuthStatus.isLoggedIn = false;
+                userAuthStatus.status = 'ANONYMOUS';
+                userAuthStatus.authorized = false;
+                syncPresetAuthBoxes();
+                showOverlayNotice(
+                    'Sesi Login Berakhir',
+                    'Sesi akun Anda telah berakhir. Silakan masuk kembali untuk mengklaim kode lisensi.',
+                    'info',
+                    () => { window.location.href = '/login?next=/web-flasher'; }
+                );
+                if (btnEl) {
+                    btnEl.disabled = false;
+                    btnEl.textContent = originalText || 'Buka Kunci';
+                }
+                return;
+            }
             if (resp.ok && data.success) {
+                const targetPreset = data.preset_id || currentPresetId;
+                try {
+                    const prev = JSON.parse(localStorage.getItem(WIZARD_STORAGE_KEY) || '{}');
+                    prev.sourceMode = 'preset';
+                    prev.presetId = targetPreset;
+                    prev.currentStep = 3;
+                    localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(prev));
+                } catch (e) {}
                 showOverlayNotice(
                     'Gembok Terbuka!',
                     '<strong>Selamat!</strong> Lisensi preset resmi berhasil diaktifkan.<br><br>Halaman akan dimuat ulang untuk memperbarui hak akses Anda.',
                     'success',
-                    () => { window.location.reload(); }
+                    () => { window.location.href = '/web-flasher?preset=' + encodeURIComponent(targetPreset); }
                 );
-                setTimeout(() => { window.location.reload(); }, 2000);
+                setTimeout(() => { window.location.href = '/web-flasher?preset=' + encodeURIComponent(targetPreset); }, 1800);
             } else {
                 const reqIdNote = data.request_id ? ('<br><small style="color:var(--app-muted);">[ID Request: ' + data.request_id + ']</small>') : '';
                 showOverlayNotice(
@@ -1694,74 +1831,84 @@
     }
 
     // Handler Switch Preset Antar Pilihan yang Ada
-    window.onUserPresetChange = async function(presetId) {
+    window.onUserPresetChange = async function(presetId, preferredVersion) {
+        const prevPresetId = currentPresetId;
         currentPresetId = presetId;
+
+        if (loadedBufferMeta && loadedBufferMeta.presetId !== presetId) {
+            resetPresetLoadedBuffer();
+        }
+
         const sel = document.getElementById('userPresetSelect');
+        if (sel && sel.value !== presetId) sel.value = presetId;
         const opt = sel ? sel.querySelector('option[value="' + presetId + '"]') : null;
-        if (opt) {
-            const t = opt.dataset.title || presetId;
-            const d = opt.dataset.desc || '';
-            const v = opt.dataset.activever || 'v001';
-            const o = opt.dataset.offset || '0x0';
-            const elT = document.getElementById('lblPresetTitle');
-            const elD = document.getElementById('lblPresetDesc');
-            const elV = document.getElementById('lblPresetVersion');
-            const elO = document.getElementById('lblPresetOffset');
-            if (elT) elT.textContent = t;
-            if (elD) elD.textContent = d;
-            if (elV) elV.textContent = 'Versi: ' + v;
-            if (elO) elO.textContent = 'Offset Otomatis: ' + o;
-        }
-
         let cachedPreset = PRESETS_CACHE.find(p => p.id === presetId);
+
+        const titleVal = (opt && opt.dataset.title) || (cachedPreset && cachedPreset.title) || presetId;
+        const descVal = (opt && opt.dataset.desc) || (cachedPreset && cachedPreset.description) || '';
+        const actVerVal = (opt && opt.dataset.activever) || (cachedPreset && cachedPreset.active_version) || 'v001';
+        const offsetVal = (opt && opt.dataset.offset) || (cachedPreset && cachedPreset.offset) || '0x0';
+
+        const elT = document.getElementById('lblPresetTitle');
+        const elD = document.getElementById('lblPresetDesc');
+        const elV = document.getElementById('lblPresetVersion');
+        const elO = document.getElementById('lblPresetOffset');
+        if (elT) elT.textContent = titleVal;
+        if (elD) elD.textContent = descVal;
+        if (elV) elV.textContent = 'Versi: ' + (preferredVersion || actVerVal);
+        if (elO) elO.textContent = 'Offset Otomatis: ' + offsetVal;
+
+        // Sinkronisasi kartu visual Step 2 jika dipanggil langsung via <select>
+        document.querySelectorAll('.preset-board-card').forEach(c => c.classList.remove('is-selected'));
+        const activeCard = document.getElementById('cardBoard_' + presetId);
+        if (activeCard) activeCard.classList.add('is-selected');
+        document.querySelectorAll('[id^="radioBoard_"]').forEach(r => r.classList.remove('is-checked'));
+        const activeRadio = document.getElementById('radioBoard_' + presetId);
+        if (activeRadio) activeRadio.classList.add('is-checked');
+
         if (cachedPreset) {
-            renderPresetVersions(presetId, cachedPreset.versions, cachedPreset.active_version);
+            renderPresetVersions(presetId, cachedPreset.versions, cachedPreset.active_version, preferredVersion);
         }
 
+        const reqSeq = ++presetStatusFetchSeq;
         try {
             const res = await fetch('/api/v1/flasher/preset/' + encodeURIComponent(presetId) + '/status', { credentials: 'same-origin' });
+            if (reqSeq !== presetStatusFetchSeq) return;
             if (res.ok) {
                 const st = await res.json();
+                if (reqSeq !== presetStatusFetchSeq) return;
+
                 userAuthStatus.authorized = !!st.authorized;
                 userAuthStatus.status = st.status || 'NONE';
+                userAuthStatus.isLoggedIn = (userAuthStatus.status !== 'ANONYMOUS');
                 userAuthStatus.activeVersion = st.active_version || 'v001';
 
                 if (st.preset) {
                     const idx = PRESETS_CACHE.findIndex(p => p.id === presetId);
                     if (idx >= 0) PRESETS_CACHE[idx] = st.preset;
                     else PRESETS_CACHE.push(st.preset);
-                    renderPresetVersions(presetId, st.preset.versions, st.active_version);
+                    if (elT) elT.textContent = st.preset.title || titleVal;
+                    if (elO) elO.textContent = 'Offset Otomatis: ' + (st.preset.offset || offsetVal);
+                    renderPresetVersions(presetId, st.preset.versions, st.active_version, preferredVersion || (prevPresetId === presetId ? currentSelectedVersion : ''));
                 }
 
-                const unlockedBox = document.getElementById('boxPresetUnlocked');
-                const lockedBox = document.getElementById('boxPresetLocked');
-                if (unlockedBox && lockedBox) {
-                    if (st.authorized) {
-                        unlockedBox.style.display = 'block';
-                        lockedBox.style.display = 'none';
-                    } else {
-                        unlockedBox.style.display = 'none';
-                        lockedBox.style.display = 'block';
-                    }
-                }
-                const badge = document.getElementById('sourceBadge');
-                if (badge && currentSourceMode === 'preset') {
-                    badge.innerHTML = st.authorized ? '<span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Official Preset</span>' : '<span style="display:inline-flex; align-items:center; gap:4px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Locked Preset</span>';
-                    badge.className = st.authorized ? 'app-chip app-chip-success' : 'app-chip app-chip-danger';
-                }
+                syncPresetAuthBoxes();
+                if (typeof updateStepperUI === 'function') updateStepperUI();
+                if (typeof saveWizardState === 'function') saveWizardState();
             }
         } catch (e) {
             console.error('Error fetching preset status:', e);
         }
     };
 
-    window.renderPresetVersions = function(presetId, versionsList, activeVer) {
+    window.renderPresetVersions = function(presetId, versionsList, activeVer, preferredVer) {
         const vSelect = document.getElementById('userPresetVersionSelect');
         if (!vSelect) return;
 
         let presetObj = PRESETS_CACHE.find(p => p.id === presetId);
         let versions = versionsList || (presetObj ? presetObj.versions : []) || [];
         let defActive = activeVer || (presetObj ? presetObj.active_version : 'v001');
+        let chosenVer = (preferredVer && versions.some(v => v.version === preferredVer)) ? preferredVer : defActive;
 
         vSelect.innerHTML = '';
         if (versions.length === 0) {
@@ -1769,6 +1916,7 @@
             opt.value = defActive;
             opt.textContent = defActive + ' (Versi Aktif)';
             vSelect.appendChild(opt);
+            chosenVer = defActive;
         } else {
             versions.forEach(v => {
                 const opt = document.createElement('option');
@@ -1779,17 +1927,21 @@
                     label += ' • ' + (v.changelog.length > 40 ? v.changelog.substring(0, 37) + '...' : v.changelog);
                 }
                 opt.textContent = label;
-                if (isAct) opt.selected = true;
+                if (v.version === chosenVer) opt.selected = true;
                 vSelect.appendChild(opt);
             });
         }
 
-        currentSelectedVersion = vSelect.value || defActive;
+        currentSelectedVersion = vSelect.value || chosenVer || defActive;
         onUserPresetVersionChange(currentSelectedVersion);
     };
 
     window.onUserPresetVersionChange = function(versionCode) {
         currentSelectedVersion = versionCode;
+        if (loadedBufferMeta && (loadedBufferMeta.presetId !== currentPresetId || loadedBufferMeta.version !== versionCode)) {
+            resetPresetLoadedBuffer();
+        }
+
         let presetObj = PRESETS_CACHE.find(p => p.id === currentPresetId);
         let versions = presetObj ? (presetObj.versions || []) : [];
         let verMeta = versions.find(v => v.version === versionCode) || null;
@@ -1802,12 +1954,23 @@
         if (elV) elV.textContent = 'Versi: ' + versionCode;
 
         const pill = document.getElementById('versionStatusPill');
+        const actionBadge = document.getElementById('verUpdateActionBadge');
         const alertBox = document.getElementById('olderVersionAlert');
         const alertName = document.getElementById('alertVersionName');
 
         if (pill) {
             pill.textContent = isOlder ? 'Versi Sebelumnya (' + versionCode + ')' : 'Versi Aktif (' + versionCode + ')';
             pill.className = isOlder ? 'app-chip app-chip-warning' : 'app-chip app-chip-success';
+        }
+        if (actionBadge) {
+            const updateType = (verMeta && verMeta.update_type) ? verMeta.update_type : 'reflash';
+            if (updateType === 'reconnect') {
+                actionBadge.textContent = 'Cukup Reconnect / Opsional Flash';
+                actionBadge.className = 'app-chip app-chip-success';
+            } else {
+                actionBadge.textContent = 'Wajib Flash Ulang (.bin)';
+                actionBadge.className = 'app-chip app-chip-warning';
+            }
         }
         if (alertBox) {
             alertBox.style.display = isOlder ? 'block' : 'none';
@@ -1824,14 +1987,24 @@
 
         if (verMeta) {
             if (fnEl) fnEl.textContent = verMeta.filename || (currentPresetId + '_' + versionCode + '.bin');
-            if (dtEl) dtEl.textContent = verMeta.uploaded_at ? verMeta.uploaded_at.substring(0, 10) : '';
-            if (clEl) clEl.textContent = verMeta.changelog || 'Rilis firmware versi ' + versionCode;
+            if (dtEl) {
+                if (verMeta.uploaded_at) {
+                    const parsed = new Date(verMeta.uploaded_at);
+                    dtEl.textContent = !isNaN(parsed.getTime())
+                        ? parsed.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : verMeta.uploaded_at.substring(0, 10);
+                } else {
+                    dtEl.textContent = '-';
+                }
+            }
+            if (clEl) clEl.textContent = verMeta.changelog || ('Rilis firmware versi ' + versionCode);
             if (szEl) {
                 const mb = verMeta.size_bytes ? (verMeta.size_bytes / (1024 * 1024)).toFixed(2) : '0';
                 szEl.textContent = 'Ukuran: ' + mb + ' MB' + (verMeta.sha256_short ? ' • SHA: ' + verMeta.sha256_short : '');
             }
         } else {
             if (fnEl) fnEl.textContent = currentPresetId + '_' + versionCode + '.bin';
+            if (dtEl) dtEl.textContent = '-';
             if (clEl) clEl.textContent = 'Rilis firmware versi ' + versionCode;
         }
 
@@ -1839,15 +2012,17 @@
         const btn = document.getElementById('btnLoadPreset');
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Muat Preset Ini ke Flasher (\' + versionCode + \')</span>';
+            btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Muat Preset Ini ke Flasher (${versionCode})</span>`;
             btn.classList.remove('app-button-ghost');
             btn.classList.add('app-button-primary');
         }
+        if (typeof updateStepperUI === 'function') updateStepperUI();
     };
 
-    // Inisialisasi awal pilihan versi preset
+    // Inisialisasi awal pilihan versi preset & status login
     try {
-        renderPresetVersions(currentPresetId, null, userAuthStatus.activeVersion);
+        renderPresetVersions(currentPresetId, null, userAuthStatus.activeVersion, initialSelectedVersion);
+        syncPresetAuthBoxes();
     } catch (e) {
         console.warn('Initial preset versions render warning:', e);
     }
@@ -2077,7 +2252,20 @@
             });
 
             if (!resp.ok) {
-                if (resp.status === 403 || resp.status === 401) {
+                if (resp.status === 401) {
+                    userAuthStatus.isLoggedIn = false;
+                    userAuthStatus.status = 'ANONYMOUS';
+                    userAuthStatus.authorized = false;
+                    syncPresetAuthBoxes();
+                    showOverlayNotice(
+                        'Masuk ke Akun Diperlukan',
+                        'Sesi login Anda belum aktif atau telah berakhir.<br><br>Silakan masuk ke akun Anda terlebih dahulu untuk memuat preset firmware berlisensi.',
+                        'info',
+                        () => { window.location.href = '/login?next=/web-flasher'; }
+                    );
+                    throw new Error('Silakan masuk ke akun terlebih dahulu.');
+                }
+                if (resp.status === 403) {
                     showOverlayNotice(
                         'Akses Lisensi Terkunci',
                         'Anda belum memiliki izin lisensi aktif untuk mengunduh preset resmi ini.<br><br>Silakan masukkan <strong>Kode Lisensi</strong> Anda pada kolom input di Step 3 untuk membuka akses.',
@@ -2103,6 +2291,11 @@
 
             const buffer = await resp.arrayBuffer();
             selectedFileBuffer = ensureBinaryString(buffer);
+            loadedBufferMeta = {
+                presetId: currentPresetId,
+                version: firmwareVer,
+                offset: customOffset
+            };
 
             // Update UI
             if (selectedFileInfo) selectedFileInfo.style.display = 'block';
@@ -2140,7 +2333,7 @@
             logToConsole('[ERROR] Gagal memuat preset: ' + err.message);
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Muat Preset Ini ke Flasher (\' + (reqVer || \'v001\') + \')</span>';
+                btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px;"><svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Muat Preset Ini ke Flasher (${reqVer || 'v001'})</span>`;
             }
         }
     };
@@ -3079,6 +3272,17 @@
         }
         if (step === 3) {
             if (currentSourceMode === 'preset') {
+                // 0. CEK SESI LOGIN
+                if (!userAuthStatus.isLoggedIn || userAuthStatus.status === 'ANONYMOUS') {
+                    showOverlayNotice(
+                        'Masuk ke Akun Diperlukan',
+                        'Sesi login Anda belum aktif atau telah berakhir.<br><br>Silakan masuk ke akun Anda terlebih dahulu untuk memuat firmware preset resmi.',
+                        'info',
+                        () => { window.location.href = '/login?next=/web-flasher'; }
+                    );
+                    return false;
+                }
+
                 // 1. GEMBOK TERKUNCI CHECK (CRITICAL: CANNOT PROCEED IF LOCKED)
                 if (!userAuthStatus.authorized) {
                     showOverlayNotice(
@@ -3181,13 +3385,21 @@
         const bStatus = document.getElementById('step3BufferStatus');
         if (bStatus && currentSourceMode === 'preset') {
             bStatus.style.display = 'flex';
+            const presetObj = PRESETS_CACHE.find(p => p.id === currentPresetId);
+            const activeOffset = (loadedBufferMeta && loadedBufferMeta.presetId === currentPresetId && loadedBufferMeta.offset)
+                || (presetObj && presetObj.offset)
+                || (typeof offsetInput !== 'undefined' && offsetInput ? offsetInput.value : '0x0')
+                || '0x0';
             if (selectedFileBuffer && selectedFileBuffer.length > 0) {
                 bStatus.className = 'wizard-notice-banner wizard-notice-success';
                 const mb = (selectedFileBuffer.length / (1024*1024)).toFixed(2);
-                bStatus.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Binary firmware siap di memori (${mb} MB, offset otomatis 0x0). Silakan lanjut ke Step 4!</span>`;
+                bStatus.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Binary firmware siap di memori (${mb} MB, offset otomatis ${activeOffset}). Silakan lanjut ke Step 4!</span>`;
+            } else if (!userAuthStatus.isLoggedIn || userAuthStatus.status === 'ANONYMOUS') {
+                bStatus.className = 'wizard-notice-banner wizard-notice-warning';
+                bStatus.innerHTML = '<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Anda belum masuk akun. Klik "Masuk ke Akun Sekarang" di atas untuk membuka preset berlisensi.</span>';
             } else if (!userAuthStatus.authorized) {
                 bStatus.className = 'wizard-notice-banner wizard-notice-danger';
-                bStatus.innerHTML = '<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Gembok terkunci. Masukkan kode lisensi Anda untuk membuka akses firmware.</span>';
+                bStatus.innerHTML = '<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Gembok terkunci untuk board ini. Masukkan kode lisensi Anda atau cek pilihan Varian Board di Step 2.</span>';
             } else {
                 bStatus.className = 'wizard-notice-banner wizard-notice-warning';
                 bStatus.innerHTML = '<span style="display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Lisensi aktif. Klik tombol "Muat Preset Ini ke Flasher" di atas untuk menyiapkan firmware.</span>';
@@ -3320,7 +3532,7 @@
         if (save) saveWizardState();
     }
 
-    function selectPreset(presetId) {
+    async function selectPreset(presetId, preferredVersion) {
         currentPresetId = presetId;
 
         // Update cards styling
@@ -3340,7 +3552,7 @@
         if (sel) sel.value = presetId;
 
         if (window.onUserPresetChange) {
-            window.onUserPresetChange(presetId);
+            await window.onUserPresetChange(presetId, preferredVersion);
         }
 
         updateStepperUI();
@@ -3432,35 +3644,52 @@
 
     async function restoreWizardState() {
         try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const rawQueryPreset = (urlParams.get('preset') || '').trim().toLowerCase();
+            const rawQueryVersion = (urlParams.get('version') || '').trim();
+            const hasQueryPreset = !!(rawQueryPreset && PRESETS_CACHE.some(p => p.id === rawQueryPreset));
+
             const raw = localStorage.getItem(WIZARD_STORAGE_KEY);
             if (!raw) {
-                const defaultMode = (PRESETS_CACHE && PRESETS_CACHE.length > 0) ? 'preset' : 'preset';
-                setWizardSourceMode(defaultMode, false);
+                setWizardSourceMode('preset', false);
+                syncPresetAuthBoxes();
+                if (hasQueryPreset) {
+                    await selectPreset(rawQueryPreset, rawQueryVersion || initialSelectedVersion);
+                    if (userAuthStatus.isLoggedIn && userAuthStatus.authorized) {
+                        try {
+                            await window.loadOfficialPreset();
+                        } catch (e) {
+                            console.warn('Auto load query preset buffer:', e);
+                        }
+                    }
+                    goToStep(3, false);
+                    return;
+                }
                 updateStepperUI();
                 return;
             }
 
             const state = JSON.parse(raw);
             if (!state || typeof state !== 'object') {
+                syncPresetAuthBoxes();
                 updateStepperUI();
                 return;
             }
 
-            // 1. Restore Source Mode
-            if (state.sourceMode === 'preset' || state.sourceMode === 'custom') {
-                setWizardSourceMode(state.sourceMode, false);
+            // 1. Restore Source Mode (query ?preset= selalu masuk mode preset)
+            let effectiveMode = (state.sourceMode === 'custom') ? 'custom' : 'preset';
+            if (hasQueryPreset) {
+                effectiveMode = 'preset';
             }
+            setWizardSourceMode(effectiveMode, false);
 
-            // 2. Restore Preset ID & Version
-            if (state.presetId && state.presetId !== currentPresetId) {
-                selectPreset(state.presetId);
-            }
-            if (state.presetVersion) {
-                const vSel = document.getElementById('userPresetVersionSelect');
-                if (vSel) {
-                    vSel.value = state.presetVersion;
-                    if (window.onUserPresetVersionChange) window.onUserPresetVersionChange(state.presetVersion);
-                }
+            // 2. Restore Preset ID & Version (await status agar tidak race dengan loadOfficialPreset)
+            const validStoredPreset = (state.presetId && PRESETS_CACHE.some(p => p.id === state.presetId)) ? state.presetId : '';
+            const targetPresetId = hasQueryPreset ? rawQueryPreset : (validStoredPreset || currentPresetId);
+            const targetVersion = (hasQueryPreset && rawQueryVersion) ? rawQueryVersion : (state.presetVersion || initialSelectedVersion || '');
+
+            if (targetPresetId) {
+                await selectPreset(targetPresetId, targetVersion);
             }
 
             // 3. Restore Options
@@ -3482,21 +3711,27 @@
             }
 
             // 4. Target Step Restoration (1-5)
-            let targetStep = parseInt(state.currentStep, 10) || 1;
+            let targetStep = hasQueryPreset ? 3 : (parseInt(state.currentStep, 10) || 1);
             if (targetStep < 1) targetStep = 1;
             if (targetStep > 5) targetStep = 5;
 
-            // In preset mode, if authorized, auto-load preset buffer on restore
-            if (state.sourceMode === 'preset' && targetStep >= 3 && userAuthStatus.authorized) {
-                try {
-                    await window.loadOfficialPreset();
-                } catch (e) {
-                    console.warn('Auto restore preset buffer:', e);
+            if (effectiveMode === 'preset') {
+                if (!userAuthStatus.isLoggedIn || userAuthStatus.status === 'ANONYMOUS') {
+                    // Jangan pernah bypass sesi login saat restore wizard
+                    targetStep = hasQueryPreset ? 3 : 1;
+                } else if (!userAuthStatus.authorized && targetStep > 3) {
+                    targetStep = 3;
+                } else if (targetStep >= 3 && userAuthStatus.authorized) {
+                    try {
+                        await window.loadOfficialPreset();
+                    } catch (e) {
+                        console.warn('Auto restore preset buffer:', e);
+                    }
                 }
             }
 
             // For custom binary upload mode, File buffers cannot be stored in browser localStorage
-            if (state.sourceMode === 'custom' && targetStep > 2 && !selectedFileBuffer) {
+            if (effectiveMode === 'custom' && targetStep > 2 && !selectedFileBuffer) {
                 targetStep = 2;
                 showOverlayNotice('Sesi Dipulihkan', 'Sesi Anda dipulihkan. Demi keamanan browser, silakan pilih kembali file binary (.bin) Anda.', 'info');
             }
@@ -3507,9 +3742,11 @@
                 showOverlayNotice('Sesi Dipulihkan', 'Sesi Anda dipulihkan. Silakan hubungkan kembali port COM ESP32 Anda untuk melanjutkan.', 'info');
             }
 
+            syncPresetAuthBoxes();
             goToStep(targetStep, false);
         } catch (e) {
             console.warn('Gagal memulihkan wizard state:', e);
+            syncPresetAuthBoxes();
             updateStepperUI();
         }
     }
