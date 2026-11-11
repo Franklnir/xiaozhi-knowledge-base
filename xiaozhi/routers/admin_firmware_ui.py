@@ -6,15 +6,9 @@ from xiaozhi.services.preset_approval_service import (
     save_or_update_preset,
     set_active_preset_version,
     delete_preset_version,
-    update_preset_version_changelog,
     generate_claim_code,
     list_claim_codes,
     delete_claim_code,
-)
-from xiaozhi.services.changelog_service import (
-    list_server_updates,
-    add_server_update,
-    delete_server_update,
 )
 import logging
 from fastapi import APIRouter, Request, Form, Query, HTTPException, status, UploadFile, File
@@ -64,7 +58,6 @@ async def admin_approvals_page(request: Request):
     preset_granted = list_preset_granted_users()
     presets = list_presets()
     claim_codes = list_claim_codes()
-    server_updates = list_server_updates()
     return render(request, "admin/firmware_approvals.html", {
         "user": user,
         "page": "admin_firmware_approvals",
@@ -72,7 +65,6 @@ async def admin_approvals_page(request: Request):
         "preset_granted": preset_granted,
         "presets": presets,
         "claim_codes": claim_codes,
-        "server_updates": server_updates,
     })
 
 
@@ -119,12 +111,9 @@ async def admin_save_preset_action(
     offset: str = Form("0x0"),
     description: str = Form(""),
     changelog: str = Form(""),
-    update_type: str = Form("reflash"),
-    csrf_token: str = Form(...),
     firmware_file: Optional[UploadFile] = File(None),
 ):
     user = require_admin(request)
-    validate_csrf(request, csrf_token, user)
     file_bytes = None
     filename = None
     if firmware_file and firmware_file.filename:
@@ -145,7 +134,6 @@ async def admin_save_preset_action(
             filename=filename,
             admin_user=user,
             changelog=changelog,
-            update_type=update_type,
         )
         ver = updated_preset.get("active_version", "v001")
         msg = f"Preset '{updated_preset.get('title')}' berhasil disimpan. Versi aktif: {ver}."
@@ -200,86 +188,6 @@ async def admin_delete_preset_version_action(
     except Exception:
         logger.exception("Error deleting preset firmware version")
         return redirect_with_message("/admin/firmware/approvals", "Gagal menghapus versi karena terjadi kesalahan sistem.")
-
-
-@router.post("/presets/{preset_id}/versions/{version}/changelog")
-async def admin_update_preset_version_changelog_action(
-    request: Request,
-    preset_id: str,
-    version: str,
-    changelog: str = Form(...),
-    update_type: str = Form("reflash"),
-    csrf_token: str = Form(...),
-):
-    user = require_admin(request)
-    validate_csrf(request, csrf_token, user)
-    try:
-        updated = update_preset_version_changelog(
-            preset_id=preset_id,
-            version=version,
-            changelog=changelog,
-            update_type=update_type,
-            admin_user=user,
-        )
-        return redirect_with_message(
-            "/admin/firmware/approvals?tab=presets",
-            f"Changelog versi '{version}' pada preset '{updated.get('title', preset_id)}' berhasil diperbarui.",
-        )
-    except ValueError as exc:
-        return redirect_with_message("/admin/firmware/approvals?tab=presets", f"Gagal memperbarui changelog: {exc}")
-    except Exception:
-        logger.exception("Error updating preset version changelog")
-        return redirect_with_message("/admin/firmware/approvals?tab=presets", "Gagal memperbarui changelog karena terjadi kesalahan sistem.")
-
-
-@router.post("/server-changelog/add")
-async def admin_add_server_changelog_action(
-    request: Request,
-    title: str = Form(...),
-    description: str = Form(...),
-    update_type: str = Form("server_reconnect"),
-    target: str = Form("Server & MCP"),
-    csrf_token: str = Form(...),
-):
-    user = require_admin(request)
-    validate_csrf(request, csrf_token, user)
-    try:
-        entry = add_server_update(
-            title=title,
-            description=description,
-            update_type=update_type,
-            target=target,
-            admin_user=user,
-        )
-        return redirect_with_message(
-            "/admin/firmware/approvals?tab=server-changelog",
-            f"Catatan update Server/MCP '{entry.get('title')}' berhasil dipublikasikan ke halaman Changelog.",
-        )
-    except ValueError as exc:
-        return redirect_with_message("/admin/firmware/approvals?tab=server-changelog", f"Gagal menambah changelog server: {exc}")
-    except Exception:
-        logger.exception("Error adding server changelog entry")
-        return redirect_with_message("/admin/firmware/approvals?tab=server-changelog", "Gagal menyimpan catatan changelog server.")
-
-
-@router.post("/server-changelog/{entry_id}/delete")
-async def admin_delete_server_changelog_action(
-    request: Request,
-    entry_id: str,
-    csrf_token: str = Form(...),
-):
-    user = require_admin(request)
-    validate_csrf(request, csrf_token, user)
-    deleted = delete_server_update(entry_id)
-    if deleted:
-        return redirect_with_message(
-            "/admin/firmware/approvals?tab=server-changelog",
-            "Catatan changelog server berhasil dihapus.",
-        )
-    return redirect_with_message(
-        "/admin/firmware/approvals?tab=server-changelog",
-        "Catatan changelog server tidak ditemukan atau sudah terhapus.",
-    )
 
 
 @router.post("/claim-codes/generate")

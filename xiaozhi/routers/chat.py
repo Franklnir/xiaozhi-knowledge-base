@@ -22,7 +22,6 @@ from xiaozhi.services.preset_approval_service import (
     redeem_claim_code,
     PRESETS,
 )
-from xiaozhi.services.changelog_service import get_unified_changelog_payload
 
 from xiaozhi.config import CHAT_HISTORY_DEFAULT_LIMIT, ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
@@ -688,35 +687,6 @@ async def web_flasher_page(
             "mcp_required": False,
         },
     )
-
-
-@router.get("/changelog", response_class=HTMLResponse)
-@router.get("/info-update", response_class=HTMLResponse)
-async def changelog_page(request: Request):
-    user = get_current_user(request)
-    payload = get_unified_changelog_payload()
-    preset_ids = [p["id"] for p in payload.get("presets", []) if p.get("id")]
-    authorized_presets = get_user_authorized_presets(user, preset_ids=preset_ids)
-    return render(
-        request,
-        "changelog.html",
-        {
-            "user": user,
-            "page": "changelog",
-            "active_page": "changelog",
-            "changelog_presets": payload.get("presets", []),
-            "server_updates": payload.get("server_updates", []),
-            "changelog_stats": payload.get("stats", {}),
-            "authorized_presets": authorized_presets,
-            "mcp_required": False,
-        },
-    )
-
-
-@router.get("/api/v1/changelog")
-async def get_changelog_api():
-    payload = get_unified_changelog_payload()
-    return JSONResponse({"success": True, **payload})
 
 
 @router.get("/api/v1/flasher/preset/{preset_id}/status")

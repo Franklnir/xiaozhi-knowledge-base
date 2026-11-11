@@ -932,10 +932,7 @@
                                 <label for="userPresetVersionSelect" style="font-size:12px; font-weight:800; color:var(--app-text); display:inline-flex; align-items:center; gap:5px; margin:0;">
                                     <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> Versi Rilis Firmware:
                                 </label>
-                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                    <span id="versionStatusPill" class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">Versi Aktif</span>
-                                    <span id="verUpdateActionBadge" class="app-chip app-chip-warning" style="font-size:10.5px; font-weight:800;">Wajib Flash Ulang (.bin)</span>
-                                </div>
+                                <span id="versionStatusPill" class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">Versi Aktif</span>
                             </div>
 
                             {% set init_ver = selected_version or (preset_status.active_version if preset_status else 'v001') %}
@@ -966,10 +963,6 @@
                                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
                                     <span id="verDetailFilename">firmware.bin</span>
                                     <span id="verDetailSize">Ukuran: 0 MB</span>
-                                </div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:2px;">
-                                    <span style="font-size:11px; color:var(--app-muted);">Bingung kapan flash ulang vs reconnect?</span>
-                                    <a href="/changelog" target="_blank" rel="noopener" style="font-size:11.5px; font-weight:750; color:var(--app-brand, #059669); text-decoration:none;">Lihat Semua Info Update &amp; Changelog &rarr;</a>
                                 </div>
                             </div>
                         </div>
@@ -1954,23 +1947,12 @@
         if (elV) elV.textContent = 'Versi: ' + versionCode;
 
         const pill = document.getElementById('versionStatusPill');
-        const actionBadge = document.getElementById('verUpdateActionBadge');
         const alertBox = document.getElementById('olderVersionAlert');
         const alertName = document.getElementById('alertVersionName');
 
         if (pill) {
             pill.textContent = isOlder ? 'Versi Sebelumnya (' + versionCode + ')' : 'Versi Aktif (' + versionCode + ')';
             pill.className = isOlder ? 'app-chip app-chip-warning' : 'app-chip app-chip-success';
-        }
-        if (actionBadge) {
-            const updateType = (verMeta && verMeta.update_type) ? verMeta.update_type : 'reflash';
-            if (updateType === 'reconnect') {
-                actionBadge.textContent = 'Cukup Reconnect / Opsional Flash';
-                actionBadge.className = 'app-chip app-chip-success';
-            } else {
-                actionBadge.textContent = 'Wajib Flash Ulang (.bin)';
-                actionBadge.className = 'app-chip app-chip-warning';
-            }
         }
         if (alertBox) {
             alertBox.style.display = isOlder ? 'block' : 'none';

@@ -357,8 +357,6 @@ async def robots_txt():
         "Allow: /\n"
         "Allow: /dokumentasi\n"
         "Allow: /web-flasher\n"
-        "Allow: /changelog\n"
-        "Allow: /info-update\n"
         "Allow: /login\n"
         "Allow: /register\n"
         "Disallow: /admin\n"
@@ -407,12 +405,6 @@ async def sitemap_xml():
         <lastmod>{today}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.9</priority>
-    </url>
-    <url>
-        <loc>https://xiaozhiscig.biz.id/changelog</loc>
-        <lastmod>{today}</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>0.85</priority>
     </url>
     <url>
         <loc>https://xiaozhiscig.biz.id/login</loc>

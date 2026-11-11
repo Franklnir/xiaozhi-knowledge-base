@@ -278,23 +278,12 @@ def get_preset(preset_id: str) -> Optional[Dict[str, Any]]:
     return data.get("presets", {}).get(clean_id)
 
 
-ALLOWED_FIRMWARE_UPDATE_TYPES = ("reflash", "reconnect")
-
-
-def _normalize_update_type(update_type: Optional[str]) -> str:
-    """Normalisasi jenis tindakan update firmware ('reflash' vs 'reconnect')."""
-    val = str(update_type or "reflash").strip().lower()
-    if val in ALLOWED_FIRMWARE_UPDATE_TYPES:
-        return val
-    return "reflash"
-
-
 def sanitize_preset_for_client(preset: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """
     Menyaring metadata preset agar aman dikirim ke browser / frontend.
     Menghilangkan path penyimpanan internal (storage_bucket, storage_key, enc_rel_path),
     tetapi menyertakan daftar versi lengkap yang dapat dipilih oleh pengguna beserta
-    catatan rilis (changelog), tipe aksi update, dan ukuran filenya.
+    catatan rilis (changelog) dan ukuran filenya.
     """
     if not preset:
         return None
@@ -317,7 +306,6 @@ def sanitize_preset_for_client(preset: Optional[Dict[str, Any]]) -> Optional[Dic
             "size_bytes": int(v.get("size_bytes", 0)),
             "sha256_short": sha[:12] if sha else "",
             "changelog": str(v.get("changelog", "")),
-            "update_type": _normalize_update_type(v.get("update_type")),
             "uploaded_at": str(v.get("uploaded_at", "")),
             "is_active": (v_code == active_ver),
         })
@@ -441,59 +429,6 @@ def delete_preset_version(
     return preset
 
 
-def update_preset_version_changelog(
-    preset_id: str,
-    version: str,
-    changelog: str,
-    update_type: str = "reflash",
-    admin_user: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    """Perbarui catatan rilis (changelog) dan tipe aksi update untuk satu versi preset."""
-    clean_id = _clean_slug(preset_id)
-    target_ver_code = str(version or "").strip()
-    if not clean_id or not target_ver_code:
-        raise ValueError("ID preset atau versi tidak valid.")
-    clean_changelog = str(changelog or "").strip()
-    if not clean_changelog:
-        raise ValueError("Catatan rilis (changelog) tidak boleh kosong.")
-
-    data = _load_data()
-    presets = data.setdefault("presets", {})
-    existing = presets.get(clean_id)
-    if not existing:
-        raise ValueError(f"Preset '{clean_id}' tidak ditemukan.")
-
-    versions = existing.get("versions", [])
-    target_ver = None
-    for v in versions:
-        if str(v.get("version", "")).strip().lower() == target_ver_code.lower():
-            target_ver = v
-            break
-
-    if not target_ver:
-        raise ValueError(f"Versi '{target_ver_code}' tidak ditemukan pada preset '{clean_id}'.")
-
-    admin_name = str((admin_user or {}).get("username") or "admin")
-    now_iso = datetime.now(timezone.utc).isoformat()
-    target_ver["changelog"] = clean_changelog
-    target_ver["update_type"] = _normalize_update_type(update_type)
-    target_ver["changelog_updated_at"] = now_iso
-    target_ver["changelog_updated_by"] = admin_name
-
-    existing["updated_at"] = now_iso
-    existing["updated_by"] = admin_name
-    presets[clean_id] = existing
-    _save_data(data)
-    logger.info(
-        "Admin '%s' memperbarui changelog versi '%s' pada preset '%s' (update_type=%s).",
-        admin_name,
-        target_ver.get("version"),
-        clean_id,
-        target_ver["update_type"],
-    )
-    return existing
-
-
 def _clean_slug(text: str) -> str:
     cleaned = re.sub(r"[^a-zA-Z0-9_]+", "_", text.strip().lower())
     return re.sub(r"_+", "_", cleaned).strip("_")
@@ -509,7 +444,6 @@ def save_or_update_preset(
     filename: Optional[str] = None,
     admin_user: Optional[Dict[str, Any]] = None,
     changelog: str = "",
-    update_type: str = "reflash",
 ) -> Dict[str, Any]:
     """
     Tambah preset baru atau update preset yang sudah ada.
@@ -524,7 +458,6 @@ def save_or_update_preset(
     clean_chip = (chip or "ESP32-S3").strip()
     clean_offset = (offset or "0x0").strip()
     clean_desc = (description or "").strip()
-    clean_update_type = _normalize_update_type(update_type)
     admin_name = str((admin_user or {}).get("username") or "admin")
     now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -575,7 +508,6 @@ def save_or_update_preset(
                 "size_bytes": len(file_bytes),
                 "sha256": hashlib.sha256(file_bytes).hexdigest(),
                 "changelog": changelog.strip() or f"Pembaruan firmware versi {next_version_code}",
-                "update_type": clean_update_type,
                 "uploaded_at": now_iso,
                 "uploaded_by": admin_name,
             }
@@ -618,7 +550,6 @@ def save_or_update_preset(
                 "size_bytes": size_bytes,
                 "sha256": hashlib.sha256(file_bytes).hexdigest(),
                 "changelog": changelog.strip() or "Rilis perdana preset firmware v001",
-                "update_type": clean_update_type,
                 "uploaded_at": now_iso,
                 "uploaded_by": admin_name,
             }

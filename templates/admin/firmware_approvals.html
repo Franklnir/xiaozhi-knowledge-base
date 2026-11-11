@@ -541,12 +541,6 @@
             <span>Lisensi Pengguna Aktif</span>
             <span class="app-chip app-chip-small" style="font-size:10.5px;">{{ preset_granted|length if preset_granted else 0 }}</span>
         </button>
-
-        <button type="button" class="admin-tab-btn" id="tabBtnServerChangelog" onclick="switchFirmwareTab('server-changelog')">
-            <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
-            <span>Changelog Server &amp; MCP</span>
-            <span class="app-chip app-chip-small" style="font-size:10.5px;">{{ server_updates|length if server_updates else 0 }}</span>
-        </button>
     </div>
 
     <!-- ======================================================== -->
@@ -628,7 +622,7 @@
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; margin-bottom:14px;">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:14px;">
                     <div>
                         <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
                             Deskripsi Preset:
@@ -640,16 +634,6 @@
                             Catatan Rilis / Changelog Versi (Opsional):
                         </label>
                         <textarea name="changelog" rows="2" placeholder="misal: Optimasi latency audio I2S dan perbaikan WiFi reconnect..." class="app-input" style="width:100%; font-size:12px;"></textarea>
-                    </div>
-                    <div>
-                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">
-                            Tindakan Update Untuk User:
-                        </label>
-                        <select name="update_type" class="app-input" style="width:100%; font-size:12px; padding:7px 10px;">
-                            <option value="reflash" selected>Wajib Flash Ulang (.bin)</option>
-                            <option value="reconnect">Cukup Reconnect / Opsional Flash</option>
-                        </select>
-                        <span style="display:block; margin-top:4px; font-size:11px; color:var(--app-muted);">Ditampilkan sebagai badge panduan di /changelog &amp; Web Flasher.</span>
                     </div>
                 </div>
 
@@ -808,27 +792,8 @@
                                                 </div>
                                                 {% endif %}
                                             </td>
-                                            <td style="color:var(--app-muted); font-size:11.5px; min-width:250px; max-width:340px;">
-                                                <div style="margin-bottom:6px;">
-                                                    {% if v.update_type == 'reconnect' %}
-                                                    <span class="app-chip app-chip-success" style="font-size:10px; font-weight:800;">Cukup Reconnect / Opsional Flash</span>
-                                                    {% else %}
-                                                    <span class="app-chip app-chip-warning" style="font-size:10px; font-weight:800;">Wajib Flash Ulang (.bin)</span>
-                                                    {% endif %}
-                                                </div>
-                                                <form method="POST" action="/admin/firmware/presets/{{ p.id }}/versions/{{ v.version }}/changelog" style="display:flex; flex-direction:column; gap:5px; margin:0;">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                                    <textarea name="changelog" rows="2" required class="app-input" style="width:100%; font-size:11px; padding:4px 7px;">{{ v.changelog or '' }}</textarea>
-                                                    <div style="display:flex; gap:5px; align-items:center;">
-                                                        <select name="update_type" class="app-input" style="flex:1; font-size:10.5px; padding:3px 6px;">
-                                                            <option value="reflash" {% if v.update_type != 'reconnect' %}selected{% endif %}>Wajib Flash Ulang (.bin)</option>
-                                                            <option value="reconnect" {% if v.update_type == 'reconnect' %}selected{% endif %}>Cukup Reconnect / Opsional Flash</option>
-                                                        </select>
-                                                        <button type="submit" class="app-button app-button-secondary app-button-small" style="font-size:10.5px; padding:3px 8px; font-weight:800; white-space:nowrap;">
-                                                            Simpan Changelog
-                                                        </button>
-                                                    </div>
-                                                </form>
+                                            <td style="color:var(--app-muted); font-size:11.5px; max-width:240px;">
+                                                {{ v.changelog or 'Tanpa catatan rilis' }}
                                             </td>
                                             <td style="text-align:right;">
                                                 <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
@@ -1190,111 +1155,6 @@
             {% endif %}
         </div>
     </div>
-
-    <!-- ======================================================== -->
-    <!-- TAB 4: CHANGELOG SERVER & MCP                            -->
-    <!-- ======================================================== -->
-    <div id="tabContentServerChangelog" class="fw-tab-pane" style="display:none;">
-        <div class="fw-card" style="background:var(--app-surface-muted);">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px; border-bottom:1px solid var(--app-border); padding-bottom:12px;">
-                <h2 style="font-size:15.5px; font-weight:900; margin:0; color:var(--app-text); display:flex; align-items:center; gap:8px;">
-                    <svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
-                    <span>Publikasikan Changelog Server &amp; MCP Tools</span>
-                </h2>
-                <a href="/changelog" target="_blank" rel="noopener" class="app-button app-button-secondary app-button-small" style="text-decoration:none; font-size:11.5px; font-weight:800;">Lihat Halaman /changelog &rarr;</a>
-            </div>
-            <p style="font-size:12.5px; color:var(--app-muted); margin:0 0 14px; line-height:1.5;">
-                Gunakan form ini untuk mengumumkan update backend server, MCP tools, atau perbaikan layanan yang tidak mengharuskan pengguna flash ulang <code>.bin</code> (atau beri tanda khusus jika wajib flash ulang).
-            </p>
-            <form method="POST" action="/admin/firmware/server-changelog/add" style="display:flex; flex-direction:column; gap:12px;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-                    <div>
-                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">Judul Pembaruan:</label>
-                        <input type="text" name="title" required placeholder="misal: Optimasi Tool Relay Smart Home & Musik" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
-                    </div>
-                    <div>
-                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">Komponen Target:</label>
-                        <input type="text" name="target" value="Server & MCP" placeholder="misal: Server & MCP, Web Flasher, Relay" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
-                    </div>
-                    <div>
-                        <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">Tindakan yang Diperlukan User:</label>
-                        <select name="update_type" class="app-input" style="width:100%; font-size:12.5px; padding:7px 10px;">
-                            <option value="server_reconnect" selected>Otomatis / Cukup Reconnect (Server/MCP)</option>
-                            <option value="device_reconnect">Cukup Reconnect / Restart Perangkat</option>
-                            <option value="reflash">Wajib Flash Ulang (.bin)</option>
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label class="app-label" style="display:block; font-weight:800; font-size:12px; margin-bottom:4px;">Deskripsi Lengkap Pembaruan:</label>
-                    <textarea name="description" rows="3" required placeholder="Jelaskan apa yang diperbarui dan apa yang perlu dilakukan pengguna..." class="app-input" style="width:100%; font-size:12.5px;"></textarea>
-                </div>
-                <div style="display:flex; justify-content:flex-end;">
-                    <button type="submit" class="app-button app-button-primary" style="font-weight:850; font-size:12.5px; padding:8px 18px;">
-                        Publikasikan Update Server
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <div class="fw-card" style="padding:0; overflow:hidden;">
-            <div class="fw-card-header">
-                <h3 style="font-size:15px; font-weight:900; margin:0; color:var(--app-text);">Daftar Changelog Server &amp; MCP Terbit</h3>
-                <span class="app-chip app-chip-neutral" style="font-size:11px; font-weight:800;">{{ server_updates|length if server_updates else 0 }} Catatan</span>
-            </div>
-            {% if not server_updates %}
-            <div style="padding:36px 20px; text-align:center; color:var(--app-muted); font-size:13px;">
-                Belum ada catatan pembaruan server.
-            </div>
-            {% else %}
-            <div class="app-table-wrap fw-scroll-table-wrap" style="margin:0;">
-                <table class="app-table" style="margin:0; width:100%;">
-                    <thead>
-                        <tr>
-                            <th style="min-width:220px;">Judul &amp; Deskripsi</th>
-                            <th style="min-width:130px;">Target</th>
-                            <th style="min-width:190px;">Status Tindakan</th>
-                            <th style="min-width:130px;">Tanggal</th>
-                            <th style="min-width:90px; text-align:right;">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for srv in server_updates %}
-                        <tr>
-                            <td>
-                                <div style="font-weight:850; font-size:13px; color:var(--app-text);">{{ srv.title }}</div>
-                                <div style="font-size:12px; color:var(--app-muted); margin-top:4px; white-space:pre-line;">{{ srv.description }}</div>
-                            </td>
-                            <td>
-                                <span class="app-chip app-chip-neutral" style="font-size:10.5px; font-weight:750;">{{ srv.target or 'Server & MCP' }}</span>
-                            </td>
-                            <td>
-                                {% if srv.update_type == 'reflash' %}
-                                <span class="app-chip app-chip-warning" style="font-size:10.5px; font-weight:800;">Wajib Flash Ulang (.bin)</span>
-                                {% elif srv.update_type == 'device_reconnect' %}
-                                <span class="app-chip app-chip-info" style="font-size:10.5px; font-weight:800;">Cukup Reconnect / Restart Perangkat</span>
-                                {% else %}
-                                <span class="app-chip app-chip-success" style="font-size:10.5px; font-weight:800;">Otomatis / Cukup Reconnect</span>
-                                {% endif %}
-                            </td>
-                            <td style="font-size:11.5px; color:var(--app-muted);">
-                                {{ srv.created_at[:16].replace('T', ' ') if srv.created_at else '-' }}
-                            </td>
-                            <td style="text-align:right;">
-                                <form method="POST" action="/admin/firmware/server-changelog/{{ srv.id }}/delete" style="margin:0; display:inline;" onsubmit="return confirm('Hapus catatan changelog server ini?')">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                    <button type="submit" class="app-button app-button-danger app-button-small" style="font-size:11px; padding:4px 9px; font-weight:800;">Hapus</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% endif %}
-        </div>
-    </div>
 </div>
 
 <!-- Toast Feedback Notification -->
@@ -1306,23 +1166,11 @@
 <script>
     // Tab Switching
     function switchFirmwareTab(tabName) {
-        const tabs = ['presets', 'claim-codes', 'users', 'server-changelog'];
-        const btnMap = {
-            'presets': 'tabBtnPresets',
-            'claim-codes': 'tabBtnClaimCodes',
-            'users': 'tabBtnUsers',
-            'server-changelog': 'tabBtnServerChangelog'
-        };
-        const contentMap = {
-            'presets': 'tabContentPresets',
-            'claim-codes': 'tabContentClaimCodes',
-            'users': 'tabContentUsers',
-            'server-changelog': 'tabContentServerChangelog'
-        };
+        const tabs = ['presets', 'claim-codes', 'users'];
         tabs.forEach(t => {
-            const btn = document.getElementById(btnMap[t]);
-            const content = document.getElementById(contentMap[t]);
-
+            const btn = document.getElementById(t === 'presets' ? 'tabBtnPresets' : (t === 'claim-codes' ? 'tabBtnClaimCodes' : 'tabBtnUsers'));
+            const content = document.getElementById(t === 'presets' ? 'tabContentPresets' : (t === 'claim-codes' ? 'tabContentClaimCodes' : 'tabContentUsers'));
+            
             if (btn && content) {
                 if (t === tabName) {
                     btn.classList.add('active');
@@ -1589,14 +1437,10 @@
         renderTableSlide('users');
     });
 
-    // Restore active tab (?tab= takes priority over localStorage)
+    // Restore active tab
     try {
-        const queryTab = new URLSearchParams(window.location.search).get('tab');
         const savedTab = localStorage.getItem('fw_approval_tab');
-        const allowedTabs = ['presets', 'claim-codes', 'users', 'server-changelog'];
-        if (queryTab && allowedTabs.includes(queryTab)) {
-            switchFirmwareTab(queryTab);
-        } else if (savedTab && allowedTabs.includes(savedTab)) {
+        if (savedTab && ['presets', 'claim-codes', 'users'].includes(savedTab)) {
             switchFirmwareTab(savedTab);
         }
     } catch (e) {}
