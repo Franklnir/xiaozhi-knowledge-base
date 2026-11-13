@@ -1,4 +1,5 @@
-{% set current_theme = user.ui_theme if user and user.ui_theme in ['default', 'dark', 'neo'] else 'neo' %}
+{% set theme_options = {'neo': 'Neo Brutalism', 'default': 'Original', 'dark': 'Dark', 'clay': 'Claymorphism · Light Clay', 'clay-dark': 'Claymorphism · Midnight Clay'} %}
+{% set current_theme = user.ui_theme if user and user.ui_theme in theme_options else 'neo' %}
 <!DOCTYPE html>
 <html lang="id" {% if current_theme != 'default' %}data-theme="{{ current_theme }}" {% endif %}>
 <head>
@@ -2121,6 +2122,7 @@
         :root[data-theme="neo"] .app-toast-info { background: #ffffff; color: #111827; }
         :root[data-theme="neo"] .app-toast-info .app-toast-icon-wrap { background: #0284c7; color: #ffffff; border: 1.5px solid #111827; }
     </style>
+    <link rel="stylesheet" href="/static/css/claymorphism.css">
     <script src="/static/js/app.js"></script>
 </head>
 {% set page = active_page|default(page|default('')) %}
@@ -2545,9 +2547,9 @@
                 </div>
             </a>
             <select id="themeSelect" class="app-input" style="font-size:12px; padding:6px 8px; min-height:32px" aria-label="Tema">
-                <option value="neo">Neo Brutalism</option>
-                <option value="default">Original</option>
-                <option value="dark">Dark</option>
+                {% for value, label in theme_options.items() %}
+                <option value="{{ value }}"{% if value == current_theme %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
             </select>
             <a href="/logout" class="app-button app-button-small" style="justify-content:center">Keluar</a>
         </div>
@@ -2821,8 +2823,6 @@
         (function () {
             const select = document.getElementById('themeSelect');
             if (!select) return;
-            const validThemes = ["default", "dark", "neo"];
-            const initialTheme = {{ current_theme|tojson }};
             const csrfToken = {{ csrf_token|tojson }};
 
             function applyTheme(theme) {
@@ -2830,10 +2830,10 @@
                 document.documentElement.dataset.theme = theme;
             }
 
-            select.value = validThemes.includes(initialTheme) ? initialTheme : "neo";
             select.addEventListener("change", async () => {
-                const theme = validThemes.includes(select.value) ? select.value : "default";
+                const theme = select.value;
                 const prev = document.documentElement.dataset.theme || "default";
+                select.disabled = true;
                 applyTheme(theme);
                 try {
                     const r = await fetch("/api/user/theme", {
@@ -2849,6 +2849,8 @@
                     applyTheme(prev);
                     if (window.App && App.toast) App.toast.error(e.message || "Gagal simpan tema.");
                     else alert(e.message || "Gagal simpan tema.");
+                } finally {
+                    select.disabled = false;
                 }
             });
         })();

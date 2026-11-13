@@ -1,0 +1,417 @@
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) {
+    --app-bg: #ecf1fb;
+    --app-surface: #eef3fc;
+    --app-surface-muted: #e6edf9;
+    --app-border: #bac8df;
+    --app-border-strong: #a6b6d1;
+    --app-text: #323a4d;
+    --app-muted: #576278;
+    --app-soft: #e3eafa;
+    --app-brand: #6245ac;
+    --app-accent: #6748b4;
+    --app-sky: #245a93;
+    --app-danger: #a12642;
+    --app-radius: 20px;
+    --app-nav-bg: linear-gradient(145deg, #f8faffe6, #e2e9f7e6);
+    --app-input-bg: var(--clay-well);
+    --app-button-bg: var(--clay-surface);
+    --app-shadow: var(--clay-raised);
+    --clay-background:
+        radial-gradient(1200px 800px at 10% -8%, #f4f8ff, transparent 60%),
+        radial-gradient(900px 700px at 92% 12%, #f9f0ff, transparent 55%),
+        radial-gradient(1100px 900px at 50% 115%, #e1f3f6, transparent 60%),
+        linear-gradient(160deg, #ecf1fb, #dfe8f7 55%, #e9eefb);
+    --clay-surface: linear-gradient(145deg, #f8faff, #e9effb 55%, #e2e9f7);
+    --clay-edge: #ffffffb8;
+    --clay-shadow-dark: #9aacce80;
+    --clay-shadow-light: #fffffff5;
+    --clay-inset-dark: #9aacce57;
+    --clay-inset-light: #fffffff5;
+    --clay-well: linear-gradient(145deg, #dce4f3, #edf2fc);
+    --clay-recessed: inset 6px 6px 13px #98a9ca85, inset -6px -6px 13px #ffffffeb;
+    --clay-orb: #cbb6fa65;
+    --clay-orb-cool: #afc9f56b;
+    --clay-orb-mint: #b3e5e46b;
+    --clay-tone: 258;
+    --clay-fill-start: 92% 91%;
+    --clay-fill-end: 74% 78%;
+    --clay-accent-ink: 55% 26%;
+    --clay-accent-shade: 45% 66% / .5;
+    --clay-accent-highlight: 95% 97% / .9;
+    --clay-raised: 16px 16px 34px var(--clay-shadow-dark), -12px -12px 28px var(--clay-shadow-light),
+        inset -6px -6px 14px var(--clay-inset-dark), inset 6px 6px 14px var(--clay-inset-light);
+    --clay-raised-small: 5px 5px 12px var(--clay-shadow-dark), -4px -4px 10px var(--clay-shadow-light),
+        inset -2px -2px 5px var(--clay-inset-dark), inset 2px 2px 5px var(--clay-inset-light);
+}
+
+:root[data-theme="clay-dark"] {
+    color-scheme: dark;
+    --app-bg: #161b29;
+    --app-surface: #232b40;
+    --app-surface-muted: #1d2437;
+    --app-border: #424e6c;
+    --app-border-strong: #536180;
+    --app-text: #ecf1ff;
+    --app-muted: #a5b2ce;
+    --app-soft: #2b344e;
+    --app-brand: #7654b5;
+    --app-accent: #c5afff;
+    --app-sky: #a1d2ff;
+    --app-danger: #ff9eb0;
+    --app-nav-bg: linear-gradient(145deg, #262e45e0, #181e2ee0);
+    --clay-background:
+        radial-gradient(1100px 750px at 12% -5%, #232942, transparent 60%),
+        radial-gradient(900px 680px at 90% 15%, #2b223d, transparent 55%),
+        radial-gradient(1000px 850px at 50% 110%, #192d38, transparent 60%),
+        linear-gradient(160deg, #161b29, #121622 55%, #171c2b);
+    --clay-surface: linear-gradient(145deg, #262e45, #1d2437 55%, #181e2e);
+    --clay-edge: #ffffff18;
+    --clay-shadow-dark: #070a12bf;
+    --clay-shadow-light: #38446640;
+    --clay-inset-dark: #080b14a6;
+    --clay-inset-light: #586a9638;
+    --clay-well: linear-gradient(145deg, #141927, #1c2235);
+    --clay-recessed: inset 6px 6px 13px #06080fcc, inset -5px -5px 12px #34406038;
+    --clay-orb: #694cb640;
+    --clay-orb-cool: #475d9e48;
+    --clay-orb-mint: #2b777638;
+    --clay-fill-start: 55% 40%;
+    --clay-fill-end: 56% 29%;
+    --clay-accent-ink: 90% 96%;
+    --clay-accent-shade: 65% 19% / .7;
+    --clay-accent-highlight: 85% 68% / .4;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) body {
+    isolation: isolate;
+    background: var(--clay-background) fixed;
+    font-family: ui-rounded, "SF Pro Rounded", "Segoe UI Variable", Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) body::before {
+    content: "";
+    position: fixed;
+    inset: -30px;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(circle 95px at 26% 20%, var(--clay-orb), transparent),
+        radial-gradient(circle 125px at 78% 15%, var(--clay-orb-cool), transparent),
+        radial-gradient(circle 150px at 58% 70%, var(--clay-orb), transparent),
+        radial-gradient(circle 135px at 92% 52%, var(--clay-orb-mint), transparent),
+        radial-gradient(circle 100px at 16% 85%, var(--clay-orb-cool), transparent);
+    animation: clay-orbs 14s ease-in-out infinite alternate;
+}
+
+@keyframes clay-orbs {
+    to { transform: translate3d(28px, -26px, 0); }
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-card, .app-stat-card, .auth-card, .app-modal-box, .app-modal-card, .mcp-blocking-box,
+    .pwa-guide-box, .dash-modal-box, .stat-card-modern, .quota-strip, .chat-main-container,
+    .chat-day-card, .chat-tool-card, .tool-card, .doc-step, .relay-room-card, .relay-mode-nav,
+    .relay-quick-stats, .relay-modal-panel, .relay-modal-card, .relay-dialog, .relay-item,
+    .fw-hero, .fw-card, .fw-admin-card, .fw-content-panel, .fw-detail-box, .fw-checkout-card,
+    .fw-modal-box, .fw-seller-card, .fw-purchase-card, .fw-metric-card, .fw-sim-box, .edit-card,
+    .mcp-stat-card, .mcp-panel, .playlist-hero, .persona-hero-card, .persona-card,
+    .chronos-hero-card, .chronos-card, .chronos-feature-card, .wizard-step-panel,
+    .source-option-card, .version-option-card, .alarm-panel, .storage-box, .stream-card,
+    .overlay-panel, .access-stat-card, .access-filter-card, .monitor-filter-card, .modal-box
+) {
+    background: var(--clay-surface);
+    border: 1px solid var(--clay-edge);
+    border-radius: clamp(22px, 3vw, 30px);
+    box-shadow: var(--clay-raised);
+    color: var(--app-text);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-nav-aside, .app-guest-header, .app-footer-guest, .pwa-install-banner
+) {
+    background: var(--app-nav-bg);
+    border: 1px solid var(--clay-edge);
+    box-shadow: var(--clay-raised-small);
+    color: var(--app-text);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-nav-aside {
+    border-radius: 0 26px 26px 0;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-guest-header {
+    border-radius: 0 0 24px 24px;
+    backdrop-filter: blur(14px);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-sidebar-link.is-active, .app-sidebar-link:hover, .app-muted-panel,
+    .app-content-preview, .app-list-panel, .app-table-wrap, .chat-scroll-area,
+    .chat-reply-quote, .material-preview-box, .mcp-hardware-box, .mcp-connecting-panel,
+    .chronos-qr-box, .pwa-step-item, .ann-preview-box, .fw-spec-box, .relay-voice-box
+) {
+    background: var(--clay-well);
+    border-color: var(--clay-edge);
+    border-radius: 20px;
+    box-shadow: var(--clay-recessed);
+    color: var(--app-text);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-input, .app-select, .app-textarea, .chat-text-input,
+    input:not([type]), input:is([type="text"], [type="password"], [type="email"], [type="url"],
+        [type="number"], [type="search"], [type="date"], [type="time"], [type="datetime-local"]),
+    select, textarea
+) {
+    background: var(--clay-well);
+    border-color: var(--clay-edge);
+    border-radius: 16px;
+    box-shadow: var(--clay-recessed);
+    color: var(--app-text);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(input, textarea)::placeholder {
+    color: var(--app-muted);
+    opacity: 1;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(button, a, input, select, textarea):focus-visible {
+    outline: 2px solid var(--app-accent);
+    outline-offset: 2px;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-button, .app-google-btn, .app-icon-button, .app-sidebar-toggle, .app-modal-close,
+    .relay-head-btn, .relay-mode-btn, .relay-cfg-tab, .filter-pill, .admin-tab-btn,
+    .chronos-btn, .chat-submit-btn, .scroll-down-btn, .pwa-btn-install, .pwa-btn-understand
+) {
+    background: var(--clay-surface);
+    border: 1px solid var(--clay-edge);
+    border-radius: 16px;
+    box-shadow: var(--clay-raised-small);
+    color: var(--app-text);
+    font-weight: 800;
+    transition: transform .18s cubic-bezier(.34, 1.56, .64, 1), box-shadow .18s ease;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-button-primary, .app-button-success, .app-button-danger, .app-button-sky,
+    .relay-mode-btn.is-active, .relay-cfg-tab.is-active, .admin-tab-btn.is-active, .filter-pill.active,
+    .chat-submit-btn, .chronos-btn, .pwa-btn-install, .pwa-btn-understand,
+    .app-chip-success, .app-chip-info, .app-status-pill.is-online, .app-status-pill.is-offline,
+    .app-alert-success, .app-alert-warning, .app-alert-danger, .app-alert-info,
+    .app-sidebar-avatar, .app-brand-mark, .relay-mode-icon-box, .stat-card-icon,
+    .app-mcp-lock-badge, .pwa-banner-icon, .pwa-guide-icon, .pwa-step-num, .doc-step-number
+) {
+    background: linear-gradient(145deg, hsl(var(--clay-tone) var(--clay-fill-start)), hsl(var(--clay-tone) var(--clay-fill-end)));
+    border-color: var(--clay-edge);
+    box-shadow: 5px 5px 11px var(--clay-shadow-dark),
+        -4px -4px 10px var(--clay-shadow-light),
+        inset -3px -3px 7px hsl(var(--clay-tone) var(--clay-accent-shade)),
+        inset 3px 3px 7px hsl(var(--clay-tone) var(--clay-accent-highlight));
+    color: hsl(var(--clay-tone) var(--clay-accent-ink));
+}
+
+/* Community chat assigns important colors to message roles. */
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(.msg-bubble-admin, .msg-bubble-me, .msg-bubble-other) {
+    background: linear-gradient(145deg, hsl(var(--clay-tone) var(--clay-fill-start)), hsl(var(--clay-tone) var(--clay-fill-end))) !important;
+    color: hsl(var(--clay-tone) var(--clay-accent-ink)) !important;
+    border: 1px solid var(--clay-edge) !important;
+    border-radius: 20px;
+    box-shadow: var(--clay-raised-small) !important;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .msg-bubble-admin { --clay-tone: 155; }
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .msg-bubble-other { --clay-tone: 205; }
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .chat-bubble :is(.msg-username, .msg-meta-text) {
+    color: inherit !important;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .chat-bubble :is(.msg-id-tag, .chat-reply-quote) {
+    background: var(--clay-well) !important;
+    border-color: var(--app-border) !important;
+    color: var(--app-text) !important;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-button-success, .app-chip-success, .app-alert-success, .app-status-pill.is-online
+) { --clay-tone: 155; }
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-button-danger, .app-alert-danger, .app-status-pill.is-offline
+) { --clay-tone: 349; }
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(.app-button-sky, .app-chip-info, .app-alert-info) {
+    --clay-tone: 205;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-alert-warning { --clay-tone: 42; }
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-button, .app-google-btn, .app-icon-button, .app-sidebar-toggle, .relay-head-btn,
+    .relay-mode-btn, .relay-cfg-tab, .filter-pill, .admin-tab-btn, .chronos-btn, .chat-submit-btn,
+    .pwa-btn-install, .pwa-btn-understand
+):not(:disabled, [aria-disabled="true"]):hover { transform: translateY(-2px); }
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-button, .app-google-btn, .app-icon-button, .app-sidebar-toggle, .relay-head-btn,
+    .relay-mode-btn, .relay-cfg-tab, .filter-pill, .admin-tab-btn, .chronos-btn, .chat-submit-btn,
+    .pwa-btn-install, .pwa-btn-understand
+):not(:disabled, [aria-disabled="true"]):active {
+    box-shadow: var(--clay-recessed);
+    transform: translateY(1px) scale(.98);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(.app-chip, .app-status-pill, .cat-chip, .quota-badge) {
+    border-radius: 999px;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
+    .app-chip-neutral, .app-chip:not(.app-chip-info, .app-chip-success),
+    .app-status-pill:not(.is-online, .is-offline), .app-table th, .chat-date-pill
+) {
+    background: var(--app-soft);
+    color: var(--app-text);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-title {
+    font-weight: 900;
+    letter-spacing: -.035em;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-page {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .doc-tab {
+    border-radius: 16px;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .doc-tab.active {
+    background: var(--clay-well);
+    border-color: var(--clay-edge);
+    box-shadow: var(--clay-recessed);
+    color: var(--app-text);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(.app-label, .app-table-title, .relay-mode-title) {
+    color: var(--app-text);
+}
+
+/* Utility colors used by templates with their own markup. */
+:root[data-theme="clay-dark"] :is(.bg-white, .bg-slate-50, .bg-gray-50, .hover\:bg-slate-50:hover) {
+    background-color: var(--app-surface-muted);
+}
+
+:root[data-theme="clay-dark"] :is(
+    .text-slate-950, .text-slate-900, .text-slate-800, .text-slate-700, .text-slate-600,
+    .text-gray-900, .text-gray-800, .text-gray-700, .text-gray-600
+) { color: var(--app-text); }
+
+:root[data-theme="clay-dark"] :is(.text-slate-500, .text-slate-400, .text-gray-500, .text-gray-400) {
+    color: var(--app-muted);
+}
+
+:root[data-theme="clay-dark"] :is(.border-slate-200, .border-gray-200, .app-table td, .app-list-row) {
+    border-color: var(--app-border);
+}
+
+/* The shared announcement dialog sets these decorations inline. */
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) #announcementOverlay > div {
+    background: var(--clay-surface) !important;
+    border: 1px solid var(--clay-edge) !important;
+    border-radius: 30px !important;
+    box-shadow: var(--clay-raised) !important;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) #announcementOverlay #annModalTitle + div {
+    background: var(--clay-well) !important;
+    border: 1px solid var(--clay-edge) !important;
+    border-radius: 20px !important;
+    box-shadow: var(--clay-recessed) !important;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) #announcementOverlay :is(button, .app-chip) {
+    background: linear-gradient(145deg, hsl(var(--clay-tone) var(--clay-fill-start)), hsl(var(--clay-tone) var(--clay-fill-end))) !important;
+    color: hsl(var(--clay-tone) var(--clay-accent-ink)) !important;
+    border: 1px solid var(--clay-edge) !important;
+    border-radius: 14px !important;
+    box-shadow: var(--clay-raised-small) !important;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-item {
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--clay-edge);
+    border-radius: 22px;
+    background: var(--clay-surface);
+    color: var(--app-text);
+    box-shadow: var(--clay-raised);
+    transform: translateY(-20px) scale(.95);
+    transition: transform .25s cubic-bezier(.34, 1.56, .64, 1), opacity .22s ease;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-item.is-visible {
+    transform: translateY(0) scale(1);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-item.is-dismissing {
+    transform: translateY(-14px) scale(.97);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-icon-wrap {
+    --toast-orb: linear-gradient(145deg, #60a5fa, #2563eb);
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--toast-orb);
+    box-shadow: 2px 2px 6px #0003, inset 1px 1px 3px #ffffffb3;
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-success .app-toast-icon-wrap {
+    --toast-orb: linear-gradient(145deg, #34d399, #059669);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-warning .app-toast-icon-wrap {
+    --toast-orb: linear-gradient(145deg, #fbbf24, #d97706);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-error .app-toast-icon-wrap {
+    --toast-orb: linear-gradient(145deg, #f87171, #dc2626);
+}
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-close:hover {
+    background: var(--clay-well);
+}
+
+.app-toast-progress { display: none; }
+
+:root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-progress {
+    display: block;
+    position: absolute;
+    inset: auto 0 0;
+    height: 4px;
+    background: linear-gradient(90deg, hsl(258 75% 62%), hsl(200 80% 56%));
+    transform-origin: left;
+    animation: clay-toast-countdown var(--toast-duration) linear forwards;
+}
+
+@keyframes clay-toast-countdown {
+    to { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root:is([data-theme="clay"], [data-theme="clay-dark"]) body::before,
+    :root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-toast-progress { animation: none; }
+
+    :root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(button, a, .app-toast-item) {
+        transition: none;
+    }
+}

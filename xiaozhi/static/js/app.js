@@ -235,6 +235,14 @@
     el.appendChild(content);
     el.appendChild(closeBtn);
 
+    if (durationMs > 0) {
+      const progress = document.createElement("div");
+      progress.className = "app-toast-progress";
+      progress.setAttribute("aria-hidden", "true");
+      el.style.setProperty("--toast-duration", durationMs + "ms");
+      el.appendChild(progress);
+    }
+
     let dismissed = false;
     function dismiss() {
       if (dismissed) return;
