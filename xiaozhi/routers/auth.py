@@ -62,7 +62,7 @@ async def login_page(request: Request, mode: str = Query("login")):
     user = get_current_user(request)
     if user:
         return RedirectResponse(url="/dashboard")
-    active_mode = mode if mode in {"login", "search", "register"} else "login"
+    active_mode = "register" if mode == "register" else "login"
     error = request.query_params.get("error")
     success = request.query_params.get("message") or request.query_params.get("success")
     return render(
@@ -78,13 +78,11 @@ async def login_post(
     username: str = Form(...),
     password: str = Form(...),
     csrf_token: str = Form(...),
-    auth_mode: str = Form("login"),
 ):
     from xiaozhi.services.mcp_service import is_mcp_connected
     enforce_predefined_limit(request, "login")
     store = get_store()
     validate_csrf(request, csrf_token, None)
-    active_mode = "search" if auth_mode == "search" else "login"
     submitted_username = (username or "").strip().lower()
     try:
         user_record = store.get_user_by_username(username)
@@ -119,10 +117,9 @@ async def login_post(
                 "user": None,
                 "error": "Username atau password salah.",
                 "success": None,
-                "active_mode": active_mode,
+                "active_mode": "login",
                 "active_page": "login",
-                "login_username": submitted_username if active_mode == "login" else "",
-                "search_username": submitted_username if active_mode == "search" else "",
+                "login_username": submitted_username,
             },
             status_code=400,
         )
@@ -134,10 +131,9 @@ async def login_post(
                 "user": None,
                 "error": "Username atau password salah.",
                 "success": None,
-                "active_mode": active_mode,
+                "active_mode": "login",
                 "active_page": "login",
-                "login_username": submitted_username if active_mode == "login" else "",
-                "search_username": submitted_username if active_mode == "search" else "",
+                "login_username": submitted_username,
             },
             status_code=400,
         )

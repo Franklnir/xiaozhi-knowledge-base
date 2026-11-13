@@ -329,7 +329,7 @@ All secrets are stored in `/opt/xiaozhi/.env`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ADMIN_USERNAME` | `admin` | Admin username |
-| `ADMIN_PASSWORD` | *(auto-generated if empty)* | Admin password (set in `.env`) |
+| `ADMIN_PASSWORD` | *(empty)* | Set in `.env` to provision the initial admin account on startup. |
 | `COOKIE_SECURE` | `true` | HTTPS cookies |
 | `ALLOWED_HOSTS` | `*` | Allowed hosts |
 | `LOG_LEVEL` | `INFO` | Logging level |

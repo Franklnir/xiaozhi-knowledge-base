@@ -133,7 +133,6 @@
             <label for="authMode" class="app-label">Pilih akses</label>
             <select id="authMode" class="app-select">
                 <option value="login"{% if (active_mode or 'login') == 'login' %} selected{% endif %}>Login</option>
-                <option value="search"{% if active_mode == 'search' %} selected{% endif %}>Cari akun</option>
                 <option value="register"{% if active_mode == 'register' %} selected{% endif %}>Register</option>
             </select>
         </div>
@@ -141,7 +140,6 @@
         <div class="auth-panel">
             <form id="loginPanel" action="/login" method="POST" class="space-y-4{% if active_mode and active_mode != 'login' %} hidden{% endif %}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="auth_mode" value="login">
                 <div>
                     <label for="login_username" class="app-label">Username</label>
                     <input id="login_username" type="text" name="username" required autocomplete="username" value="{{ login_username or '' }}" class="app-input">
@@ -166,30 +164,6 @@
                     <span>Masuk dengan Google</span>
                 </a>
             </form>
-
-            <div id="searchPanel" class="space-y-4{% if active_mode != 'search' %} hidden{% endif %}">
-                <div>
-                    <label for="accountSearch" class="app-label">Cari username</label>
-                    <input id="accountSearch" type="search" autocomplete="off" placeholder="irs" value="{{ search_username or '' }}" class="app-input">
-                </div>
-                <div id="accountResults" class="hidden overflow-hidden rounded-lg border border-slate-200"></div>
-                <form id="searchLoginForm" action="/login" method="POST" class="{% if not search_username %}hidden {% endif %}space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input type="hidden" name="auth_mode" value="search">
-                    <input id="selectedUsername" type="hidden" name="username" value="{{ search_username or '' }}">
-                    <div>
-                        <p class="text-xs font-semibold uppercase text-slate-500">Akun</p>
-                        <p id="selectedUsernameLabel" class="mt-1 text-sm font-bold text-slate-950">{{ search_username or '' }}</p>
-                    </div>
-                    <div>
-                        <label for="search_password" class="app-label">Password</label>
-                        <input id="search_password" type="password" name="password" required autocomplete="current-password" class="app-input">
-                    </div>
-                    <button type="submit" class="app-button app-button-primary app-button-full">
-                        Masuk
-                    </button>
-                </form>
-            </div>
 
             <form id="registerPanel" action="/register" method="POST" class="space-y-4{% if active_mode != 'register' %} hidden{% endif %}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -245,18 +219,8 @@
     const authMode = document.getElementById("authMode");
     const panels = {
         login: document.getElementById("loginPanel"),
-        search: document.getElementById("searchPanel"),
         register: document.getElementById("registerPanel"),
-        cek_mcp: document.getElementById("cek_mcpPanel"),
     };
-    const accountSearch = document.getElementById("accountSearch");
-    const accountResults = document.getElementById("accountResults");
-    const searchLoginForm = document.getElementById("searchLoginForm");
-    const selectedUsername = document.getElementById("selectedUsername");
-    const selectedUsernameLabel = document.getElementById("selectedUsernameLabel");
-    const searchPassword = document.getElementById("search_password");
-    let searchTimer = null;
-
     function setMode(mode) {
         Object.entries(panels).forEach(([name, panel]) => {
             panel.classList.toggle("hidden", name !== mode);
@@ -267,67 +231,8 @@
         window.history.replaceState({}, "", url);
     }
 
-    function selectAccount(username) {
-        selectedUsername.value = username;
-        selectedUsernameLabel.textContent = username;
-        searchLoginForm.classList.remove("hidden");
-        accountResults.classList.add("hidden");
-        searchPassword.focus();
-    }
-
-    function renderAccounts(accounts) {
-        accountResults.innerHTML = "";
-        if (!accounts.length) {
-            accountResults.classList.remove("hidden");
-            accountResults.innerHTML = '<div class="px-3 py-2 text-sm text-slate-500">Tidak ada akun.</div>';
-            return;
-        }
-        accounts.forEach((account) => {
-            const button = document.createElement("button");
-            button.type = "button";
-            button.className = "block w-full px-3 py-2 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50";
-            button.textContent = account.username;
-            button.addEventListener("click", () => selectAccount(account.username));
-            accountResults.appendChild(button);
-        });
-        accountResults.classList.remove("hidden");
-    }
-
-    async function searchAccounts() {
-        const query = accountSearch.value.trim().toLowerCase();
-        searchLoginForm.classList.add("hidden");
-        selectedUsername.value = "";
-        selectedUsernameLabel.textContent = "";
-        if (query.length < 3 || !/^[a-z0-9_]+$/.test(query)) {
-            accountResults.classList.add("hidden");
-            accountResults.innerHTML = "";
-            return;
-        }
-        const response = await fetch(`/accounts/search?q=${encodeURIComponent(query)}`, {
-            headers: { "Accept": "application/json" },
-        });
-        if (!response.ok) {
-            renderAccounts([]);
-            return;
-        }
-        const data = await response.json();
-        renderAccounts(data.accounts || []);
-    }
-
     authMode.addEventListener("change", () => setMode(authMode.value));
-    accountSearch.addEventListener("input", () => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(searchAccounts, 180);
-    });
-
     setMode("{{ active_mode or 'login' }}");
-    if (selectedUsername.value) {
-        searchLoginForm.classList.remove("hidden");
-    }
-    if (authMode.value === "search" && accountSearch.value.trim().length >= 3) {
-        searchAccounts();
-    }
-
     // End authMode
 
     function escapeHtml(s) {
@@ -340,7 +245,6 @@
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const loginForm = document.getElementById("loginPanel");
-    const searchLoginForm = document.getElementById("searchLoginForm");
     const mcpCard = document.getElementById("loginMcpGatingCard");
     const mcpTokenInput = document.getElementById("login_mcp_token");
     const connectBtn = document.getElementById("loginConnectMcpBtn");
@@ -375,7 +279,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (data.mcp_required) {
                     // MCP is required and not connected! Show gating card!
                     if (loginForm) loginForm.classList.add("hidden");
-                    if (searchLoginForm) searchLoginForm.classList.add("hidden");
                     document.getElementById("authMode")?.parentElement?.classList.add("hidden");
 
                     mcpCard.classList.remove("hidden");

@@ -1140,7 +1140,7 @@ HUGGING XIAOZHI/
 | `ALLOWED_HOSTS` | Opsional | `*` | CORS allowed hosts |
 | `REAL_RELAY_POLL_INTERVAL_MS` | Opsional | `1000` | Relay polling interval |
 | `ADMIN_USERNAME` | Opsional | `admin` | Admin account username |
-| `ADMIN_PASSWORD` | Opsional | generated | Admin account password |
+| `ADMIN_PASSWORD` | Opsional | kosong | Isi untuk membuat akun admin saat aplikasi dimulai |
 
 ### 18.2 Generate Secrets
 
@@ -1175,7 +1175,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 | HF Dataset error | HF_TOKEN | Pastikan token punya write access |
 | CORS error | ALLOWED_HOSTS | Tambah domain ke allowed hosts |
 | Token encryption error | DATA_ENCRYPTION_KEY | Pastikan key konsisten (tidak berubah) |
-| Admin login gagal | ADMIN_PASSWORD | Cek environment variable atau logs |
+| Admin login gagal | ADMIN_PASSWORD | Periksa pengaturan kredensial admin |
 
 ---
 

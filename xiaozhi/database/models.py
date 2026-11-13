@@ -23,10 +23,6 @@ class LiveApiPreviewRequest(BaseModel):
     previous_hash: str = ""
 
 
-class AccountSearchResponse(BaseModel):
-    accounts: List[dict]
-
-
 class UserThemeCommand(BaseModel):
     theme: str
 

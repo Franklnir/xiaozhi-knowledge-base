@@ -74,17 +74,7 @@ async def lifespan(app: FastAPI):
     elif store.has_admin_user():
         logger.info("Admin account verified in database.")
     else:
-        # Fresh installation: No admin exists, and no ADMIN_PASSWORD set in environment
-        import secrets
-        generated_pw = secrets.token_urlsafe(16)
-        store.ensure_admin_user(ADMIN_USERNAME, generated_pw)
-        logger.warning("=" * 76)
-        logger.warning("[SECURITY NOTICE] Fresh install: No admin found & ADMIN_PASSWORD not in .env")
-        logger.warning("An initial admin account has been created with a generated secure password:")
-        logger.warning("  Username : %s", ADMIN_USERNAME)
-        logger.warning("  Password : %s", generated_pw)
-        logger.warning("Please copy this password immediately or set ADMIN_PASSWORD in your .env file!")
-        logger.warning("=" * 76)
+        logger.warning("No admin account exists. Set ADMIN_PASSWORD and restart to provision one.")
 
     # Only restore test account if explicitly configured in environment
     if RESTORED_USER_USERNAME and RESTORED_USER_PASSWORD:
