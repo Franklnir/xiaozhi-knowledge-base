@@ -251,6 +251,9 @@ func (h *WSDeviceHandler) HandleDeviceAudioWS(w http.ResponseWriter, r *http.Req
 			_ = h.audioStore.AckCommand(ctx, ownerID, cmd.ID)
 
 			streamURL := fmt.Sprintf("%s/api/audio/stream/%s?mac=%s&chip=%s&owner_id=%d", baseURL, cmd.VideoID, normMAC, chip, ownerID)
+			if isConfirmedVideoStream(cmd.StreamURL, normMAC) {
+				streamURL += "&mode=video"
+			}
 
 			log.Printf("[WS-DEVICE] Dispatching audio command to %s: ID=%d, Title=%s", normMAC, cmd.ID, cmd.Title)
 

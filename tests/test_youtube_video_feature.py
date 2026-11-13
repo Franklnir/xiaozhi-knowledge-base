@@ -3,6 +3,7 @@ Unit & Integration Tests for YouTube Video Scraping, Genre Classification,
 Confirmation Management with Request ID, and Material Saving.
 """
 
+import asyncio
 import tempfile
 import os
 import pytest
@@ -267,9 +268,45 @@ def test_video_audio_queues_only_confirmed_candidate(test_setup):
             assert audio.call_args.args == (owner_id,)
             assert audio.call_args.kwargs["video_id"] == "bbbbbbbbbbb"
             assert f"/api/audio/stream/bbbbbbbbbbb?owner_id={owner_id}" in audio.call_args.kwargs["stream_url"]
+            assert "&mode=video" in audio.call_args.kwargs["stream_url"]
             assert audio.call_args.kwargs["video_url"] == result["url"]
     finally:
         mcp_active_slot_ctx.reset(slot)
+
+
+def test_device_plays_confirmed_video_without_second_search_or_queue(test_setup):
+    from starlette.requests import Request
+    from xiaozhi.mcp.context import mcp_active_mac_ctx, mcp_active_slot_ctx
+    from xiaozhi.routers.youtube import audio_play_direct
+    from xiaozhi.services.youtube_playback_service import remember_playback_choices
+
+    owner_id, store, mcp = test_setup
+    mac = "AA:BB:CC:DD:EE:01"
+    video_id = "bbbbbbbbbbb"
+    token = mcp_active_mac_ctx.set(mac)
+    slot = mcp_active_slot_ctx.set(1)
+    try:
+        request_id, _ = remember_playback_choices(owner_id, 1, [{
+            "video_id": video_id, "title": "Confirmed video", "duration_seconds": 60,
+            "url": f"https://www.youtube.com/watch?v={video_id}",
+        }])
+        confirmed = mcp.tools["play_confirmed_youtube_video"](request_id, 1)
+        assert confirmed["success"], confirmed
+    finally:
+        mcp_active_mac_ctx.reset(token)
+        mcp_active_slot_ctx.reset(slot)
+    request = Request({"type": "http", "headers": [], "scheme": "https",
+                       "server": ("example.test", 443), "path": "/api/audio/play_direct"})
+    with patch("xiaozhi.routers.youtube.get_store", return_value=store), \
+         patch("xiaozhi.routers.youtube.youtube_search") as search, \
+         patch.object(store, "queue_audio_command") as queue:
+        result = asyncio.run(audio_play_direct(request, q=video_id, mac=mac, token="", owner_id=owner_id))
+        assert result["video_id"] == video_id
+        assert result["title"] == "Confirmed video"
+        assert result["duration"] == "01:00"
+        assert result["stream_url"].endswith("&mode=video")
+        search.assert_not_called()
+        queue.assert_not_called()
 
 
 def test_research_source_number_queues_exact_video_without_searching_again(test_setup):

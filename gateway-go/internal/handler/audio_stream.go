@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -147,8 +148,53 @@ func (h *AudioStreamHandler) notifyPlaybackEnd(ownerID int64, sessionID, reason 
 	}()
 }
 
-
 var safeFilenameRegex = regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
+var youtubeVideoID = regexp.MustCompile(`^[a-zA-Z0-9_-]{11}$`)
+
+func isConfirmedVideoStream(streamURL, mac string) bool {
+	parsed, err := url.Parse(streamURL)
+	if err != nil {
+		return false
+	}
+	params := parsed.Query()
+	deviceMAC := store.NormalizeMAC(mac)
+	return params.Get("mode") == "video" && deviceMAC != "" &&
+		store.NormalizeMAC(params.Get("mac")) == deviceMAC
+}
+
+func resolveVideoBitrate(requested string, rssi *int, chip string, sampleRate int) string {
+	bitrate := ResolveBitrate(requested, rssi, chip)
+	if requested != "" && !strings.EqualFold(requested, "auto") && rssi != nil {
+		adaptive := ResolveBitrate("auto", rssi, chip)
+		if bitrateKbps(adaptive) < bitrateKbps(bitrate) {
+			bitrate = adaptive
+		}
+	}
+	limit := "24k"
+	if sampleRate == 16000 {
+		limit = "16k"
+	}
+	if bitrateKbps(bitrate) > bitrateKbps(limit) {
+		return limit
+	}
+	return bitrate
+}
+
+func bitrateKbps(bitrate string) int {
+	kbps, _ := strconv.Atoi(strings.TrimSuffix(bitrate, "k"))
+	return kbps
+}
+
+// Read enough Opus data before sending the first video audio bytes so small
+// FFmpeg reads do not consume the player's initial burst one page at a time.
+func bufferVideoAudio(source io.Reader, bitrate string) (io.Reader, int, error) {
+	buffer := make([]byte, max(2600, 3*bitrateKbps(bitrate)*1000/8))
+	n, err := io.ReadFull(source, buffer)
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		err = nil
+	}
+	return io.MultiReader(bytes.NewReader(buffer[:n]), source), n, err
+}
 
 // ResolveBitrate chooses optimal bitrate according to ESP32 chip profile and Wi-Fi RSSI
 func ResolveBitrate(requested string, rssi *int, chip string) string {
@@ -308,10 +354,26 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 
 	bitrate := ResolveBitrate(requestedBr, rssi, chip)
 	sampleRate := ResolveSampleRate(chip)
+	isVideo := q.Get("mode") == "video" && youtubeVideoID.MatchString(videoID)
+	var videoCommandID int64
+	// Some firmware rebuilds the stream URL and drops the playback mode.
+	if ownerID > 0 && store.NormalizeMAC(mac) != "" && youtubeVideoID.MatchString(videoID) {
+		id, streamURL := h.audioStore.RecentVideoCommand(r.Context(), ownerID, videoID)
+		if isConfirmedVideoStream(streamURL, mac) {
+			isVideo = true
+			videoCommandID = id
+		}
+	}
+	if isVideo {
+		bitrate = resolveVideoBitrate(requestedBr, rssi, chip, sampleRate)
+	}
 	safeVid := safeFilenameRegex.ReplaceAllString(videoID, "_")
 
 	// 1. FAST PATH: Check local disk cache (Playlist track already transcoded)
 	cachePattern := filepath.Join(h.cfg.AudioCacheDir, fmt.Sprintf("%s_*.opus", safeVid))
+	if isVideo {
+		cachePattern = filepath.Join(h.cfg.AudioCacheDir, fmt.Sprintf("%s_%d_%s.opus", safeVid, sampleRate, bitrate))
+	}
 	matches, _ := filepath.Glob(cachePattern)
 	if len(matches) > 0 {
 		for _, match := range matches {
@@ -375,6 +437,9 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 					title = fmt.Sprintf("Cached Track %s", videoID)
 				}
 				sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
+				if videoCommandID != 0 {
+					_ = h.audioStore.AckCommand(r.Context(), ownerID, videoCommandID)
+				}
 
 				totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate, sessionID, ownerID)
 				if cmd != nil {
@@ -430,18 +495,29 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 
 	// 3. EXECUTE FFMPEG WITH ZERO-COPY PIPE
 	ffmpegBin := "ffmpeg"
+	reconnectAtEOF := "1"
+	if isVideo {
+		reconnectAtEOF = "0"
+	}
 	args := []string{
 		"-reconnect", "1",
-		"-reconnect_at_eof", "1",
+		"-reconnect_at_eof", reconnectAtEOF,
 		"-reconnect_streamed", "1",
 		"-reconnect_delay_max", "5",
 		"-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
+	}
+	if isVideo {
+		args = append(args, "-rw_timeout", "8000000")
 	}
 
 	if startSec > 0 {
 		args = append(args, "-ss", fmt.Sprintf("%.2f", startSec))
 	}
 
+	vbr := "on"
+	if isVideo {
+		vbr = "constrained"
+	}
 	args = append(args,
 		"-i", resolveData.SourceURL,
 		"-vn",
@@ -449,7 +525,7 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		"-ar", strconv.Itoa(sampleRate),
 		"-c:a", "libopus",
 		"-b:a", bitrate,
-		"-vbr", "on",
+		"-vbr", vbr,
 		"-compression_level", "5",
 		"-application", "audio",
 		"-flush_packets", "1",
@@ -474,7 +550,21 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 	}
 
 	var streamReader io.Reader = stdout
-	if startSec > 0 {
+	if isVideo {
+		buffered, n, err := bufferVideoAudio(stdout, bitrate)
+		if err != nil || n == 0 || (startSec > 0 && n < 2600) {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+			log.Printf("[VIDEO AUDIO] Initial buffer unavailable for %s", videoID)
+			if startSec > 0 && err == nil && n < 2600 {
+				http.Error(w, "Track reached end of file", http.StatusRequestedRangeNotSatisfiable)
+			} else {
+				http.Error(w, "Unable to read video audio", http.StatusBadGateway)
+			}
+			return
+		}
+		streamReader = buffered
+	} else if startSec > 0 {
 		buf := make([]byte, 4096)
 		n, readErr := io.ReadAtLeast(stdout, buf, 2600)
 		if n < 2600 && (readErr == io.EOF || readErr == io.ErrUnexpectedEOF) {
@@ -497,6 +587,9 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		title = fmt.Sprintf("YouTube %s", videoID)
 	}
 	sessionID := h.notifyPlaybackStart(r.Context(), ownerID, videoID, title, mac, bitrate, chip)
+	if videoCommandID != 0 {
+		_ = h.audioStore.AckCommand(r.Context(), ownerID, videoCommandID)
+	}
 	var totalBytes int64
 	defer func() {
 		reason := "finished"

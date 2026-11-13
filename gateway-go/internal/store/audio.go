@@ -24,6 +24,22 @@ type AudioStore struct {
 	db *db.DB
 }
 
+// RecentVideoCommand returns only a fresh command for the exact owner and video.
+func (s *AudioStore) RecentVideoCommand(ctx context.Context, ownerID int64, videoID string) (int64, string) {
+	var id int64
+	var streamURL string
+	err := s.db.Pool.QueryRow(ctx, `
+		SELECT id, stream_url FROM audio_queue
+		WHERE owner_id = $1 AND video_id = $2 AND created_at >= NOW() - INTERVAL '2 minutes'
+		  AND status IN ('pending', 'played')
+		ORDER BY id DESC LIMIT 1
+	`, ownerID, videoID).Scan(&id, &streamURL)
+	if err != nil {
+		return 0, ""
+	}
+	return id, streamURL
+}
+
 func NewAudioStore(db *db.DB) *AudioStore {
 	return &AudioStore{db: db}
 }

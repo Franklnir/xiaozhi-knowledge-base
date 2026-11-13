@@ -10,7 +10,9 @@ import re
 import shutil
 import subprocess
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, AsyncGenerator
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -1490,6 +1492,34 @@ async def audio_play_direct(
             store.record_device_activity(clean_mac, resolved_owner_id)
         except Exception:
             pass
+
+    # Confirmed video requests carry their exact stream URL. Skip playlist/title
+    # lookup and avoid creating a second pending command for the device call.
+    if resolved_owner_id and clean_mac and re.fullmatch(r"[A-Za-z0-9_-]{11}", q):
+        try:
+            for command in reversed(store.get_pending_audio_commands(resolved_owner_id)):
+                if command.get("video_id") != q:
+                    continue
+                params = parse_qs(urlsplit(command["stream_url"]).query)
+                created = datetime.fromisoformat(str(command["created_at"]))
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                if (
+                    params.get("mode") == ["video"]
+                    and _normalize_mac(params.get("mac", [""])[0]) == _normalize_mac(clean_mac)
+                    and timedelta(0) <= datetime.now(timezone.utc) - created <= timedelta(minutes=2)
+                ):
+                    device_base = base_url.replace("https://", "http://", 1)
+                    stream_params = urlencode({"owner_id": resolved_owner_id, "mac": clean_mac, "mode": "video"})
+                    return {
+                        "success": True, "video_id": q, "title": command["title"],
+                        "duration": format_duration(command.get("duration")),
+                        "stream_url": f"{device_base}/api/audio/stream/{q}?{stream_params}",
+                        "owner_id": resolved_owner_id,
+                    }
+                break
+        except Exception as exc:
+            logger.debug("Confirmed video lookup failed: %s", type(exc).__name__)
 
     try:
         vid = ""

@@ -50,3 +50,32 @@ def test_today_uses_verified_wib_date_and_orders_same_day_by_time(monkeypatch):
     result = video.find_playback_choices(1, 2, "Update ESP32 hari ini")
     assert [item["video_id"] for item in result["candidates"]] == ["ccccccccccc", "aaaaaaaaaaa"]
     assert result["candidates"][0]["published_at_wib"].startswith("2026-11-13T01:00")
+
+
+def test_latest_release_keeps_xiaozhi_topic_and_retries_unrelated_results(monkeypatch):
+    search = Mock(side_effect=[
+        ([{"id": "aaaaaaaaaaa", "title": "Unrelated recent upload"}], "youtube_search_sample"),
+        ([{"id": "bbbbbbbbbbb", "title": "Update Xiao-Zhi ESP32", "upload_date": "20261110"}],
+         "youtube_search_sample"),
+    ])
+    monkeypatch.setattr(video, "search_youtube_candidates", search)
+    result = video.find_playback_choices(1, 2, "rilis video terbaru Xiao Zhi")
+    assert result["candidates"][0]["video_id"] == "bbbbbbbbbbb"
+    assert search.call_args_list[0].args[:2] == ("xiaozhi", True)
+    assert search.call_args_list[1].args == ("xiaozhi", True, None, None, 12)
+
+
+def test_latest_channel_handle_uses_its_uploads(monkeypatch):
+    uploads = Mock(return_value=[
+        {"id": "aaaaaaaaaaa", "title": "Latest upload", "uploader_id": "@maker"},
+        {"id": "bbbbbbbbbbb", "title": "Another channel", "uploader_id": "@other"},
+    ])
+    search = Mock()
+    monkeypatch.setattr(video, "_channel_uploads", uploads)
+    monkeypatch.setattr(video, "search_youtube_candidates", search)
+    monkeypatch.setattr(video, "_video_metadata", lambda _: None)
+    result = video.find_playback_choices(1, 2, "video terbaru dari channel @maker")
+    assert result["search_method"] == "youtube_channel_uploads"
+    assert [item["video_id"] for item in result["candidates"]] == ["aaaaaaaaaaa"]
+    uploads.assert_called_once_with("@maker")
+    search.assert_not_called()
