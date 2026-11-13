@@ -258,6 +258,19 @@
     --clay-accent-ink: 65% 18%;
 }
 
+/* These active states use important white text in their base styles. */
+:root[data-theme="clay"] :is(.filter-pill.active, .relay-mode-btn.is-active) {
+    color: hsl(var(--clay-tone) var(--clay-accent-ink)) !important;
+}
+
+:root[data-theme="clay"] .relay-mode-btn.is-active :is(.relay-mode-title, .relay-mode-subtitle, .relay-mode-icon-box) {
+    color: inherit;
+}
+
+:root[data-theme="clay"] .relay-mode-btn.is-active .relay-mode-subtitle {
+    opacity: 1;
+}
+
 :root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
     .app-button, .app-google-btn, .app-icon-button, .app-sidebar-toggle, .relay-head-btn,
     .relay-mode-btn, .relay-cfg-tab, .filter-pill, .admin-tab-btn, .chronos-btn, .chat-submit-btn,
