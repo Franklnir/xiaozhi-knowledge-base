@@ -1,4 +1,4 @@
-{% set theme_options = {'neo': 'Neo Brutalism', 'default': 'Original', 'dark': 'Dark', 'clay': 'Claymorphism · Light Clay', 'clay-dark': 'Claymorphism · Midnight Clay'} %}
+{% set theme_options = {'neo': 'Neo Brutalism', 'default': 'Original', 'dark': 'Dark', 'clay': 'Claymorphism · Light Clay', 'clay-dark': 'Claymorphism · Midnight Clay', 'playful': 'Playful'} %}
 {% set current_theme = user.ui_theme if user and user.ui_theme in theme_options else default_ui_theme %}
 <!DOCTYPE html>
 <html lang="id" {% if current_theme != 'default' %}data-theme="{{ current_theme }}" {% endif %}>
@@ -2124,6 +2124,7 @@
     </style>
     <link rel="stylesheet" href="/static/css/claymorphism.css?v=3">
     <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/playful.css">
     <script src="/static/js/app.js"></script>
 </head>
 {% set page = active_page|default(page|default('')) %}

@@ -833,7 +833,7 @@ SESSION_MAX_AGE = 60 * 60 * 24 * 7
 CSRF_MAX_AGE = 60 * 60 * 4
 
 # ── UI ─────────────────────────────────────────────────────────────────────
-UI_THEMES = {"default", "dark", "neo", "clay", "clay-dark"}
+UI_THEMES = {"default", "dark", "neo", "clay", "clay-dark", "playful"}
 DEFAULT_UI_THEME = "clay"
 
 # ── Production Detection ───────────────────────────────────────────────────

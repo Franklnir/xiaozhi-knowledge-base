@@ -1,0 +1,226 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root[data-theme="playful"] {
+    --playful-violet: #8b5cf6;
+    --playful-pink: #f472b6;
+    --playful-yellow: #fbbf24;
+    --playful-mint: #34d399;
+    --playful-ink: #1e293b;
+    --playful-heading: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
+    --playful-shadow: 4px 4px 0 var(--playful-ink);
+    --app-bg: #fffdf5;
+    --app-surface: #fff;
+    --app-surface-muted: #f1f5f9;
+    --app-border: #cbd5e1;
+    --app-border-strong: var(--playful-ink);
+    --app-text: var(--playful-ink);
+    --app-muted: #475569;
+    --app-soft: #f0e9ff;
+    --app-brand: #6d28d9;
+    --app-accent: #6d28d9;
+    --app-sky: #075985;
+    --app-danger: #9f1239;
+    --app-radius: 16px;
+    --app-shadow: var(--playful-shadow);
+    --app-nav-bg: var(--app-bg);
+}
+
+:root[data-theme="playful"] body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    background-color: var(--app-bg);
+    background-image: radial-gradient(#1e293b24 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+:root[data-theme="playful"] ::selection {
+    background: var(--playful-yellow);
+    color: var(--playful-ink);
+}
+
+:root[data-theme="playful"] :is(
+    .app-title, .app-section-title, .app-brand-name, .app-modal-title, .app-stat-value,
+    .stat-card-num, .auth-brand h1
+) {
+    font-family: var(--playful-heading);
+    font-weight: 800;
+    letter-spacing: -.025em;
+}
+
+:root[data-theme="playful"] :is(
+    .app-card, .app-stat-card, .auth-card, .stat-card-modern, .quota-strip,
+    .app-modal-box, .app-modal-card, .dash-modal-box, .mcp-blocking-box, .pwa-guide-box,
+    .chat-main-container, .chat-day-card, .chat-tool-card, .tool-card, .doc-step,
+    .relay-room-card, .relay-mode-nav, .relay-quick-stats, .relay-modal-panel, .relay-dialog,
+    .mcp-panel, .mcp-stat-card, .fw-hero, .fw-card, .fw-admin-card, .fw-detail-box,
+    .fw-checkout-card, .fw-modal-box, .fw-seller-card, .fw-purchase-card, .fw-metric-card,
+    .playlist-hero, .persona-hero-card, .persona-card, .wizard-step-panel, .chronos-hero-card,
+    .chronos-card, .chronos-feature-card, .source-option-card, .version-option-card,
+    .access-stat-card, .access-filter-card, .monitor-filter-card
+) {
+    background: var(--app-surface);
+    border: 2px solid var(--playful-ink);
+    border-radius: 20px;
+    box-shadow: var(--playful-shadow);
+}
+
+:root[data-theme="playful"] :is(.dashboard-stat-grid, .app-stat-grid) > :nth-child(4n + 1) {
+    box-shadow: 4px 4px 0 var(--playful-violet);
+}
+
+:root[data-theme="playful"] :is(.dashboard-stat-grid, .app-stat-grid) > :nth-child(4n + 2) {
+    box-shadow: 4px 4px 0 var(--playful-yellow);
+}
+
+:root[data-theme="playful"] :is(.dashboard-stat-grid, .app-stat-grid) > :nth-child(4n + 3) {
+    box-shadow: 4px 4px 0 var(--playful-pink);
+}
+
+:root[data-theme="playful"] :is(.dashboard-stat-grid, .app-stat-grid) > :nth-child(4n + 4) {
+    box-shadow: 4px 4px 0 var(--playful-mint);
+}
+
+:root[data-theme="playful"] .stat-card-icon {
+    border: 2px solid var(--playful-ink);
+    box-shadow: 2px 2px 0 var(--playful-ink);
+}
+
+:root[data-theme="playful"] .stat-card-modern:nth-child(odd) .stat-card-icon {
+    border-radius: 50%;
+}
+
+:root[data-theme="playful"] .stat-card-modern:nth-child(even) .stat-card-icon {
+    border-radius: 10px;
+}
+
+:root[data-theme="playful"] :is(.app-nav-aside, .app-guest-header, .app-compact-header) {
+    background: var(--app-bg);
+    border-color: var(--playful-ink);
+    border-width: 2px;
+}
+
+:root[data-theme="playful"] .app-brand-mark {
+    border: 2px solid var(--playful-ink);
+    border-radius: 50%;
+    box-shadow: 2px 2px 0 var(--playful-yellow);
+}
+
+:root[data-theme="playful"] .app-sidebar-link.is-active {
+    background: var(--playful-yellow);
+    color: var(--playful-ink);
+    border-color: var(--playful-ink);
+    border-radius: 999px;
+    box-shadow: 2px 2px 0 var(--playful-ink);
+}
+
+:root[data-theme="playful"] :is(.app-page-header, .dashboard-container > header) .app-title {
+    text-decoration: underline;
+    text-decoration-color: var(--playful-yellow);
+    text-decoration-thickness: .14em;
+    text-underline-offset: .16em;
+}
+
+:root[data-theme="playful"] :is(
+    .app-button, .app-google-btn, .app-sidebar-toggle, .app-icon-button, .filter-pill,
+    .admin-tab-btn, .relay-head-btn, .relay-mode-btn, .relay-cfg-tab, .chronos-btn, .chat-submit-btn
+) {
+    --playful-button: #fff;
+    background: var(--playful-button);
+    color: var(--playful-ink);
+    border: 2px solid var(--playful-ink);
+    border-radius: 999px;
+    box-shadow: var(--playful-shadow);
+    font-family: var(--playful-heading);
+    font-weight: 800;
+    transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), box-shadow .22s ease;
+}
+
+:root[data-theme="playful"] :is(.app-button-primary, .chronos-btn, .chat-submit-btn) {
+    --playful-button: var(--playful-violet);
+    color: #111827;
+}
+
+:root[data-theme="playful"] .app-button-success { --playful-button: var(--playful-mint); }
+:root[data-theme="playful"] .app-button-danger { --playful-button: var(--playful-pink); }
+:root[data-theme="playful"] .app-button-sky { --playful-button: #bae6fd; }
+
+:root[data-theme="playful"] :is(.filter-pill.active, .admin-tab-btn.is-active, .relay-cfg-tab.is-active, .relay-mode-btn.is-active) {
+    --playful-button: var(--playful-yellow);
+    color: var(--playful-ink) !important;
+}
+
+:root[data-theme="playful"] .relay-mode-btn.is-active :is(.relay-mode-title, .relay-mode-subtitle, .relay-mode-icon-box) {
+    color: inherit;
+}
+
+:root[data-theme="playful"] .app-button-ghost {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+}
+
+:root[data-theme="playful"] :is(.app-button, .app-google-btn, .filter-pill, .relay-head-btn):not(:disabled, [aria-disabled="true"]):hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--playful-ink);
+}
+
+:root[data-theme="playful"] :is(.app-button, .app-google-btn, .filter-pill, .relay-head-btn):not(:disabled, [aria-disabled="true"]):active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 var(--playful-ink);
+}
+
+:root[data-theme="playful"] :is(.app-input, .app-select, .app-textarea, .chat-text-input) {
+    border: 2px solid var(--playful-ink);
+    border-radius: 14px;
+}
+
+:root[data-theme="playful"] :is(a, button, input, select, textarea):focus-visible {
+    outline: 3px solid var(--app-accent);
+    outline-offset: 3px;
+}
+
+:root[data-theme="playful"] :is(.app-chip, .app-status-pill, .app-alert) {
+    border: 1px solid var(--playful-ink);
+    color: var(--playful-ink);
+}
+
+:root[data-theme="playful"] :is(.app-chip, .app-status-pill) { border-radius: 999px; }
+:root[data-theme="playful"] :is(.app-chip-info, .app-alert-info) { background: #e9ddff; }
+:root[data-theme="playful"] :is(.app-chip-success, .app-alert-success, .app-status-pill.is-online) { background: #a7f3d0; }
+:root[data-theme="playful"] .app-alert-warning { background: #fde68a; }
+:root[data-theme="playful"] :is(.app-alert-danger, .app-status-pill.is-offline) { background: #fbcfe8; }
+
+:root[data-theme="playful"] .app-table-wrap {
+    border: 2px solid var(--playful-ink);
+}
+
+:root[data-theme="playful"] .app-table th {
+    background: #e9ddff;
+    color: var(--playful-ink);
+    font-family: var(--playful-heading);
+}
+
+:root[data-theme="playful"] .app-toast-item {
+    background: var(--playful-ink);
+    border: 2px solid var(--playful-ink);
+    border-radius: 20px;
+    color: #fff;
+    box-shadow: 4px 4px 0 var(--toast-accent, var(--playful-violet));
+}
+
+:root[data-theme="playful"] .app-toast-success { --toast-accent: var(--playful-mint); }
+:root[data-theme="playful"] .app-toast-error { --toast-accent: var(--playful-pink); }
+:root[data-theme="playful"] .app-toast-warning { --toast-accent: var(--playful-yellow); }
+
+:root[data-theme="playful"] .app-toast-item .app-toast-icon-wrap {
+    border: 0;
+    border-radius: 50%;
+    background: var(--toast-accent, var(--playful-violet));
+    color: #111827;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root[data-theme="playful"] :is(a, button, .app-toast-item) { transition: none; }
+    :root[data-theme="playful"] :is(.app-button, .app-google-btn, .filter-pill, .relay-head-btn):is(:hover, :active) {
+        transform: none;
+    }
+}
