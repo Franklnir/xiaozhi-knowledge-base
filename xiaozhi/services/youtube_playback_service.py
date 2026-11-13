@@ -1,8 +1,11 @@
-"""Select an exact YouTube video before sending it to the browser player."""
+"""Select an exact YouTube video before queuing its audio."""
 
 import re
 import time
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, datetime, timedelta, timezone
+from difflib import SequenceMatcher
 from threading import Lock
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
@@ -14,6 +17,10 @@ from xiaozhi.services.youtube_research_service import search_youtube_candidates
 _VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
 _PENDING = OrderedDict()
 _LOCK = Lock()
+_RECENT_WORDS = r"\b(?:paling\s+baru|terbaru|terkini|hari\s+ini|barusan)\b"
+_METADATA_OPTIONS = {"quiet": True, "no_warnings": True, "noplaylist": True,
+                     "socket_timeout": 5, "retries": 0, "extractor_retries": 0,
+                     "ignore_no_formats_error": True}
 
 
 def _direct_video_id(query):
@@ -37,46 +44,160 @@ def _direct_video_id(query):
     return candidate
 
 
-def find_playback_choices(owner_id, slot, query):
+def _words(value):
+    return " ".join(re.findall(r"[^\W_]+", str(value or "").casefold()))
+
+
+def _match_title(query, title):
+    target = _words(str(title or "")[:300])
+    if not query:
+        return 1.0
+    if query == target:
+        return 3.0
+    if f" {query} " in f" {target} ":
+        return 2.0
+    overlap = len(set(query.split()) & set(target.split())) / len(set(query.split()))
+    similarity = SequenceMatcher(None, query, target, autojunk=False).ratio()
+    if overlap >= 0.6 or similarity >= 0.78:
+        return max(overlap, similarity)
+    return 0.0
+
+
+def _matches_channel(entry, channel):
+    if not channel:
+        return True
+    names = {entry.get("channel"), entry.get("uploader"), entry.get("uploader_id")}
+    if channel.startswith("@"):
+        return any(str(name or "").casefold() == channel.casefold() for name in names)
+    return _words(channel) in {_words(name) for name in names if name}
+
+
+def _upload_day(entry):
+    try:
+        return datetime.strptime(entry.get("upload_date") or "", "%Y%m%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _publication_time(entry):
+    try:
+        if entry.get("published_at"):
+            published = datetime.fromisoformat(entry["published_at"].replace("Z", "+00:00"))
+            return published if published.tzinfo else None
+        if entry.get("timestamp"):
+            return datetime.fromtimestamp(entry["timestamp"], timezone.utc)
+    except (ValueError, TypeError, OverflowError, OSError):
+        pass
+    return None
+
+
+def _video_metadata(video_id):
+    with yt_dlp.YoutubeDL(_METADATA_OPTIONS.copy()) as ydl:
+        entry = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+    return entry if entry and entry.get("id") == video_id else None
+
+
+def _enrich(entry):
+    try:
+        return {**entry, **{key: value for key, value in (_video_metadata(entry["id"]) or {}).items()
+                           if value is not None}}
+    except Exception:
+        return entry
+
+
+def find_playback_choices(owner_id, slot, query, *, channel="", newest=False):
     query = " ".join(query.split())
-    if not query or len(query) > 300:
+    channel = " ".join(channel.split())
+    if not (query or channel) or len(query) > 300 or len(channel) > 120:
         return {"success": False, "message": "Masukkan judul, channel, atau tautan video YouTube."}
     try:
         video_id = _direct_video_id(query)
     except ValueError:
         return {"success": False, "message": "Gunakan tautan ke satu video YouTube yang valid."}
 
+    today_only = False
+    if not video_id:
+        today_only = bool(re.search(r"\bhari\s+ini\b", query, re.I))
+        newest = newest or bool(re.search(_RECENT_WORDS, query, re.I))
+        query = re.sub(_RECENT_WORDS, " ", query, flags=re.I).strip()
+        match = re.search(r"(?:^|\s)dari\s+(?:channel|kanal)\s+(.+)$", query, re.I)
+        if match:
+            channel = channel or match[1].strip()
+            query = query[:match.start()].strip()
+    title_query = _words(query)
+    search_query = " ".join(part for part in (query, channel) if part)
+    if not search_query:
+        return {"success": False, "message": "Sebutkan topik video atau channel yang ingin dicari."}
+
+    method = "direct_video"
+    wib = timezone(timedelta(hours=7))
+    today = datetime.now(wib).date()
     try:
         if video_id:
-            options = {"quiet": True, "no_warnings": True, "noplaylist": True,
-                       "socket_timeout": 6, "retries": 0, "ignore_no_formats_error": True}
-            with yt_dlp.YoutubeDL(options) as ydl:
-                entry = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            entries = [entry] if entry and entry.get("id") == video_id else []
+            entry = _video_metadata(video_id)
+            entries = [entry] if entry else []
         else:
-            entries, _ = search_youtube_candidates(query, False, None, None, 6)
+            start = today - timedelta(days=1) if today_only else today - timedelta(days=7) if newest and not channel else None
+            entries, method = search_youtube_candidates(search_query, newest, start, None, 12)
+            if newest and not entries and not today_only and start:
+                entries, method = search_youtube_candidates(search_query, newest, None, None, 12)
     except Exception:
         return {"success": False, "message": "Metadata video YouTube sedang tidak bisa diperiksa."}
 
-    choices = {}
+    pool = {}
     for entry in entries:
         if not entry or not _VIDEO_ID.fullmatch(str(entry.get("id") or "")) or not entry.get("title"):
             continue
+        if video_id or _match_title(title_query, entry["title"]):
+            pool.setdefault(entry["id"], entry)
+    if not video_id:
+        needs_metadata = [entry for entry in pool.values()
+                          if (today_only and not _publication_time(entry))
+                          or (newest and not _upload_day(entry))
+                          or (channel and not _matches_channel(entry, channel))][:8]
+        if needs_metadata:
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                for entry in executor.map(_enrich, needs_metadata):
+                    pool[entry["id"]] = entry
+
+    ranked = []
+    for entry in pool.values():
+        if not video_id and not _matches_channel(entry, channel):
+            continue
+        uploaded = _upload_day(entry)
+        published_at = _publication_time(entry)
+        if today_only:
+            if not published_at or published_at.astimezone(wib).date() != today:
+                continue
+        if published_at:
+            uploaded = published_at.astimezone(timezone.utc).date()
+        score = _match_title(title_query, entry["title"]) if not video_id else 1.0
+        if not score:
+            continue
         vid = entry["id"]
-        choices.setdefault(vid, {
+        date_rank = (uploaded or date.min, published_at.timestamp() if published_at else 0)
+        ranked.append((score, date_rank, {
             "video_id": vid,
             "title": str(entry["title"])[:200],
             "channel": str(entry.get("channel") or entry.get("uploader") or "")[:120],
             "duration_seconds": entry.get("duration"),
+            "published_date_utc": uploaded.isoformat() if uploaded else None,
+            "published_at_wib": published_at.astimezone(wib).isoformat() if published_at else None,
             "url": f"https://www.youtube.com/watch?v={vid}",
-        })
-        if len(choices) == 3:
-            break
-    if not choices:
-        return {"success": False, "message": "Tidak ada video yang cocok. Coba sertakan judul dan channel."}
+        }))
+    if not ranked:
+        return {"success": False, "message": "Tidak ada video yang cocok dengan judul, channel, atau tanggal yang diminta. Coba sebutkan nama channel persis atau kirim tautannya."}
 
-    request_id, candidates = remember_playback_choices(owner_id, slot, choices.values())
-    return {"success": True, "request_id": request_id, "needs_confirmation": True, "candidates": candidates}
+    ranked.sort(key=lambda item: (item[1], item[0]) if newest else (item[0], item[1]), reverse=True)
+    request_id, candidates = remember_playback_choices(owner_id, slot, (item[2] for item in ranked[:3]))
+    result = {"success": True, "request_id": request_id, "needs_confirmation": True, "candidates": candidates}
+    if newest and not video_id:
+        result["freshness_note"] = (
+            "Tanggal sebagian pilihan belum bisa diverifikasi." if any(not item["published_date_utc"] for item in candidates)
+            else "Urutan tanggal berlaku untuk kandidat yang ditemukan."
+        )
+        result["search_method"] = method
+    return result
 
 
 def remember_playback_choices(owner_id, slot, videos):

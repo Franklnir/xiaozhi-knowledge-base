@@ -48,6 +48,7 @@ def search_youtube_candidates(query, newest, start, end, count):
                     "id": item["id"]["videoId"],
                     "title": item["snippet"].get("title"),
                     "channel": item["snippet"].get("channelTitle"),
+                    "published_at": item["snippet"]["publishedAt"],
                     "upload_date": item["snippet"]["publishedAt"][:10].replace("-", ""),
                 }
                 for item in response.json().get("items", [])
