@@ -1,4 +1,10 @@
+import asyncio
+from contextlib import asynccontextmanager
+from unittest.mock import Mock
+
 import pytest
+
+from xiaozhi.mcp import bridge
 from xiaozhi.mcp.bridge import (
     validate_mcp_ws_url,
     record_bridge_failure,
@@ -68,3 +74,30 @@ def test_bridge_cooldown_and_backoff():
     reset_bridge_failure(task_key)
     assert not is_bridge_in_cooldown(task_key)
     assert task_key not in mcp_bridge_failure_counts
+
+
+@pytest.mark.parametrize("error_type", [OSError, RuntimeError])
+def test_bridge_hides_token_from_logs_and_status(monkeypatch, caplog, error_type):
+    secret = "synthetic-test-credential"
+    url = f"wss://example.test/mcp?token={secret}"
+    status = Mock()
+
+    @asynccontextmanager
+    async def failed_connection(*args, **kwargs):
+        raise error_type(f"Connection failed for {url}")
+        yield
+
+    monkeypatch.setattr(bridge, "websocket_client_server", failed_connection)
+    monkeypatch.setattr(bridge, "set_mcp_connection_state", status)
+    caplog.set_level("INFO", logger=bridge.logger.name)
+    task_key = "99999:2"
+    try:
+        asyncio.run(bridge.run_mcp_bridge(None, None, 99999, url, "", slot=2))
+        assert is_bridge_in_cooldown(task_key)
+        assert "coba lagi" in status.call_args.kwargs["message"]
+        assert "example.test" not in caplog.text
+        assert secret not in caplog.text
+        assert secret not in status.call_args.kwargs["message"]
+        assert not any(record.exc_info for record in caplog.records)
+    finally:
+        reset_bridge_failure(task_key)

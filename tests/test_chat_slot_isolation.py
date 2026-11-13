@@ -187,6 +187,26 @@ def test_mcp_recall_chat_memory_slot_isolation(tmp_path):
 
     # Clean up context
     mcp_active_owner_ctx.reset(t1_owner)
+    mcp_active_slot_ctx.reset(t3_slot)
     mcp_active_slot_ctx.reset(t1_slot)
+
+    from contextvars import Context
+
+    for tool in (recall_fn, registered_tools["get_chat_history"]):
+        def recall_with_context(owner=None, slot=None):
+            if owner is not None:
+                mcp_active_owner_ctx.set(owner)
+            if slot is not None:
+                mcp_active_slot_ctx.set(slot)
+            return tool()
+
+        for owner, slot in ((None, 1), (owner_id, None)):
+            result = Context().run(recall_with_context, owner, slot)
+            assert result["success"] is False
+            assert result["riwayat_percakapan"] == []
+
+        result = Context().run(recall_with_context, owner_id, 2)
+        assert result["success"] is True
+        assert result["riwayat_percakapan"] == []
 
 

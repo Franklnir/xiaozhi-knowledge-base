@@ -70,11 +70,11 @@ def validate_mcp_ws_url(url: str) -> Tuple[bool, str]:
             bool(re.match(r"^172\.(1[6-9]|2[0-9]|3[0-1])\.", hostname))
         )
         if is_private and (IS_PRODUCTION or os.getenv("ENVIRONMENT") == "production"):
-            return False, f"IP privat lokal ({hostname}) tidak dapat dijangkau dari server cloud VPS. Gunakan domain publik."
+            return False, "IP privat lokal tidak dapat dijangkau dari server cloud VPS. Gunakan domain publik."
 
         return True, ""
-    except Exception as exc:
-        return False, f"URL tidak valid: {exc}"
+    except ValueError:
+        return False, "Format URL endpoint MCP tidak valid."
 
 
 def capture_xiaozhi_ws_chat(owner_id: int, direction: str, raw_message: str, token_hash: str = "", slot: int = 1, device_mac: str = "", request_id: str = ""):
@@ -258,7 +258,7 @@ async def mcp_background_task(store, mcp_server):
                     task = asyncio.create_task(run_mcp_bridge(store, mcp_server, user_id, url, token_hash, slot=slot, device_label=label, board_mac=board_mac))
                     mcp_bridge_tasks[task_key] = task
                 except Exception as item_err:
-                    logger.exception("Gagal memproses token MCP per-user: user_id=%s slot=%s err=%s", token_info.get("user_id"), token_info.get("slot_number"), item_err)
+                    logger.error("Gagal memproses token MCP per-user: user_id=%s slot=%s error_type=%s", token_info.get("user_id"), token_info.get("slot_number"), type(item_err).__name__)
 
             # Wait for reload signal OR timeout (check for new users every 30s)
             if mcp_reload_event:
@@ -270,18 +270,15 @@ async def mcp_background_task(store, mcp_server):
                     pass  # Timeout is normal - just loop to check for new users
             else:
                 await asyncio.sleep(30)
-        except Exception:
-            logger.exception("Gagal menjalankan background MCP.")
+        except Exception as exc:
+            logger.error("Gagal menjalankan background MCP: error_type=%s", type(exc).__name__)
             await asyncio.sleep(10)
 
 
 async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: str, slot: int = 1, device_label: str = "XiaoZhi", board_mac: str = ""):
     """Run a single MCP WebSocket bridge for a user's slot."""
     try:
-        import anyio
-        import websockets
-        from mcp import types
-        from mcp.server.session import SessionMessage
+        from websockets import exceptions as ws_exceptions
     except ImportError:
         logger.error("MCP/WebSocket packages not available.")
         return
@@ -291,8 +288,7 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
     token_hash = normalize_token_hash(token_hash) or xiaozhi_token_hash(url)
     task_key = f"{user_id}:{slot}"
     request_id = f"mcp-{user_id}-s{slot}-{uuid.uuid4().hex[:6]}"
-    masked = url[:50] + "..." if len(url) > 50 else url
-    logger.info("[%s] MCP bridge start: user_id=%s slot=%s mac=%s url=%s", request_id, user_id, slot, board_mac, masked)
+    logger.info("[%s] MCP bridge start: user_id=%s slot=%s mac=%s", request_id, user_id, slot, board_mac)
     ctx_token = mcp_active_owner_ctx.set(user_id)
     req_token = mcp_request_id_ctx.set(request_id)
     slot_token = mcp_active_slot_ctx.set(int(slot or 1))
@@ -314,22 +310,23 @@ async def run_mcp_bridge(store, mcp_server, user_id: int, url: str, token_hash: 
                 read_stream, write_stream,
                 mcp_server._mcp_server.create_initialization_options(),
             )
-    except websockets.exceptions.InvalidStatusCode as exc:
+    except ws_exceptions.InvalidStatus as exc:
         cd = record_bridge_failure(task_key)
-        logger.error("[%s] MCP bridge HTTP error: user_id=%s slot=%s status=%s (cooldown %ss)", request_id, user_id, slot, exc.status_code, int(cd))
-        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"HTTP {exc.status_code} dari XiaoZhi (coba lagi dlm {int(cd)}s)", request_id=request_id, slot=slot, device_label=device_label, board_mac=board_mac)
-    except websockets.exceptions.ConnectionClosed as exc:
+        status_code = exc.response.status_code
+        logger.error("[%s] MCP bridge HTTP error: user_id=%s slot=%s status=%s (cooldown %ss)", request_id, user_id, slot, status_code, int(cd))
+        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"HTTP {status_code} dari XiaoZhi (coba lagi dlm {int(cd)}s)", request_id=request_id, slot=slot, device_label=device_label, board_mac=board_mac)
+    except ws_exceptions.ConnectionClosed as exc:
         cd = record_bridge_failure(task_key)
-        logger.warning("[%s] MCP bridge closed: user_id=%s slot=%s code=%s reason=%s (cooldown %ss)", request_id, user_id, slot, exc.code, exc.reason, int(cd))
+        logger.warning("[%s] MCP bridge closed: user_id=%s slot=%s code=%s (cooldown %ss)", request_id, user_id, slot, exc.code, int(cd))
         set_mcp_connection_state(user_id, token_hash, connected=False, message=f"WebSocket ditutup: {exc.code} (coba lagi dlm {int(cd)}s)", request_id=request_id, slot=slot, device_label=device_label, board_mac=board_mac)
     except OSError as exc:
         cd = record_bridge_failure(task_key)
-        logger.error("[%s] MCP bridge network error: user_id=%s slot=%s err=%s (cooldown %ss)", request_id, user_id, slot, exc, int(cd))
-        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Network error: {exc} (coba lagi dlm {int(cd)}s)", request_id=request_id, slot=slot, device_label=device_label, board_mac=board_mac)
+        logger.error("[%s] MCP bridge network error: user_id=%s slot=%s error_type=%s (cooldown %ss)", request_id, user_id, slot, type(exc).__name__, int(cd))
+        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Koneksi jaringan MCP gagal (coba lagi dlm {int(cd)}s)", request_id=request_id, slot=slot, device_label=device_label, board_mac=board_mac)
     except Exception as exc:
         cd = record_bridge_failure(task_key)
-        logger.exception("[%s] MCP bridge unexpected error: user_id=%s slot=%s (cooldown %ss)", request_id, user_id, slot, int(cd))
-        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Error: {str(exc)[:100]}", request_id=request_id, slot=slot, device_label=device_label, board_mac=board_mac)
+        logger.error("[%s] MCP bridge unexpected error: user_id=%s slot=%s error_type=%s (cooldown %ss)", request_id, user_id, slot, type(exc).__name__, int(cd))
+        set_mcp_connection_state(user_id, token_hash, connected=False, message=f"Koneksi MCP gagal (coba lagi dlm {int(cd)}s)", request_id=request_id, slot=slot, device_label=device_label, board_mac=board_mac)
     finally:
         mcp_active_owner_ctx.reset(ctx_token)
         mcp_request_id_ctx.reset(req_token)
@@ -386,10 +383,10 @@ async def websocket_client_server(user_id: int, url: str, token_hash: str, slot:
                         try:
                             msg = types.JSONRPCMessage.model_validate_json(message)
                             await read_stream_writer.send(SessionMessage(msg))
-                        except Exception as exc:
-                            await read_stream_writer.send(exc)
+                        except Exception:
+                            await read_stream_writer.send(ValueError("Pesan JSON-RPC MCP tidak valid."))
             except Exception as exc:
-                logger.info("WebSocket reader berhenti: %s (%s)", type(exc).__name__, exc)
+                logger.info("WebSocket reader berhenti: %s", type(exc).__name__)
 
         async def ws_writer():
             try:
@@ -399,7 +396,7 @@ async def websocket_client_server(user_id: int, url: str, token_hash: str, slot:
                         asyncio.create_task(asyncio.to_thread(capture_xiaozhi_ws_chat, user_id, "outbound", json_str, token_hash, slot, device_mac, request_id))
                         await ws.send(json_str)
             except Exception as exc:
-                logger.info("WebSocket writer berhenti: %s (%s)", type(exc).__name__, exc)
+                logger.info("WebSocket writer berhenti: %s", type(exc).__name__)
 
         async with anyio.create_task_group() as tg:
             tg.start_soon(ws_reader)

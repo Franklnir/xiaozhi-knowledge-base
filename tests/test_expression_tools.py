@@ -239,5 +239,5 @@ def test_tools_py_registration(tmp_path):
 
     # Test eksekusi get_chat_history
     res_history = server.tools["get_chat_history"](query="obrolan tadi")
-    assert res_history["success"] is True
-    assert "riwayat_percakapan" in res_history
+    assert res_history["success"] is False
+    assert res_history["riwayat_percakapan"] == []

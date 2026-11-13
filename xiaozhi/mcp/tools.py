@@ -1063,17 +1063,14 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         """
         req_id = f"mem_{int(time.time())}_{uuid.uuid4().hex[:6]}"
         owner_id = mcp_active_owner_ctx.get()
-        if owner_id is None and hasattr(store, "list_xiaozhi_tokens"):
-            try:
-                tokens = store.list_xiaozhi_tokens()
-                if tokens:
-                    owner_id = int(tokens[0].get("user_id", 1))
-            except Exception:
-                pass
-        if owner_id is None:
-            owner_id = 1
-
-        active_slot = int(mcp_active_slot_ctx.get() or 1)
+        active_slot = mcp_active_slot_ctx.get(None)
+        if not owner_id or not active_slot:
+            return {
+                "success": False,
+                "request_id": req_id,
+                "message": "Konteks akun dan slot MCP aktif diperlukan untuk membaca riwayat.",
+                "riwayat_percakapan": [],
+            }
 
         limit_val = max(1, min(int(limit or 5), 8))
         query_clean = str(query or "").strip()
@@ -1106,29 +1103,6 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 slot_number=active_slot,
                 strict_slot=True,
             )
-
-            # Fallback 1: Jika strict_slot kosong pada slot 1, ambil tanpa pembatasan slot ketat
-            if not records and active_slot == 1:
-                records = store.list_chat_history(
-                    owner_id,
-                    query=effective_query,
-                    limit=limit_val,
-                    date=date_filter,
-                    semantic=False,
-                    slot_number=1,
-                    strict_slot=False,
-                )
-
-            # Fallback 2: Jika masih kosong, ambil riwayat umum akun tanpa slot
-            if not records:
-                records = store.list_chat_history(
-                    owner_id,
-                    query=effective_query,
-                    limit=limit_val,
-                    date=date_filter,
-                    semantic=False,
-                    strict_slot=False,
-                )
 
             parsed_history = []
             has_active_session = False
