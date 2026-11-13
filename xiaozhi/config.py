@@ -369,6 +369,14 @@ ALL_MCP_TOOLS_CATALOG = [
         "description": "Mengecek status unduhan cache lagu-lagu playlist di server, mengetahui lagu mana yang siap diputar lancar tanpa kendala putus-putus.",
     },
     {
+        "name": "get_last_youtube_video",
+        "title": "Video Terakhir dan Kesimpulan",
+        "category": "media",
+        "category_label": "Media & Web",
+        "icon": "📺",
+        "description": "Cek pemutaran video terakhir di slot aktif dan baca subtitle untuk merangkum isi video.",
+    },
+    {
         "name": "get_playback_status",
         "title": "Cek Konteks Riwayat & Status Pemutaran",
         "category": "media",

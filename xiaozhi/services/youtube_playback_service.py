@@ -84,23 +84,23 @@ def remember_playback_choices(owner_id, slot, videos):
     request_id = uuid4().hex
     candidates = [{"number": i, **video} for i, video in enumerate(videos, 1)]
     with _LOCK:
-        _PENDING.pop((owner_id, slot), None)
-        _PENDING[owner_id, slot] = (request_id, time.monotonic() + 300, candidates)
+        _PENDING[owner_id, slot, request_id] = (time.monotonic() + 300, candidates)
         if len(_PENDING) > 256:
             _PENDING.popitem(last=False)
     return request_id, candidates
 
 
 def take_playback_choice(owner_id, slot, request_id, choice):
+    key = (owner_id, slot, request_id)
     with _LOCK:
-        pending = _PENDING.get((owner_id, slot))
-        if not pending or pending[0] != request_id:
+        pending = _PENDING.get(key)
+        if not pending:
             return None
-        if pending[1] <= time.monotonic():
-            del _PENDING[owner_id, slot]
+        expires_at, candidates = pending
+        if expires_at <= time.monotonic():
+            del _PENDING[key]
             return None
-        candidates = pending[2]
         if not 1 <= choice <= len(candidates):
             return None
-        del _PENDING[owner_id, slot]
+        del _PENDING[key]
         return candidates[choice - 1]

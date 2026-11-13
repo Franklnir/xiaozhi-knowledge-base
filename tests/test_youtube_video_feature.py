@@ -261,6 +261,7 @@ def test_video_audio_queues_only_confirmed_candidate(test_setup):
             result = play(req, 2)
             assert result["url"] == "https://www.youtube.com/watch?v=bbbbbbbbbbb"
             assert result["playback_queued"]
+            assert "self.audio.play_youtube dengan video_id='bbbbbbbbbbb'" in result["instructions"]
             assert not play(req, 2)["success"]
             audio.assert_called_once()
             assert audio.call_args.args == (owner_id,)
@@ -285,13 +286,15 @@ def test_research_source_number_queues_exact_video_without_searching_again(test_
     try:
         with patch("xiaozhi.services.youtube_research_service.research_youtube",
                    return_value={"success": True, "sources": sources}) as research, \
-             patch("xiaozhi.services.youtube_playback_service.search_youtube_candidates") as search, \
+             patch("xiaozhi.services.youtube_playback_service.search_youtube_candidates",
+                   return_value=([{"id": "ccccccccccc", "title": "Other search"}], "test")) as search, \
              patch.object(store, "queue_audio_command") as audio:
             result = mcp.tools["research_youtube_information"]("topik")
             assert [source["number"] for source in result["sources"]] == [1, 2]
             audio.assert_not_called()
             play = mcp.tools["play_confirmed_youtube_video"]
             request_id = result["playback_request_id"]
+            assert mcp.tools["find_youtube_video_to_play"]("other search")["success"]
             other_slot = mcp_active_slot_ctx.set(2)
             try:
                 assert not play(request_id, 2)["success"]
@@ -303,9 +306,44 @@ def test_research_source_number_queues_exact_video_without_searching_again(test_
             assert audio.call_args.args == (owner_id,)
             assert audio.call_args.kwargs["video_id"] == "bbbbbbbbbbb"
             research.assert_called_once()
-            search.assert_not_called()
+            search.assert_called_once()
     finally:
         mcp_active_slot_ctx.reset(slot)
+
+
+def test_last_video_summary_uses_slot_and_exact_id(test_setup):
+    from xiaozhi.mcp.context import mcp_active_mac_ctx, mcp_active_slot_ctx
+
+    owner, store, mcp = test_setup
+    video_id = "bbbbbbbbbbb"
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    store.add_chat_history(owner, tool_name="play_confirmed_youtube_video", slot_number=1,
+                           response_payload={"success": True, "playback_queued": True, "video_id": video_id})
+    store.add_chat_history(owner, tool_name="play_confirmed_youtube_video", slot_number=2,
+                           response_payload={"success": True, "playback_queued": True, "video_id": "aaaaaaaaaaa"})
+    mac = "AA:BB:CC:DD:EE:FF"
+    slot_token = mcp_active_slot_ctx.set(1)
+    mac_token = mcp_active_mac_ctx.set(mac)
+    try:
+        with patch("xiaozhi.services.playback_tracker.playback_tracker.get_latest_session", return_value={
+            "video_id": video_id, "bytes_streamed": 0, "device_mac": mac,
+        }) as tracker, patch("xiaozhi.services.scraper_service.extract_youtube_transcript",
+                             return_value={"success": True, "content": "Judul\n\n[00:00] Isi video"}) as captions, \
+             patch.object(store, "queue_audio_command") as audio:
+            check = mcp.tools["get_last_youtube_video"]
+            assert check()["video"]["status"] == "belum_terverifikasi"
+            captions.assert_not_called()
+            from datetime import datetime, timezone
+            tracker.return_value.update(bytes_streamed=100, started_at=datetime.now(timezone.utc).timestamp())
+            summary = mcp.tools["get_playback_status"]("Apa kesimpulan video tadi?")
+            assert summary["video"]["status"] == "stream_berjalan"
+            assert summary["video"]["video_id"] == video_id
+            assert summary["transcript_excerpt"] == "[00:00] Isi video"
+            captions.assert_called_once_with(video_id, url, max_chars=4000)
+            audio.assert_not_called()
+    finally:
+        mcp_active_mac_ctx.reset(mac_token)
+        mcp_active_slot_ctx.reset(slot_token)
 
 
 def test_video_selection_preserves_exact_link_id(test_setup):

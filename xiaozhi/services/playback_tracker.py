@@ -276,6 +276,12 @@ class PlaybackTracker:
                         return s
             return None
 
+    def get_latest_session(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Snapshot the active stream or the most recent ended stream."""
+        with self._lock:
+            session = self.get_user_session(user_id) or self._last_played.get(user_id)
+            return dict(session) if session else None
+
     def get_playback_status(self, user_id: int) -> Dict[str, Any]:
         """Get comprehensive playback status for AI tools and user queries."""
         with self._lock:

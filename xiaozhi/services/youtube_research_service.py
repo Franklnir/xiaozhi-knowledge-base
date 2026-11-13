@@ -78,7 +78,8 @@ def _source(entry, start, end, newest):
     url = f"https://www.youtube.com/watch?v={video_id}"
     uploaded = _upload_date(entry)
     if (newest or start or end) and not uploaded:
-        options = {"quiet": True, "no_warnings": True, "socket_timeout": 5, "retries": 0, "extractor_retries": 0}
+        options = {"quiet": True, "no_warnings": True, "socket_timeout": 5, "retries": 0,
+                   "extractor_retries": 0, "ignore_no_formats_error": True}
         try:
             with yt_dlp.YoutubeDL(options) as downloader:
                 metadata = downloader.extract_info(url, download=False)
@@ -154,9 +155,13 @@ def research_youtube(query: str, newest: bool = True, start_date: str = "", end_
         return {"success": False, "message": "Tanggal mulai harus sebelum atau sama dengan tanggal akhir.", "sources": []}
 
     limit = max(2, min(limit, 4))
-    count = limit + 2
+    count = limit + 5 if newest else limit + 2
+    prefer_recent = newest and start is None and end is None
+    recent_start = datetime.now(timezone.utc).date() - timedelta(days=7) if prefer_recent else start
     try:
-        entries, search_method = search_youtube_candidates(query, newest, start, end, count)
+        entries, search_method = search_youtube_candidates(query, newest, recent_start, end, count)
+        if prefer_recent and not entries:
+            entries, search_method = search_youtube_candidates(query, newest, None, None, count)
     except Exception:
         return {"success": False, "message": "Pencarian YouTube sedang tidak tersedia.", "sources": []}
     candidates = {}
@@ -174,6 +179,10 @@ def research_youtube(query: str, newest: bool = True, start_date: str = "", end_
 
     if newest:
         sources.sort(key=lambda source: source["published_date_utc"] or "", reverse=True)
+    recent_found = sum(
+        source["published_date_utc"] is not None and source["published_date_utc"] >= recent_start.isoformat()
+        for source in sources
+    ) if prefer_recent else None
     sources = sources[:limit]
     return {
         "success": bool(sources),
@@ -183,6 +192,11 @@ def research_youtube(query: str, newest: bool = True, start_date: str = "", end_
             "Hasil mengikuti indeks pencarian YouTube."
             if search_method == "youtube_data_api"
             else "Urutan terbaru dihitung dari kandidat yang ditemukan dan tanggal yang bisa dibaca."
+        ),
+        "freshness_note": (
+            "Tidak ditemukan sumber bersubtitle dengan tanggal terverifikasi dalam tujuh hari terakhir. "
+            "Jika ada hasil yang lebih lama atau tanpa tanggal, sebutkan keterbatasan itu."
+            if recent_found == 0 else None
         ),
         "sources": sources,
         "skipped": skipped,

@@ -97,14 +97,14 @@ async def start_mcp_background(store):
         logger.warning("MCP server not available. Background task not started.")
         return
 
-    mcp_reload_event = asyncio.Event()
+    mcp_service.mcp_reload_event = asyncio.Event()
 
     # Set capture function
     from xiaozhi.core.utils import collect_chat_messages
     import json
     import time
 
-    pending_tool_calls: Dict[str, Dict[str, Any]] = {}
+    pending_tool_calls: Dict[tuple, Dict[str, Any]] = {}
 
     def _capture(owner_id, direction, raw_message, token_hash="", slot: int = 1, device_mac: str = "", request_id: str = ""):
         try:
@@ -119,6 +119,7 @@ async def start_mcp_background(store):
         resp_payload = None
 
         msg_id = str(payload.get("id")) if payload.get("id") is not None else None
+        call_key = (owner_id, slot, request_id, msg_id)
         turn_request_id = (
             f"{request_id}:{msg_id[:32]}"[:64]
             if msg_id
@@ -144,7 +145,7 @@ async def start_mcp_background(store):
             xiaozhi_answer = str(args.get("xiaozhi_answer") or "")
 
             if msg_id:
-                pending_tool_calls[msg_id] = {
+                pending_tool_calls[call_key] = {
                     "owner_id": owner_id,
                     "tool_name": called_tool,
                     "user_message": user_message,
@@ -157,8 +158,8 @@ async def start_mcp_background(store):
                 }
 
         # 2. Outbound tool response from server
-        elif direction == "outbound" and msg_id and msg_id in pending_tool_calls:
-            pending = pending_tool_calls.pop(msg_id)
+        elif direction == "outbound" and msg_id and call_key in pending_tool_calls:
+            pending = pending_tool_calls.pop(call_key)
             tool_name = pending["tool_name"]
             user_message = pending["user_message"]
             req_payload = pending["request_payload"]

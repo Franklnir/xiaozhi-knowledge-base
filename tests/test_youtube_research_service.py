@@ -61,3 +61,22 @@ def test_youtube_api_search_uses_date_bounds(monkeypatch):
     assert params["order"] == "date"
     assert params["publishedAfter"] == "2026-11-01T00:00:00Z"
     assert params["publishedBefore"] == "2026-11-02T23:59:59.999Z"
+
+
+def test_latest_search_prioritizes_recent_dates_and_labels_older_fallback(monkeypatch):
+    from datetime import date, datetime, timezone
+
+    class FixedClock(datetime):
+        @classmethod
+        def now(cls, tz):
+            return cls(2026, 11, 13, tzinfo=timezone.utc).astimezone(tz)
+
+    monkeypatch.setattr(research, "datetime", FixedClock)
+    entry = {"id": "aaaaaaaaaaa", "upload_date": "20261024"}
+    search = Mock(side_effect=[([], "youtube_search_sample"), ([entry], "youtube_search_sample")])
+    monkeypatch.setattr(research, "search_youtube_candidates", search)
+    monkeypatch.setattr(research, "_source", lambda *_: ({"published_date_utc": "2026-10-24"}, None))
+    result = research.research_youtube("topik", newest=True, limit=3)
+    assert search.call_args_list[0].args == ("topik", True, date(2026, 11, 6), None, 8)
+    assert search.call_args_list[1].args == ("topik", True, None, None, 8)
+    assert result["success"] and result["freshness_note"]
