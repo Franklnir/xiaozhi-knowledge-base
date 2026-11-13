@@ -274,7 +274,8 @@ def test_video_audio_queues_only_confirmed_candidate(test_setup):
         mcp_active_slot_ctx.reset(slot)
 
 
-def test_device_plays_confirmed_video_without_second_search_or_queue(test_setup):
+@pytest.mark.parametrize("mac_in_command", [True, False])
+def test_device_plays_confirmed_video_without_second_search_or_queue(test_setup, mac_in_command):
     from starlette.requests import Request
     from xiaozhi.mcp.context import mcp_active_mac_ctx, mcp_active_slot_ctx
     from xiaozhi.routers.youtube import audio_play_direct
@@ -283,10 +284,10 @@ def test_device_plays_confirmed_video_without_second_search_or_queue(test_setup)
     owner_id, store, mcp = test_setup
     mac = "AA:BB:CC:DD:EE:01"
     video_id = "bbbbbbbbbbb"
-    token = mcp_active_mac_ctx.set(mac)
-    slot = mcp_active_slot_ctx.set(1)
+    token = mcp_active_mac_ctx.set(mac if mac_in_command else "")
+    slot = mcp_active_slot_ctx.set(2)
     try:
-        request_id, _ = remember_playback_choices(owner_id, 1, [{
+        request_id, _ = remember_playback_choices(owner_id, 2, [{
             "video_id": video_id, "title": "Confirmed video", "duration_seconds": 60,
             "url": f"https://www.youtube.com/watch?v={video_id}",
         }])
@@ -299,6 +300,7 @@ def test_device_plays_confirmed_video_without_second_search_or_queue(test_setup)
                        "server": ("example.test", 443), "path": "/api/audio/play_direct"})
     with patch("xiaozhi.routers.youtube.get_store", return_value=store), \
          patch("xiaozhi.routers.youtube.youtube_search") as search, \
+         patch.object(store, "find_user_by_active_token_mac", return_value=owner_id), \
          patch.object(store, "queue_audio_command") as queue:
         result = asyncio.run(audio_play_direct(request, q=video_id, mac=mac, token="", owner_id=owner_id))
         assert result["video_id"] == video_id

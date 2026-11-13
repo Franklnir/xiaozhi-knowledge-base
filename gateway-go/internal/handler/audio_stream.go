@@ -152,14 +152,20 @@ var safeFilenameRegex = regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
 var youtubeVideoID = regexp.MustCompile(`^[a-zA-Z0-9_-]{11}$`)
 
 func isConfirmedVideoStream(streamURL, mac string) bool {
+	isVideo, commandMAC := confirmedVideoStreamDevice(streamURL)
+	deviceMAC := store.NormalizeMAC(mac)
+	return isVideo && deviceMAC != "" && commandMAC == deviceMAC
+}
+
+func confirmedVideoStreamDevice(streamURL string) (bool, string) {
 	parsed, err := url.Parse(streamURL)
 	if err != nil {
-		return false
+		return false, ""
 	}
 	params := parsed.Query()
-	deviceMAC := store.NormalizeMAC(mac)
-	return params.Get("mode") == "video" && deviceMAC != "" &&
-		store.NormalizeMAC(params.Get("mac")) == deviceMAC
+	rawMAC := params.Get("mac")
+	mac := store.NormalizeMAC(rawMAC)
+	return params.Get("mode") == "video" && (rawMAC == "" || mac != ""), mac
 }
 
 func resolveVideoBitrate(requested string, rssi *int, chip string, sampleRate int) string {
@@ -357,9 +363,18 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 	isVideo := q.Get("mode") == "video" && youtubeVideoID.MatchString(videoID)
 	var videoCommandID int64
 	// Some firmware rebuilds the stream URL and drops the playback mode.
-	if ownerID > 0 && store.NormalizeMAC(mac) != "" && youtubeVideoID.MatchString(videoID) {
+	deviceMAC := store.NormalizeMAC(mac)
+	if ownerID > 0 && deviceMAC != "" && youtubeVideoID.MatchString(videoID) {
 		id, streamURL := h.audioStore.RecentVideoCommand(r.Context(), ownerID, videoID)
-		if isConfirmedVideoStream(streamURL, mac) {
+		confirmed, commandMAC := confirmedVideoStreamDevice(streamURL)
+		if confirmed && commandMAC == "" {
+			// No MAC in the MCP session. Correlate only with a device of the same owner.
+			deviceOwner, _ := h.deviceStore.ResolveOwner(r.Context(), "", mac)
+			confirmed = deviceOwner == ownerID
+		} else {
+			confirmed = confirmed && commandMAC == deviceMAC
+		}
+		if confirmed {
 			isVideo = true
 			videoCommandID = id
 		}

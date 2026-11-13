@@ -15,6 +15,9 @@ func TestConfirmedVideoAudioProfile(t *testing.T) {
 	if isConfirmedVideoStream(streamURL, "AA:BB:CC:DD:EE:02") {
 		t.Fatal("a different device must not inherit the video request")
 	}
+	if confirmed, mac := confirmedVideoStreamDevice("/api/audio/stream/abcdefghijk?mode=video"); !confirmed || mac != "" {
+		t.Fatal("a video request without a MAC must be checked against the device owner")
+	}
 	if bitrate := resolveVideoBitrate("40k", nil, "esp32s3", 24000); bitrate != "24k" {
 		t.Errorf("video bitrate = %s, want 24k", bitrate)
 	}

@@ -1504,9 +1504,15 @@ async def audio_play_direct(
                 created = datetime.fromisoformat(str(command["created_at"]))
                 if created.tzinfo is None:
                     created = created.replace(tzinfo=timezone.utc)
+                command_mac = _normalize_mac(params.get("mac", [""])[0])
+                device_mac = _normalize_mac(clean_mac)
+                if params.get("mode") != ["video"]:
+                    break
+                device_matches = command_mac == device_mac if command_mac else (
+                    store.find_user_by_active_token_mac(device_mac) == resolved_owner_id
+                )
                 if (
-                    params.get("mode") == ["video"]
-                    and _normalize_mac(params.get("mac", [""])[0]) == _normalize_mac(clean_mac)
+                    device_matches
                     and timedelta(0) <= datetime.now(timezone.utc) - created <= timedelta(minutes=2)
                 ):
                     device_base = base_url.replace("https://", "http://", 1)
