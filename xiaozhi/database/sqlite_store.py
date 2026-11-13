@@ -518,8 +518,8 @@ class SQLiteStore:
         conn = self._get_conn()
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, 'user', ?)",
-                (username, password_hash, utc_now())
+                "INSERT INTO users (username, password_hash, role, created_at, ui_theme) VALUES (?, ?, 'user', ?, ?)",
+                (username, password_hash, utc_now(), DEFAULT_UI_THEME)
             )
             conn.commit()
             user_id = cursor.lastrowid
@@ -613,8 +613,8 @@ class SQLiteStore:
         conn = self._get_conn()
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash, role, google_id, google_email, registered_with_google, created_at) VALUES (?, ?, 'user', ?, ?, 1, ?)",
-                (username, password_hash, str(google_id), str(google_email).strip().lower(), utc_now())
+                "INSERT INTO users (username, password_hash, role, google_id, google_email, registered_with_google, created_at, ui_theme) VALUES (?, ?, 'user', ?, ?, 1, ?, ?)",
+                (username, password_hash, str(google_id), str(google_email).strip().lower(), utc_now(), DEFAULT_UI_THEME)
             )
             conn.commit()
             user_id = cursor.lastrowid
@@ -662,8 +662,8 @@ class SQLiteStore:
                 conn.commit()
             return self.get_user(existing["id"])
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, 'admin', ?)",
-            (username, hash_password(password), utc_now())
+            "INSERT INTO users (username, password_hash, role, created_at, ui_theme) VALUES (?, ?, 'admin', ?, ?)",
+            (username, hash_password(password), utc_now(), DEFAULT_UI_THEME)
         )
         conn.commit()
         return {"id": cursor.lastrowid, "username": username, "role": "admin", "session_version": 1, "ui_theme": DEFAULT_UI_THEME}
@@ -681,8 +681,8 @@ class SQLiteStore:
                 conn.commit()
             return self.get_user(existing["id"])
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, 'user', ?)",
-            (username, hash_password(password), utc_now())
+            "INSERT INTO users (username, password_hash, role, created_at, ui_theme) VALUES (?, ?, 'user', ?, ?)",
+            (username, hash_password(password), utc_now(), DEFAULT_UI_THEME)
         )
         conn.commit()
         user_id = cursor.lastrowid

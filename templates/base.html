@@ -1,5 +1,5 @@
 {% set theme_options = {'neo': 'Neo Brutalism', 'default': 'Original', 'dark': 'Dark', 'clay': 'Claymorphism · Light Clay', 'clay-dark': 'Claymorphism · Midnight Clay'} %}
-{% set current_theme = user.ui_theme if user and user.ui_theme in theme_options else 'neo' %}
+{% set current_theme = user.ui_theme if user and user.ui_theme in theme_options else default_ui_theme %}
 <!DOCTYPE html>
 <html lang="id" {% if current_theme != 'default' %}data-theme="{{ current_theme }}" {% endif %}>
 <head>
@@ -2123,6 +2123,7 @@
         :root[data-theme="neo"] .app-toast-info .app-toast-icon-wrap { background: #0284c7; color: #ffffff; border: 1.5px solid #111827; }
     </style>
     <link rel="stylesheet" href="/static/css/claymorphism.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
     <script src="/static/js/app.js"></script>
 </head>
 {% set page = active_page|default(page|default('')) %}
@@ -2423,18 +2424,27 @@
     </div>
     {% if not user and active_page == 'login' %}
     <!-- No user (login/register page) -->
-    <div style="flex:1; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; width:100%">
+    <main class="app-auth-shell">
         {% block content_login %}{% endblock %}
-    </div>
+    </main>
     {% else %}
     {% if user %}
     <!-- Mobile toggle -->
-    <button class="app-sidebar-toggle" onclick="toggleSidebar()" aria-label="Menu">&#9776;</button>
-    <div class="app-sidebar-overlay" onclick="toggleSidebar()"></div>
+    <header class="app-compact-header">
+        <button class="app-sidebar-toggle" type="button" onclick="toggleSidebar()" aria-label="Menu" aria-controls="appSidebar" aria-expanded="false">
+            <svg class="app-icon app-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <a href="/dashboard" class="app-brand">Xiaozhi Indonesia</a>
+        <a href="/profil" class="app-sidebar-avatar" aria-label="Profil saya">{{ user.username[0]|upper }}</a>
+    </header>
+    <div class="app-sidebar-overlay" onclick="toggleSidebar(true)"></div>
 
     <!-- Sidebar -->
     <aside class="app-nav-aside" id="appSidebar">
         <div class="app-sidebar-header">
+            <button class="app-drawer-close app-icon-button" type="button" onclick="toggleSidebar(true)" aria-label="Tutup menu">
+                <svg class="app-icon app-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
             <a href="/" class="app-brand">
                 <span class="app-brand-mark">
                     <img src="/static/img/logo.png" alt="Xiaozhi Logo" width="38" height="38" loading="eager">
@@ -2594,13 +2604,13 @@
             const sidebar = document.getElementById('appSidebar');
             const overlay = document.querySelector('.app-sidebar-overlay');
             if (!sidebar || !overlay) return;
-            if (forceClose === true) {
-                sidebar.classList.remove('is-open');
-                overlay.classList.remove('is-visible');
-            } else {
-                sidebar.classList.toggle('is-open');
-                overlay.classList.toggle('is-visible');
-            }
+            const open = forceClose !== true && !sidebar.classList.contains('is-open');
+            sidebar.classList.toggle('is-open', open);
+            overlay.classList.toggle('is-visible', open);
+            const trigger = document.querySelector('.app-sidebar-toggle');
+            trigger.setAttribute('aria-expanded', String(open));
+            if (open) sidebar.querySelector('.app-drawer-close').focus();
+            else if (sidebar.contains(document.activeElement)) trigger.focus();
         }
 
         document.addEventListener('keydown', function (e) {

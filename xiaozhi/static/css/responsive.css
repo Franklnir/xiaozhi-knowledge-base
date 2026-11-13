@@ -1,0 +1,198 @@
+.app-compact-header,
+.app-sidebar-header .app-drawer-close {
+    display: none;
+}
+
+.app-auth-shell {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+}
+
+.app-auth-shell .auth-layout {
+    min-height: calc(100dvh - var(--app-banner-offset, 0px));
+    padding: clamp(16px, 4vw, 40px);
+}
+
+.auth-brand {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.auth-logo {
+    display: block;
+    object-fit: contain;
+    border-radius: 18px;
+    box-shadow: var(--app-shadow);
+}
+
+.auth-controls {
+    min-width: 0;
+}
+
+body.has-pwa-banner {
+    --app-banner-offset: var(--pwa-banner-height);
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+    .app-auth-shell .auth-card:has(> .auth-brand + .auth-controls) {
+        display: grid;
+        width: min(100%, 840px);
+        min-height: auto;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+        align-items: center;
+        gap: clamp(20px, 4vw, 40px);
+        padding: clamp(24px, 4vw, 42px);
+    }
+
+    .auth-brand {
+        min-height: 240px;
+        margin: 0;
+        padding: 24px;
+        border-radius: 22px;
+        background: var(--app-input-bg);
+        box-shadow: var(--clay-recessed, none);
+    }
+
+    .auth-logo {
+        width: 96px;
+        height: 96px;
+    }
+
+    .dashboard-container .dashboard-stat-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .app-main .app-content-grid {
+        grid-template-columns: minmax(0, 3fr) minmax(230px, 2fr);
+    }
+}
+
+@media (max-width: 1024px) {
+    .app-compact-header {
+        position: fixed;
+        inset: var(--app-banner-offset, 0px) 0 auto;
+        z-index: 42;
+        min-height: 60px;
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) 44px;
+        align-items: center;
+        gap: 12px;
+        padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+        background: var(--app-nav-bg);
+        border-bottom: 1px solid var(--app-border);
+        border-radius: 0 0 20px 20px;
+        box-shadow: var(--clay-raised-small, var(--app-shadow));
+    }
+
+    .app-compact-header .app-sidebar-toggle {
+        position: static;
+        width: 44px;
+        height: 44px;
+    }
+
+    .app-compact-header .app-brand {
+        justify-self: center;
+        font-size: 15px;
+        font-weight: 800;
+        text-align: center;
+    }
+
+    .app-compact-header .app-sidebar-avatar {
+        justify-self: end;
+        width: 44px;
+        height: 44px;
+        text-decoration: none;
+    }
+
+    .app-nav-aside {
+        width: min(320px, calc(100% - 52px));
+        visibility: hidden;
+        overscroll-behavior: contain;
+        padding-bottom: env(safe-area-inset-bottom);
+        transition: transform .25s ease, visibility .25s;
+    }
+
+    .app-nav-aside.is-open {
+        visibility: visible;
+    }
+
+    .app-sidebar-header .app-drawer-close {
+        display: grid;
+        place-items: center;
+        float: right;
+        width: 44px;
+        height: 44px;
+        margin-left: 8px;
+    }
+
+    .app-sidebar-nav .app-sidebar-link {
+        min-height: 44px;
+    }
+
+    .app-main-wrapper:not(.is-guest) .app-main {
+        padding-top: 82px;
+    }
+
+    .app-main-wrapper.is-guest .app-main {
+        padding-top: 24px;
+    }
+
+    .app-main :is(.app-page, .dashboard-container, .dashboard-grid, .app-content-grid) > * {
+        min-width: 0;
+    }
+
+    .app-main .chat-main-container {
+        height: calc(100dvh - 120px - var(--app-banner-offset, 0px));
+    }
+}
+
+@media (max-width: 767px) {
+    .app-auth-shell .auth-layout {
+        padding: 16px;
+    }
+
+    .auth-card .app-button,
+    .auth-card .app-input,
+    .auth-card .app-select,
+    .app-sidebar-footer .app-input {
+        min-height: 44px;
+    }
+
+    .auth-card :is(.app-input, .app-select) {
+        font-size: 16px;
+    }
+
+    .app-main .app-content-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .app-main .dashboard-container,
+    .app-main .dashboard-grid {
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .dashboard-stat-grid .stat-card-modern {
+        gap: 6px;
+        padding: 12px;
+    }
+
+    .dashboard-stat-grid .stat-card-icon {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+    }
+
+    .app-main .fw-search-box {
+        min-width: 0;
+    }
+
+    .app-main .fw-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

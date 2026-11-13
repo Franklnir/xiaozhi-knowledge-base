@@ -1,9 +1,10 @@
 // Xiaozhi AI Service Worker for PWA Offline Resilience & Instant Shell Caching
-const CACHE_NAME = 'xiaozhi-pwa-v2';
+const CACHE_NAME = 'xiaozhi-pwa-v3';
 const PRECACHE_ASSETS = [
   '/',
   '/static/css/app.min.css',
   '/static/css/claymorphism.css',
+  '/static/css/responsive.css',
   '/static/js/app.js',
   '/static/img/logo.png',
   '/static/img/apple-touch-icon.png',

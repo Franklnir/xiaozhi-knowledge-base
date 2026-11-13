@@ -10,13 +10,14 @@
 </style>
 <section class="auth-layout">
     <div class="auth-card">
-        <div class="mb-6" style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px;">
+        <div class="auth-brand">
             <a href="/" style="display:inline-block; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                <img src="/static/img/logo.png" alt="Xiaozhi Logo" style="width:72px; height:72px; object-fit:contain; border-radius:18px; box-shadow:0 6px 18px rgba(0,0,0,0.12); border:2.5px solid #111;">
+                <img class="auth-logo" src="/static/img/logo.png" alt="Xiaozhi Logo" width="72" height="72">
             </a>
             <h1 class="app-title text-2xl" style="margin:0;">Xiaozhi Indonesia</h1>
         </div>
 
+        <div class="auth-controls">
         {% if error %}
         <div class="app-alert app-alert-danger mb-5">{{ error }}</div>
         {% endif %}
@@ -154,6 +155,7 @@
                     <span>Daftar dengan Google</span>
                 </a>
             </form>
+        </div>
         </div>
     </div>
 </section>

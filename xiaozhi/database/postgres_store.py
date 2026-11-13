@@ -627,11 +627,11 @@ class PostgresStore:
                 try:
                     cur.execute(
                         """
-                        INSERT INTO users (username, password_hash, role, created_at)
-                        VALUES (%s, %s, 'user', %s)
+                        INSERT INTO users (username, password_hash, role, created_at, ui_theme)
+                        VALUES (%s, %s, 'user', %s, %s)
                         RETURNING id, username, role, session_version, ui_theme, registered_with_google
                         """,
-                        (username, password_hash, utc_now()),
+                        (username, password_hash, utc_now(), DEFAULT_UI_THEME),
                     )
                     user = cur.fetchone()
                     conn.commit()
@@ -733,11 +733,11 @@ class PostgresStore:
                 try:
                     cur.execute(
                         """
-                        INSERT INTO users (username, password_hash, role, google_id, google_email, registered_with_google, created_at)
-                        VALUES (%s, %s, 'user', %s, %s, TRUE, %s)
+                        INSERT INTO users (username, password_hash, role, google_id, google_email, registered_with_google, created_at, ui_theme)
+                        VALUES (%s, %s, 'user', %s, %s, TRUE, %s, %s)
                         RETURNING id, username, role, session_version, ui_theme, google_id, google_email, registered_with_google
                         """,
-                        (username, password_hash, str(google_id), str(google_email).strip().lower(), utc_now()),
+                        (username, password_hash, str(google_id), str(google_email).strip().lower(), utc_now(), DEFAULT_UI_THEME),
                     )
                     user = cur.fetchone()
                     conn.commit()
@@ -781,11 +781,11 @@ class PostgresStore:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO users (username, password_hash, role, created_at)
-                    VALUES (%s, %s, 'admin', %s)
+                    INSERT INTO users (username, password_hash, role, created_at, ui_theme)
+                    VALUES (%s, %s, 'admin', %s, %s)
                     RETURNING id, username, role, session_version, ui_theme
                     """,
-                    (username, password_hash, utc_now()),
+                    (username, password_hash, utc_now(), DEFAULT_UI_THEME),
                 )
                 admin = cur.fetchone()
             conn.commit()
@@ -807,8 +807,8 @@ class PostgresStore:
                     user = cur.fetchone()
                 else:
                     cur.execute(
-                        "INSERT INTO users (username, password_hash, role, created_at) VALUES (%s, %s, 'user', %s) RETURNING id, username, role",
-                        (username, pwd_hash, now),
+                        "INSERT INTO users (username, password_hash, role, created_at, ui_theme) VALUES (%s, %s, 'user', %s, %s) RETURNING id, username, role",
+                        (username, pwd_hash, now, DEFAULT_UI_THEME),
                     )
                     user = cur.fetchone()
             conn.commit()

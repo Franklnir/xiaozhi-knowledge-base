@@ -16,6 +16,7 @@ from xiaozhi.config import (
     ADMIN_USERNAME,
     ALLOWED_ORIGINS,
     ALLOWED_ORIGIN_REGEX,
+    DEFAULT_UI_THEME,
     IS_PRODUCTION,
     RESTORED_USER_PASSWORD,
     RESTORED_USER_USERNAME,
@@ -32,6 +33,7 @@ from xiaozhi.services.mcp_service import set_store_ref
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR) if TEMPLATES_DIR.exists() else "templates")
+templates.env.globals["default_ui_theme"] = DEFAULT_UI_THEME
 
 # Configure Jinja2 environment to safely serialize datetimes/complex objects in {{ ...|tojson }}
 def _jinja_json_serializer(obj):
