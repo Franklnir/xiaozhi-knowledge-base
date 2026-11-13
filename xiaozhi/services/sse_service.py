@@ -701,7 +701,8 @@ async def stream_ai_chat(query: str, user_id: int, store: Any, request: Request)
                 "jejak digital": "osint_recon", "ip lookup": "osint_recon", "cek domain": "osint_recon",
                 "cache playlist": "get_playlist_cache_status", "status unduhan": "get_playlist_cache_status",
                 "unduhan playlist": "get_playlist_cache_status", "siap putar": "get_playlist_cache_status",
-                "video youtube": "inspect_youtube_video", "tonton video": "inspect_youtube_video", "genre video": "inspect_youtube_video",
+                "tonton video": "find_youtube_video_to_play", "putar video": "find_youtube_video_to_play",
+                "video youtube": "find_youtube_video_to_play", "genre video": "inspect_youtube_video",
                 "konfirmasi video": "confirm_play_and_save_video",
             }
 

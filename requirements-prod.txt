@@ -19,5 +19,5 @@ psycopg[binary,pool]>=3.2.0
 alembic>=1.13.0
 boto3>=1.34.0
 Pillow>=10.0.0
-youtube-transcript-api>=0.6.2
+youtube-transcript-api>=1.2
 pypdf>=4.0.0

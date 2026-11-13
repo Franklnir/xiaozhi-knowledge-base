@@ -215,35 +215,113 @@ def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
         assert any(t["video_id"] == "testvid2022" for t in playlist_tracks)
 
 
-def test_play_youtube_song_intercepts_video_query(test_setup):
-    """Test play_youtube_song intercepts video queries and delegates to inspect_youtube_video."""
+def test_play_youtube_song_routes_explicit_video_to_selection(test_setup):
+    from xiaozhi.mcp.context import mcp_active_slot_ctx
+
+    owner_id, _, mcp = test_setup
+    token = mcp_active_slot_ctx.set(1)
+    try:
+        with patch("xiaozhi.services.youtube_playback_service.find_playback_choices") as find:
+            result = mcp.tools["play_youtube_song"](query="putar video YouTube lofi chill")
+            find.assert_called_once_with(owner_id, 1, "lofi chill")
+            assert result is find.return_value
+    finally:
+        mcp_active_slot_ctx.reset(token)
+
+
+def test_video_audio_queues_only_confirmed_candidate(test_setup):
+    from xiaozhi.mcp.context import mcp_active_slot_ctx
+
     owner_id, store, mcp = test_setup
-    play_fn = mcp.tools["play_youtube_song"]
+    find = mcp.tools["find_youtube_video_to_play"]
+    play = mcp.tools["play_confirmed_youtube_video"]
+    entries = [
+        {"id": "aaaaaaaaaaa", "title": "Same title", "channel": "Channel A"},
+        {"id": "bbbbbbbbbbb", "title": "Same title", "channel": "Channel B", "duration": 60},
+    ]
+    slot = mcp_active_slot_ctx.set(1)
+    try:
+        with patch("xiaozhi.services.youtube_playback_service.search_youtube_candidates", return_value=(entries, "test")), \
+             patch.object(store, "queue_audio_command") as audio:
+            response = find("same title")
+            assert [item["channel"] for item in response["candidates"]] == ["Channel A", "Channel B"]
+            audio.assert_not_called()
+            req = response["request_id"]
+            assert not play(req, 3)["success"]
+            other_slot = mcp_active_slot_ctx.set(2)
+            try:
+                assert not play(req, 2)["success"]
+            finally:
+                mcp_active_slot_ctx.reset(other_slot)
+            other_owner = mcp_active_owner_ctx.set(owner_id + 1)
+            try:
+                assert not play(req, 2)["success"]
+            finally:
+                mcp_active_owner_ctx.reset(other_owner)
+            result = play(req, 2)
+            assert result["url"] == "https://www.youtube.com/watch?v=bbbbbbbbbbb"
+            assert result["playback_queued"]
+            assert not play(req, 2)["success"]
+            audio.assert_called_once()
+            assert audio.call_args.args == (owner_id,)
+            assert audio.call_args.kwargs["video_id"] == "bbbbbbbbbbb"
+            assert f"/api/audio/stream/bbbbbbbbbbb?owner_id={owner_id}" in audio.call_args.kwargs["stream_url"]
+            assert audio.call_args.kwargs["video_url"] == result["url"]
+    finally:
+        mcp_active_slot_ctx.reset(slot)
 
-    mock_details = {
-        "success": True,
-        "request_id": "ytr_req_303",
-        "video_id": "vid_lofi_99",
-        "title": "Lofi Chill Beats to Relax",
-        "channel_name": "Chill Vibe",
-        "duration_formatted": "1 jam 20 menit",
-        "view_count_formatted": "500 ribu penonton",
-        "genre": "Musik & Seni",
-        "topic": "Musik santai instrumental",
-        "description": "Koleksi musik santai untuk fokus.",
-        "thumbnail": "https://example.com/lofi.jpg",
-        "youtube_url": "https://www.youtube.com/watch?v=vid_lofi_99",
-        "has_transcript": False,
-        "transcript": "",
-    }
 
-    with patch("xiaozhi.services.scraper_service.scrape_youtube_video_details", return_value=mock_details):
-        # User says "putar video lofi" -> should NOT directly play, must inspect and ask confirmation!
-        res = play_fn(query="putar video lofi chill")
-        assert res["success"] is True
-        assert res.get("needs_confirmation") is True
-        assert "Apakah benar video ini yang ingin Anda putar?" in res["message"]
-        assert res.get("request_id") == "ytr_req_303"
+def test_research_source_number_queues_exact_video_without_searching_again(test_setup):
+    from xiaozhi.mcp.context import mcp_active_slot_ctx
+
+    owner_id, store, mcp = test_setup
+    sources = [
+        {"video_id": "aaaaaaaaaaa", "title": "Same title", "channel": "A",
+         "url": "https://www.youtube.com/watch?v=aaaaaaaaaaa"},
+        {"video_id": "bbbbbbbbbbb", "title": "Same title", "channel": "B",
+         "url": "https://www.youtube.com/watch?v=bbbbbbbbbbb"},
+    ]
+    slot = mcp_active_slot_ctx.set(1)
+    try:
+        with patch("xiaozhi.services.youtube_research_service.research_youtube",
+                   return_value={"success": True, "sources": sources}) as research, \
+             patch("xiaozhi.services.youtube_playback_service.search_youtube_candidates") as search, \
+             patch.object(store, "queue_audio_command") as audio:
+            result = mcp.tools["research_youtube_information"]("topik")
+            assert [source["number"] for source in result["sources"]] == [1, 2]
+            audio.assert_not_called()
+            play = mcp.tools["play_confirmed_youtube_video"]
+            request_id = result["playback_request_id"]
+            other_slot = mcp_active_slot_ctx.set(2)
+            try:
+                assert not play(request_id, 2)["success"]
+            finally:
+                mcp_active_slot_ctx.reset(other_slot)
+            assert play(request_id, 2)["video_id"] == "bbbbbbbbbbb"
+            assert not play(request_id, 2)["success"]
+            audio.assert_called_once()
+            assert audio.call_args.args == (owner_id,)
+            assert audio.call_args.kwargs["video_id"] == "bbbbbbbbbbb"
+            research.assert_called_once()
+            search.assert_not_called()
+    finally:
+        mcp_active_slot_ctx.reset(slot)
+
+
+def test_video_selection_preserves_exact_link_id(test_setup):
+    from xiaozhi.mcp.context import mcp_active_slot_ctx
+
+    _, _, mcp = test_setup
+    slot = mcp_active_slot_ctx.set(1)
+    try:
+        with patch("xiaozhi.services.youtube_playback_service.yt_dlp.YoutubeDL") as ydl:
+            extract = ydl.return_value.__enter__.return_value.extract_info
+            extract.return_value = {"id": "bbbbbbbbbbb", "title": "Exact video"}
+            result = mcp.tools["find_youtube_video_to_play"]("https://youtu.be/bbbbbbbbbbb?list=irrelevant")
+            extract.assert_called_once_with("https://www.youtube.com/watch?v=bbbbbbbbbbb", download=False)
+            assert [item["video_id"] for item in result["candidates"]] == ["bbbbbbbbbbb"]
+    finally:
+        mcp_active_slot_ctx.reset(slot)
 
 
 def test_confirm_workflow_cancelled_by_user(test_setup):
