@@ -410,23 +410,6 @@
         text-overflow: ellipsis;
         max-width: 210px;
     }
-    .mcp-copy-btn {
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 2px 3px;
-        border-radius: 4px;
-        color: var(--app-muted);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        transition: color 0.15s ease, background 0.15s ease;
-    }
-    .mcp-copy-btn:hover {
-        color: var(--app-text);
-        background: rgba(0,0,0,0.05);
-    }
-
     .mcp-mac-cell {
         display: inline-flex;
         align-items: center;
@@ -845,9 +828,6 @@
                                                 {% if sl.preview %}
                                                 <div class="mcp-endpoint-cell" title="{{ sl.preview }}">
                                                     <code class="mcp-endpoint-code">{{ sl.preview }}</code>
-                                                    <button type="button" class="mcp-copy-btn" onclick="event.stopPropagation(); copyMcpEndpoint('{{ sl.preview }}')" title="Salin Endpoint">
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                                    </button>
                                                 </div>
                                                 {% else %}
                                                 <span class="mcp-empty-hint">Belum diatur</span>
@@ -1199,24 +1179,6 @@ function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
-function copyMcpEndpoint(val) {
-    if (!val) return;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(val).then(() => {
-            if (window.App && typeof App.toast === 'function') {
-                App.toast("Endpoint WebSocket disalin!", "success");
-            } else {
-                alert("Endpoint WebSocket disalin!");
-            }
-        }).catch(() => {
-            prompt("Salin endpoint WebSocket:", val);
-        });
-    } else {
-        prompt("Salin endpoint WebSocket:", val);
-    }
-}
-
-
 function switchSlot(slotNum) {
     currentSlot = Number(slotNum);
     for (let i = 1; i <= 3; i++) {
@@ -1420,9 +1382,6 @@ async function pollMcp() {
                     matrixEndpoint.innerHTML = `
                         <div class="mcp-endpoint-cell" title="${escapeHtml(s.preview)}">
                             <code class="mcp-endpoint-code">${escapeHtml(s.preview)}</code>
-                            <button type="button" class="mcp-copy-btn" onclick="event.stopPropagation(); copyMcpEndpoint('${escapeHtml(s.preview)}')" title="Salin Endpoint">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                            </button>
                         </div>`;
                 } else {
                     matrixEndpoint.innerHTML = `<span class="mcp-empty-hint">Belum diatur</span>`;
