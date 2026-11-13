@@ -324,6 +324,9 @@
     }
     .cat-chip-tugas { background: #fef3c7; color: #92400e; border-color: #fde68a; }
     .cat-chip-pengumuman { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
+    :root[data-theme="clay"] .cat-chip-pengumuman { background: #e8fac7; color: #35560c; border-color: #a5cd68; }
+    .stat-card-icon.announcement-stat-icon { background: rgba(124, 58, 237, .08); color: #7c3aed; }
+    :root[data-theme="clay"] .stat-card-icon.announcement-stat-icon { background: #e8fac7; color: var(--app-accent); }
     .cat-chip-materi { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
     .cat-chip-api { background: #e0f2fe; color: #075985; border-color: #bae6fd; }
     .cat-chip-youtube { background: #fee2e2; color: #991b1b; border-color: #fca5a5; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; }
@@ -559,7 +562,7 @@
                 <span class="stat-card-label">Pengumuman</span>
                 <span class="stat-card-num">{{ stats.pengumuman }}</span>
             </div>
-            <div class="stat-card-icon" style="color:#7c3aed; background:rgba(124,58,237,0.08);">
+            <div class="stat-card-icon announcement-stat-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
             </div>
         </div>
