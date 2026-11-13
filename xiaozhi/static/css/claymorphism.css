@@ -7,8 +7,8 @@
     --app-text: #323a4d;
     --app-muted: #576278;
     --app-soft: #e3eafa;
-    --app-brand: #6245ac;
-    --app-accent: #6748b4;
+    --app-brand: #3f690e;
+    --app-accent: #426d10;
     --app-sky: #245a93;
     --app-danger: #a12642;
     --app-radius: 20px;
@@ -18,7 +18,7 @@
     --app-shadow: var(--clay-raised);
     --clay-background:
         radial-gradient(1200px 800px at 10% -8%, #f4f8ff, transparent 60%),
-        radial-gradient(900px 700px at 92% 12%, #f9f0ff, transparent 55%),
+        radial-gradient(900px 700px at 92% 12%, #f1ffd6, transparent 55%),
         radial-gradient(1100px 900px at 50% 115%, #e1f3f6, transparent 60%),
         linear-gradient(160deg, #ecf1fb, #dfe8f7 55%, #e9eefb);
     --clay-surface: linear-gradient(145deg, #f8faff, #e9effb 55%, #e2e9f7);
@@ -29,15 +29,16 @@
     --clay-inset-light: #fffffff5;
     --clay-well: linear-gradient(145deg, #dce4f3, #edf2fc);
     --clay-recessed: inset 6px 6px 13px #98a9ca85, inset -6px -6px 13px #ffffffeb;
-    --clay-orb: #cbb6fa65;
+    --clay-orb: #c5f87770;
     --clay-orb-cool: #afc9f56b;
     --clay-orb-mint: #b3e5e46b;
-    --clay-tone: 258;
+    --clay-tone: 83;
     --clay-fill-start: 92% 91%;
     --clay-fill-end: 74% 78%;
     --clay-accent-ink: 55% 26%;
     --clay-accent-shade: 45% 66% / .5;
     --clay-accent-highlight: 95% 97% / .9;
+    --clay-toast-progress: linear-gradient(90deg, #63a813, #b6ef44);
     --clay-raised: 16px 16px 34px var(--clay-shadow-dark), -12px -12px 28px var(--clay-shadow-light),
         inset -6px -6px 14px var(--clay-inset-dark), inset 6px 6px 14px var(--clay-inset-light);
     --clay-raised-small: 5px 5px 12px var(--clay-shadow-dark), -4px -4px 10px var(--clay-shadow-light),
@@ -75,11 +76,13 @@
     --clay-orb: #694cb640;
     --clay-orb-cool: #475d9e48;
     --clay-orb-mint: #2b777638;
+    --clay-tone: 258;
     --clay-fill-start: 55% 40%;
     --clay-fill-end: 56% 29%;
     --clay-accent-ink: 90% 96%;
     --clay-accent-shade: 65% 19% / .7;
     --clay-accent-highlight: 85% 68% / .4;
+    --clay-toast-progress: linear-gradient(90deg, hsl(258 75% 62%), hsl(200 80% 56%));
 }
 
 :root:is([data-theme="clay"], [data-theme="clay-dark"]) body {
@@ -249,6 +252,12 @@
 
 :root:is([data-theme="clay"], [data-theme="clay-dark"]) .app-alert-warning { --clay-tone: 42; }
 
+:root[data-theme="clay"] :is(.app-button-primary, .chat-submit-btn, .pwa-btn-install, .pwa-btn-understand) {
+    --clay-fill-start: 100% 89%;
+    --clay-fill-end: 88% 64%;
+    --clay-accent-ink: 65% 18%;
+}
+
 :root:is([data-theme="clay"], [data-theme="clay-dark"]) :is(
     .app-button, .app-google-btn, .app-icon-button, .app-sidebar-toggle, .relay-head-btn,
     .relay-mode-btn, .relay-cfg-tab, .filter-pill, .admin-tab-btn, .chronos-btn, .chat-submit-btn,
@@ -398,7 +407,7 @@
     position: absolute;
     inset: auto 0 0;
     height: 4px;
-    background: linear-gradient(90deg, hsl(258 75% 62%), hsl(200 80% 56%));
+    background: var(--clay-toast-progress);
     transform-origin: left;
     animation: clay-toast-countdown var(--toast-duration) linear forwards;
 }

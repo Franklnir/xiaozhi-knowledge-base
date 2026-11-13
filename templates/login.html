@@ -7,8 +7,55 @@
 {% block content_login %}
 <style>
     .hidden { display: none !important; }
+
+    .app-auth-shell .auth-layout.has-xichi-link {
+        padding-bottom: max(96px, calc(84px + env(safe-area-inset-bottom)));
+    }
+
+    .login-xichi-link {
+        position: fixed;
+        left: max(16px, env(safe-area-inset-left));
+        bottom: max(16px, env(safe-area-inset-bottom));
+        z-index: 35;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        max-width: calc(100% - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right)));
+        color: #171717;
+        text-decoration: none;
+    }
+
+    .login-xichi-avatar {
+        display: block;
+        flex: none;
+        width: clamp(52px, 10vw, 64px);
+        height: auto;
+        aspect-ratio: 1;
+        border: 2px solid #171717;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 0 0 3px #fff, 0 5px 16px #17171726;
+    }
+
+    .login-xichi-bubble {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        padding: 8px clamp(10px, 3vw, 16px);
+        border: 2px solid #171717;
+        border-radius: 20px 20px 20px 4px;
+        background: #fff;
+        font-size: clamp(12px, 3vw, 14px);
+        font-weight: 800;
+        line-height: 1.35;
+        box-shadow: 0 5px 16px #1717171a;
+    }
+
+    .login-xichi-link:is(:hover, :focus-visible) .login-xichi-bubble {
+        background: #fff6cf;
+    }
 </style>
-<section class="auth-layout">
+<section class="auth-layout{% if not active_mode or active_mode == 'login' %} has-xichi-link{% endif %}">
     <div class="auth-card">
         <div class="auth-brand">
             <a href="/" style="display:inline-block; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
@@ -159,6 +206,13 @@
         </div>
     </div>
 </section>
+
+{% if not active_mode or active_mode == 'login' %}
+<a class="login-xichi-link" href="https://produk.irsyadlabs.id/">
+    <img class="login-xichi-avatar" src="/static/img/logo.png" alt="" width="64" height="64">
+    <span class="login-xichi-bubble">Halo! Mau ngobrol sama Xichi? 👋</span>
+</a>
+{% endif %}
 
 <script>
     const authMode = document.getElementById("authMode");
