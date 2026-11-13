@@ -14,9 +14,9 @@ from xiaozhi.mcp.context import (
     mcp_active_token_hash_ctx,
     mcp_active_mac_ctx,
 )
+from xiaozhi.services import mcp_service
 from xiaozhi.services.mcp_service import (
     mcp_bridge_tasks,
-    mcp_reload_event,
     set_mcp_connection_state,
     signal_mcp_reload,
 )
@@ -89,7 +89,6 @@ def set_capture_function(fn):
 
 async def start_mcp_background(store):
     """Start the MCP background task for managing WebSocket bridges."""
-    global mcp_reload_event
 
     from xiaozhi.mcp.server import mcp_server
 
@@ -262,10 +261,11 @@ async def mcp_background_task(store, mcp_server):
                     logger.error("Gagal memproses token MCP per-user: user_id=%s slot=%s error_type=%s", token_info.get("user_id"), token_info.get("slot_number"), type(item_err).__name__)
 
             # Wait for reload signal OR timeout (check for new users every 30s)
-            if mcp_reload_event:
-                mcp_reload_event.clear()
+            reload_event = mcp_service.mcp_reload_event
+            if reload_event is not None:
                 try:
-                    await asyncio.wait_for(mcp_reload_event.wait(), timeout=30)
+                    await asyncio.wait_for(reload_event.wait(), timeout=30)
+                    reload_event.clear()
                     logger.info("MCP reload signal received. Checking for new bridges.")
                 except asyncio.TimeoutError:
                     pass  # Timeout is normal - just loop to check for new users
