@@ -79,3 +79,44 @@ def test_latest_channel_handle_uses_its_uploads(monkeypatch):
     assert [item["video_id"] for item in result["candidates"]] == ["aaaaaaaaaaa"]
     uploads.assert_called_once_with("@maker")
     search.assert_not_called()
+
+
+def test_misspelled_channel_suggests_identity_then_filters_its_uploads(monkeypatch):
+    channel_id = "UCs9uQ6vUJk6t4xGeHIb1OTg"
+    publisher = {"channel": "Saqahayang Movie", "channel_id": channel_id, "uploader_id": "@Saqahayangmovie"}
+    uploads = Mock(return_value=[
+        {"id": "aaaaaaaaaaa", "title": "Video psikopat terbaru", "upload_date": "20261113", **publisher},
+        {"id": "bbbbbbbbbbb", "title": "Video lain", "channel": "Other", "upload_date": "20261114"},
+    ])
+    search = Mock(return_value=([{"id": "aaaaaaaaaaa", "title": "Video psikopat terbaru", **publisher}],
+                                "youtube_search_sample"))
+    monkeypatch.setattr(video, "search_youtube_candidates", search)
+    monkeypatch.setattr(video, "_channel_uploads", uploads)
+    suggestion = video.find_playback_choices(1, 2, "Saka Hayang", channel="Saka Hayang", newest=True)
+    assert suggestion["needs_channel_confirmation"]
+    assert suggestion["channel_candidates"] == [
+        {"name": "Saqahayang Movie", "channel_id": channel_id, "handle": "@Saqahayangmovie"}
+    ]
+    assert "request_id" not in suggestion
+    uploads.assert_not_called()
+    search.assert_called_once_with("Saka Hayang", False, None, None, 12)
+
+    result = video.find_playback_choices(1, 2, "psikopat", channel=channel_id, newest=True)
+    assert [entry["video_id"] for entry in result["candidates"]] == ["aaaaaaaaaaa"]
+    uploads.assert_called_once_with(channel_id)
+
+
+def test_missing_topic_does_not_drop_confirmed_channel(monkeypatch):
+    monkeypatch.setattr(video, "_channel_uploads", lambda _: [
+        {"id": "aaaaaaaaaaa", "title": "Tutorial ESP32", "uploader_id": "@maker"},
+    ])
+    search = Mock(return_value=([
+        {"id": "bbbbbbbbbbb", "title": "Review film psikopat", "uploader_id": "@other"},
+    ], "youtube_search_sample"))
+    monkeypatch.setattr(video, "search_youtube_candidates", search)
+    monkeypatch.setattr(video, "_video_metadata", lambda _: None)
+    result = video.find_playback_choices(1, 2, "psikopat", channel="@maker", newest=True)
+    assert not result["success"]
+    assert result["channel"] == "@maker"
+    assert "request_id" not in result
+    search.assert_called_once_with("psikopat @maker", True, None, None, 12)

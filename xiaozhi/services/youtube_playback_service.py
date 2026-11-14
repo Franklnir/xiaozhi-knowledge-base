@@ -25,6 +25,7 @@ _RELEASE_PREFIX = re.compile(
 )
 _CHANNEL_HANDLE = re.compile(r"@[A-Za-z0-9_.-]{3,30}")
 _CHANNEL_ID = re.compile(r"UC[A-Za-z0-9_-]{22}")
+_CHANNEL_CLAUSE = re.compile(r"(?:^|\bdari\s+)(?:channel|kanal)\s+(.+)$", re.I)
 _METADATA_OPTIONS = {"quiet": True, "no_warnings": True, "noplaylist": True,
                      "socket_timeout": 5, "retries": 0, "extractor_retries": 0,
                      "ignore_no_formats_error": True}
@@ -75,7 +76,9 @@ def _matches_channel(entry, channel):
     if not channel:
         return True
     names = {entry.get("channel"), entry.get("uploader"), entry.get("uploader_id"), entry.get("channel_id")}
-    if channel.startswith("@") or _CHANNEL_ID.fullmatch(channel):
+    if _CHANNEL_ID.fullmatch(channel):
+        return entry.get("channel_id") == channel
+    if channel.startswith("@"):
         return any(str(name or "").casefold() == channel.casefold() for name in names)
     return _words(channel) in {_words(name) for name in names if name}
 
@@ -127,6 +130,116 @@ def _channel_uploads(identity):
         ]
 
 
+def _channel_identity(entry):
+    channel_id = str(entry.get("channel_id") or "")
+    handle = str(entry.get("uploader_id") or "")
+    if _CHANNEL_ID.fullmatch(channel_id):
+        return channel_id
+    return handle if _CHANNEL_HANDLE.fullmatch(handle) else ""
+
+
+def _channel_name_key(name):
+    return re.sub(r"\b(?:movie|official|channel|tv)$", "", _words(name)).replace(" ", "")
+
+
+def _channel_suggestions(entries, channel):
+    requested = _channel_name_key(channel)
+    candidates = {}
+    if len(requested) < 5:
+        return []
+    for entry in entries:
+        if not entry:
+            continue
+        identity = _channel_identity(entry)
+        handle = str(entry.get("uploader_id") or "")
+        name = entry.get("channel") or entry.get("uploader") or handle
+        similarity = max(
+            SequenceMatcher(None, requested, _channel_name_key(label), autojunk=False).ratio()
+            for label in (name, handle)
+        )
+        if identity and similarity >= 0.85:
+            candidates[identity] = (similarity, {
+                "name": str(name)[:120],
+                "channel_id": identity if _CHANNEL_ID.fullmatch(identity) else None,
+                "handle": handle if _CHANNEL_HANDLE.fullmatch(handle) else None,
+            })
+    return [choice for _, choice in sorted(candidates.values(), key=lambda item: item[0], reverse=True)[:3]]
+
+
+def parse_video_search(query, channel):
+    query = _RELEASE_PREFIX.sub("", query)
+    query = re.sub(_RECENT_WORDS, " ", query, flags=re.I).strip()
+    match = _CHANNEL_CLAUSE.search(query)
+    if match:
+        channel = channel or match[1].strip()
+        query = query[:match.start()].strip()
+    spoken_handle = re.fullmatch(r"at\s+([A-Za-z0-9_.-]{3,30})", channel, re.I)
+    if spoken_handle:
+        channel = "@" + spoken_handle[1]
+    if not channel and (_CHANNEL_HANDLE.fullmatch(query) or _CHANNEL_ID.fullmatch(query)):
+        query, channel = "", query
+    if channel and _words(query) == _words(channel):
+        query = ""
+    query = re.sub(r"\bxiao[\s-]+zhi\b", "xiaozhi", query, flags=re.I)
+    return query, channel
+
+
+def search_channel_videos(query, channel, newest, start, end, count, *, search, use_uploads=True):
+    """Use both the video topic and the channel identity without dropping either."""
+    identity = channel if _CHANNEL_HANDLE.fullmatch(channel) or _CHANNEL_ID.fullmatch(channel) else ""
+    title = _words(query)
+    discovery = []
+    terms = " ".join(part for part in (query, channel) if part)
+    if title and not identity:
+        entries, method = search(terms, newest, start, end, count)
+        exact = [entry for entry in entries if entry and _matches_channel(entry, channel)]
+        identities = {_channel_identity(entry) for entry in exact} - {""}
+        if len(identities) <= 1 and any(_match_title(title, entry.get("title")) for entry in exact):
+            return entries, method, next(iter(identities), channel), []
+
+    if not identity:
+        discovery, _ = search(channel, False, None, None, count)
+        exact = [entry for entry in discovery if entry and _matches_channel(entry, channel)]
+        identities = {_channel_identity(entry) for entry in exact} - {""}
+        if len(identities) == 1:
+            identity = identities.pop()
+        elif len(identities) > 1 or not exact:
+            choices = _channel_suggestions(exact or discovery, channel)
+            if choices:
+                return [], "youtube_channel_lookup", channel, choices
+
+    scope = identity or channel
+    if identity and use_uploads and (newest or not title):
+        try:
+            uploads = _channel_uploads(identity)
+        except Exception:
+            uploads = []
+        scoped_uploads = [entry for entry in uploads if _matches_channel(entry, scope)]
+        if any(_match_title(title, entry.get("title")) for entry in scoped_uploads):
+            return uploads, "youtube_channel_uploads", scope, []
+        if scoped_uploads and _CHANNEL_ID.fullmatch(channel):
+            publisher = scoped_uploads[0]
+            terms = " ".join(part for part in (query, publisher.get("uploader_id") or publisher.get("channel")) if part)
+
+    if not identity and not title and not start and not end:
+        return discovery, "youtube_channel_lookup", scope, []
+    entries, method = search(terms, newest, start, end, count)
+    if channel.startswith("@") and not any(entry and _matches_channel(entry, scope) for entry in entries):
+        choices = _channel_suggestions(entries, channel)
+        if choices:
+            return [], "youtube_channel_lookup", channel, choices
+    return entries, method, scope, []
+
+
+def channel_confirmation(choices):
+    return {
+        "success": False,
+        "needs_channel_confirmation": True,
+        "channel_candidates": choices,
+        "message": "Konfirmasi channel yang dimaksud, lalu cari lagi dengan ID atau @handle pilihan pengguna.",
+    }
+
+
 def find_playback_choices(owner_id, slot, query, *, channel="", newest=False):
     query = " ".join(query.split())
     channel = " ".join(channel.split())
@@ -141,13 +254,7 @@ def find_playback_choices(owner_id, slot, query, *, channel="", newest=False):
     if not video_id:
         today_only = bool(re.search(r"\bhari\s+ini\b", query, re.I))
         newest = newest or bool(re.search(_RECENT_WORDS, query, re.I))
-        query = _RELEASE_PREFIX.sub("", query)
-        query = re.sub(_RECENT_WORDS, " ", query, flags=re.I).strip()
-        match = re.search(r"(?:^|\bdari\s+)(?:channel|kanal)\s+(.+)$", query, re.I)
-        if match:
-            channel = channel or match[1].strip()
-            query = query[:match.start()].strip()
-        query = re.sub(r"\bxiao[\s-]+zhi\b", "xiaozhi", query, flags=re.I)
+        query, channel = parse_video_search(query, channel)
     title_query = _words(query)
     search_query = " ".join(part for part in (query, channel) if part)
     if not search_query:
@@ -160,35 +267,18 @@ def find_playback_choices(owner_id, slot, query, *, channel="", newest=False):
         if video_id:
             entry = _video_metadata(video_id)
             entries = [entry] if entry else []
+        elif channel:
+            start = today - timedelta(days=1) if today_only else None
+            entries, method, channel, suggestions = search_channel_videos(
+                query, channel, newest, start, None, 12, search=search_youtube_candidates,
+            )
+            if suggestions:
+                return channel_confirmation(suggestions)
         else:
-            start = today - timedelta(days=1) if today_only else today - timedelta(days=7) if newest and not channel else None
-            entries, method = [], "youtube_search_sample"
-            if newest and (_CHANNEL_HANDLE.fullmatch(channel) or _CHANNEL_ID.fullmatch(channel)):
-                try:
-                    entries, method = _channel_uploads(channel), "youtube_channel_uploads"
-                except Exception:
-                    pass
-            if not any(
-                entry and _matches_channel(entry, channel) and _match_title(title_query, entry.get("title"))
-                for entry in entries
-            ):
-                entries, method = search_youtube_candidates(search_query, newest, start, None, 12)
-            if newest and channel and not title_query and method == "youtube_search_sample":
-                identities = {
-                    entry["channel_id"] for entry in entries
-                    if entry and _matches_channel(entry, channel)
-                    and _CHANNEL_ID.fullmatch(entry.get("channel_id") or "")
-                }
-                if len(identities) == 1:
-                    try:
-                        uploads = _channel_uploads(identities.pop())
-                        if uploads:
-                            entries, method = uploads, "youtube_channel_uploads"
-                    except Exception:
-                        pass
+            start = today - timedelta(days=1 if today_only else 7) if newest else None
+            entries, method = search_youtube_candidates(search_query, newest, start, None, 12)
             if start and not today_only and not any(
-                entry and _matches_channel(entry, channel) and _match_title(title_query, entry.get("title"))
-                for entry in entries
+                entry and _match_title(title_query, entry.get("title")) for entry in entries
             ):
                 entries, method = search_youtube_candidates(search_query, newest, None, None, 12)
     except Exception:
@@ -236,6 +326,9 @@ def find_playback_choices(owner_id, slot, query, *, channel="", newest=False):
             "url": f"https://www.youtube.com/watch?v={vid}",
         }))
     if not ranked:
+        if channel and not video_id:
+            return {"success": False, "channel": channel,
+                    "message": "Belum ditemukan video yang cocok dari channel ini. Minta judul atau tautan, atau tanyakan apakah pengguna ingin mencari di channel lain."}
         return {"success": False, "message": "Tidak ada video yang cocok dengan judul, channel, atau tanggal yang diminta. Coba sebutkan nama channel persis atau kirim tautannya."}
 
     ranked.sort(key=lambda item: (item[1], item[0]) if newest else (item[0], item[1]), reverse=True)
@@ -248,6 +341,10 @@ def find_playback_choices(owner_id, slot, query, *, channel="", newest=False):
                 if method == "youtube_channel_uploads"
                 else "Sebagian tanggal terbit belum terverifikasi. Hasil ini berasal dari sampel pencarian."
             )
+        elif not today_only and not any(
+            item["published_date_utc"] >= (today - timedelta(days=7)).isoformat() for item in candidates
+        ):
+            result["freshness_note"] = "Hasil teratas lebih lama dari tujuh hari. Sebutkan tanggalnya sebagai hasil yang tersedia."
         else:
             result["freshness_note"] = "Urutan tanggal berlaku untuk kandidat yang ditemukan."
         result["search_method"] = method

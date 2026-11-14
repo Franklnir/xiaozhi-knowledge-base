@@ -45,6 +45,9 @@ def test_youtube_research_reports_unavailable_captions(monkeypatch):
     assert result["success"] is False
     assert result["sources"] == []
     assert result["skipped"] == ["subtitle_gagal_diambil"]
+    assert result["videos_without_subtitles"][0]["url"] == "https://www.youtube.com/watch?v=aaaaaaaaaaa"
+    assert result["videos_without_subtitles"][0]["published_date_utc"] == "2026-11-08"
+    assert "transcript_excerpt" not in result["videos_without_subtitles"][0]
     assert not research.research_youtube("topik", start_date="kemarin")["success"]
 
 
@@ -80,3 +83,21 @@ def test_latest_search_prioritizes_recent_dates_and_labels_older_fallback(monkey
     assert search.call_args_list[0].args == ("topik", True, date(2026, 11, 6), None, 8)
     assert search.call_args_list[1].args == ("topik", True, None, None, 8)
     assert result["success"] and result["freshness_note"]
+
+
+def test_channel_research_returns_only_verified_channel_metadata_without_subtitles(monkeypatch):
+    from xiaozhi.services import youtube_playback_service as video
+
+    monkeypatch.setattr(video, "_channel_uploads", lambda _: [
+        {"id": "aaaaaaaaaaa", "title": "Topik lama", "uploader_id": "@maker", "upload_date": "20261110"},
+        {"id": "bbbbbbbbbbb", "title": "Topik baru", "uploader_id": "@maker", "upload_date": "20261113"},
+        {"id": "ccccccccccc", "title": "Topik luar", "uploader_id": "@other", "upload_date": "20261114"},
+    ])
+    monkeypatch.setattr(research, "YouTubeTranscriptApi", Mock(side_effect=RuntimeError))
+    search = Mock()
+    monkeypatch.setattr(research, "search_youtube_candidates", search)
+    result = research.research_youtube("topik", channel="@maker")
+    assert not result["success"]
+    assert result["sources"] == []
+    assert [item["title"] for item in result["videos_without_subtitles"]] == ["Topik baru", "Topik lama"]
+    search.assert_not_called()
