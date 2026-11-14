@@ -165,6 +165,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["Authorization", "Content-Type", "X-Device-Token", "X-EDUSMART-API-KEY", "Accept", "Origin"],
+    expose_headers=["X-Request-ID"],
 )
 
 
@@ -172,12 +173,15 @@ app.add_middleware(
 async def monitor_requests(request: Request, call_next):
     """Monitor request timing and errors with guaranteed unique Request ID."""
     import uuid
-    start = time.time()
-    req_id = request.headers.get("X-Request-ID") or f"req-{uuid.uuid4().hex[:10]}"
+    start = time.perf_counter()
+    req_id = f"req-{uuid.uuid4().hex}"
     request.state.request_id = req_id
+    login_request = request.url.path in {"/login", "/api/auth/web-login"}
+    if login_request:
+        request.state.login_timings = {}
 
     response = await call_next(request)
-    duration_ms = (time.time() - start) * 1000
+    duration_ms = (time.perf_counter() - start) * 1000
 
     # Record metric
     endpoint = request.url.path
@@ -186,7 +190,15 @@ async def monitor_requests(request: Request, call_next):
     record_request(endpoint, method, status, duration_ms)
 
     # Log slow requests
-    if duration_ms > 5000:
+    if login_request:
+        timings = request.state.login_timings
+        stages = [f"{stage};dur={ms:.1f}" for stage, ms in timings.items()]
+        response.headers["Server-Timing"] = ", ".join([f"app;dur={duration_ms:.1f}", *stages])
+        log = logger.warning if duration_ms >= 1000 else logger.info
+        log("[%s] Login %s %s status=%d total_ms=%.1f stages=%s",
+            req_id, method, endpoint, status, duration_ms, " ".join(stages))
+        response.headers["Cache-Control"] = "no-store"
+    elif duration_ms > 5000:
         logger.warning(f"[{req_id}] Slow request: {method} {endpoint} took {duration_ms:.0f}ms")
 
     # Add performance headers
@@ -202,6 +214,17 @@ async def monitor_requests(request: Request, call_next):
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
     return response
+
+
+@app.exception_handler(500)
+async def unhandled_request_error(request: Request, exc: Exception):
+    from fastapi.responses import PlainTextResponse
+
+    req_id = request.state.request_id
+    logger.error("[%s] Request failed (%s)", req_id, type(exc).__name__)
+    return PlainTextResponse("Internal Server Error", status_code=500, headers={
+        "X-Request-ID": req_id, "Cache-Control": "no-store",
+    })
 
 
 # Include routers

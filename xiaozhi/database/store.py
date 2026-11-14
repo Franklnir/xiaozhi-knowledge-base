@@ -9,6 +9,7 @@ from threading import RLock
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from cryptography.fernet import Fernet, InvalidToken
+from xiaozhi.database.dashboard_materials import PAGE_SIZE, PREVIEW_LENGTH, clamp_page
 
 # Optional HuggingFace Hub imports
 try:
@@ -900,6 +901,27 @@ class HFJsonStore:
                 if int(item.get("owner_id", 0)) == int(owner_id)
             ]
             return sorted(materials, key=lambda item: int(item["id"]), reverse=True)
+
+    def dashboard_material_page(self, owner_id, query, category, page):
+        with self._lock:
+            owned = [row for row in self._load()["materials"] if int(row.get("owner_id", 0)) == int(owner_id)]
+        stats = {"total": len(owned)}
+        for field in ("tugas", "pengumuman", "materi"):
+            stats[field] = sum(field in str(row.get("category") or "").lower() for row in owned)
+        needle = query.lower()
+        filtered = [
+            row for row in owned
+            if (not category or row.get("category") == category)
+            and (not needle or needle in " ".join(
+                str(row.get(field) or "") for field in ("title", "category", "content", "keywords")
+            ).lower())
+        ]
+        page = clamp_page(len(filtered), page)
+        offset = (page - 1) * PAGE_SIZE
+        filtered.sort(key=lambda row: int(row["id"]), reverse=True)
+        rows = [self._public_material({**row, "content": str(row.get("content") or "")[:PREVIEW_LENGTH + 1]})
+                for row in filtered[offset:offset + PAGE_SIZE]]
+        return rows, stats, len(filtered), page
 
     def get_material(
         self,

@@ -1,0 +1,46 @@
+<div id="viewModal" class="dash-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="viewModalTitle">
+    <div class="dash-modal-box" style="max-width: 640px;">
+        <div class="dash-modal-header">
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span id="viewCatBadge" class="cat-chip cat-chip-default">Kategori</span>
+                    <span id="viewIdBadge" class="text-xs font-mono text-slate-500">#0</span>
+                </div>
+                <h3 class="app-section-title" id="viewModalTitle">Judul Materi</h3>
+            </div>
+            <button type="button" data-material-action="close" class="app-button app-button-ghost app-icon-button" aria-label="Tutup">&times;</button>
+        </div>
+
+        <div class="dash-modal-body">
+            <div id="viewKeywordsWrap" class="text-xs text-slate-500 flex items-center gap-1.5 pb-2 border-b border-slate-200 dark:border-slate-800">
+                <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                <span class="font-bold">Kata Kunci:</span>
+                <span id="viewKeywordsText">-</span>
+            </div>
+
+            <div class="relative">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-bold text-slate-600 dark:text-slate-300">Isi Lengkap:</span>
+                    <button type="button" id="copyContentBtn" data-material-action="copy" class="app-button app-button-ghost app-button-small text-xs font-bold btn-icon" style="color:var(--app-sky);">
+                        <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        <span id="copyBtnText">Salin Teks</span>
+                    </button>
+                </div>
+                <div id="viewFullContent" class="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-sans text-xs leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap max-h-72 overflow-y-auto select-text"></div>
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                <span id="viewMetaStats">0 kata · 0 karakter</span>
+                <span id="viewLiveEndpointText" class="text-sky-600 truncate max-w-[280px]"></span>
+            </div>
+        </div>
+
+        <div class="dash-modal-footer">
+            <button type="button" data-material-action="close" class="app-button">Tutup</button>
+            <button type="button" id="viewEditDirectBtn" data-material-action="edit-viewed" class="app-button app-button-primary btn-icon">
+                <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                <span>Edit Materi Ini</span>
+            </button>
+        </div>
+    </div>
+</div>

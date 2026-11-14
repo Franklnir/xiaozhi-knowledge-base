@@ -1,0 +1,360 @@
+:root {
+    --pwa-banner-height: 64px;
+}
+body.has-pwa-banner {
+    padding-top: var(--pwa-banner-height);
+}
+body.has-pwa-banner .app-nav-aside {
+    top: var(--pwa-banner-height);
+    height: calc(100vh - var(--pwa-banner-height));
+}
+body.has-pwa-banner .app-sidebar-toggle {
+    top: calc(12px + var(--pwa-banner-height));
+}
+body.has-pwa-banner .app-guest-header {
+    top: var(--pwa-banner-height);
+}
+
+/* Overlay Banner Top */
+.pwa-install-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100000;
+    background: #ffffff;
+    border-bottom: 2px solid var(--app-border-strong);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    padding: 8px 14px;
+    animation: pwaSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box;
+}
+@keyframes pwaSlideDown {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+:root[data-theme="neo"] .pwa-install-banner {
+    background: #ffe600;
+    border-bottom: 2.5px solid #111111;
+    box-shadow: 0 4px 0 #111111;
+    color: #111111;
+}
+:root[data-theme="dark"] .pwa-install-banner {
+    background: #18181b;
+    border-bottom: 2px solid #3f3f46;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    color: #f8fafc;
+}
+
+.pwa-banner-content {
+    max-width: var(--app-wide-max);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.pwa-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+.pwa-banner-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 9px;
+    background: #ffffff;
+    border: 1.5px solid #111111;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.12);
+}
+:root[data-theme="neo"] .pwa-banner-icon {
+    border: 2px solid #111111;
+    box-shadow: 2px 2px 0 #111111;
+}
+.pwa-banner-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.pwa-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.pwa-banner-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    font-weight: 800;
+    line-height: 1.25;
+    color: inherit;
+}
+.pwa-banner-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 850;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 99px;
+    background: #10b981;
+    color: #ffffff;
+}
+:root[data-theme="neo"] .pwa-banner-badge {
+    background: #111111;
+    color: #ffe600;
+    border: 1px solid #111111;
+}
+.pwa-banner-desc {
+    font-size: 12px;
+    color: var(--app-muted);
+    line-height: 1.35;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+:root[data-theme="neo"] .pwa-banner-desc {
+    color: #262626;
+    font-weight: 600;
+}
+.pwa-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.pwa-btn-install {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 800;
+    border-radius: 8px;
+    border: 1.5px solid #111111;
+    background: #047857;
+    color: #ffffff;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 2.5px 2.5px 0 #111111;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+:root[data-theme="neo"] .pwa-btn-install {
+    background: #111111;
+    color: #ffffff;
+    border: 2px solid #111111;
+    box-shadow: 3px 3px 0 #111111;
+}
+:root[data-theme="neo"] .pwa-btn-install:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 #111111;
+    background: #000000;
+}
+:root[data-theme="neo"] .pwa-btn-install:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #111111;
+}
+:root[data-theme="dark"] .pwa-btn-install {
+    background: #10b981;
+    color: #022c22;
+    border-color: #34d399;
+}
+.pwa-btn-dismiss {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1.5px solid transparent;
+    display: grid;
+    place-items: center;
+    font-size: 16px;
+    font-weight: 800;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.15s, background-color 0.15s;
+}
+.pwa-btn-dismiss:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.08);
+}
+:root[data-theme="neo"] .pwa-btn-dismiss:hover {
+    background: rgba(0, 0, 0, 0.12);
+}
+
+/* Modal Panduan iOS / Android Fallback */
+.pwa-guide-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100005;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.pwa-guide-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.pwa-guide-box {
+    position: relative;
+    z-index: 2;
+    background: var(--app-surface);
+    border: 2.5px solid #111111;
+    border-radius: 16px;
+    box-shadow: 6px 6px 0 #111111;
+    max-width: 440px;
+    width: 100%;
+    padding: 22px 20px;
+    color: var(--app-text);
+    animation: mcpPopIn 0.22s ease-out;
+    box-sizing: border-box;
+}
+:root[data-theme="dark"] .pwa-guide-box {
+    border-color: #3f3f46;
+    box-shadow: 0 16px 36px rgba(0,0,0,0.6);
+}
+.pwa-guide-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.pwa-guide-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #dcfce7;
+    border: 2px solid #111111;
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+:root[data-theme="dark"] .pwa-guide-icon {
+    background: rgba(16, 185, 129, 0.18);
+    border-color: #10b981;
+}
+.pwa-guide-heading {
+    font-size: 17px;
+    font-weight: 900;
+    margin: 0 0 4px;
+    line-height: 1.3;
+    color: var(--app-text);
+}
+.pwa-guide-sub {
+    font-size: 12.5px;
+    color: var(--app-muted);
+    margin: 0;
+    line-height: 1.45;
+}
+.pwa-guide-close {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--app-muted);
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+.pwa-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+.pwa-step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: var(--app-surface-muted);
+    border: 1.5px solid var(--app-border-strong);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+:root[data-theme="neo"] .pwa-step-item {
+    border: 2px solid #111111;
+    box-shadow: 2px 2px 0 #111111;
+    background: #fffde7;
+}
+.pwa-step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #111111;
+    color: #ffffff;
+    font-weight: 900;
+    font-size: 12px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+:root[data-theme="neo"] .pwa-step-num {
+    background: #ffe600;
+    color: #111111;
+    border: 1.5px solid #111111;
+}
+.pwa-step-text {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--app-text);
+}
+.pwa-guide-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+.pwa-btn-understand {
+    width: 100%;
+    padding: 11px 16px;
+    font-size: 14px;
+    font-weight: 850;
+    border-radius: 10px;
+    border: 2px solid #111111;
+    background: #ffe600;
+    color: #111111;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 #111111;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.pwa-btn-understand:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 #111111;
+}
+.pwa-btn-understand:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #111111;
+}
+
+@media (max-width: 640px) {
+    :root {
+        --pwa-banner-height: 74px;
+    }
+    .pwa-banner-content {
+        gap: 8px;
+    }
+    .pwa-banner-title {
+        font-size: 12.5px;
+    }
+    .pwa-banner-desc {
+        display: none;
+    }
+    .pwa-btn-install {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+}

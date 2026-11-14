@@ -17,6 +17,7 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
+from xiaozhi.database.dashboard_materials import PAGE_SIZE, clamp_page, material_page_queries, summary_query
 
 from xiaozhi.config import (
     DEFAULT_CATEGORIES,
@@ -942,6 +943,23 @@ class PostgresStore:
                 cur.execute("SELECT * FROM materials WHERE owner_id = %s ORDER BY id DESC", (int(owner_id),))
                 rows = cur.fetchall()
                 return [self._public_material(row) for row in rows]
+
+    def dashboard_material_page(self, owner_id, query, category, page):
+        count_sql, rows_sql, params = material_page_queries("%s", owner_id, query, category)
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                self.set_rls_context(cur, owner_id)
+                cur.execute(summary_query("%s"), (int(owner_id),))
+                stats = cur.fetchone()
+                if query or category:
+                    cur.execute(count_sql, params)
+                    total = cur.fetchone()["total"]
+                else:
+                    total = stats["total"]
+                page = clamp_page(total, page)
+                cur.execute(rows_sql, (*params, PAGE_SIZE, (page - 1) * PAGE_SIZE))
+                rows = [self._public_material(row) for row in cur.fetchall()]
+        return rows, stats, total, page
 
     def get_material(self, owner_id: int, material_id: int) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:

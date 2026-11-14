@@ -1,0 +1,63 @@
+.app-auth-shell .auth-layout.has-login-shortcuts {
+    padding-bottom: calc(148px + max(16px, env(safe-area-inset-bottom)));
+}
+
+.login-shortcuts {
+    position: fixed;
+    left: max(16px, env(safe-area-inset-left));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 35;
+    display: grid;
+    gap: 10px;
+    max-width: calc(100% - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right)));
+}
+
+.login-shortcut {
+    justify-self: start;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #171717;
+    text-decoration: none;
+}
+
+.login-shortcut-icon {
+    display: block;
+    flex: none;
+    width: clamp(52px, 10vw, 64px);
+    height: auto;
+    aspect-ratio: 1;
+    border: 2px solid #171717;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 3px #fff, 0 5px 16px #17171726;
+}
+
+.login-shortcut-whatsapp .login-shortcut-icon {
+    display: grid;
+    place-items: center;
+    background: #25d366;
+    color: #073b1e;
+}
+
+.login-shortcut-bubble {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 8px clamp(10px, 3vw, 16px);
+    border: 2px solid #171717;
+    border-radius: 20px 20px 20px 4px;
+    background: #fff;
+    font-size: clamp(12px, 3vw, 14px);
+    font-weight: 800;
+    line-height: 1.35;
+    box-shadow: 0 5px 16px #1717171a;
+}
+
+.login-shortcut:is(:hover, :focus-visible) .login-shortcut-bubble {
+    background: #fff6cf;
+}
+
+.login-shortcut-whatsapp:is(:hover, :focus-visible) .login-shortcut-bubble {
+    background: #e1fbe9;
+}

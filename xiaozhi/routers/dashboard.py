@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from xiaozhi.database.dashboard_materials import PAGE_SIZE
 from xiaozhi.services.sse_service import (
     broadcast_material_event,
     stream_material_events,
@@ -35,13 +36,16 @@ router = APIRouter()
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page(request: Request):
+def dashboard_page(
+    request: Request, q: str = Query("", max_length=200), category: str = Query("", max_length=120),
+    page: int = Query(1, ge=1),
+):
     user = get_current_user(request)
     if not user:
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
     store = get_store()
     categories = store.list_categories(user["id"])
-    materials = store.list_materials(user["id"])
+    context = material_list_context(store, user["id"], q, category, page)
     quota = store.user_quota(user["id"])
     token_info = store.get_xiaozhi_token_info(user["id"])
     mcp_status = mcp_status_payload(
@@ -50,22 +54,14 @@ async def dashboard_page(request: Request):
         token_preview=token_info.get("preview", "") if token_info else "",
         token_hash=token_info.get("token_hash", "") if token_info else "",
     )
-    # Calculate stats
-    stats = {
-        "total": len(materials),
-        "tugas": sum(1 for m in materials if "tugas" in m.get("category", "").lower()),
-        "pengumuman": sum(1 for m in materials if "pengumuman" in m.get("category", "").lower()),
-        "materi": sum(1 for m in materials if "materi" in m.get("category", "").lower()),
-    }
-    return render(
+    response = render(
         request,
         "dashboard.html",
         {
             "user": user,
             "categories": categories,
-            "materials": materials,
+            **context,
             "quota": quota,
-            "stats": stats,
             "mcp_token_saved": bool(token_info),
             "mcp_token_preview": token_info.get("preview", "") if token_info else "",
             "mcp_status": mcp_status,
@@ -73,6 +69,45 @@ async def dashboard_page(request: Request):
             "active_page": "dashboard",
         },
     )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def material_list_context(store, owner_id, query, category, page):
+    query = query.strip()
+    category = category.strip()
+    materials, stats, total, page = store.dashboard_material_page(owner_id, query, category, page)
+    return {
+        "materials": materials, "stats": stats, "filtered_total": total,
+        "material_query": query, "material_category": category, "material_page": page,
+        "material_pages": max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE),
+    }
+
+
+@router.get("/api/materials/list", response_class=HTMLResponse)
+def dashboard_material_list(request: Request, q: str = Query("", max_length=200),
+                            category: str = Query("", max_length=120), page: int = Query(1, ge=1)):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sesi telah berakhir.")
+    store = get_store()
+    context = material_list_context(store, user["id"], q, category, page)
+    from xiaozhi.dependencies import templates
+    response = templates.TemplateResponse(request=request, name="dashboard/material_list.html", context=context)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@router.get("/api/materials/detail/{material_id}")
+def dashboard_material_detail(request: Request, material_id: int):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sesi telah berakhir.")
+    item = get_store().get_material(user["id"], material_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Materi tidak ditemukan.")
+    fields = ("id", "title", "category", "content", "keywords", "source_type", "api_url", "api_label", "masked_api_url")
+    return JSONResponse({field: item.get(field) for field in fields}, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/add_material")
@@ -156,6 +191,7 @@ async def api_materials_stream_index(request: Request):
     content_type = request.headers.get("content-type", "")
     if "application/json" in content_type:
         payload = await request.json()
+        validate_csrf(request, payload.get("csrf_token") or "", user)
         title = payload.get("title", "")
         category = payload.get("category", "")
         content = payload.get("content", "")
@@ -163,6 +199,7 @@ async def api_materials_stream_index(request: Request):
         api_url = payload.get("api_url", "")
     else:
         form = await request.form()
+        validate_csrf(request, form.get("csrf_token") or "", user)
         title = form.get("title", "")
         category = form.get("category", "")
         content = form.get("content", "")
@@ -199,7 +236,7 @@ async def api_materials_stream_events(request: Request):
     user = require_user(request)
     store = get_store()
     return StreamingResponse(
-        stream_material_events(user["id"], request, store),
+        stream_material_events(user["id"], request, store, monitor_live_api=request.query_params.get("view") != "dashboard"),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
@@ -227,7 +264,7 @@ async def api_materials_live_api_preview(request: Request):
 
 
 @router.get("/api/materials/live-api/{material_id}")
-async def api_materials_live_api_item(request: Request, material_id: int, last_hash: str = ""):
+def api_materials_live_api_item(request: Request, material_id: int, last_hash: str = ""):
     """Server-side live API status updater for dashboard table."""
     user = require_user(request)
     store = get_store()

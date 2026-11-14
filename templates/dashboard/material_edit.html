@@ -1,0 +1,80 @@
+<div id="editModal" class="dash-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="editMatTitle">
+    <div class="dash-modal-box">
+        <div class="dash-modal-header">
+            <div>
+                <h3 class="app-section-title" id="editMatTitle">Edit Data Materi</h3>
+                <p class="app-section-subtitle">Perbarui judul, kategori, atau teks materi yang disimpan.</p>
+            </div>
+            <button type="button" data-material-action="close" class="app-button app-button-ghost app-icon-button" aria-label="Tutup">&times;</button>
+        </div>
+
+        <form id="editForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="dash-modal-body">
+                <div>
+                    <label for="edit_title" class="app-label">Judul Materi <span class="text-rose-600">*</span></label>
+                    <input id="edit_title" type="text" name="title" required maxlength="160" class="app-input">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="edit_category" class="app-label">Kategori <span class="text-rose-600">*</span></label>
+                        <select id="edit_category" name="category" required class="app-select">
+                            <optgroup label="Kategori Reguler (Teks & Dokumen)">
+                                {% for cat in categories if cat.name|trim|lower != 'data dari api' %}
+                                <option value="{{ cat.name }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Khusus Realtime Live API (Endpoint Eksternal)">
+                                <option value="data dari api">data dari api (Live Endpoint API JSON)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit_keywords" class="app-label">Kata Kunci</label>
+                        <input id="edit_keywords" type="text" name="keywords" maxlength="300" class="app-input">
+                    </div>
+                </div>
+
+                <!-- Edit Live API Fields -->
+                <div id="editLiveApiFields" class="p-3 rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/30 dark:border-sky-800 hidden space-y-2" style="display: none;">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-sky-900 dark:text-sky-300 flex items-center gap-1.5">
+                            <svg class="dash-icon text-sky-600" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            <span>Sumber API Realtime (Terenkripsi)</span>
+                        </span>
+                        <span class="app-chip app-chip-info app-chip-small flex items-center gap-1 font-mono text-[10px]">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            AES-256 & RLS
+                        </span>
+                    </div>
+                    <input id="edit_api_url" type="url" name="api_url" placeholder="https://..." autocomplete="off" class="app-input text-xs font-mono">
+                    <div class="p-2 rounded bg-sky-100/70 dark:bg-sky-900/40 text-[11px] text-sky-900 dark:text-sky-200 leading-normal border border-sky-300/40 dark:border-sky-700/40">
+                        <svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Endpoint diamankan dengan enkripsi at-rest Fernet AES-256 dan isolasi PostgreSQL RLS.
+                    </div>
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[11px] font-semibold text-slate-500" id="editLiveApiStatus">Data API akan tampil di Isi Data.</span>
+                        <button type="button" class="app-button app-button-small text-xs" id="editLiveApiRefreshButton">Refresh</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label for="edit_content" class="app-label !mb-0">Isi Data Materi <span class="text-rose-600">*</span></label>
+                        <span class="text-[11px] font-mono text-slate-500" id="editWordCountDisplay">0 kata</span>
+                    </div>
+                    <textarea id="edit_content" name="content" rows="8" required class="app-textarea"></textarea>
+                </div>
+            </div>
+
+            <div class="dash-modal-footer">
+                <button type="button" data-material-action="close" class="app-button">Batal</button>
+                <button type="submit" class="app-button app-button-primary btn-icon">
+                    <svg class="dash-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    <span>Simpan Perubahan</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

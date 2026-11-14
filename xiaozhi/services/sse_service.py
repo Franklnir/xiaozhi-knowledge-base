@@ -1094,6 +1094,8 @@ async def stream_material_events(
     request: Request,
     store: Any = None,
     live_api_interval_sec: float = 15.0,
+    *,
+    monitor_live_api: bool = True,
 ) -> AsyncGenerator[str, None]:
     """
     Generator for streaming real-time Material / Knowledge Base events to Web UI via SSE.
@@ -1110,7 +1112,7 @@ async def stream_material_events(
 
     try:
         initial_stats: Dict[str, Any] = {"total": 0, "categories": []}
-        if store is not None:
+        if store is not None and monitor_live_api:
             try:
                 materials = store.list_materials(uid)
                 initial_stats = {
@@ -1147,7 +1149,7 @@ async def stream_material_events(
 
             # Server-side periodic check for live API materials without client polling
             now = time.time()
-            if store is not None and (now - last_live_check >= live_api_interval_sec):
+            if store is not None and monitor_live_api and (now - last_live_check >= live_api_interval_sec):
                 last_live_check = now
                 try:
                     materials = store.list_materials(uid)

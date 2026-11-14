@@ -1,82 +1,21 @@
-{% extends "base.html" %}
+{% extends "auth_base.html" %}
 
 {% block title %}Masuk Dashboard - Xiaozhi Indonesia Asisten Suara Cerdas | xiaozhiscig{% endblock %}
 {% block meta_title %}Masuk Dashboard - Xiaozhi Indonesia Asisten Suara Cerdas | xiaozhiscig{% endblock %}
 {% block meta_desc %}Masuk ke akun Xiaozhi Indonesia untuk mengelola perangkat ESP32, token koneksi MCP, custom tools, dan simulasi smart home IoT.{% endblock %}
 
+{% block auth_assets %}
+<link rel="stylesheet" href="/static/css/login-shortcuts.css">
+<script defer src="/static/js/login.js"></script>
+{% endblock %}
+
 {% block content_login %}
-<style>
-    .hidden { display: none !important; }
 
-    .app-auth-shell .auth-layout.has-login-shortcuts {
-        padding-bottom: calc(148px + max(16px, env(safe-area-inset-bottom)));
-    }
-
-    .login-shortcuts {
-        position: fixed;
-        left: max(16px, env(safe-area-inset-left));
-        bottom: max(16px, env(safe-area-inset-bottom));
-        z-index: 35;
-        display: grid;
-        gap: 10px;
-        max-width: calc(100% - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right)));
-    }
-
-    .login-shortcut {
-        justify-self: start;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: #171717;
-        text-decoration: none;
-    }
-
-    .login-shortcut-icon {
-        display: block;
-        flex: none;
-        width: clamp(52px, 10vw, 64px);
-        height: auto;
-        aspect-ratio: 1;
-        border: 2px solid #171717;
-        border-radius: 50%;
-        background: #fff;
-        box-shadow: 0 0 0 3px #fff, 0 5px 16px #17171726;
-    }
-
-    .login-shortcut-whatsapp .login-shortcut-icon {
-        display: grid;
-        place-items: center;
-        background: #25d366;
-        color: #073b1e;
-    }
-
-    .login-shortcut-bubble {
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-        padding: 8px clamp(10px, 3vw, 16px);
-        border: 2px solid #171717;
-        border-radius: 20px 20px 20px 4px;
-        background: #fff;
-        font-size: clamp(12px, 3vw, 14px);
-        font-weight: 800;
-        line-height: 1.35;
-        box-shadow: 0 5px 16px #1717171a;
-    }
-
-    .login-shortcut:is(:hover, :focus-visible) .login-shortcut-bubble {
-        background: #fff6cf;
-    }
-
-    .login-shortcut-whatsapp:is(:hover, :focus-visible) .login-shortcut-bubble {
-        background: #e1fbe9;
-    }
-</style>
 <section class="auth-layout{% if not active_mode or active_mode == 'login' %} has-login-shortcuts{% endif %}">
     <div class="auth-card">
         <div class="auth-brand">
             <a href="/" style="display:inline-block; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                <img class="auth-logo" src="/static/img/logo.png" alt="Xiaozhi Logo" width="72" height="72">
+                <img class="auth-logo" src="/static/img/apple-touch-icon.png" alt="Xiaozhi Logo" width="72" height="72">
             </a>
             <h1 class="app-title text-2xl" style="margin:0;">Xiaozhi Indonesia</h1>
         </div>
@@ -198,8 +137,7 @@
     </div>
 </section>
 
-{% if not active_mode or active_mode == 'login' %}
-<nav class="login-shortcuts" aria-label="Bantuan login">
+<nav class="login-shortcuts{% if active_mode == 'register' %} hidden{% endif %}" aria-label="Bantuan login">
     <a class="login-shortcut login-shortcut-whatsapp" href="https://wa.me/6289531832365?text=Halo%20Admin%2C%20saya%20butuh%20bantuan%20untuk%20akun%20Xiaozhi%20Indonesia." target="_blank" rel="noopener noreferrer" aria-label="Bantuan atau lupa akun? Hubungi admin lewat WhatsApp">
         <span class="login-shortcut-icon" aria-hidden="true">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
@@ -209,186 +147,8 @@
         <span class="login-shortcut-bubble">Bantuan atau lupa akun?</span>
     </a>
     <a class="login-shortcut" href="https://produk.irsyadlabs.id/">
-        <img class="login-shortcut-icon" src="/static/img/logo.png" alt="" width="64" height="64">
+        <img class="login-shortcut-icon" src="/static/img/apple-touch-icon.png" alt="" width="64" height="64">
         <span class="login-shortcut-bubble">Halo! Mau ngobrol sama Xichi? 👋</span>
     </a>
 </nav>
-{% endif %}
-
-<script>
-    const authMode = document.getElementById("authMode");
-    const panels = {
-        login: document.getElementById("loginPanel"),
-        register: document.getElementById("registerPanel"),
-    };
-    function setMode(mode) {
-        Object.entries(panels).forEach(([name, panel]) => {
-            panel.classList.toggle("hidden", name !== mode);
-        });
-        authMode.value = mode;
-        const url = new URL(window.location.href);
-        url.searchParams.set("mode", mode);
-        window.history.replaceState({}, "", url);
-    }
-
-    authMode.addEventListener("change", () => setMode(authMode.value));
-    setMode("{{ active_mode or 'login' }}");
-    // End authMode
-
-    function escapeHtml(s) {
-        return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    }
-</script>
 {% endblock %}
-
-
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    const loginForm = document.getElementById("loginPanel");
-    const mcpCard = document.getElementById("loginMcpGatingCard");
-    const mcpTokenInput = document.getElementById("login_mcp_token");
-    const connectBtn = document.getElementById("loginConnectMcpBtn");
-    const notice = document.getElementById("loginMcpStatusNotice");
-    const noticeText = document.getElementById("loginMcpStatusText");
-    const noticeIcon = document.getElementById("loginMcpStatusIcon");
-    const progressBar = document.getElementById("loginMcpProgressBar");
-    let csrf = document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : "";
-
-    let pollTimer = null;
-
-    async function handleAjaxLogin(username, password, submitBtn) {
-        if (!username || !password) return;
-        submitBtn.disabled = true;
-        const origText = submitBtn.textContent;
-        submitBtn.textContent = "Memverifikasi...";
-
-        try {
-            const resp = await fetch("/api/auth/web-login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    username: username,
-                    password: password,
-                    csrf_token: csrf
-                })
-            });
-            const data = await resp.json();
-
-            if (data.success) {
-                if (data.csrf_token) csrf = data.csrf_token;
-                if (data.mcp_required) {
-                    // MCP is required and not connected! Show gating card!
-                    if (loginForm) loginForm.classList.add("hidden");
-                    document.getElementById("authMode")?.parentElement?.classList.add("hidden");
-
-                    mcpCard.classList.remove("hidden");
-                    if (data.token_preview) mcpTokenInput.value = data.token_preview;
-                    mcpTokenInput.focus();
-                } else {
-                    window.location.href = data.redirect_url || "/dashboard";
-                }
-            } else {
-                alert(data.message || "Username atau password salah.");
-                submitBtn.disabled = false;
-                submitBtn.textContent = origText;
-            }
-        } catch (_) {
-            loginForm.submit();
-        }
-    }
-
-    if (loginForm) {
-        loginForm.addEventListener("submit", function(e) {
-            e.preventDefault();
-            const u = document.getElementById("login_username").value.trim();
-            const p = document.getElementById("login_password").value;
-            const btn = loginForm.querySelector('button[type="submit"]');
-            handleAjaxLogin(u, p, btn);
-        });
-    }
-
-    if (connectBtn) {
-        connectBtn.addEventListener("click", async function() {
-            const token = mcpTokenInput.value.trim();
-            if (!token || (!token.startsWith("wss://") && !token.startsWith("ws://"))) {
-                alert("Endpoint MCP wajib diawali wss:// atau ws://");
-                mcpTokenInput.focus();
-                return;
-            }
-
-            connectBtn.disabled = true;
-            connectBtn.textContent = "Menghubungkan ke XiaoZhi...";
-            notice.classList.remove("hidden");
-            noticeIcon.textContent = "⏳";
-            noticeText.textContent = "Menyimpan endpoint MCP...";
-            progressBar.style.width = "40%";
-
-            try {
-                const fd = new FormData();
-                fd.append("csrf_token", csrf);
-                fd.append("mcp_token", token);
-
-                const sResp = await fetch("/save_mcp", {
-                    method: "POST",
-                    body: fd,
-                    credentials: "same-origin"
-                });
-                const sData = await sResp.json();
-
-                if (sData.success) {
-                    noticeText.textContent = "Endpoint tersimpan. Menghubungkan ke bridge WebSocket...";
-                    progressBar.style.width = "70%";
-
-                    let attempts = 0;
-                    if (pollTimer) clearInterval(pollTimer);
-
-                    pollTimer = setInterval(async function() {
-                        attempts++;
-                        try {
-                            const stResp = await fetch("/api/mcp/status", { credentials: "same-origin" });
-                            const stData = await stResp.json();
-
-                            if (stData.success && stData.status) {
-                                const s = stData.status;
-                                if (s.connected) {
-                                    clearInterval(pollTimer);
-                                    noticeIcon.innerHTML = '<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
-                                    noticeText.textContent = "MCP Berhasil Terhubung! Mengalihkan ke Dashboard...";
-                                    progressBar.style.width = "100%";
-                                    progressBar.className = "h-full bg-emerald-600 transition-all duration-300";
-
-                                    setTimeout(function() {
-                                        window.location.href = "/dashboard";
-                                    }, 1200);
-                                    return;
-                                } else {
-                                    noticeText.textContent = s.statusText || ("Menunggu respon XiaoZhi (" + attempts + "s)...");
-                                }
-                            }
-                        } catch (_) {}
-
-                        if (attempts >= 25) {
-                            clearInterval(pollTimer);
-                            connectBtn.disabled = false;
-                            connectBtn.textContent = "Coba Hubungkan Ulang";
-                            noticeIcon.innerHTML = '<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-                            noticeText.textContent = "Belum terhubung. Pastikan URL WebSocket MCP benar.";
-                        }
-                    }, 1500);
-
-                } else {
-                    connectBtn.disabled = false;
-                    connectBtn.textContent = "Hubungkan MCP & Masuk";
-                    noticeIcon.innerHTML = '<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
-                    noticeText.textContent = sData.detail || "Gagal menyimpan endpoint.";
-                }
-            } catch (err) {
-                connectBtn.disabled = false;
-                connectBtn.textContent = "Hubungkan MCP & Masuk";
-                noticeIcon.innerHTML = '<svg class="app-icon app-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
-                noticeText.textContent = "Terjadi kesalahan: " + err.message;
-            }
-        });
-    }
-});
-</script>

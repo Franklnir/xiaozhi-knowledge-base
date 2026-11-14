@@ -1,0 +1,24 @@
+<div id="deleteModal" class="dash-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dash-modal-box" style="max-width: 440px;">
+        <div class="dash-modal-header" style="border-bottom:none; padding-bottom:0;">
+            <div class="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 flex items-center justify-center text-rose-600">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            </div>
+            <button type="button" data-material-action="close" class="app-button app-button-ghost app-icon-button">&times;</button>
+        </div>
+        <div class="dash-modal-body" style="padding-top:10px;">
+            <h3 class="app-section-title text-base">Hapus Materi Ini?</h3>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mt-1" id="deleteTargetPrompt">
+                Apakah Anda yakin ingin menghapus materi ini? Data yang terhapus tidak dapat dikembalikan.
+            </p>
+        </div>
+        <form id="deleteForm" method="POST" class="dash-modal-footer">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="button" data-material-action="close" class="app-button text-xs">Batal</button>
+            <button type="submit" class="app-button app-button-danger text-xs font-bold btn-icon">
+                <svg class="dash-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <span>Ya, Hapus Materi</span>
+            </button>
+        </form>
+    </div>
+</div>

@@ -18,6 +18,7 @@ from xiaozhi.services.sse_service import (
     format_sse,
     material_event_hub,
     stream_material_events,
+    stream_material_indexing,
 )
 
 
@@ -94,26 +95,41 @@ def test_sse_endpoint_unauthorized():
     assert response.status_code in (302, 303, 401)
 
 
-def test_auto_save_broadcasts_material_created():
-    """Verify that _auto_save_to_knowledge_base in mcp/tools.py triggers broadcast_material_event."""
+def test_research_does_not_save_material():
     from xiaozhi.mcp.tools import _auto_save_to_knowledge_base
+
+    store = MagicMock()
+    assert _auto_save_to_knowledge_base(
+        store, 999, "Hasil riset", "Riset & Pengetahuan", "Isi riset", "riset"
+    ) is None
+    store.add_material.assert_not_called()
+
+
+def test_manual_save_broadcasts_material_created(monkeypatch):
+    """The dashboard refreshes after an explicit save emits the material event."""
+    from xiaozhi.services import mcp_service, sse_service
+
+    monkeypatch.setattr(mcp_service, "signal_mcp_reload", lambda: None)
+    monkeypatch.setattr(sse_service, "log_admin_event", lambda *args: None)
+    monkeypatch.setattr(sse_service, "emit_user_event", lambda *args: None)
+
     async def _test():
         hub = material_event_hub
         q = await hub.subscribe(999)
         try:
             mock_store = MagicMock()
-            mock_store.search_materials.return_value = []
-            mock_store.add_material.return_value = 615
-
-            res = _auto_save_to_knowledge_base(
-                store=mock_store,
-                owner_id=999,
-                title="Riset: Robot Bebek Hugging Face Viral",
-                category="Riset & Pengetahuan",
-                content="Data riset robot bebek dengan konten yang cukup panjang untuk memenuhi batas minimal 80 karakter pada sistem...",
-                keywords="robot bebek"
+            mock_store.add_material.return_value = {"id": 615, "title": "Catatan Robot Bebek"}
+            chunks = [
+                chunk async for chunk in stream_material_indexing(
+                    user_id=999, title="Catatan Robot Bebek", category="Materi",
+                    content="Cara kerja robot bebek.", keywords="robot bebek", api_url="",
+                    store=mock_store, request=MagicMock(),
+                )
+            ]
+            mock_store.add_material.assert_called_once_with(
+                999, "Catatan Robot Bebek", "Materi", "Cara kerja robot bebek.", "robot bebek", ""
             )
-            assert res == 615
+            assert "event: done" in chunks[-1]
 
             evt = await asyncio.wait_for(q.get(), timeout=1.0)
             assert evt["type"] == "material_created"

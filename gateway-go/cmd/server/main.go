@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"os"
@@ -68,6 +70,16 @@ func main() {
 	r := chi.NewRouter()
 
 	// Essential Middlewares (Zero-bloat)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var randomID [16]byte
+			_, _ = rand.Read(randomID[:])
+			id := "req-" + hex.EncodeToString(randomID[:])
+			r.Header.Set("X-Request-ID", id)
+			w.Header().Set("X-Request-ID", id)
+			next.ServeHTTP(w, r)
+		})
+	})
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)

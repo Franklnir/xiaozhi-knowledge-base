@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Query, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.concurrency import run_in_threadpool
 from itsdangerous import BadSignature, SignatureExpired
 
 from xiaozhi.config import (
@@ -15,6 +16,7 @@ from xiaozhi.config import (
 )
 from xiaozhi.core.security import normalize_username, hash_password, verify_password
 from xiaozhi.core.rate_limiter import enforce_predefined_limit
+from xiaozhi.core.request_timing import measure
 from xiaozhi.dependencies import (
     get_current_user,
     get_store,
@@ -58,8 +60,9 @@ async def root(request: Request):
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, mode: str = Query("login")):
-    user = get_current_user(request)
+def login_page(request: Request, mode: str = Query("login")):
+    with measure(request, "auth", excluding="db"):
+        user = get_current_user(request)
     if user:
         return RedirectResponse(url="/dashboard")
     active_mode = "register" if mode == "register" else "login"
@@ -73,20 +76,22 @@ async def login_page(request: Request, mode: str = Query("login")):
 
 
 @router.post("/login")
-async def login_post(
+def login_post(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
     csrf_token: str = Form(...),
 ):
-    from xiaozhi.services.mcp_service import is_mcp_connected
     enforce_predefined_limit(request, "login")
     store = get_store()
     validate_csrf(request, csrf_token, None)
     submitted_username = (username or "").strip().lower()
     try:
-        user_record = store.get_user_by_username(username)
-        if user_record and verify_password(password, user_record.get("password_hash", "")):
+        with measure(request, "db"):
+            user_record = store.get_user_by_username(username)
+        with measure(request, "auth"):
+            authenticated = user_record and verify_password(password, user_record.get("password_hash", ""))
+        if authenticated:
             role = str(user_record.get("role") or "user").lower()
             user_id = int(user_record["id"])
             user = {
@@ -99,10 +104,12 @@ async def login_post(
 
             # Synchronize with Firebase
             from xiaozhi.services.firebase_service import sync_firebase_user
-            fb_res = sync_firebase_user(user_record["username"], password=password, email=user_record.get("google_email"), is_register=False)
+            with measure(request, "firebase"):
+                fb_res = sync_firebase_user(user_record["username"], password=password, email=user_record.get("google_email"), is_register=False)
             if fb_res:
                 try:
-                    store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
+                    with measure(request, "db"):
+                        store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
                 except Exception:
                     pass
 
@@ -141,18 +148,30 @@ async def login_post(
 
 @router.post("/api/auth/web-login")
 async def web_login_api(request: Request):
+    enforce_predefined_limit(request, "login")
+    try:
+        body = await request.json()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data login tidak valid.") from None
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Data login tidak valid.")
+    return await run_in_threadpool(_web_login, request, body)
+
+
+def _web_login(request, body):
     from fastapi.responses import JSONResponse
     from xiaozhi.services.mcp_service import is_mcp_connected
-    enforce_predefined_limit(request, "login")
-    body = await request.json()
     username = str(body.get("username", "")).strip().lower()
     password = str(body.get("password", ""))
     csrf_token = str(body.get("csrf_token", ""))
 
     validate_csrf(request, csrf_token, None)
     store = get_store()
-    user_record = store.get_user_by_username(username)
-    if not user_record or not verify_password(password, user_record.get("password_hash", "")):
+    with measure(request, "db"):
+        user_record = store.get_user_by_username(username)
+    with measure(request, "auth"):
+        authenticated = user_record and verify_password(password, user_record.get("password_hash", ""))
+    if not authenticated:
         return JSONResponse({"success": False, "message": "Username atau password salah."}, status_code=401)
 
     role = str(user_record.get("role") or "user").lower()
@@ -167,15 +186,19 @@ async def web_login_api(request: Request):
 
     # Synchronize with Firebase
     from xiaozhi.services.firebase_service import sync_firebase_user
-    fb_res = sync_firebase_user(user_record["username"], password=password, email=user_record.get("google_email"), is_register=False)
+    with measure(request, "firebase"):
+        fb_res = sync_firebase_user(user_record["username"], password=password, email=user_record.get("google_email"), is_register=False)
     if fb_res:
         try:
-            store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
+            with measure(request, "db"):
+                store.link_firebase_account(user_id, fb_res["firebase_uid"], fb_res["firebase_email"])
         except Exception:
             pass
 
-    token_info = store.get_xiaozhi_token_info(user_id)
-    mcp_ok = is_mcp_connected(user_id)
+    with measure(request, "db"):
+        token_info = store.get_xiaozhi_token_info(user_id)
+    with measure(request, "mcp"):
+        mcp_ok = is_mcp_connected(user_id)
 
     new_csrf = make_csrf_token(user)
     if role == "admin" or mcp_ok:

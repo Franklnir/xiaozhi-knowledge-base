@@ -15,6 +15,7 @@ from xiaozhi.config import (
     session_serializer,
 )
 from xiaozhi.core.security import extract_bearer_token, validate_access_token, verify_password
+from xiaozhi.core.request_timing import measure
 
 # Templates will be set by main.py after app creation
 templates: Optional[Jinja2Templates] = None
@@ -42,7 +43,8 @@ def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
         if token:
             user_info, error = validate_access_token(token)
             if user_info and not error:
-                user = _store.get_user(user_info["user_id"])
+                with measure(request, "db"):
+                    user = _store.get_user(user_info["user_id"])
                 if user and user.get("username") == user_info.get("username"):
                     return user
 
@@ -52,7 +54,8 @@ def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
         return None
     try:
         payload = session_serializer.loads(token, max_age=SESSION_MAX_AGE)
-        user = _store.get_user(int(payload["id"]))
+        with measure(request, "db"):
+            user = _store.get_user(int(payload["id"]))
         if (
             user
             and user["username"] == payload.get("username")
@@ -139,9 +142,7 @@ def require_mcp_connected_if_not_admin(request: Request, user: Dict[str, Any]) -
 
 
 def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None, status_code: int = 200):
-    user = context.get("user") if context else None
-    if user is None:
-        user = get_current_user(request)
+    user = context["user"] if context is not None and "user" in context else get_current_user(request)
 
     mcp_connected = False
     if user and isinstance(user, dict) and "id" in user:
@@ -186,12 +187,13 @@ def render(request: Request, name: str, context: Optional[Dict[str, Any]] = None
             merged["mcp_required"] = mcp_required
         if "active_announcement" not in context:
             merged["active_announcement"] = active_announcement
-    return templates.TemplateResponse(
-        request=request,
-        name=name,
-        context=merged,
-        status_code=status_code,
-    )
+    with measure(request, "render"):
+        return templates.TemplateResponse(
+            request=request,
+            name=name,
+            context=merged,
+            status_code=status_code,
+        )
 
 
 def redirect_with_message(url: str, message: str, status_code: int = 303) -> RedirectResponse:

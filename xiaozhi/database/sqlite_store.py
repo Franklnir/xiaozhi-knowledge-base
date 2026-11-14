@@ -44,6 +44,7 @@ from xiaozhi.core.utils import (
     utc_now,
 )
 from xiaozhi.database.helpers import empty_database
+from xiaozhi.database.dashboard_materials import PAGE_SIZE, clamp_page, material_page_queries, summary_query
 
 logger = logging.getLogger("xiaozhi.sqlite")
 
@@ -792,6 +793,15 @@ class SQLiteStore:
             (owner_id,)
         ).fetchall()
         return [self._public_material(row) for row in rows]
+
+    def dashboard_material_page(self, owner_id, query, category, page):
+        conn = self._get_conn()
+        count_sql, rows_sql, params = material_page_queries("?", owner_id, query, category)
+        stats = dict(conn.execute(summary_query("?"), (int(owner_id),)).fetchone())
+        total = conn.execute(count_sql, params).fetchone()["total"] if query or category else stats["total"]
+        page = clamp_page(total, page)
+        rows = conn.execute(rows_sql, (*params, PAGE_SIZE, (page - 1) * PAGE_SIZE)).fetchall()
+        return [self._public_material(row) for row in rows], stats, total, page
 
     def get_material(self, owner_id: int, material_id: int) -> Optional[Dict[str, Any]]:
         conn = self._get_conn()
