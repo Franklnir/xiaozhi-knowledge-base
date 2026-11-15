@@ -5,6 +5,7 @@ Supports PostgreSQL (production VPS), HuggingFace (for HF Spaces), and SQLite (f
 import os
 import logging
 import xiaozhi.config
+from xiaozhi.database import PostgresResourceSchemaError
 
 logger = logging.getLogger("xiaozhi.factory")
 
@@ -34,6 +35,8 @@ def create_store():
         try:
             from xiaozhi.database.postgres_store import PostgresStore
             return PostgresStore()
+        except PostgresResourceSchemaError:
+            raise
         except Exception as exc:
             logger.warning("PostgreSQL server tidak dapat diakses (%s). Beralih otomatis ke database lokal SQLite untuk mode development.", exc)
             from xiaozhi.database.sqlite_store import SQLiteStore
@@ -53,6 +56,8 @@ def create_store():
             logger.info("Using PostgreSQL backend (auto-detected from environment)")
             from xiaozhi.database.postgres_store import PostgresStore
             return PostgresStore()
+        except PostgresResourceSchemaError:
+            raise
         except Exception as exc:
             logger.warning("PostgreSQL backend auto-detect failed (%s), falling back...", exc)
 

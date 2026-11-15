@@ -83,10 +83,10 @@ func (h *RelayHandler) HandleGetCommands(w http.ResponseWriter, r *http.Request)
 	}
 
 	// 4. Update Device Liveness (Throttled in Go store)
-	h.relayStore.TouchDeviceLastSeen(r.Context(), room.ID)
+	h.relayStore.TouchDeviceLastSeen(r.Context(), room.OwnerID, room.ID)
 
 	// 5. Retrieve Current Relays State
-	relays, err := h.relayStore.GetRoomRelays(r.Context(), room.ID)
+	relays, err := h.relayStore.GetRoomRelays(r.Context(), room.OwnerID, room.ID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": "Gagal membaca status relay."})
 		return
@@ -150,7 +150,7 @@ func (h *RelayHandler) HandlePostStatus(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// 4. Update Device Liveness
-	h.relayStore.TouchDeviceLastSeen(r.Context(), room.ID)
+	h.relayStore.TouchDeviceLastSeen(r.Context(), room.OwnerID, room.ID)
 
 	// 5. Update Single Relay (if sent)
 	relayNum := payload.Relay
@@ -165,18 +165,18 @@ func (h *RelayHandler) HandlePostStatus(w http.ResponseWriter, r *http.Request) 
 		st = payload.State
 	}
 	if relayNum > 0 && relayNum <= 16 && st != "" {
-		_ = h.relayStore.UpdateRelayStatus(r.Context(), room.ID, relayNum, st)
+		_ = h.relayStore.UpdateRelayStatus(r.Context(), room.OwnerID, room.ID, relayNum, st)
 	}
 
 	// 6. Update Batch Relays (if sent)
 	for _, item := range payload.Relays {
 		if item.Relay > 0 && item.Relay <= 16 && item.Status != "" {
-			_ = h.relayStore.UpdateRelayStatus(r.Context(), room.ID, item.Relay, item.Status)
+			_ = h.relayStore.UpdateRelayStatus(r.Context(), room.OwnerID, room.ID, item.Relay, item.Status)
 		}
 	}
 
 	// 7. Retrieve refreshed states
-	relays, _ := h.relayStore.GetRoomRelays(r.Context(), room.ID)
+	relays, _ := h.relayStore.GetRoomRelays(r.Context(), room.OwnerID, room.ID)
 
 	// 8. Log activity to Admin SSE Stream
 	if h.sseHub != nil {
@@ -293,7 +293,7 @@ func (h *RelayHandler) HandlePostControl(w http.ResponseWriter, r *http.Request)
 	}
 
 	// 3. Keamanan batas ruangan: Pastikan relay benar-benar terdaftar pada ruangan tersebut
-	relays, err := h.relayStore.GetRoomRelays(r.Context(), room.ID)
+	relays, err := h.relayStore.GetRoomRelays(r.Context(), room.OwnerID, room.ID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": "Gagal memvalidasi channel relay."})
 		return

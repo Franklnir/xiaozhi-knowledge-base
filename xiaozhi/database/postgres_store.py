@@ -17,6 +17,7 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
+from xiaozhi.database import PostgresResourceSchemaError
 from xiaozhi.database.dashboard_materials import PAGE_SIZE, clamp_page, material_page_queries, summary_query
 
 from xiaozhi.config import (
@@ -41,7 +42,6 @@ from xiaozhi.core.security import (
 from xiaozhi.core.utils import (
     clean_text,
     compact_text,
-    count_text_words,
     is_live_api_category,
     normalize_mac_address,
     parse_int_range,
@@ -89,6 +89,11 @@ class PostgresStore:
             open=True,
         )
         self._init_db()
+        try:
+            self._verify_resource_schema()
+        except PostgresResourceSchemaError:
+            self.close()
+            raise
 
     @staticmethod
     def _build_dsn() -> str:
@@ -109,16 +114,60 @@ class PostgresStore:
         with self.pool.connection(timeout=timeout) as conn:
             yield conn
 
+    @contextmanager
+    def _get_resource_conn(self, owner_id: Optional[int] = None, *, role: str = "user"):
+        try:
+            with self._get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SET LOCAL ROLE app_tenant_role")
+                    self.set_rls_context(cur, owner_id, user_role=role)
+                yield conn
+        except psycopg.errors.CheckViolation as exc:
+            if exc.diag.constraint_name in {
+                "quota_material_count", "quota_material_words", "quota_live_api_count", "quota_relay_room_count",
+            }:
+                raise ValueError(exc.diag.message_primary) from exc
+            raise
+
+    def _verify_resource_schema(self) -> None:
+        error = "PostgreSQL resource policies are unavailable. Run alembic upgrade head before starting Xiaozhi."
+        try:
+            with self._get_resource_conn() as conn:
+                status = conn.execute(
+                    """
+                    SELECT row_security_active('public.materials') AND
+                           row_security_active('public.categories') AND
+                           row_security_active('public.relay_rooms') AND
+                           row_security_active('public.relay_devices') AND
+                           row_security_active('public.user_limits') AS rls_active,
+                           (SELECT COUNT(*) FROM pg_trigger
+                            WHERE tgenabled IN ('O', 'A') AND
+                                ((tgrelid = 'public.materials'::regclass AND tgname = 'trg_enforce_material_quota') OR
+                                 (tgrelid = 'public.relay_rooms'::regclass AND tgname = 'trg_enforce_relay_room_quota') OR
+                                 (tgrelid = 'public.user_limits'::regclass AND tgname = 'trg_lock_user_limit_change'))
+                           ) AS quota_triggers
+                    """
+                ).fetchone()
+        except psycopg.Error as exc:
+            raise PostgresResourceSchemaError(error) from exc
+        if not status["rls_active"] or status["quota_triggers"] != 3:
+            raise PostgresResourceSchemaError(error)
+
     @staticmethod
     def set_rls_context(cur, user_id: Optional[int] = None, user_role: Optional[str] = "user") -> None:
         """Sets transaction-local configuration for PostgreSQL Row-Level Security."""
         uid_str = str(user_id) if user_id is not None else ""
         role_str = str(user_role) if user_role else "user"
         is_admin_str = "true" if role_str in ("admin", "system") else "false"
-        cur.execute("SELECT set_config('app.user_id', %s, true);", (uid_str,))
-        cur.execute("SELECT set_config('app.current_user_id', %s, true);", (uid_str,))
-        cur.execute("SELECT set_config('app.user_role', %s, true);", (role_str,))
-        cur.execute("SELECT set_config('app.is_admin', %s, true);", (is_admin_str,))
+        cur.execute(
+            """
+            SELECT set_config('app.user_id', %s, true),
+                   set_config('app.current_user_id', %s, true),
+                   set_config('app.user_role', %s, true),
+                   set_config('app.is_admin', %s, true)
+            """,
+            (uid_str, uid_str, role_str, is_admin_str),
+        )
 
     def close(self) -> None:
         """Close connection pool cleanly."""
@@ -842,9 +891,8 @@ class PostgresStore:
     # ── Category Management ────────────────────────────────────────────────
 
     def _seed_default_categories(self, user_id: int) -> None:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(user_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, user_id)
                 now = utc_now()
                 for name in DEFAULT_CATEGORIES:
                     cur.execute(
@@ -858,9 +906,8 @@ class PostgresStore:
             conn.commit()
 
     def _ensure_live_api_category(self, user_id: int) -> None:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(user_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, user_id)
                 cur.execute(
                     """
                     INSERT INTO categories (owner_id, name, created_at)
@@ -872,17 +919,15 @@ class PostgresStore:
             conn.commit()
 
     def list_categories(self, owner_id: int) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM categories WHERE owner_id = %s ORDER BY name ASC", (int(owner_id),))
                 return cur.fetchall()
 
     def add_category(self, owner_id: int, name: str) -> None:
         name = clean_text(name, max_len=80, min_len=2, field="Nama kategori")
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 try:
                     cur.execute(
                         "INSERT INTO categories (owner_id, name, created_at) VALUES (%s, %s, %s)",
@@ -894,9 +939,8 @@ class PostgresStore:
                     raise ValueError(f"Kategori '{name}' sudah ada.")
 
     def delete_category(self, owner_id: int, category_id: int) -> bool:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT name FROM categories WHERE id = %s AND owner_id = %s", (int(category_id), int(owner_id)))
                 row = cur.fetchone()
                 if not row:
@@ -918,9 +962,8 @@ class PostgresStore:
                     pass
         if not cleaned:
             return []
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 now = utc_now()
                 for cat in cleaned:
                     cur.execute(
@@ -937,18 +980,16 @@ class PostgresStore:
     # ── Materials Management ───────────────────────────────────────────────
 
     def list_materials(self, owner_id: int) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM materials WHERE owner_id = %s ORDER BY id DESC", (int(owner_id),))
                 rows = cur.fetchall()
                 return [self._public_material(row) for row in rows]
 
     def dashboard_material_page(self, owner_id, query, category, page):
         count_sql, rows_sql, params = material_page_queries("%s", owner_id, query, category)
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute(summary_query("%s"), (int(owner_id),))
                 stats = cur.fetchone()
                 if query or category:
@@ -962,18 +1003,16 @@ class PostgresStore:
         return rows, stats, total, page
 
     def get_material(self, owner_id: int, material_id: int) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute("SELECT * FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                 row = cur.fetchone()
                 return self._public_material(row) if row else None
 
     def search_materials(self, owner_id: int, keyword: str, limit: int = 10) -> List[Dict[str, Any]]:
         keyword = keyword.strip()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 if not keyword:
                     cur.execute(
                         "SELECT * FROM materials WHERE owner_id = %s ORDER BY id DESC LIMIT %s",
@@ -999,9 +1038,8 @@ class PostgresStore:
     def find_material_detail(
         self, owner_id: int, material_id: int = 0, title: str = "", keyword: str = ""
     ) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 if material_id:
                     cur.execute("SELECT * FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                     row = cur.fetchone()
@@ -1030,7 +1068,7 @@ class PostgresStore:
                 return bool(row and row.get("role") == "admin")
 
     def _get_user_limits_dict(self, owner_id: int) -> Dict[str, int]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM user_limits WHERE user_id = %s", (int(owner_id),))
                 row = cur.fetchone()
@@ -1041,38 +1079,6 @@ class PostgresStore:
                     value = row.get(key, default)
                     limits[key] = default if value is None else max(0, int(value))
                 return limits
-
-    def _enforce_material_limits(
-        self, owner_id: int, content: str = "", api_url: str = "", is_new: bool = True, material_id: int = 0
-    ) -> None:
-        if self._is_admin(owner_id):
-            return
-        limits = self._get_user_limits_dict(owner_id)
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
-                if is_new:
-                    cur.execute("SELECT COUNT(*) as cnt FROM materials WHERE owner_id = %s", (int(owner_id),))
-                    cnt = cur.fetchone()["cnt"]
-                    max_mat = limits.get("max_materials", 3)
-                    if max_mat > 0 and cnt >= max_mat:
-                        raise ValueError(f"Batas materi akun Anda telah tercapai ({max_mat} materi).")
-
-                if api_url and is_new:
-                    cur.execute(
-                        "SELECT COUNT(*) as cnt FROM materials WHERE owner_id = %s AND source_type = %s",
-                        (int(owner_id), LIVE_API_SOURCE_TYPE),
-                    )
-                    api_cnt = cur.fetchone()["cnt"]
-                    max_api = limits.get("max_live_apis", 2)
-                    if max_api > 0 and api_cnt >= max_api:
-                        raise ValueError(f"Batas API realtime akun Anda telah tercapai ({max_api} API).")
-
-                max_words = limits.get("max_words_per_material", 6000)
-                if max_words > 0 and content:
-                    words = count_text_words(content)
-                    if words > max_words:
-                        raise ValueError(f"Konten melebihi batas kata per materi ({words}/{max_words} kata).")
 
     def add_material(
         self,
@@ -1086,16 +1092,14 @@ class PostgresStore:
     ) -> int:
         if not is_live_api_category(category):
             api_url = ""
-        self._enforce_material_limits(owner_id, content=content, api_url=api_url, is_new=True)
         now = utc_now()
         api_ciphertext = encrypt_secret(api_url.strip()) if api_url.strip() else None
         s_type = kwargs.get("source_type") or (LIVE_API_SOURCE_TYPE if api_url.strip() else None)
         source_hash = kwargs.get("source_hash")
         source_key = kwargs.get("source_key")
 
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     INSERT INTO materials (
@@ -1145,13 +1149,11 @@ class PostgresStore:
     ) -> bool:
         if not is_live_api_category(category):
             api_url = ""
-        self._enforce_material_limits(owner_id, content=content, api_url=api_url, is_new=False, material_id=material_id)
         now = utc_now()
         api_ciphertext = encrypt_secret(api_url.strip()) if api_url.strip() else None
         source_type = LIVE_API_SOURCE_TYPE if api_url.strip() else None
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     UPDATE materials SET
@@ -1195,9 +1197,8 @@ class PostgresStore:
         return affected
 
     def delete_material(self, owner_id: int, material_id: int) -> bool:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute("DELETE FROM materials WHERE id = %s AND owner_id = %s", (int(material_id), int(owner_id)))
                 affected = cur.rowcount > 0
             conn.commit()
@@ -1214,9 +1215,8 @@ class PostgresStore:
         return affected
 
     def list_live_api_materials(self, owner_id: int, keyword: str = "", limit: int = 5) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     SELECT * FROM materials 
@@ -1231,9 +1231,8 @@ class PostgresStore:
     def list_material_database(
         self, owner_id: int, keyword: str = "", category: str = "", limit: int = 10
     ) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 sql = "SELECT * FROM materials WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
                 if category:
@@ -2742,7 +2741,7 @@ class PostgresStore:
             conn.commit()
 
     def list_relay_rooms(self, owner_id: int) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM relay_rooms WHERE owner_id = %s ORDER BY id ASC", (int(owner_id),))
                 rooms = cur.fetchall()
@@ -2785,44 +2784,30 @@ class PostgresStore:
     def add_relay_room(
         self, owner_id: int, nama_tempat: str, api_slug: str, api_token: str, api_client_id: str, relays: List[Dict]
     ) -> int:
-        is_admin = self._is_admin(owner_id)
-        limits = self._get_user_limits_dict(owner_id) if not is_admin else {"max_relay_rooms": 0}
-        max_rooms = limits.get("max_relay_rooms", 7)
         t_cipher = encrypt_secret(api_token.strip()) if api_token.strip() else None
         t_hash = hashlib.sha256(api_token.strip().encode()).hexdigest() if api_token.strip() else None
         now = utc_now()
-        target_slug = api_slug.strip()
+        base_slug = api_slug.strip()
+        target_slug = base_slug
 
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                # Serialize room creation per user so simultaneous requests cannot
-                # pass the quota check together and exceed the administrator limit.
-                cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (73129, int(owner_id)))
-                if not is_admin and max_rooms > 0:
-                    cur.execute("SELECT COUNT(*) AS cnt FROM relay_rooms WHERE owner_id = %s", (int(owner_id),))
-                    if cur.fetchone()["cnt"] >= max_rooms:
-                        raise ValueError(
-                            f"Batas perangkat Relay Nyata akun Anda telah tercapai ({max_rooms} ruangan). "
-                            "Hubungi admin jika ingin menambah kuota."
-                        )
-                cur.execute("SELECT 1 FROM relay_rooms WHERE api_slug = %s", (target_slug,))
-                if cur.fetchone():
-                    target_slug = f"{target_slug}-{secrets.token_hex(3)}"
-                    while True:
-                        cur.execute("SELECT 1 FROM relay_rooms WHERE api_slug = %s", (target_slug,))
-                        if not cur.fetchone():
-                            break
-                        target_slug = f"{api_slug.strip()}-{secrets.token_hex(3)}"
-
-                cur.execute(
-                    """
-                    INSERT INTO relay_rooms (owner_id, nama_tempat, api_slug, api_token_ciphertext, api_token_hash, api_client_id, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                    """,
-                    (int(owner_id), nama_tempat.strip(), target_slug, t_cipher, t_hash, api_client_id.strip(), now),
-                )
-                room_id = cur.fetchone()["id"]
+                while True:
+                    cur.execute(
+                        """
+                        INSERT INTO relay_rooms (owner_id, nama_tempat, api_slug, api_token_ciphertext,
+                                                 api_token_hash, api_client_id, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (api_slug) DO NOTHING
+                        RETURNING id
+                        """,
+                        (int(owner_id), nama_tempat.strip(), target_slug, t_cipher, t_hash, api_client_id.strip(), now),
+                    )
+                    inserted = cur.fetchone()
+                    if inserted:
+                        room_id = inserted["id"]
+                        break
+                    target_slug = f"{base_slug}-{secrets.token_hex(3)}"
                 for relay in relays:
                     cur.execute(
                         """
@@ -2842,7 +2827,7 @@ class PostgresStore:
         return room_id
 
     def get_relay_room(self, owner_id: int, room_id: int) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM relay_rooms WHERE id = %s AND owner_id = %s", (int(room_id), int(owner_id)))
                 room = cur.fetchone()
@@ -2893,12 +2878,14 @@ class PostgresStore:
 
     def update_relay_room(self, owner_id: int, room_id: int, nama_tempat: str, relays: List[Dict]) -> None:
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE relay_rooms SET nama_tempat = %s, updated_at = %s WHERE id = %s AND owner_id = %s",
                     (nama_tempat, now, int(room_id), int(owner_id)),
                 )
+                if not cur.rowcount:
+                    return
                 for relay in relays:
                     cur.execute(
                         """
@@ -2924,7 +2911,7 @@ class PostgresStore:
             conn.commit()
 
     def delete_relay_room(self, owner_id: int, room_id: int) -> bool:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM relay_rooms WHERE id = %s AND owner_id = %s", (int(room_id), int(owner_id)))
                 affected = cur.rowcount > 0
@@ -2932,7 +2919,7 @@ class PostgresStore:
         return affected
 
     def find_relay_room_by_slug(self, api_slug: str) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM relay_rooms WHERE api_slug = %s", (api_slug.strip(),))
                 room = cur.fetchone()
@@ -2951,7 +2938,7 @@ class PostgresStore:
 
     def ack_relay_command(self, owner_id: int, room_id: int, command_id: str = None) -> None:
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE relay_rooms SET updated_at = %s, device_last_seen_at = %s WHERE id = %s AND owner_id = %s",
@@ -2963,7 +2950,7 @@ class PostgresStore:
         status_clean = status.strip().upper()
         if status_clean not in ("ON", "OFF"):
             raise ValueError("Status relay harus ON atau OFF.")
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE relay_devices SET status = %s WHERE room_id = %s AND relay_number = %s",
@@ -3816,9 +3803,8 @@ class PostgresStore:
 
     def user_quota(self, owner_id: int) -> Dict[str, Any]:
         is_admin = self._is_admin(owner_id)
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id, user_role="admin" if is_admin else "user")
                 cur.execute("SELECT COUNT(*) as cnt FROM materials WHERE owner_id = %s", (int(owner_id),))
                 mat_cnt = cur.fetchone()["cnt"]
                 cur.execute(
@@ -3881,7 +3867,7 @@ class PostgresStore:
     def set_user_limits(self, target_user_id: int, **kwargs) -> Dict[str, int]:
         limits = {k: parse_limit_value(v, field=k) for k, v in kwargs.items()}
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -3922,9 +3908,8 @@ class PostgresStore:
             all_mcp_states = {}
 
         result = []
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, user_role="admin")
                 for row in rows:
                     user_id = row["id"]
                     cur.execute("SELECT COUNT(*) as cnt FROM materials WHERE owner_id = %s", (user_id,))

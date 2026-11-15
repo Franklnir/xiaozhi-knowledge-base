@@ -115,6 +115,10 @@ jobs:
             # Pull pre-built images (ZERO build on VPS!)
             docker compose pull xiaozhi gateway
 
+            # Install database policies and quota triggers before serving requests with the new image.
+            docker compose up -d --wait postgres || exit 1
+            docker compose run --rm --no-deps xiaozhi alembic upgrade head || exit 1
+
             # Ensure clean transition from standalone container to docker-compose service
             docker rm -f xiaozhi-gateway 2>/dev/null || true
 
@@ -124,9 +128,6 @@ jobs:
             # Wait for health check
             echo "Waiting for services to be healthy..."
             sleep 10
-
-            # Run Alembic migrations on PostgreSQL
-            docker compose exec -T xiaozhi alembic upgrade head || true
 
             # Verify services are running
             if docker compose ps | grep -q "xiaozhi.*Up" && docker compose ps | grep -q "xiaozhi-gateway.*Up"; then

@@ -88,7 +88,7 @@ func (s *RelayStore) GetRoomBySlug(ctx context.Context, slug string) (*RelayRoom
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.db.SetSystemContext(ctx, tx); err != nil {
+	if err := s.db.SetRelayContext(ctx, tx, 0); err != nil {
 		return nil, fmt.Errorf("gagal set system context: %w", err)
 	}
 
@@ -144,7 +144,7 @@ func (s *RelayStore) VerifyToken(room *RelayRoomInfo, token string) bool {
 }
 
 // GetRoomRelays retrieves all relay channels for a room
-func (s *RelayStore) GetRoomRelays(ctx context.Context, roomID int64) ([]RelayDeviceInfo, error) {
+func (s *RelayStore) GetRoomRelays(ctx context.Context, ownerID, roomID int64) ([]RelayDeviceInfo, error) {
 	conn, err := s.db.Pool.Acquire(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("gagal acquire database connection: %w", err)
@@ -157,7 +157,7 @@ func (s *RelayStore) GetRoomRelays(ctx context.Context, roomID int64) ([]RelayDe
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.db.SetSystemContext(ctx, tx); err != nil {
+	if err := s.db.SetRelayContext(ctx, tx, ownerID); err != nil {
 		return nil, fmt.Errorf("gagal set system context: %w", err)
 	}
 
@@ -190,7 +190,7 @@ func (s *RelayStore) GetRoomRelays(ctx context.Context, roomID int64) ([]RelayDe
 }
 
 // TouchDeviceLastSeen updates updated_at and device_last_seen_at (throttled to at most once per 4 seconds)
-func (s *RelayStore) TouchDeviceLastSeen(ctx context.Context, roomID int64) {
+func (s *RelayStore) TouchDeviceLastSeen(ctx context.Context, ownerID, roomID int64) {
 	now := time.Now()
 	s.lastSeenTouchMu.Lock()
 	lastTouch, exists := s.lastSeenTouch[roomID]
@@ -217,7 +217,7 @@ func (s *RelayStore) TouchDeviceLastSeen(ctx context.Context, roomID int64) {
 		}
 		defer tx.Rollback(bgCtx)
 
-		if err := s.db.SetSystemContext(bgCtx, tx); err != nil {
+		if err := s.db.SetRelayContext(bgCtx, tx, ownerID); err != nil {
 			return
 		}
 
@@ -228,7 +228,7 @@ func (s *RelayStore) TouchDeviceLastSeen(ctx context.Context, roomID int64) {
 }
 
 // UpdateRelayStatus updates a single relay's status in PostgreSQL
-func (s *RelayStore) UpdateRelayStatus(ctx context.Context, roomID int64, relayNum int, status string) error {
+func (s *RelayStore) UpdateRelayStatus(ctx context.Context, ownerID, roomID int64, relayNum int, status string) error {
 	statusClean := NormalizeRelayState(status)
 
 	conn, err := s.db.Pool.Acquire(ctx)
@@ -243,7 +243,7 @@ func (s *RelayStore) UpdateRelayStatus(ctx context.Context, roomID int64, relayN
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.db.SetSystemContext(ctx, tx); err != nil {
+	if err := s.db.SetRelayContext(ctx, tx, ownerID); err != nil {
 		return fmt.Errorf("system context error: %w", err)
 	}
 

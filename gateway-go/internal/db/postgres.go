@@ -58,6 +58,24 @@ func (d *DB) SetSystemContext(ctx context.Context, tx pgx.Tx) error {
 	return err
 }
 
+// SetRelayContext scopes relay transactions to the room owner.
+// A zero owner is used to resolve the room before verifying the device credential.
+func (d *DB) SetRelayContext(ctx context.Context, tx pgx.Tx, ownerID int64) error {
+	if _, err := tx.Exec(ctx, "SET LOCAL ROLE app_tenant_role"); err != nil {
+		return err
+	}
+	if ownerID == 0 {
+		return d.SetSystemContext(ctx, tx)
+	}
+	_, err := tx.Exec(ctx, `
+		SELECT set_config('app.user_id', $1, true),
+		       set_config('app.current_user_id', $1, true),
+		       set_config('app.user_role', 'user', true),
+		       set_config('app.is_admin', 'false', true);
+	`, fmt.Sprintf("%d", ownerID))
+	return err
+}
+
 // SetUserContext sets RLS session variables for a specific user
 func (d *DB) SetUserContext(ctx context.Context, tx pgx.Tx, userID int64) error {
 	_, err := tx.Exec(ctx, `

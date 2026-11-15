@@ -188,9 +188,9 @@ func (s *RelayMQTTService) handleStateMessage(topic string, payload []byte) {
 
 	// Update PostgreSQL
 	if state.Relay > 0 && state.Status != "" {
-		_ = s.relayStore.UpdateRelayStatus(ctx, room.ID, state.Relay, state.Status)
+		_ = s.relayStore.UpdateRelayStatus(ctx, room.OwnerID, room.ID, state.Relay, state.Status)
 	}
-	s.relayStore.TouchDeviceLastSeen(ctx, room.ID)
+	s.relayStore.TouchDeviceLastSeen(ctx, room.OwnerID, room.ID)
 
 	// Admin log
 	if s.sseHub != nil {
@@ -205,7 +205,7 @@ func (s *RelayMQTTService) handleStateMessage(topic string, payload []byte) {
 	}
 
 	// Notify Python Web UI (Instant SSE)
-	relays, _ := s.relayStore.GetRoomRelays(ctx, room.ID)
+	relays, _ := s.relayStore.GetRoomRelays(ctx, room.OwnerID, room.ID)
 	s.notifyPython(room.OwnerID, room.ID, room.NamaTempat, relays, true)
 }
 
@@ -226,7 +226,7 @@ func (s *RelayMQTTService) handleAvailabilityMessage(topic string, avail string)
 	}
 
 	if isOnline {
-		s.relayStore.TouchDeviceLastSeen(ctx, room.ID)
+		s.relayStore.TouchDeviceLastSeen(ctx, room.OwnerID, room.ID)
 	}
 
 	logMsg := fmt.Sprintf("[LWT] Perangkat '%s' sekarang %s", room.NamaTempat, strings.ToUpper(avail))
@@ -245,7 +245,7 @@ func (s *RelayMQTTService) handleAvailabilityMessage(topic string, avail string)
 		})
 	}
 
-	relays, _ := s.relayStore.GetRoomRelays(ctx, room.ID)
+	relays, _ := s.relayStore.GetRoomRelays(ctx, room.OwnerID, room.ID)
 	s.notifyPython(room.OwnerID, room.ID, room.NamaTempat, relays, isOnline)
 }
 
