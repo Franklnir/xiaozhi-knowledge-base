@@ -378,6 +378,46 @@ def test_last_video_summary_uses_slot_and_exact_id(test_setup):
         mcp_active_slot_ctx.reset(slot_token)
 
 
+def test_last_video_summary_fallback_to_metadata_when_subtitles_blocked(test_setup):
+    """Test Solution A fallback: When subtitles are blocked (HTTP 429) or missing,
+    get_last_youtube_video falls back to video metadata & synopsis so summary is still available."""
+    owner, store, mcp = test_setup
+    from xiaozhi.mcp.context import mcp_active_mac_ctx, mcp_active_slot_ctx
+
+    video_id = "6dKYahU4ZAM"
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    store.add_chat_history(owner, tool_name="play_confirmed_youtube_video", slot_number=1,
+                           response_payload={"success": True, "playback_queued": True, "video_id": video_id,
+                                             "title": "NGERI !! - JASAD INI SELALU BANGKIT KETIKA MALAM KERAMAT TERJADI !!"})
+    mac = "98:C3:77:A0:B0:F8"
+    slot_token = mcp_active_slot_ctx.set(1)
+    mac_token = mcp_active_mac_ctx.set(mac)
+    try:
+        mock_details = {
+            "success": True,
+            "title": "NGERI !! - JASAD INI SELALU BANGKIT KETIKA MALAM KERAMAT TERJADI !!",
+            "channel_name": "Saqahayang Movie",
+            "genre": "Hiburan & Film",
+            "topic": "Alur cerita film horor",
+            "description": "Hai guys.. film ini kan yang selama ini kalian request. Menceritakan tentang jasad yang bangkit saat malam keramat.",
+        }
+        with patch("xiaozhi.services.scraper_service.extract_youtube_transcript",
+                   return_value={"success": False, "error": "IP Blocked 429"}), \
+             patch("xiaozhi.services.scraper_service.scrape_youtube_video_details",
+                   return_value=mock_details):
+            summary = mcp.tools["get_playback_status"]("Apa kesimpulan video tadi?")
+            assert summary["success"] is True
+            assert summary["summary_available"] is True
+            assert summary["summary_source"] == "video_metadata_and_synopsis"
+            assert "NGERI !! - JASAD INI SELALU BANGKIT" in summary["transcript_excerpt"]
+            assert "Saqahayang Movie" in summary["transcript_excerpt"]
+            assert "Menceritakan tentang jasad yang bangkit" in summary["transcript_excerpt"]
+            assert "Kesimpulan isi video disediakan berdasarkan judul, channel, sinopsis" in summary["summary_message"]
+    finally:
+        mcp_active_mac_ctx.reset(mac_token)
+        mcp_active_slot_ctx.reset(slot_token)
+
+
 def test_video_selection_preserves_exact_link_id(test_setup):
     from xiaozhi.mcp.context import mcp_active_slot_ctx
 

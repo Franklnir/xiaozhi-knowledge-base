@@ -2989,7 +2989,7 @@ class PostgresStore:
     # ── Devices ────────────────────────────────────────────────────────────
 
     def get_user_mac_address(self, user_id: int) -> Optional[str]:
-        with self._get_resource_conn(owner_id) as conn:
+        with self._get_resource_conn(user_id) as conn:
             with conn.cursor() as cur:
                 # 1. Registered devices (non-detached)
                 cur.execute(

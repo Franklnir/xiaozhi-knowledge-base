@@ -2099,6 +2099,20 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         from xiaozhi.services.radio_service import explicit_radio_query, is_radio_id
         if explicit_radio_query(query) is not None:
             return play_playlist_song(query)
+
+        clean_q = (query or "").strip().lower()
+        inquiry_indicators = [
+            "cek lagu", "lagu terakhir", "tadi lagu apa", "lagu apa tadi", "lagu yang tadi",
+            "cek video", "video terakhir", "tadi video apa", "video apa tadi", "video yang tadi",
+            "cek pemutaran", "pemutaran terakhir", "status pemutaran",
+            "cek riset", "cek pencarian", "riset terakhir", "pencarian terakhir", "tadi cari apa",
+            "tadi kita cari", "apa yang tadi kita cari", "apa yang tadi kita tonton", "tadi tonton apa",
+            "tadi kita tonton apa", "lagu apa sekarang", "lagu yang sedang diputar"
+        ]
+        if any(ind in clean_q for ind in inquiry_indicators) and not any(cmd in clean_q for cmd in ["putar lagi", "mainkan lagi", "putar kembali", "mainkan kembali"]):
+            logger.info("Redirecting play_youtube_song to get_playback_status because query is an inquiry: %s", query)
+            return get_playback_status(query=clean_q)
+
         owner_id = mcp_active_owner_ctx.get()
         try:
             # 1. Cek jika user meminta playlist secara umum tanpa nomor/judul spesifik
@@ -2854,6 +2868,19 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         Args:
             query: Contoh "nomor 2", "Lofi Beat", atau "putar radio Gen FM Jakarta".
         """
+        clean_q = (query or "").strip().lower()
+        inquiry_indicators = [
+            "cek lagu", "lagu terakhir", "tadi lagu apa", "lagu apa tadi", "lagu yang tadi",
+            "cek video", "video terakhir", "tadi video apa", "video apa tadi", "video yang tadi",
+            "cek pemutaran", "pemutaran terakhir", "status pemutaran",
+            "cek riset", "cek pencarian", "riset terakhir", "pencarian terakhir", "tadi cari apa",
+            "tadi kita cari", "apa yang tadi kita cari", "apa yang tadi kita tonton", "tadi tonton apa",
+            "tadi kita tonton apa", "lagu apa sekarang", "lagu yang sedang diputar"
+        ]
+        if any(ind in clean_q for ind in inquiry_indicators) and not any(cmd in clean_q for cmd in ["putar lagi", "mainkan lagi", "putar kembali", "mainkan kembali"]):
+            logger.info("Redirecting play_playlist_song to get_playback_status because query is an inquiry: %s", query)
+            return get_playback_status(query=clean_q)
+
         owner_id = mcp_active_owner_ctx.get()
         if not owner_id:
             return {"success": False, "message": "Belum ada koneksi akun/perangkat aktif."}
@@ -3322,13 +3349,19 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         from xiaozhi.services.playback_tracker import playback_tracker
         from xiaozhi.services.youtube_playback_history import get_last_requested_video
 
-        owner, slot = mcp_active_owner_ctx.get(), mcp_active_slot_ctx.get(None)
-        if not owner or not slot:
+        owner, slot = mcp_active_owner_ctx.get(), mcp_active_slot_ctx.get(None) or 1
+        if not owner:
             return {"success": False, "message": "Sesi MCP aktif diperlukan."}
         played, requested = get_last_requested_video(store, playback_tracker, owner, slot, mcp_active_mac_ctx.get())
         video = played or requested
         if not video:
-            return {"success": False, "message": "Belum ada riwayat permintaan pemutaran video di slot ini."}
+            return {
+                "success": True,
+                "video": None,
+                "last_request": None,
+                "message": "Belum ada riwayat permintaan pemutaran video di slot ini.",
+                "instructions": "Beri tahu pengguna bahwa belum ada riwayat pemutaran video sebelumnya. JANGAN memutar lagu atau audio!",
+            }
         response = {
             "success": True, "video": video, "last_request": requested,
             "message": (
@@ -3344,8 +3377,89 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             transcript = re.split(r"(?m)(?=^\[\d+:\d{2}\])", content, maxsplit=1)
             response["transcript_excerpt"] = transcript[-1] if len(transcript) > 1 else ""
             response["summary_available"] = bool(response["transcript_excerpt"])
-            if not response["summary_available"]:
-                response["summary_message"] = "Subtitle tidak bisa dibaca. Kesimpulan video belum bisa dibuat."
+
+            if response["summary_available"]:
+                response["summary_source"] = "youtube_subtitle"
+                response["summary_message"] = "Cuplikan subtitle tersedia untuk membuat kesimpulan video."
+            else:
+                # ── SOLUSI A: FALLBACK KE METADATA & DESKRIPSI RESMI VIDEO ──
+                # Jika subtitle diblokir YouTube (HTTP 429) atau tidak memiliki CC,
+                # jangan langsung menyerah. Ambil judul, channel, kategori, sinopsis,
+                # dan deskripsi video agar pengguna tetap mendapatkan kesimpulan isi video.
+                v_title = video.get("title") or ""
+                v_channel = ""
+                v_genre = ""
+                v_topic = ""
+                v_desc = ""
+
+                try:
+                    from xiaozhi.services.scraper_service import scrape_youtube_video_details
+                    details = scrape_youtube_video_details(video["video_id"])
+                    if details.get("success"):
+                        v_title = details.get("title") or v_title
+                        v_channel = details.get("channel_name") or ""
+                        v_genre = details.get("genre") or ""
+                        v_topic = details.get("topic") or ""
+                        v_desc = (details.get("description") or "").strip()
+                except Exception as e_det:
+                    logger.debug("Failed scrape_youtube_video_details in get_last_youtube_video fallback: %s", e_det)
+
+                # Jika deskripsi masih kosong, coba ambil cepat dari YouTube watch page meta
+                if not v_desc:
+                    try:
+                        import urllib.request
+                        req_meta = urllib.request.Request(
+                            f"https://www.youtube.com/watch?v={video['video_id']}",
+                            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                        )
+                        with urllib.request.urlopen(req_meta, timeout=4) as r_meta:
+                            html_meta = r_meta.read().decode("utf-8", errors="ignore")
+                            m_sh = re.search(r'"shortDescription":"(.*?)"', html_meta)
+                            if m_sh:
+                                v_desc = m_sh.group(1).encode().decode("unicode_escape").strip()
+                            if not v_desc:
+                                m_d = re.search(r'<meta\s+name=["\']description["\']\s+content=["\'](.*?)["\']', html_meta)
+                                if m_d:
+                                    v_desc = m_d.group(1).strip()
+                    except Exception as e_m:
+                        logger.debug("Fast HTML meta fallback failed: %s", e_m)
+
+                # Jika deskripsi singkat/minimal, lengkapi konteks dengan pencarian web topik/sinopsis
+                web_context = ""
+                if len(v_desc) < 80 and v_title:
+                    try:
+                        clean_search_title = re.sub(r"[^\w\s-]", " ", v_title).strip()
+                        search_res = _deep_web_search(f"sinopsis alur cerita {clean_search_title}", max_results=2, read_content=False)
+                        if search_res.get("results"):
+                            web_snippets = [f"- {r.get('title')}: {r.get('snippet', '')}" for r in search_res["results"] if r.get("snippet")]
+                            if web_snippets:
+                                web_context = "\n".join(web_snippets[:2])
+                    except Exception as e_w:
+                        logger.debug("Web synopsis search fallback failed: %s", e_w)
+
+                summary_parts = [
+                    f"🎬 **Judul Video**: {v_title or 'Video YouTube'}",
+                ]
+                if v_channel:
+                    summary_parts.append(f"👤 **Channel / Kreator**: {v_channel}")
+                if v_genre or v_topic:
+                    summary_parts.append(f"📌 **Kategori / Topik**: {v_genre} - {v_topic}")
+                if v_desc:
+                    summary_parts.append(f"📝 **Deskripsi / Sinopsis Video**:\n{v_desc[:1500]}")
+                if web_context:
+                    summary_parts.append(f"🌐 **Konteks & Sinopsis Tambahan (Web)**:\n{web_context}")
+
+                if v_title and (v_desc or web_context or v_topic):
+                    response["transcript_excerpt"] = "\n\n".join(summary_parts)
+                    response["summary_available"] = True
+                    response["summary_source"] = "video_metadata_and_synopsis"
+                    response["summary_message"] = (
+                        "Subtitle teks langsung tidak tersedia dari YouTube (terbatas atau tidak ada CC). "
+                        "Kesimpulan isi video disediakan berdasarkan judul, channel, sinopsis, dan deskripsi resmi video."
+                    )
+                else:
+                    response["summary_available"] = False
+                    response["summary_message"] = "Subtitle tidak bisa dibaca. Kesimpulan video belum bisa dibuat."
         return response
 
     @mcp_server.tool()
