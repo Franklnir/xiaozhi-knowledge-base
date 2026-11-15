@@ -480,6 +480,25 @@
         flex-direction: column;
         gap: 8px;
         margin-top: 6px;
+        max-height: 445px;
+        overflow-y: auto;
+        padding-right: 4px;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: var(--app-border-strong) transparent;
+    }
+    .version-cards-list::-webkit-scrollbar {
+        width: 6px;
+    }
+    .version-cards-list::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .version-cards-list::-webkit-scrollbar-thumb {
+        background-color: var(--app-border-strong);
+        border-radius: 6px;
+    }
+    .version-cards-list::-webkit-scrollbar-thumb:hover {
+        background-color: var(--app-muted);
     }
     .version-option-card {
         display: flex;
@@ -492,6 +511,7 @@
         cursor: pointer;
         transition: all 0.18s ease;
         text-align: left;
+        flex-shrink: 0;
     }
     .version-option-card:hover {
         border-color: var(--app-accent, #059669);
