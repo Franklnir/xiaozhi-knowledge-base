@@ -154,3 +154,133 @@ def test_concurrent_material_creates_respect_single_remaining_place(accounts):
         results = list(pool.map(attempt, ("Materi pertama", "Materi kedua")))
     assert sorted(results) == ["blocked", "saved"]
     assert len(store.list_materials(owner)) == 1
+
+
+def test_mcp_slots_and_boards_stay_with_their_owner(accounts):
+    store, owner, other, _ = accounts
+    mac_hex = "02" + uuid4().hex[:10].upper()
+    mac = ":".join(mac_hex[i:i+2] for i in range(0, 12, 2))
+    endpoint = "wss://example.test/mcp?token=" + uuid4().hex
+    store.set_xiaozhi_token(owner, endpoint, slot=1)
+    store.set_xiaozhi_token(other, endpoint + "-other", slot=1)
+    store.set_xiaozhi_token(owner, endpoint + "-updated", slot=1)
+    assert store.get_xiaozhi_token(owner, slot=1) == endpoint + "-updated"
+    assert store.get_xiaozhi_token(other, slot=1) == endpoint + "-other"
+    assert store.bind_board_to_slot(owner, slot=1, device_mac=mac)["success"]
+    assert store.list_registered_devices(owner)
+    assert not store.bind_board_to_slot(other, slot=1, device_mac=mac)["success"]
+    assert not store.register_device(other, device_id=mac).get("success", True)
+    assert not store.detach_device(mac, owner_id=other)
+    assert not store.delete_device(other, mac)
+    with store._get_resource_conn(other) as conn:
+        for table, column in (("xiaozhi_tokens", "user_id"), ("registered_devices", "owner_id"), ("board_binding_history", "user_id")):
+            query = psycopg.sql.SQL("SELECT 1 FROM {} WHERE {} = %s").format(
+                psycopg.sql.Identifier(table), psycopg.sql.Identifier(column)
+            )
+            assert conn.execute(query, (owner,)).fetchone() is None
+
+    assert store.get_board_binding_history(user_id=owner)[0]["status"] == "ACTIVE"
+    assert store.detach_board_from_slot(owner, slot=1)["success"]
+    assert store.bind_board_to_slot(other, slot=1, device_mac=mac)["success"]
+    assert store.get_board_binding_history(user_id=owner)[0]["status"] == "DETACHED"
+    assert store.get_board_binding_history(user_id=other)[0]["status"] == "ACTIVE"
+    assert store.delete_xiaozhi_token(other, slot=1)
+    assert not store.list_registered_devices(other)
+
+
+def test_admin_settings_are_readable_only_by_owner_and_writable_by_admin(accounts):
+    from xiaozhi.services.mcp_service import get_mcp_connection_restriction
+
+    store, owner, other, _ = accounts
+    endpoint = "wss://example.test/mcp?token=" + uuid4().hex
+    store.set_xiaozhi_token(owner, endpoint, slot=1)
+    store.set_xiaozhi_token(owner, endpoint + "-two", slot=2)
+    store.set_user_access_plus(owner, mcp_multislot_allowed=False)
+    store.set_mcp_tool_toggle(owner, "search_news", False)
+    store.set_user_feature(owner, "youtube_music", False)
+    store.set_feature_setting(owner, "virtual_smarthome_enabled", False)
+    assert store.get_feature_settings(owner) == {
+        "virtual_smarthome_enabled": False, "youtube_music_enabled": False,
+    }
+    assert store.get_feature_settings(other)["youtube_music_enabled"]
+    assert get_mcp_connection_restriction(store, owner, 2)
+    assert not get_mcp_connection_restriction(store, owner, 1)
+    assert [s["slot_number"] for s in store.list_active_mcp_tokens() if s["user_id"] == owner] == [1]
+
+    store.set_mcp_blocked(owner, True, "synthetic")
+    assert get_mcp_connection_restriction(store, owner, 1)
+    assert not [s for s in store.list_active_mcp_tokens() if s["user_id"] == owner]
+    with store._get_resource_conn(other) as conn:
+        assert not conn.execute("SELECT user_id FROM feature_settings WHERE user_id = %s", (owner,)).fetchone()
+        assert not conn.execute("SELECT user_id FROM user_access_plus_settings WHERE user_id = %s", (owner,)).fetchone()
+    with store._get_resource_conn(owner) as conn:
+        assert conn.execute("UPDATE user_access_plus_settings SET mcp_multislot_allowed = TRUE").rowcount == 0
+        assert conn.execute("UPDATE mcp_tool_toggles SET enabled = TRUE").rowcount == 0
+        assert conn.execute("UPDATE mcp_user_settings SET mcp_blocked = FALSE").rowcount == 0
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        store.set_feature_setting(owner, "youtube_music_enabled", True)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        with store._get_resource_conn(owner) as conn:
+            conn.execute("UPDATE xiaozhi_tokens SET is_active = TRUE WHERE slot_number = 2")
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        store.set_xiaozhi_token(owner, endpoint + "-three", slot=3)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        with store._get_resource_conn(db_role="app_mcp_connector") as conn:
+            conn.execute("SELECT id FROM chat_history")
+
+    store.set_mcp_blocked(owner, False)
+    store.set_user_access_plus(owner, mcp_multislot_allowed=True)
+    assert not get_mcp_connection_restriction(store, owner, 2)
+    assert sorted(s["slot_number"] for s in store.list_active_mcp_tokens() if s["user_id"] == owner) == [1, 2]
+    assert store.set_user_slot_active(owner, 2, False)
+    assert store.delete_xiaozhi_token(owner, slot=2)
+    assert get_mcp_connection_restriction(store, owner, 2)
+    overview = next(account for account in store.list_access_plus_overview() if account["user_id"] == owner)
+    assert not overview["slots"][2]["is_active"] and not overview["slots"][2]["preview"]
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        store.set_xiaozhi_token(owner, endpoint + "-two", slot=2)
+    assert store.set_user_slot_active(owner, 2, True)
+    store.set_xiaozhi_token(owner, endpoint + "-two", slot=2)
+    assert not get_mcp_connection_restriction(store, owner, 2)
+
+
+def test_chat_persona_and_reminders_use_separate_account_and_worker_roles(accounts):
+    from datetime import datetime, timedelta, timezone
+
+    store, owner, other, _ = accounts
+    store.add_chat_history(owner, source="test", tool_name="test", user_message="visible slot one", slot_number=1)
+    store.add_chat_history(owner, source="test", tool_name="test", user_message="visible slot two", slot_number=2)
+    slot_history = store.list_chat_history(owner, slot_number=1)
+    assert [entry["user_message"] for entry in slot_history] == ["visible slot one"]
+    chat_id = slot_history[0]["id"]
+    assert store.get_chat_history_item(chat_id, owner)["user_message"] == "visible slot one"
+    assert store.get_chat_history_item(chat_id, other) is None
+    assert not store.delete_chat_history_item(other, chat_id)
+    assert store.delete_chat_history_item(owner, chat_id)
+    assert not store.list_chat_history(owner, slot_number=1)
+    assert not store.list_chat_history(other)
+    store.save_user_preference(owner, "test", "setting", "private value")
+    assert store.get_user_persona(owner)
+    assert not store.get_user_persona(other)
+
+    due, future = uuid4().hex, uuid4().hex
+    now = datetime.now(timezone.utc)
+    store.add_reminder(owner, due, "Due test", (now - timedelta(minutes=2)).isoformat())
+    store.add_reminder(other, future, "Future test", (now + timedelta(days=2)).isoformat())
+    with store._get_resource_conn(other) as conn:
+        assert conn.execute("UPDATE reminders SET message = 'Denied' WHERE id = %s", (due,)).rowcount == 0
+        assert conn.execute("SELECT id FROM chat_history WHERE owner_id = %s", (owner,)).fetchone() is None
+        assert conn.execute("SELECT id FROM user_persona WHERE owner_id = %s", (owner,)).fetchone() is None
+    claimed = {row["id"] for row in store.get_due_reminders()}
+    assert due in claimed and future not in claimed
+    store.mark_reminder_sent(due)
+    assert store.list_reminders(owner)[0]["status"] == "sent"
+    assert store.list_reminders(other)[0]["status"] == "pending"
+    assert not store.delete_reminder(other, due)
+    assert not store.delete_reminder(owner, future, pending_only=True)
+    with store._get_resource_conn(db_role="app_reminder_worker") as conn:
+        assert not conn.execute("SELECT id FROM reminders WHERE id IN (%s, %s)", (due, future)).fetchall()
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        with store._get_resource_conn(db_role="app_reminder_worker") as conn:
+            conn.execute("UPDATE reminders SET message = 'Denied'")
+    assert store.delete_reminder(other, future, pending_only=True)

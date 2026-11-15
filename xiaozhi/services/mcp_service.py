@@ -8,6 +8,22 @@ from xiaozhi.core.utils import utc_now
 
 logger = logging.getLogger("xiaozhi.mcp")
 
+
+def get_mcp_connection_restriction(store, owner_id: int, slot: int) -> str:
+    """Use the same account restrictions for manual connection entry points."""
+    if hasattr(store, "is_mcp_blocked") and store.is_mcp_blocked(owner_id) is True:
+        return "Koneksi MCP akun ini diblokir oleh admin."
+    if hasattr(store, "get_user_access_plus"):
+        access = store.get_user_access_plus(owner_id)
+        if slot > 1 and access.get("mcp_multislot_allowed") is False:
+            return "Slot tambahan dibatasi oleh admin melalui Akses Plus."
+        if slot in (access.get("disabled_mcp_slots") or ()):
+            return "Slot MCP ini dinonaktifkan oleh admin."
+    token_info = store.get_xiaozhi_token_info(owner_id, slot=slot)
+    if token_info and token_info.get("is_active") is False:
+        return "Slot MCP ini dinonaktifkan oleh admin."
+    return ""
+
 # ── MCP State (Maksimal 3 Slot per Akun) ─────────────────────────────────
 mcp_state_lock = RLock()
 mcp_connection_states: Dict[str, Dict[str, Any]] = {}

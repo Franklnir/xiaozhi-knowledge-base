@@ -275,6 +275,17 @@ def test_websocket_protocol_and_bridge_shutdown(monkeypatch, caplog, close_code)
         return text
 
     async def exercise():
+        loop = asyncio.get_running_loop()
+        captures_done = asyncio.Event()
+        directions = set()
+
+        def record_direction(direction):
+            directions.add(direction)
+            if directions == {"inbound", "outbound"}:
+                captures_done.set()
+
+        capture.side_effect = lambda _owner, direction, *args: loop.call_soon_threadsafe(record_direction, direction)
+
         async def peer(ws):
             to_client, from_socket = anyio.create_memory_object_stream(0)
             to_socket, from_client = anyio.create_memory_object_stream(0)
@@ -296,6 +307,7 @@ def test_websocket_protocol_and_bridge_shutdown(monkeypatch, caplog, close_code)
                         assert [tool.name for tool in (await client.list_tools()).tools] == ["echo_text"]
                         result = await client.call_tool("echo_text", {"text": "coba bridge"})
                         assert result.content[0].text == "coba bridge"
+                        await asyncio.wait_for(captures_done.wait(), timeout=2)
                 finally:
                     group.cancel_scope.cancel()
             await ws.close(code=close_code)

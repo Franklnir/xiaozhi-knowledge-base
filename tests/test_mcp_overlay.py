@@ -1,23 +1,16 @@
-import os
-import tempfile
-import pytest
-
-# Configure SQLite in-memory before importing app/factory
-temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-temp_db.close()
-os.environ["DB_BACKEND"] = "sqlite"
-os.environ["SQLITE_DB_PATH"] = temp_db.name
-
 from fastapi.testclient import TestClient
+from xiaozhi import dependencies
+from xiaozhi.database.sqlite_store import SQLiteStore
 from xiaozhi.main import app
-from xiaozhi.dependencies import get_store, session_serializer, SESSION_COOKIE
+from xiaozhi.dependencies import session_serializer, SESSION_COOKIE
 from xiaozhi.services.mcp_service import set_mcp_connection_state, mcp_connection_states
 
 client = TestClient(app, follow_redirects=True)
 
 
-def test_mcp_overlay_gating_behavior():
-    store = get_store()
+def test_mcp_overlay_gating_behavior(tmp_path, monkeypatch):
+    store = SQLiteStore(str(tmp_path / "mcp-overlay.db"))
+    monkeypatch.setattr(dependencies, "_store", store)
 
     # 1. Non-admin user without MCP connection
     non_admin = store.create_user("overlay_user", "password123")

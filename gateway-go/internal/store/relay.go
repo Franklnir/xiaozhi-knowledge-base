@@ -88,7 +88,7 @@ func (s *RelayStore) GetRoomBySlug(ctx context.Context, slug string) (*RelayRoom
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.db.SetRelayContext(ctx, tx, 0); err != nil {
+	if err := s.db.SetAccountContext(ctx, tx, 0); err != nil {
 		return nil, fmt.Errorf("gagal set system context: %w", err)
 	}
 
@@ -157,7 +157,7 @@ func (s *RelayStore) GetRoomRelays(ctx context.Context, ownerID, roomID int64) (
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.db.SetRelayContext(ctx, tx, ownerID); err != nil {
+	if err := s.db.SetAccountContext(ctx, tx, ownerID); err != nil {
 		return nil, fmt.Errorf("gagal set system context: %w", err)
 	}
 
@@ -217,7 +217,7 @@ func (s *RelayStore) TouchDeviceLastSeen(ctx context.Context, ownerID, roomID in
 		}
 		defer tx.Rollback(bgCtx)
 
-		if err := s.db.SetRelayContext(bgCtx, tx, ownerID); err != nil {
+		if err := s.db.SetAccountContext(bgCtx, tx, ownerID); err != nil {
 			return
 		}
 
@@ -243,7 +243,7 @@ func (s *RelayStore) UpdateRelayStatus(ctx context.Context, ownerID, roomID int6
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.db.SetRelayContext(ctx, tx, ownerID); err != nil {
+	if err := s.db.SetAccountContext(ctx, tx, ownerID); err != nil {
 		return fmt.Errorf("system context error: %w", err)
 	}
 

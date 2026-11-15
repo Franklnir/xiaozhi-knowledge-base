@@ -115,11 +115,13 @@ class PostgresStore:
             yield conn
 
     @contextmanager
-    def _get_resource_conn(self, owner_id: Optional[int] = None, *, role: str = "user"):
+    def _get_resource_conn(
+        self, owner_id: Optional[int] = None, *, role: str = "user", db_role: str = "app_tenant_role",
+    ):
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SET LOCAL ROLE app_tenant_role")
+                    cur.execute(sql.SQL("SET LOCAL ROLE {}").format(sql.Identifier(db_role)))
                     self.set_rls_context(cur, owner_id, user_role=role)
                 yield conn
         except psycopg.errors.CheckViolation as exc:
@@ -139,18 +141,37 @@ class PostgresStore:
                            row_security_active('public.categories') AND
                            row_security_active('public.relay_rooms') AND
                            row_security_active('public.relay_devices') AND
-                           row_security_active('public.user_limits') AS rls_active,
+                           row_security_active('public.user_limits') AND
+                           row_security_active('public.xiaozhi_tokens') AND
+                           row_security_active('public.registered_devices') AND
+                           row_security_active('public.board_binding_history') AND
+                           row_security_active('public.chat_history') AND
+                           row_security_active('public.user_persona') AND
+                           row_security_active('public.reminders') AND
+                           row_security_active('public.feature_settings') AND
+                           row_security_active('public.mcp_user_settings') AND
+                           row_security_active('public.mcp_tool_toggles') AND
+                           row_security_active('public.user_access_plus_settings') AS rls_active,
                            (SELECT COUNT(*) FROM pg_trigger
                             WHERE tgenabled IN ('O', 'A') AND
                                 ((tgrelid = 'public.materials'::regclass AND tgname = 'trg_enforce_material_quota') OR
                                  (tgrelid = 'public.relay_rooms'::regclass AND tgname = 'trg_enforce_relay_room_quota') OR
                                  (tgrelid = 'public.user_limits'::regclass AND tgname = 'trg_lock_user_limit_change'))
-                           ) AS quota_triggers
+                           ) AS quota_triggers,
+                           (SELECT COUNT(*) FROM pg_trigger WHERE tgenabled IN ('O', 'A') AND
+                               ((tgrelid = 'public.feature_settings'::regclass AND tgname = 'trg_protect_managed_features') OR
+                                (tgrelid = 'public.xiaozhi_tokens'::regclass AND tgname = 'trg_protect_managed_slot_access'))
+                           ) AS access_triggers,
+                           to_regprocedure('public.release_owned_boards(text,timestamptz)') IS NOT NULL AND
+                           to_regprocedure('public.complete_due_reminder(text,timestamptz)') IS NOT NULL AS rls_helpers,
+                           pg_has_role(session_user, 'app_mcp_connector', 'MEMBER') AND
+                           pg_has_role(session_user, 'app_reminder_worker', 'MEMBER') AS worker_roles
                     """
                 ).fetchone()
         except psycopg.Error as exc:
             raise PostgresResourceSchemaError(error) from exc
-        if not status["rls_active"] or status["quota_triggers"] != 3:
+        if (not status["rls_active"] or status["quota_triggers"] != 3
+                or status["access_triggers"] != 2 or not status["worker_roles"] or not status["rls_helpers"]):
             raise PostgresResourceSchemaError(error)
 
     @staticmethod
@@ -1271,9 +1292,8 @@ class PostgresStore:
         t_cipher = encrypt_secret(token_clean)
         now = utc_now()
         
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 # Dapatkan data eksisting di slot ini
                 cur.execute(
                     "SELECT token_hash, board_mac, device_label FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
@@ -1334,11 +1354,10 @@ class PostgresStore:
             return {"success": False, "detail": "Format MAC address tidak valid."}
         slot_num = int(slot or 1)
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute(
-                    "SELECT board_mac, device_label FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
+                    "SELECT board_mac, device_label FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s FOR UPDATE",
                     (int(owner_id), slot_num),
                 )
                 row = cur.fetchone()
@@ -1361,26 +1380,12 @@ class PostgresStore:
                 u_row = cur.fetchone()
                 username = u_row["username"] if u_row else f"user_{owner_id}"
 
-                # Validasi: Jika MAC ini sedang aktif terkunci pada slot user lain, tolak agar tidak terbajak!
-                cur.execute(
-                    """
-                    SELECT user_id, slot_number FROM xiaozhi_tokens
-                    WHERE user_id != %s AND (LOWER(board_mac) = LOWER(%s) OR LOWER(REPLACE(REPLACE(board_mac, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
-                      AND COALESCE(is_active, TRUE) = TRUE
-                    LIMIT 1
-                    """,
-                    (int(owner_id), norm_mac, norm_mac),
-                )
-                active_other = cur.fetchone()
-                if active_other:
-                    logger.warning(
-                        f"[SLOT BIND BLOCKED] Board {norm_mac} sedang aktif terkunci di slot {active_other['slot_number']} user {active_other['user_id']}. "
-                        f"Permintaan penautan oleh user {owner_id} ditolak."
-                    )
-                    return {
-                        "success": False,
-                        "detail": f"Board {norm_mac} sedang aktif tertaut pada akun user lain (ID: {active_other['user_id']}). Lepaskan terlebih dahulu dari akun tersebut.",
-                    }
+                # Cross-account claims are checked by the device service in this transaction.
+                self.set_rls_context(cur, owner_id, user_role="system")
+                claimed = self._claim_registered_board(cur, int(owner_id), norm_mac, label, "esp32", False, now, refresh_name=False)
+                self.set_rls_context(cur, owner_id)
+                if not claimed:
+                    return {"success": False, "detail": "Board masih tertaut pada akun lain. Lepaskan dari akun tersebut terlebih dahulu."}
 
                 # Kunci MAC ke slot user saat ini
                 cur.execute(
@@ -1413,18 +1418,6 @@ class PostgresStore:
                         (norm_mac, int(owner_id), username, label, slot_num, request_id or "", now, now, f"Terkunci ke Slot {slot_num} ({label})"),
                     )
 
-                # Pastikan registered_devices terhubung ke owner_id ini
-                cur.execute(
-                    """
-                    INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, is_protected, status, created_at, last_active_at)
-                    VALUES (%s, %s, %s, 'esp32', FALSE, 'ACTIVE', %s, %s)
-                    ON CONFLICT(device_id) DO UPDATE SET
-                        owner_id = EXCLUDED.owner_id,
-                        status = 'ACTIVE',
-                        last_active_at = EXCLUDED.last_active_at
-                    """,
-                    (int(owner_id), norm_mac, label, now, now),
-                )
             conn.commit()
         return {"success": True, "slot": slot_num, "board_mac": norm_mac, "label": label, "is_locked": True, "request_id": request_id}
 
@@ -1432,9 +1425,8 @@ class PostgresStore:
         """Lepaskan board MAC dari slot (memungkinkan board baru ditautkan)."""
         slot_num = int(slot or 1)
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     "SELECT board_mac, device_label FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
                     (int(owner_id), slot_num),
@@ -1461,15 +1453,7 @@ class PostgresStore:
                     (now, str(slot_num), request_id or "manual", int(owner_id), old_mac, old_mac),
                 )
                 # Lepaskan juga dari registered_devices untuk user ini
-                cur.execute(
-                    """
-                    UPDATE registered_devices
-                    SET owner_id = NULL, status = 'DETACHED', last_active_at = %s
-                    WHERE (LOWER(device_id) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
-                      AND owner_id = %s
-                    """,
-                    (now, old_mac, old_mac, int(owner_id)),
-                )
+                cur.execute("SELECT public.release_owned_boards(%s, %s::timestamptz)", (old_mac, now))
             conn.commit()
         return {"success": True, "slot": slot_num, "detached": True, "device_mac": old_mac, "request_id": request_id}
 
@@ -1478,9 +1462,8 @@ class PostgresStore:
         slot_num = int(slot or 1)
         label_clean = (device_label or "").strip()[:60] or f"Slot {slot_num}"
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     UPDATE xiaozhi_tokens
@@ -1494,9 +1477,8 @@ class PostgresStore:
         return affected
 
     def get_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None) -> Optional[str]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 if slot is not None:
                     cur.execute(
                         "SELECT token_ciphertext FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
@@ -1513,9 +1495,8 @@ class PostgresStore:
         return None
 
     def get_xiaozhi_token_info(self, owner_id: int, slot: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 if slot is not None:
                     cur.execute(
                         "SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active, created_at, updated_at FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s",
@@ -1546,9 +1527,8 @@ class PostgresStore:
 
     def list_user_xiaozhi_tokens(self, owner_id: int) -> List[Dict[str, Any]]:
         """List all active token slots (up to 3) for a specific user with board MAC lock status."""
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 cur.execute(
                     """
                     SELECT slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active, created_at, updated_at
@@ -1579,9 +1559,8 @@ class PostgresStore:
 
     def delete_xiaozhi_token(self, owner_id: int, slot: Optional[int] = None, request_id: str = "") -> bool:
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, owner_id)
                 # Dapatkan board_mac yang terhubung sebelum dihapus
                 if slot is not None:
                     cur.execute("SELECT board_mac FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s", (int(owner_id), int(slot)))
@@ -1598,15 +1577,7 @@ class PostgresStore:
                             (now, str(slot), request_id or "delete_slot", int(owner_id), b_mac, b_mac),
                         )
                         # Lepaskan juga board dari registered_devices untuk user ini
-                        cur.execute(
-                            """
-                            UPDATE registered_devices
-                            SET owner_id = NULL, status = 'DETACHED', last_active_at = %s
-                            WHERE (LOWER(device_id) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
-                              AND owner_id = %s
-                            """,
-                            (now, b_mac, b_mac, int(owner_id)),
-                        )
+                        cur.execute("SELECT public.release_owned_boards(%s, %s::timestamptz)", (b_mac, now))
                     cur.execute("DELETE FROM xiaozhi_tokens WHERE user_id = %s AND slot_number = %s", (int(owner_id), int(slot)))
                 else:
                     cur.execute("SELECT board_mac FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
@@ -1623,15 +1594,7 @@ class PostgresStore:
                                 """,
                                 (now, request_id or "delete_all", int(owner_id), b_mac, b_mac),
                             )
-                            cur.execute(
-                                """
-                                UPDATE registered_devices
-                                SET owner_id = NULL, status = 'DETACHED', last_active_at = %s
-                                WHERE (LOWER(device_id) = LOWER(%s) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = LOWER(REPLACE(REPLACE(%s, ':', ''), '-', '')))
-                                  AND owner_id = %s
-                                """,
-                                (now, b_mac, b_mac, int(owner_id)),
-                            )
+                            cur.execute("SELECT public.release_owned_boards(%s, %s::timestamptz)", (b_mac, now))
                     cur.execute("DELETE FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
                 affected = cur.rowcount > 0
                 cur.execute("SELECT COUNT(*) as cnt FROM xiaozhi_tokens WHERE user_id = %s", (int(owner_id),))
@@ -1649,9 +1612,8 @@ class PostgresStore:
     def delete_xiaozhi_token_by_hash(self, token: str) -> bool:
         t_hash = xiaozhi_token_hash(token)
         target_user_id = None
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, user_id=None, user_role="system")
                 cur.execute("SELECT user_id FROM xiaozhi_tokens WHERE token_hash = %s", (t_hash,))
                 row = cur.fetchone()
                 if row:
@@ -1661,9 +1623,8 @@ class PostgresStore:
             conn.commit()
         if target_user_id:
             try:
-                with self._get_conn() as conn:
+                with self._get_resource_conn(role="system") as conn:
                     with conn.cursor() as cur:
-                        self.set_rls_context(cur, user_id=None, user_role="system")
                         cur.execute("SELECT COUNT(*) as cnt FROM xiaozhi_tokens WHERE user_id = %s", (int(target_user_id),))
                         rem = cur.fetchone()
                         if rem and rem["cnt"] == 0:
@@ -1673,9 +1634,15 @@ class PostgresStore:
         return affected
 
     def list_xiaozhi_tokens(self) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        return self._list_xiaozhi_tokens()
+
+    def list_active_mcp_tokens(self) -> List[Dict[str, Any]]:
+        return self._list_xiaozhi_tokens(only_active=True)
+
+    def _list_xiaozhi_tokens(self, *, only_active: bool = False) -> List[Dict[str, Any]]:
+        scope = self._get_resource_conn(db_role="app_mcp_connector") if only_active else self._get_resource_conn(role="admin")
+        with scope as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, user_id=None, user_role="system")
                 cur.execute("SELECT user_id, slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active FROM xiaozhi_tokens ORDER BY user_id, slot_number")
                 rows = cur.fetchall()
         result = []
@@ -1697,9 +1664,8 @@ class PostgresStore:
         if not token:
             return None
         t_hash = xiaozhi_token_hash(token)
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
-                self.set_rls_context(cur, user_id=None, user_role="system")
                 cur.execute(
                     """
                     SELECT u.*, t.slot_number, t.device_label FROM users u
@@ -1734,7 +1700,7 @@ class PostgresStore:
         clean_mac = (device_mac or "").strip().upper()
         clean_req_id = (request_id or "").strip()
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 # Scoped turbo: logging can tolerate async commit without threatening integrity of core tables
                 cur.execute("SET LOCAL synchronous_commit = off;")
@@ -1813,7 +1779,7 @@ class PostgresStore:
 
         # If we have an answer but no user_message, attempt to merge with the latest pending message without answer
         if xiaozhi_answer and not user_message:
-            with self._get_conn() as conn:
+            with self._get_resource_conn(owner_id) as conn:
                 with conn.cursor() as cur:
                     if slot_num == 1:
                         cur.execute(
@@ -1895,7 +1861,7 @@ class PostgresStore:
         device_mac: str = "",
         strict_slot: bool = False,
     ) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 sql = "SELECT * FROM chat_history WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
@@ -1950,7 +1916,7 @@ class PostgresStore:
                 return rows
 
     def chat_history_dates(self, owner_id: int, token_hash: str = "", slot_number: Optional[int] = None) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 sql = """
                     SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COUNT(*) as count
@@ -1972,7 +1938,7 @@ class PostgresStore:
                 return [dict(r) for r in cur.fetchall()]
 
     def chat_history_stats(self, owner_id: int, token_hash: str = "", date: str = "", slot_number: Optional[int] = None) -> Dict[str, Any]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 sql = "SELECT COUNT(*) as total FROM chat_history WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
@@ -1994,7 +1960,7 @@ class PostgresStore:
                 return {"total": total, "total_calls": total}
 
     def clear_chat_history(self, owner_id: int, slot_number: Optional[int] = None) -> int:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 if slot_number is None:
                     cur.execute("DELETE FROM chat_history WHERE owner_id = %s", (int(owner_id),))
@@ -2008,7 +1974,7 @@ class PostgresStore:
         return count
 
     def get_chat_history_item(self, chat_id: int, owner_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id, role="admin" if owner_id is None else "user") as conn:
             with conn.cursor() as cur:
                 sql = "SELECT * FROM chat_history WHERE id = %s"
                 params: List[Any] = [int(chat_id)]
@@ -2019,8 +1985,7 @@ class PostgresStore:
                 row = cur.fetchone()
                 if not row:
                     return None
-                cols = [desc[0] for desc in cur.description]
-                return dict(zip(cols, row))
+                return dict(row)
 
     def find_chat_compaction_candidates(
         self,
@@ -2029,7 +1994,7 @@ class PostgresStore:
         limit: int = 50,
         owner_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id, role="admin" if owner_id is None else "user") as conn:
             with conn.cursor() as cur:
                 sql = '''
                     SELECT id, owner_id, slot_number, tool_name, request_payload, response_payload, created_at
@@ -2048,8 +2013,7 @@ class PostgresStore:
                 sql += " ORDER BY id ASC LIMIT %s"
                 params.append(int(limit))
                 cur.execute(sql, params)
-                cols = [desc[0] for desc in cur.description]
-                return [dict(zip(cols, row)) for row in cur.fetchall()]
+                return [dict(row) for row in cur.fetchall()]
 
     def update_chat_payloads(
         self,
@@ -2058,7 +2022,7 @@ class PostgresStore:
         request_payload: Optional[Any] = None,
         response_payload: Optional[Any] = None,
     ) -> bool:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 updates = []
                 params: List[Any] = []
@@ -2077,7 +2041,7 @@ class PostgresStore:
                 return cur.rowcount > 0
 
     def delete_chat_history_item(self, owner_id: int, chat_id: int) -> bool:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM chat_history WHERE id = %s AND owner_id = %s", (int(chat_id), int(owner_id)))
                 count = cur.rowcount
@@ -2098,7 +2062,7 @@ class PostgresStore:
 
         activity: Dict[int, Dict[str, Any]] = {}
 
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 # 1. Chat history (tools, MCP, voice queries)
                 sql_chat = """
@@ -2256,7 +2220,7 @@ class PostgresStore:
             else:
                 return "pending", "ANTREAN", "Dalam antrean pemutaran"
 
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 # 1. User map
                 cur.execute("SELECT id, username, google_email, role FROM users;")
@@ -2644,7 +2608,7 @@ class PostgresStore:
         val_clean = str(preference_value or "").strip()
         conf_val = max(0.1, min(float(confidence or 1.0), 1.0))
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -2670,7 +2634,7 @@ class PostgresStore:
         }
 
     def get_user_persona(self, owner_id: int, category: str = "") -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 sql = "SELECT * FROM user_persona WHERE owner_id = %s"
                 params: List[Any] = [int(owner_id)]
@@ -2688,7 +2652,7 @@ class PostgresStore:
                 return rows
 
     def delete_user_preference(self, owner_id: int, preference_key: str) -> bool:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM user_persona WHERE owner_id = %s AND preference_key = %s", (int(owner_id), preference_key.strip()))
                 affected = cur.rowcount > 0
@@ -3025,7 +2989,7 @@ class PostgresStore:
     # ── Devices ────────────────────────────────────────────────────────────
 
     def get_user_mac_address(self, user_id: int) -> Optional[str]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 # 1. Registered devices (non-detached)
                 cur.execute(
@@ -3047,7 +3011,7 @@ class PostgresStore:
                 return None
 
     def list_registered_devices(self, owner_id: int) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT * FROM registered_devices WHERE owner_id = %s ORDER BY created_at DESC",
@@ -3064,7 +3028,7 @@ class PostgresStore:
         norm = normalize_mac_address(device_id)
         if norm in PROTECTED_DEVICE_MACS:
             return True
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT is_protected FROM registered_devices WHERE LOWER(device_id) = %s LIMIT 1",
@@ -3072,6 +3036,44 @@ class PostgresStore:
                 )
                 row = cur.fetchone()
                 return bool(row and row.get("is_protected"))
+
+    @staticmethod
+    def _claim_registered_board(cur, owner_id, mac, name, device_type, protected, now, *, refresh_name=True):
+        cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", ("board:" + mac,))
+        cur.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM xiaozhi_tokens
+                WHERE user_id != %s AND is_active
+                  AND LOWER(TRANSLATE(board_mac, ':-', '')) = LOWER(TRANSLATE(%s, ':-', ''))
+            ) OR EXISTS (
+                SELECT 1 FROM registered_devices
+                WHERE owner_id != %s AND status IS DISTINCT FROM 'DETACHED'
+                  AND LOWER(TRANSLATE(device_id, ':-', '')) = LOWER(TRANSLATE(%s, ':-', ''))
+            ) AS owned_by_other
+            """,
+            (owner_id, mac, owner_id, mac),
+        )
+        if cur.fetchone()["owned_by_other"]:
+            return None
+        cur.execute(
+            """
+            INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, is_protected, status, created_at, last_active_at)
+            VALUES (%s, %s, %s, %s, %s, 'ACTIVE', %s, %s)
+            ON CONFLICT(device_id) DO UPDATE SET
+                owner_id = EXCLUDED.owner_id,
+                device_name = CASE WHEN %s THEN EXCLUDED.device_name ELSE registered_devices.device_name END,
+                device_type = CASE WHEN %s THEN EXCLUDED.device_type ELSE registered_devices.device_type END,
+                is_protected = EXCLUDED.is_protected OR registered_devices.is_protected,
+                status = 'ACTIVE',
+                last_active_at = EXCLUDED.last_active_at
+            WHERE registered_devices.owner_id IS NULL OR registered_devices.owner_id = EXCLUDED.owner_id
+                OR registered_devices.status = 'DETACHED'
+            RETURNING id, is_protected
+            """,
+            (owner_id, mac, name, device_type, protected, now, now, refresh_name, refresh_name),
+        )
+        return cur.fetchone()
 
     def register_device(
         self, owner_id: int, device_id: str = "", mac_address: str = "", name: str = "", device_name: str = "", device_type: str = "", notes: str = ""
@@ -3086,48 +3088,17 @@ class PostgresStore:
         now = utc_now()
         hist_notes = notes.strip() if notes else "Tautan aktif (Device Registered)"
 
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
                 # 1. Ambil username untuk audit history
                 cur.execute("SELECT username FROM users WHERE id = %s", (int(owner_id),))
                 u_row = cur.fetchone()
                 username = u_row["username"] if u_row else f"user_{owner_id}"
 
-                # 2. Cek apakah board sebelumnya tertaut ke user lain
-                cur.execute("SELECT id, owner_id, status, is_protected FROM registered_devices WHERE LOWER(device_id) = %s", (normalized_id.lower(),))
-                existing = cur.fetchone()
-                if existing:
-                    prev_owner = existing.get("owner_id")
-                    if prev_owner and int(prev_owner) != int(owner_id) and existing.get("status") != "DETACHED":
-                        logger.warning(
-                            f"[DEVICE HIJACK PREVENTED] Board {normalized_id} sudah dimiliki user {prev_owner}. "
-                            f"Menolak pendaftaran oleh user {owner_id}."
-                        )
-                        return {
-                            "id": existing.get("id"),
-                            "owner_id": prev_owner,
-                            "device_id": normalized_id,
-                            "success": False,
-                            "detail": f"Perangkat {normalized_id} sudah terdaftar pada user {prev_owner}. Lepaskan terlebih dahulu dari akun lama.",
-                        }
-
-                # 3. Upsert registered_devices
-                cur.execute(
-                    """
-                    INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, is_protected, status, created_at, last_active_at)
-                    VALUES (%s, %s, %s, %s, %s, 'ACTIVE', %s, %s)
-                    ON CONFLICT(device_id) DO UPDATE SET
-                        owner_id = EXCLUDED.owner_id,
-                        device_name = EXCLUDED.device_name,
-                        device_type = EXCLUDED.device_type,
-                        is_protected = CASE WHEN EXCLUDED.is_protected OR registered_devices.is_protected THEN TRUE ELSE FALSE END,
-                        status = 'ACTIVE',
-                        last_active_at = EXCLUDED.last_active_at
-                    RETURNING id, is_protected
-                    """,
-                    (int(owner_id), normalized_id, dev_name, dev_type, is_protected, now, now),
-                )
-                ret_row = cur.fetchone()
+                ret_row = self._claim_registered_board(cur, int(owner_id), normalized_id, dev_name, dev_type, is_protected, now)
+                if not ret_row:
+                    return {"success": False, "device_id": normalized_id, "detail": "Perangkat masih tertaut pada akun lain."}
+                self.set_rls_context(cur, owner_id)
                 dev_db_id = ret_row["id"]
                 final_is_protected = ret_row["is_protected"]
 
@@ -3168,9 +3139,9 @@ class PostgresStore:
         if not normalized_id:
             return False
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id, role="admin" if owner_id is None else "user") as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT id, owner_id FROM registered_devices WHERE LOWER(device_id) = %s", (normalized_id.lower(),))
+                cur.execute("SELECT id, owner_id FROM registered_devices WHERE LOWER(device_id) = %s FOR UPDATE", (normalized_id.lower(),))
                 dev = cur.fetchone()
                 if not dev:
                     return False
@@ -3183,28 +3154,35 @@ class PostgresStore:
                     """
                     UPDATE board_binding_history
                     SET status = 'DETACHED', unlinked_at = %s, notes = %s
-                    WHERE LOWER(device_mac) = %s AND status = 'ACTIVE'
+                    WHERE LOWER(device_mac) = %s AND user_id = %s AND status = 'ACTIVE'
                     """,
-                    (now, reason, normalized_id.lower()),
+                    (now, reason, normalized_id.lower(), dev_owner),
                 )
 
                 # Pisahkan dari user: set owner_id = NULL (JANGAN PERNAH HAPUS ROW-NYA!)
-                cur.execute(
-                    """
-                    UPDATE registered_devices 
-                    SET owner_id = NULL, status = 'DETACHED', last_active_at = %s
-                    WHERE LOWER(device_id) = %s
-                    """,
-                    (now, normalized_id.lower()),
-                )
-                affected = cur.rowcount > 0
+                if owner_id is not None:
+                    cur.execute(
+                        "SELECT public.release_owned_boards(%s, %s::timestamptz) AS affected",
+                        (normalized_id, now),
+                    )
+                    affected = cur.fetchone()["affected"] > 0
+                else:
+                    cur.execute(
+                        """
+                        UPDATE registered_devices
+                        SET owner_id = NULL, status = 'DETACHED', last_active_at = %s
+                        WHERE id = %s
+                        """,
+                        (now, dev["id"]),
+                    )
+                    affected = cur.rowcount > 0
             conn.commit()
         return affected
 
     def detach_user_devices(self, user_id: int, reason: str = "MCP diputuskan") -> List[str]:
         now = utc_now()
         detached_macs = []
-        with self._get_conn() as conn:
+        with self._get_resource_conn(user_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT device_id FROM registered_devices WHERE owner_id = %s", (int(user_id),))
                 devices = cur.fetchall()
@@ -3220,14 +3198,7 @@ class PostgresStore:
                         (now, reason, mac.lower(), int(user_id)),
                     )
                 if detached_macs:
-                    cur.execute(
-                        """
-                        UPDATE registered_devices 
-                        SET owner_id = NULL, status = 'DETACHED', last_active_at = %s
-                        WHERE owner_id = %s
-                        """,
-                        (now, int(user_id)),
-                    )
+                    cur.execute("SELECT public.release_owned_boards(%s, %s::timestamptz)", (None, now))
             conn.commit()
         return detached_macs
 
@@ -3240,15 +3211,15 @@ class PostgresStore:
             return self.detach_device(normalized_id, owner_id=owner_id, reason="Perangkat terlindungi (protected) - dipisahkan bukan dihapus")
 
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     UPDATE board_binding_history
                     SET status = 'DETACHED', unlinked_at = %s, notes = %s
-                    WHERE LOWER(device_mac) = %s AND status = 'ACTIVE'
+                    WHERE LOWER(device_mac) = %s AND user_id = %s AND status = 'ACTIVE'
                     """,
-                    (now, "Device dihapus dari sistem", normalized_id.lower()),
+                    (now, "Device dihapus dari sistem", normalized_id.lower(), int(owner_id)),
                 )
                 cur.execute(
                     "DELETE FROM registered_devices WHERE LOWER(device_id) = %s AND owner_id = %s",
@@ -3263,7 +3234,7 @@ class PostgresStore:
         if not norm:
             return
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id, role="system" if owner_id is None else "user") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE registered_devices SET last_active_at = %s WHERE LOWER(device_id) = %s",
@@ -3302,7 +3273,7 @@ class PostgresStore:
             device_mac = ""
         target_slot = slot_number if slot_number is not None else slot
 
-        with self._get_conn() as conn:
+        with self._get_resource_conn(user_id, role="admin" if user_id is None else "user") as conn:
             with conn.cursor() as cur:
                 sql = """
                     SELECT 
@@ -3411,7 +3382,7 @@ class PostgresStore:
         norm = normalize_mac_address(device_mac) or str(device_mac).strip()
         clean = norm.replace(":", "").replace("-", "").lower()
 
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
                 # 1. Cek xiaozhi_tokens aktif
                 cur.execute(
@@ -3482,7 +3453,7 @@ class PostgresStore:
         return self.get_board_binding_history(user_id=int(user_id))
 
     def list_all_devices(self) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -3506,7 +3477,7 @@ class PostgresStore:
     def find_device_by_id(self, device_id: str) -> Optional[Dict[str, Any]]:
         if not device_id:
             return None
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM registered_devices WHERE LOWER(device_id) = %s", (device_id.lower().strip(),))
                 return cur.fetchone()
@@ -3518,7 +3489,7 @@ class PostgresStore:
         clean = raw.replace(":", "").replace("-", "")
         parts = [clean[i:i+2] for i in range(0, len(clean), 2)] if len(clean) == 12 else []
         with_colons = ":".join(parts) if parts else raw
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -3593,7 +3564,7 @@ class PostgresStore:
         norm_mac = normalize_mac_address(device_mac)
         if not norm_mac:
             return None
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -3615,7 +3586,7 @@ class PostgresStore:
         dalam kurun waktu N menit terakhir, dengan verifikasi bahwa user tersebut memiliki slot yang belum terisi board lain.
         """
         clean_mac = normalize_mac_address(device_mac) if device_mac else ""
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="system") as conn:
             with conn.cursor() as cur:
                 # 1. Cari kandidat user yang baru saja memanggil tool MCP
                 cur.execute(
@@ -3764,7 +3735,7 @@ class PostgresStore:
     # ── Feature Settings & Quota ───────────────────────────────────────────
 
     def get_feature_settings(self, owner_id: int) -> Dict[str, Any]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM feature_settings WHERE user_id = %s", (int(owner_id),))
                 row = cur.fetchone()
@@ -3775,10 +3746,10 @@ class PostgresStore:
                     "youtube_music_enabled": bool(row["youtube_music_enabled"]),
                 }
 
-    def set_feature_setting(self, owner_id: int, key: str, value: bool) -> None:
+    def set_feature_setting(self, owner_id: int, key: str, value: bool, *, admin: bool = False) -> None:
         if key not in ("virtual_smarthome_enabled", "youtube_music_enabled"):
             raise ValueError(f"Feature setting '{key}' tidak dikenali.")
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id, role="admin" if admin else "user") as conn:
             with conn.cursor() as cur:
                 query = sql.SQL("""
                     INSERT INTO feature_settings (user_id, {field}, updated_at)
@@ -3799,7 +3770,7 @@ class PostgresStore:
 
     def set_user_feature(self, owner_id: int, feature: str, enabled: bool) -> None:
         key = f"{feature}_enabled"
-        self.set_feature_setting(owner_id, key, enabled)
+        self.set_feature_setting(owner_id, key, enabled, admin=True)
 
     def user_quota(self, owner_id: int) -> Dict[str, Any]:
         is_admin = self._is_admin(owner_id)
@@ -4020,7 +3991,7 @@ class PostgresStore:
 
     def add_reminder(self, owner_id: int, reminder_id: str, message: str, scheduled_at: str) -> Dict[str, Any]:
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -4040,7 +4011,7 @@ class PostgresStore:
         }
 
     def list_reminders(self, owner_id: int) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM reminders WHERE owner_id = %s ORDER BY scheduled_at ASC", (int(owner_id),))
                 rows = [dict(r) for r in cur.fetchall()]
@@ -4050,7 +4021,7 @@ class PostgresStore:
                 return rows
 
     def delete_reminder(self, owner_id: int, reminder_id: str, *, pending_only: bool = False) -> bool:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(owner_id) as conn:
             with conn.cursor() as cur:
                 sql = "DELETE FROM reminders WHERE id = %s AND owner_id = %s"
                 if pending_only:
@@ -4062,7 +4033,7 @@ class PostgresStore:
 
     def get_due_reminders(self) -> List[Dict[str, Any]]:
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(db_role="app_reminder_worker") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE reminders SET status = 'processing' "
@@ -4077,15 +4048,15 @@ class PostgresStore:
         return sorted(reminders, key=lambda row: row["scheduled_at"])
 
     def mark_reminder_sent(self, reminder_id: str) -> None:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(db_role="app_reminder_worker") as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE reminders SET status = 'sent', sent_at = %s WHERE id = %s", (utc_now(), reminder_id))
+                cur.execute("SELECT public.complete_due_reminder(%s, %s::timestamptz)", (reminder_id, utc_now()))
             conn.commit()
 
     # ── MCP User Settings & Toggles ────────────────────────────────────────
 
     def get_mcp_settings(self, user_id: int) -> Dict[str, Any]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(user_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM mcp_user_settings WHERE user_id = %s", (int(user_id),))
                 row = cur.fetchone()
@@ -4100,7 +4071,7 @@ class PostgresStore:
 
     def set_mcp_blocked(self, user_id: int, blocked: bool, reason: str = "") -> None:
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -4117,21 +4088,21 @@ class PostgresStore:
             conn.commit()
 
     def is_mcp_blocked(self, user_id: int) -> bool:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(user_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT mcp_blocked FROM mcp_user_settings WHERE user_id = %s", (int(user_id),))
                 row = cur.fetchone()
                 return bool(row["mcp_blocked"]) if row else False
 
     def get_mcp_tool_toggles(self, user_id: int) -> Dict[str, bool]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(user_id) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT tool_name, enabled FROM mcp_tool_toggles WHERE user_id = %s", (int(user_id),))
                 return {row["tool_name"]: bool(row["enabled"]) for row in cur.fetchall()}
 
     def set_mcp_tool_toggle(self, user_id: int, tool_name: str, enabled: bool) -> None:
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -4146,7 +4117,7 @@ class PostgresStore:
             conn.commit()
 
     def is_mcp_tool_enabled(self, user_id: int, tool_name: str) -> bool:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(user_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT enabled FROM mcp_tool_toggles WHERE user_id = %s AND tool_name = %s",
@@ -4157,7 +4128,7 @@ class PostgresStore:
 
     def get_all_mcp_settings_for_admin(self) -> List[Dict[str, Any]]:
         """Get MCP settings for all users (admin view)."""
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT u.id as user_id, u.username,
@@ -4648,10 +4619,10 @@ class PostgresStore:
     # ── Akses Plus Management (Multi-Slot & Playlist Quotas) ───────────────────
 
     def get_user_access_plus(self, user_id: int) -> Dict[str, Any]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(user_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT mcp_multislot_allowed, playlist_quota_enabled, max_playlist_tracks, notes, updated_at FROM user_access_plus_settings WHERE user_id = %s",
+                    "SELECT mcp_multislot_allowed, playlist_quota_enabled, max_playlist_tracks, disabled_mcp_slots, notes, updated_at FROM user_access_plus_settings WHERE user_id = %s",
                     (int(user_id),),
                 )
                 row = cur.fetchone()
@@ -4661,6 +4632,7 @@ class PostgresStore:
                         "mcp_multislot_allowed": True,
                         "playlist_quota_enabled": False,
                         "max_playlist_tracks": 15,
+                        "disabled_mcp_slots": [],
                         "notes": "",
                     }
                 return {
@@ -4668,6 +4640,7 @@ class PostgresStore:
                     "mcp_multislot_allowed": bool(row["mcp_multislot_allowed"]),
                     "playlist_quota_enabled": bool(row["playlist_quota_enabled"]),
                     "max_playlist_tracks": int(row["max_playlist_tracks"] or 15),
+                    "disabled_mcp_slots": row["disabled_mcp_slots"],
                     "notes": row.get("notes") or "",
                 }
 
@@ -4686,7 +4659,7 @@ class PostgresStore:
         new_max_tracks = current["max_playlist_tracks"] if max_playlist_tracks is None else int(max_playlist_tracks)
         new_notes = current["notes"] if notes is None else str(notes).strip()
 
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -4702,16 +4675,15 @@ class PostgresStore:
                     (int(user_id), new_multislot, new_quota_enabled, new_max_tracks, new_notes, now, now),
                 )
                 
-                # Apply multislot flag on xiaozhi_tokens
-                if not new_multislot:
+                if mcp_multislot_allowed is not None:
                     cur.execute(
-                        "UPDATE xiaozhi_tokens SET is_active = FALSE, updated_at = %s WHERE user_id = %s AND slot_number IN (2, 3)",
-                        (now, int(user_id)),
-                    )
-                else:
-                    cur.execute(
-                        "UPDATE xiaozhi_tokens SET is_active = TRUE, updated_at = %s WHERE user_id = %s AND slot_number IN (2, 3)",
-                        (now, int(user_id)),
+                        """
+                        UPDATE xiaozhi_tokens t
+                        SET is_active = (%s AND NOT (t.slot_number = ANY(a.disabled_mcp_slots))), updated_at = %s
+                        FROM user_access_plus_settings a
+                        WHERE t.user_id = %s AND a.user_id = t.user_id AND t.slot_number IN (2, 3)
+                        """,
+                        (new_multislot, now, int(user_id)),
                     )
 
                 # Apply playlist quota on user_playlists
@@ -4740,16 +4712,34 @@ class PostgresStore:
         }
 
     def set_user_slot_active(self, user_id: int, slot: int, is_active: bool) -> bool:
+        if slot not in (1, 2, 3):
+            return False
         now = utc_now()
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE xiaozhi_tokens SET is_active = %s, updated_at = %s WHERE user_id = %s AND slot_number = %s",
+                    """
+                    INSERT INTO user_access_plus_settings (user_id, disabled_mcp_slots)
+                    VALUES (%s, %s::smallint[])
+                    ON CONFLICT (user_id) DO UPDATE SET
+                        disabled_mcp_slots = CASE WHEN %s THEN array_remove(user_access_plus_settings.disabled_mcp_slots, %s::smallint)
+                            ELSE array_append(array_remove(user_access_plus_settings.disabled_mcp_slots, %s::smallint), %s::smallint)
+                        END,
+                        updated_at = %s
+                    """,
+                    (int(user_id), [] if is_active else [slot], is_active, slot, slot, slot, now),
+                )
+                cur.execute(
+                    """
+                    UPDATE xiaozhi_tokens t
+                    SET is_active = (%s AND (t.slot_number = 1 OR a.mcp_multislot_allowed)), updated_at = %s
+                    FROM user_access_plus_settings a
+                    WHERE t.user_id = %s AND t.slot_number = %s AND a.user_id = t.user_id
+                    """,
                     (bool(is_active), now, int(user_id), int(slot)),
                 )
-                affected = cur.rowcount > 0
             conn.commit()
-        return affected
+        return True
 
     def set_user_playlist_track_active(self, user_id: int, track_id: int, is_active: bool) -> bool:
         now = utc_now()
@@ -4774,7 +4764,7 @@ class PostgresStore:
                 return int(row["cnt"]) if row else 0
 
     def list_access_plus_overview(self) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+        with self._get_resource_conn(role="admin") as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT id, username, role, google_email, firebase_email, created_at FROM users WHERE role != 'admin' ORDER BY id ASC")
                 users = [dict(r) for r in cur.fetchall()]
@@ -4823,6 +4813,14 @@ class PostgresStore:
                 }
 
             has_multislot = len(u_tokens) > 1 or 2 in slot_map or 3 in slot_map
+            disabled_slots = plus_cfg.get("disabled_mcp_slots") or []
+            for slot_number in disabled_slots:
+                slot_map.setdefault(slot_number, {
+                    "slot_number": slot_number,
+                    "device_label": f"Slot {slot_number}",
+                    "preview": "",
+                    "is_active": False,
+                })
             mcp_multislot_allowed = bool(plus_cfg.get("mcp_multislot_allowed", True))
             playlist_quota_enabled = bool(plus_cfg.get("playlist_quota_enabled", False))
             max_playlist_tracks = int(plus_cfg.get("max_playlist_tracks", 15) or 15)
@@ -4846,7 +4844,7 @@ class PostgresStore:
                     "active_tracks": int(pl_stats["active_tracks"]),
                     "disabled_tracks": int(pl_stats["disabled_tracks"]),
                 },
-                "is_restricted": (not mcp_multislot_allowed) or playlist_quota_enabled,
+                "is_restricted": (not mcp_multislot_allowed) or playlist_quota_enabled or bool(disabled_slots),
             })
         return result
 

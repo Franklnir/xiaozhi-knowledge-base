@@ -16,6 +16,7 @@ from xiaozhi.dependencies import (
     render,
 )
 from xiaozhi.services.mcp_service import (
+    get_mcp_connection_restriction,
     clear_mcp_state,
     is_mcp_connected,
     mcp_bridge_tasks,
@@ -116,15 +117,9 @@ async def save_mcp(
     if slot_num < 1 or slot_num > 3:
         return JSONResponse({"success": False, "request_id": req_id, "detail": "Slot token hanya diizinkan antara 1 sampai 3."}, status_code=400)
 
-    # Cek pembatasan multi-slot Akses Plus
-    if slot_num in (2, 3) and hasattr(store, "get_user_access_plus"):
-        plus_cfg = store.get_user_access_plus(user["id"])
-        if not plus_cfg.get("mcp_multislot_allowed", True):
-            return JSONResponse({
-                "success": False,
-                "request_id": req_id,
-                "detail": "Fitur multi-slot (Slot 2 & 3) dibatasi oleh Admin. Silakan hubungi admin untuk membuka paket langganan Akses Plus."
-            }, status_code=403)
+    restriction = get_mcp_connection_restriction(store, user["id"], slot_num)
+    if restriction:
+        return JSONResponse({"success": False, "request_id": req_id, "detail": restriction}, status_code=403)
     
     label_clean = (device_label or "").strip()[:60] or (f"{user.get('username')} - Slot 1" if slot_num == 1 else f"XiaoZhi {slot_num}")
     from xiaozhi.mcp.bridge import reset_bridge_failure, run_mcp_bridge, validate_mcp_ws_url
@@ -262,15 +257,11 @@ async def reconnect_mcp(
     store = get_store()
     validate_csrf(request, csrf_token, user)
     slot_num = int(slot or 1)
-    # Cek pembatasan multi-slot Akses Plus
-    if slot_num in (2, 3) and hasattr(store, "get_user_access_plus"):
-        plus_cfg = store.get_user_access_plus(user["id"])
-        if not plus_cfg.get("mcp_multislot_allowed", True):
-            return JSONResponse({
-                "success": False,
-                "request_id": req_id,
-                "detail": "Slot ini dinonaktifkan oleh Admin. Silakan hubungi admin untuk membuka paket langganan Akses Plus."
-            }, status_code=403)
+    if slot_num < 1 or slot_num > 3:
+        return JSONResponse({"success": False, "request_id": req_id, "detail": "Slot harus bernilai antara 1 sampai 3."}, status_code=400)
+    restriction = get_mcp_connection_restriction(store, user["id"], slot_num)
+    if restriction:
+        return JSONResponse({"success": False, "request_id": req_id, "detail": restriction}, status_code=403)
 
     if not store.get_xiaozhi_token(user["id"], slot=slot_num):
         return JSONResponse({"success": False, "request_id": req_id, "detail": f"Endpoint Slot {slot_num} belum tersimpan."}, status_code=400)

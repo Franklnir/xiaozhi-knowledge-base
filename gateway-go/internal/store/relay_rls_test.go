@@ -10,7 +10,7 @@ import (
 	"gateway-go/internal/db"
 )
 
-func TestRelayStoreRespectsOwnerRLS(t *testing.T) {
+func TestAccountStoresRespectOwnerRLS(t *testing.T) {
 	dsn := os.Getenv("XIAOZHI_TEST_POSTGRES_DSN")
 	if dsn == "" {
 		t.Skip("Set XIAOZHI_TEST_POSTGRES_DSN to a separate migrated test database.")
@@ -79,4 +79,45 @@ func TestRelayStoreRespectsOwnerRLS(t *testing.T) {
 	if relays, err := store.GetRoomRelays(ctx, owners[0], roomID); err != nil || len(relays) != 1 || relays[0].Status != "ON" {
 		t.Fatalf("Owner relay status update failed: %+v, %v", relays, err)
 	}
+
+	t.Run("ESP32 ownership", func(t *testing.T) {
+		mac := NormalizeMAC(fmt.Sprintf("02%010x", suffix&0xffffffffff))
+		if _, err := database.Pool.Exec(ctx, `
+			INSERT INTO registered_devices (owner_id, device_id, device_name, device_type, status, last_active_at)
+			VALUES ($1, $2, 'Synthetic ESP32', 'esp32', 'ACTIVE', NOW() - INTERVAL '1 day')
+		`, owners[0], mac); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			cleanupCtx, release := context.WithTimeout(context.Background(), 5*time.Second)
+			defer release()
+			if _, err := database.Pool.Exec(cleanupCtx, "DELETE FROM registered_devices WHERE device_id = $1", mac); err != nil {
+				t.Error(err)
+			}
+		})
+		devices := NewDeviceStore(database)
+		owner, err := devices.ResolveOwner(ctx, "", mac)
+		if err != nil || owner != owners[0] {
+			t.Fatalf("Device resolution failed: %v", err)
+		}
+		infoOwner, name, _ := devices.GetDeviceInfo(ctx, mac)
+		if infoOwner != owners[0] || name != "Synthetic ESP32" {
+			t.Fatal("Device information could not be read by the service")
+		}
+		for _, account := range []struct {
+			id      int64
+			updated bool
+		}{{owners[1], false}, {owners[0], true}} {
+			if err := devices.RecordDeviceActivity(ctx, mac, account.id); err != nil {
+				t.Fatal(err)
+			}
+			var fresh bool
+			err := database.Pool.QueryRow(ctx,
+				"SELECT last_active_at > NOW() - INTERVAL '1 minute' FROM registered_devices WHERE device_id = $1", mac,
+			).Scan(&fresh)
+			if err != nil || fresh != account.updated {
+				t.Fatalf("Unexpected device activity visibility: %v, %v", fresh, err)
+			}
+		}
+	})
 }

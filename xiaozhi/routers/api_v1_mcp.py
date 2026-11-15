@@ -11,6 +11,7 @@ from xiaozhi.mcp.bridge import reset_bridge_failure, validate_mcp_ws_url
 from xiaozhi.services.mcp_service import (
     cancel_mcp_bridges,
     clear_mcp_state,
+    get_mcp_connection_restriction,
     is_mcp_connected,
     mcp_bridge_tasks,
     mcp_status_payload,
@@ -88,6 +89,9 @@ async def save_mcp_token(body: SaveMcpRequest, request: Request):
         raise HTTPException(status_code=400, detail=message)
 
     store = get_store()
+    restriction = get_mcp_connection_restriction(store, user["id"], 1)
+    if restriction:
+        raise HTTPException(status_code=403, detail=restriction)
     try:
         if hasattr(store, "detach_user_devices"):
             store.detach_user_devices(user["id"], reason="MCP endpoint diperbarui oleh user")
@@ -150,6 +154,9 @@ async def reconnect_mcp(request: Request):
 
     token_hash = token_info.get("token_hash", "")
     slot = int(token_info.get("slot_number") or 1)
+    restriction = get_mcp_connection_restriction(store, user["id"], slot)
+    if restriction:
+        raise HTTPException(status_code=403, detail=restriction)
     set_mcp_connection_state(user["id"], token_hash, connected=False, message="Menghubungkan ulang ke XiaoZhi...", slot=slot)
 
     task_key = f"{user['id']}:{slot}"

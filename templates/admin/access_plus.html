@@ -316,54 +316,25 @@
                         </td>
                         <td>
                             <div style="display:flex; flex-direction:column; gap:4px;">
-                                <!-- Slot 1 -->
+                                {% for slot_number in (1, 2, 3) %}
+                                {% set slot = item.slots.get(slot_number) %}
                                 <div style="display:flex; align-items:center; gap:8px;">
-                                    {% set s1 = item.slots.get(1) %}
-                                    <span class="slot-pill {% if s1 and s1.preview %}is-saved{% else %}is-empty{% endif %}">
-                                        <strong>S1:</strong> {{ s1.device_label if s1 else 'Slot 1' }}
-                                        {% if s1 and s1.preview %}
-                                            <code>({{ s1.preview }})</code>
+                                    <span class="slot-pill {% if slot and not slot.is_active %}is-disabled{% elif slot and slot.preview %}is-saved{% else %}is-empty{% endif %}">
+                                        <strong>S{{ slot_number }}:</strong> {{ slot.device_label if slot else 'Slot ' ~ slot_number }}
+                                        {% if slot and slot.preview %}
+                                            <code>({{ slot.preview }})</code>
                                         {% else %}
                                             <em>(Kosong)</em>
                                         {% endif %}
+                                        {% if slot and not slot.is_active %}<strong style="color:#ef4444;">[NONAKTIF]</strong>{% endif %}
                                     </span>
-                                </div>
-                                <!-- Slot 2 -->
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    {% set s2 = item.slots.get(2) %}
-                                    <span class="slot-pill {% if s2 and not s2.is_active %}is-disabled{% elif s2 and s2.preview %}is-saved{% else %}is-empty{% endif %}">
-                                        <strong>S2:</strong> {{ s2.device_label if s2 else 'Slot 2' }}
-                                        {% if s2 and s2.preview %}
-                                            <code>({{ s2.preview }})</code>
-                                            {% if not s2.is_active %}<strong style="color:#ef4444;">[NONAKTIF]</strong>{% endif %}
-                                        {% else %}
-                                            <em>(Kosong)</em>
-                                        {% endif %}
-                                    </span>
-                                    {% if s2 and s2.preview %}
-                                    <button type="button" onclick="toggleSlotActive({{ item.user_id }}, 2, {{ 'false' if s2.is_active else 'true' }})" class="app-button" style="padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:4px;">
-                                        {{ 'Matikan' if s2.is_active else 'Aktifkan' }}
+                                    {% if slot and (slot.preview or not slot.is_active) and (slot_number == 1 or item.mcp_multislot_allowed) %}
+                                    <button type="button" onclick="toggleSlotActive({{ item.user_id }}, {{ slot_number }}, {{ 'false' if slot.is_active else 'true' }})" class="app-button" style="padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:4px;">
+                                        {{ 'Matikan' if slot.is_active else 'Aktifkan' }}
                                     </button>
                                     {% endif %}
                                 </div>
-                                <!-- Slot 3 -->
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    {% set s3 = item.slots.get(3) %}
-                                    <span class="slot-pill {% if s3 and not s3.is_active %}is-disabled{% elif s3 and s3.preview %}is-saved{% else %}is-empty{% endif %}">
-                                        <strong>S3:</strong> {{ s3.device_label if s3 else 'Slot 3' }}
-                                        {% if s3 and s3.preview %}
-                                            <code>({{ s3.preview }})</code>
-                                            {% if not s3.is_active %}<strong style="color:#ef4444;">[NONAKTIF]</strong>{% endif %}
-                                        {% else %}
-                                            <em>(Kosong)</em>
-                                        {% endif %}
-                                    </span>
-                                    {% if s3 and s3.preview %}
-                                    <button type="button" onclick="toggleSlotActive({{ item.user_id }}, 3, {{ 'false' if s3.is_active else 'true' }})" class="app-button" style="padding:2px 7px; font-size:10.5px; font-weight:800; border-radius:4px;">
-                                        {{ 'Matikan' if s3.is_active else 'Aktifkan' }}
-                                    </button>
-                                    {% endif %}
-                                </div>
+                                {% endfor %}
                             </div>
                             <div style="margin-top:6px; font-size:11.5px; font-weight:700;">
                                 Izin Multi-Slot: 

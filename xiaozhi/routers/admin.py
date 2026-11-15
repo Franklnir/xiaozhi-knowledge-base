@@ -988,6 +988,7 @@ async def admin_api_access_plus_set_slots(
     validate_csrf(request, csrf_token, admin)
 
     is_allowed = allowed.lower() in ("true", "1", "yes", "on")
+    cfg = store.set_user_access_plus(target_user_id, mcp_multislot_allowed=is_allowed)
 
     # When restricting to 1 slot: disconnect any running tasks for slot 2 and slot 3
     if not is_allowed:
@@ -997,11 +998,7 @@ async def admin_api_access_plus_set_slots(
                 task.cancel()
             set_mcp_connection_state(target_user_id, "", connected=False, message="Dinonaktifkan oleh Admin (Akses Plus)", slot=s)
 
-    cfg = store.set_user_access_plus(target_user_id, mcp_multislot_allowed=is_allowed)
-
-    # When re-enabling multi-slot: signal bridge to auto-connect
-    if is_allowed:
-        signal_mcp_reload()
+    signal_mcp_reload()
 
     msg = f"Akses Multi-Slot untuk user {target_user_id} telah " + (
         "dibuka (diizinkan hingga 3 slot)." if is_allowed else "dibatasi (hanya diizinkan 1 slot). Slot 2 & 3 dinonaktifkan."
@@ -1049,15 +1046,19 @@ async def admin_api_access_plus_toggle_slot(
     validate_csrf(request, csrf_token, admin)
 
     active_bool = is_active.lower() in ("true", "1", "yes", "on")
-    store.set_user_slot_active(target_user_id, slot_number, active_bool)
+    if slot_number not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Nomor slot harus bernilai 1 sampai 3.")
+    if active_bool and slot_number > 1 and not store.get_user_access_plus(target_user_id)["mcp_multislot_allowed"]:
+        raise HTTPException(status_code=403, detail="Buka akses multi-slot sebelum mengaktifkan slot tambahan.")
+    if not store.set_user_slot_active(target_user_id, slot_number, active_bool):
+        raise HTTPException(status_code=404, detail="Slot MCP belum tersimpan.")
 
     if not active_bool:
         task = mcp_bridge_tasks.pop(f"{target_user_id}:{slot_number}", None)
         if task and not task.done():
             task.cancel()
         set_mcp_connection_state(target_user_id, "", connected=False, message="Dinonaktifkan oleh Admin (Akses Plus)", slot=slot_number)
-    else:
-        signal_mcp_reload()
+    signal_mcp_reload()
 
     return {
         "success": True,

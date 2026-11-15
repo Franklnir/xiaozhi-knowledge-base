@@ -619,8 +619,8 @@
                             </button>
                         </div>
                         <p class="app-field-hint">Untuk radio, tempel tautan halaman atau stream stasiun yang terdaftar di Xiaozhi.</p>
-                        <div style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.25); border-radius:6px; padding:4px 10px; font-size:11.5px; color:#059669;">
-                            <span>⚡</span> <strong>Ketentuan Durasi:</strong> Diizinkan 1 lagu versi 1 jam (maks. 1 jam 10 menit). Lagu lainnya maksimal 10 menit.
+                        <div id="addVideoDurationHint" style="margin-top:6px; display:none; align-items:center; gap:6px; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.25); border-radius:6px; padding:4px 10px; font-size:11.5px; color:#059669;">
+                            <span>⚡</span> <strong>Durasi YouTube dan TikTok</strong> Satu lagu boleh berdurasi hingga 1 jam 10 menit. Lagu lainnya maksimal 10 menit.
                         </div>
                     </div>
 
@@ -858,6 +858,9 @@
     // Add URL live preview with Auto-Detection
     function onAddUrlChanged(val) {
         const info = detectMediaSource(val);
+        const durationHint = document.getElementById('addVideoDurationHint');
+        const isVideo = info?.platform === 'youtube' || info?.platform === 'tiktok';
+        durationHint.style.display = isVideo ? 'inline-flex' : 'none';
         const box = document.getElementById('addPreviewBox');
         const badge = document.getElementById('addDetectBadge');
         const thumb = document.getElementById('addPreviewThumb');
@@ -916,9 +919,7 @@
     // Modal controls: Add Track
     function openAddTrackModal() {
         document.getElementById('formAddTrack').reset();
-        document.getElementById('addPreviewBox').style.display = 'none';
-        const badge = document.getElementById('addDetectBadge');
-        if (badge) badge.style.display = 'none';
+        onAddUrlChanged('');
         document.getElementById('modalAddTrack').classList.add('is-active');
         setTimeout(() => document.getElementById('addYoutubeUrl').focus(), 50);
     }

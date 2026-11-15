@@ -58,9 +58,9 @@ func (d *DB) SetSystemContext(ctx context.Context, tx pgx.Tx) error {
 	return err
 }
 
-// SetRelayContext scopes relay transactions to the room owner.
-// A zero owner is used to resolve the room before verifying the device credential.
-func (d *DB) SetRelayContext(ctx context.Context, tx pgx.Tx, ownerID int64) error {
+// SetAccountContext scopes transactions to the authenticated account.
+// A zero owner is used to perform a service-side device or room lookup.
+func (d *DB) SetAccountContext(ctx context.Context, tx pgx.Tx, ownerID int64) error {
 	if _, err := tx.Exec(ctx, "SET LOCAL ROLE app_tenant_role"); err != nil {
 		return err
 	}

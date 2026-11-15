@@ -250,10 +250,13 @@ async def start_mcp_background(store):
 
 async def mcp_background_task(store, mcp_server):
     """Background task that manages MCP WebSocket bridges for all users."""
+    active_token_loader = getattr(type(store), "list_active_mcp_tokens", None)
     while True:
         try:
             reload_event = mcp_service.mcp_reload_event
-            tokens = await asyncio.to_thread(store.list_xiaozhi_tokens)
+            tokens = await asyncio.to_thread(
+                store.list_active_mcp_tokens if active_token_loader else store.list_xiaozhi_tokens
+            )
             blocked_users = {}
             # Launch bridges for users not yet connected (mendukung hingga 3 slot per akun)
             for token_info in tokens:

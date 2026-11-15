@@ -73,14 +73,20 @@ func (s *DeviceStore) ResolveOwner(ctx context.Context, token, rawMAC string) (i
 	}
 	defer conn.Release()
 
-	// Bypass RLS as system
-	_, _ = conn.Exec(ctx, "SELECT set_config('app.user_role', 'system', true), set_config('app.is_admin', 'true', true);")
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+	if err := s.db.SetAccountContext(ctx, tx, 0); err != nil {
+		return 0, err
+	}
 
 	// 1. By Token
 	if token != "" {
 		tHash := XiaozhiTokenHash(token)
 		var ownerID int64
-		err := conn.QueryRow(ctx, "SELECT user_id FROM xiaozhi_tokens WHERE token_hash = $1 LIMIT 1", tHash).Scan(&ownerID)
+		err := tx.QueryRow(ctx, "SELECT user_id FROM xiaozhi_tokens WHERE token_hash = $1 LIMIT 1", tHash).Scan(&ownerID)
 		if err == nil && ownerID > 0 {
 			return ownerID, nil
 		}
@@ -92,7 +98,7 @@ func (s *DeviceStore) ResolveOwner(ctx context.Context, token, rawMAC string) (i
 	if normMAC != "" && hexMAC != "" {
 		// 2. Active Slot in xiaozhi_tokens
 		var ownerID int64
-		err := conn.QueryRow(ctx, `
+		err := tx.QueryRow(ctx, `
 			SELECT user_id FROM xiaozhi_tokens
 			WHERE (LOWER(board_mac) = LOWER($1) OR LOWER(REPLACE(REPLACE(board_mac, ':', ''), '-', '')) = $2)
 			  AND COALESCE(is_active, TRUE) = TRUE
@@ -103,7 +109,7 @@ func (s *DeviceStore) ResolveOwner(ctx context.Context, token, rawMAC string) (i
 		}
 
 		// 3. Registered Devices
-		err = conn.QueryRow(ctx, `
+		err = tx.QueryRow(ctx, `
 			SELECT owner_id FROM registered_devices
 			WHERE (LOWER(device_id) = LOWER($1) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = $2)
 			  AND (status IS NULL OR status != 'DETACHED')
@@ -115,7 +121,7 @@ func (s *DeviceStore) ResolveOwner(ctx context.Context, token, rawMAC string) (i
 
 		// 4. Fallback: Match recent audio command if stream_url explicitly contains this device's MAC
 		var macMatchedOwnerID int64
-		err = conn.QueryRow(ctx, `
+		err = tx.QueryRow(ctx, `
 			SELECT owner_id FROM audio_queue
 			WHERE (stream_url ILIKE $1 OR stream_url ILIKE $2)
 			  AND status IN ('pending', 'playing', 'played')
@@ -143,29 +149,36 @@ func (s *DeviceStore) RecordDeviceActivity(ctx context.Context, rawMAC string, o
 	}
 	defer conn.Release()
 
-	_, _ = conn.Exec(ctx, "SELECT set_config('app.user_role', 'system', true), set_config('app.is_admin', 'true', true);")
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := s.db.SetAccountContext(ctx, tx, ownerID); err != nil {
+		return err
+	}
 
-	_, _ = conn.Exec(ctx, `
+	_, _ = tx.Exec(ctx, `
 		UPDATE registered_devices
 		SET last_active_at = NOW()
 		WHERE LOWER(device_id) = LOWER($1)
 	`, normMAC)
 
 	if ownerID > 0 {
-		_, _ = conn.Exec(ctx, `
+		_, _ = tx.Exec(ctx, `
 			UPDATE board_binding_history
 			SET last_active_at = NOW()
 			WHERE LOWER(device_mac) = LOWER($1) AND user_id = $2 AND status = 'ACTIVE'
 		`, normMAC, ownerID)
 	} else {
-		_, _ = conn.Exec(ctx, `
+		_, _ = tx.Exec(ctx, `
 			UPDATE board_binding_history
 			SET last_active_at = NOW()
 			WHERE LOWER(device_mac) = LOWER($1) AND status = 'ACTIVE'
 		`, normMAC)
 	}
 
-	return nil
+	return tx.Commit(ctx)
 }
 
 // GetDeviceInfo retrieves device name and registered owner
@@ -182,13 +195,20 @@ func (s *DeviceStore) GetDeviceInfo(ctx context.Context, rawMAC string) (ownerID
 	}
 	defer conn.Release()
 
-	_, _ = conn.Exec(ctx, "SELECT set_config('app.user_role', 'system', true), set_config('app.is_admin', 'true', true);")
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return 0, "", ""
+	}
+	defer tx.Rollback(ctx)
+	if err := s.db.SetAccountContext(ctx, tx, 0); err != nil {
+		return 0, "", ""
+	}
 
 	var dbOwnerID *int64
 	var dbName *string
 	var dbType *string
-	err = conn.QueryRow(ctx, `
-		SELECT owner_id, name, device_type
+	err = tx.QueryRow(ctx, `
+		SELECT owner_id, device_name, device_type
 		FROM registered_devices
 		WHERE LOWER(device_id) = LOWER($1) OR LOWER(REPLACE(REPLACE(device_id, ':', ''), '-', '')) = $2
 		ORDER BY id DESC LIMIT 1

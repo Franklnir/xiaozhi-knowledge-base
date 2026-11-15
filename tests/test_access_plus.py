@@ -84,3 +84,35 @@ def test_access_plus_store_functionality(tmp_path):
     assert len(tracks) == 2  # Tracks are NOT deleted!
     track_1 = next(t for t in tracks if t["id"] == track_1_id)
     assert bool(track_1["is_active"]) is False
+
+
+def test_manual_mcp_connections_obey_admin_restrictions(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from xiaozhi import dependencies
+    from xiaozhi.config import SESSION_COOKIE, session_serializer
+    from xiaozhi.routers import api_v1_mcp, mcp_endpoints
+
+    store = SQLiteStore(str(tmp_path / "manual-mcp.db"))
+    user = store.create_user("manual_mcp", "password123")
+    endpoint = "wss://example.test/mcp?token=synthetic"
+    store.set_xiaozhi_token(user["id"], endpoint)
+    monkeypatch.setattr(dependencies, "_store", store)
+    app = FastAPI()
+    app.include_router(mcp_endpoints.router)
+    app.include_router(api_v1_mcp.router)
+    client = TestClient(app)
+    client.cookies.set(SESSION_COOKIE, session_serializer.dumps(user))
+    csrf = dependencies.make_csrf_token(user)
+
+    store.set_mcp_blocked(user["id"], True, "synthetic")
+    assert client.post("/api/v1/mcp/reconnect").status_code == 403
+    assert client.post("/api/v1/mcp/save", json={"mcp_token": endpoint}).status_code == 403
+    assert client.post("/reconnect_mcp", data={"slot": 1, "csrf_token": csrf}).status_code == 403
+    assert client.post("/save_mcp", data={"slot": 1, "mcp_token": endpoint, "csrf_token": csrf}).status_code == 403
+
+    store.set_mcp_blocked(user["id"], False)
+    store.set_user_access_plus(user["id"], mcp_multislot_allowed=False)
+    assert client.post("/save_mcp", data={"slot": 2, "mcp_token": endpoint, "csrf_token": csrf}).status_code == 403
+    store.set_user_slot_active(user["id"], 1, False)
+    assert client.post("/reconnect_mcp", data={"slot": 1, "csrf_token": csrf}).status_code == 403
