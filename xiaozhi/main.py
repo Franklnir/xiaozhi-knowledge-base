@@ -408,6 +408,7 @@ async def robots_txt():
         "Allow: /\n"
         "Allow: /dokumentasi\n"
         "Allow: /web-flasher\n"
+        "Allow: /app-chronos\n"
         "Allow: /login\n"
         "Allow: /register\n"
         "Disallow: /admin\n"
@@ -458,16 +459,22 @@ async def sitemap_xml():
         <priority>0.9</priority>
     </url>
     <url>
+        <loc>https://xiaozhiscig.biz.id/app-chronos</loc>
+        <lastmod>{today}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    <url>
         <loc>https://xiaozhiscig.biz.id/login</loc>
         <lastmod>{today}</lastmod>
-        <changefreq>monthly</changefreq>
-        <priority>0.6</priority>
+        <changefreq>daily</changefreq>
+        <priority>0.8</priority>
     </url>
     <url>
         <loc>https://xiaozhiscig.biz.id/register</loc>
         <lastmod>{today}</lastmod>
         <changefreq>monthly</changefreq>
-        <priority>0.6</priority>
+        <priority>0.7</priority>
     </url>
 </urlset>"""
     return Response(content=xml_content, media_type="application/xml")

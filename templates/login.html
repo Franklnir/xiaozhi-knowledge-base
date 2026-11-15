@@ -1,8 +1,10 @@
 {% extends "auth_base.html" %}
 
-{% block title %}Masuk Dashboard - Xiaozhi Indonesia Asisten Suara Cerdas | xiaozhiscig{% endblock %}
-{% block meta_title %}Masuk Dashboard - Xiaozhi Indonesia Asisten Suara Cerdas | xiaozhiscig{% endblock %}
-{% block meta_desc %}Masuk ke akun Xiaozhi Indonesia untuk mengelola perangkat ESP32, token koneksi MCP, custom tools, dan simulasi smart home IoT.{% endblock %}
+{% block title %}Xiaozhi AI - Xiaozhi Indonesia Asisten Suara Cerdas IoT & Smart Home | xiaozhiscig{% endblock %}
+{% block meta_title %}Xiaozhi AI - Xiaozhi Indonesia Asisten Suara Cerdas IoT & Smart Home | xiaozhiscig{% endblock %}
+{% block meta_desc %}Platform resmi Xiaozhi AI & Xiaozhi Indonesia (xiaozhiscig.biz.id). Masuk ke dashboard untuk mengelola perangkat asisten suara cerdas ESP32, 66 tools MCP cerdas, firmware Web Flasher, dan smart home IoT.{% endblock %}
+{% block meta_keywords %}xiaozhiscig, xiaozhi indonesia, xiaozhi ai, xiaozhiscig.biz.id, xiaozhi, esp32 xiaozhi, asisten suara ai, ai voice assistant indonesia, web flasher esp32, smart home iot{% endblock %}
+{% block canonical_url %}https://xiaozhiscig.biz.id/{% endblock %}
 
 {% block auth_assets %}
 <link rel="stylesheet" href="/static/css/login-shortcuts.css">
@@ -15,9 +17,10 @@
     <div class="auth-card">
         <div class="auth-brand">
             <a href="/" style="display:inline-block; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                <img class="auth-logo" src="/static/img/apple-touch-icon.png" alt="Xiaozhi Logo" width="72" height="72">
+                <img class="auth-logo" src="/static/img/apple-touch-icon.png" alt="Xiaozhi AI Indonesia Logo" width="72" height="72">
             </a>
-            <h1 class="app-title text-2xl" style="margin:0;">Xiaozhi Indonesia</h1>
+            <h1 class="app-title text-2xl" style="margin:0;">Xiaozhi AI Indonesia</h1>
+            <p class="text-xs text-slate-500 font-medium mt-1">Platform Resmi Asisten Suara Cerdas &bull; xiaozhiscig.biz.id</p>
         </div>
 
         <div class="auth-controls">

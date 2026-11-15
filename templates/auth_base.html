@@ -2,13 +2,107 @@
 <html lang="id"{% if default_ui_theme != 'default' %} data-theme="{{ default_ui_theme }}"{% endif %}>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Xiaozhi Indonesia{% endblock %}</title>
-    <meta name="title" content="{% block meta_title %}Xiaozhi Indonesia{% endblock %}">
-    <meta name="description" content="{% block meta_desc %}Asisten suara Xiaozhi Indonesia{% endblock %}">
-    <link rel="icon" type="image/png" href="/static/img/favicon-32x32.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+    <!-- SEO Primary Meta Tags -->
+    <title>{% block title %}Xiaozhi AI - Xiaozhi Indonesia Asisten Suara Cerdas IoT & Smart Home | xiaozhiscig{% endblock %}</title>
+    <meta name="title" content="{% block meta_title %}Xiaozhi AI - Xiaozhi Indonesia Asisten Suara Cerdas IoT & Smart Home | xiaozhiscig{% endblock %}">
+    <meta name="description" content="{% block meta_desc %}Platform resmi Xiaozhi AI & Xiaozhi Indonesia (xiaozhiscig.biz.id): platform asisten suara cerdas berbasis IoT ESP32, integrasi 66 Tools FastMCP, Web Flasher firmware, dan smart home.{% endblock %}">
+    <meta name="keywords" content="{% block meta_keywords %}xiaozhiscig, xiaozhi indonesia, xiaozhi ai, xiaozhiscig.biz.id, xiaozhi, esp32 xiaozhi, asisten suara ai, ai voice assistant indonesia, web flasher esp32, smart home iot{% endblock %}">
+    <meta name="author" content="Xiaozhi Indonesia Team">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="theme-color" content="#047857">
+    <meta name="google-site-verification" content="_erMCXcNmYeZR3sEVoyllB5Ud5ShMJJSB4JwbPk9L0A" />
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Xiaozhi AI Indonesia | xiaozhiscig">
+    <meta property="og:url" content="{% block og_url %}https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}Xiaozhi AI - Xiaozhi Indonesia Asisten Suara Cerdas IoT & Smart Home | xiaozhiscig{% endblock %}">
+    <meta property="og:description" content="{% block og_desc %}Platform resmi Xiaozhi AI & Xiaozhi Indonesia (xiaozhiscig.biz.id): platform asisten suara cerdas berbasis IoT ESP32, integrasi 66 Tools FastMCP, Web Flasher firmware, dan smart home.{% endblock %}">
+    <meta property="og:image" content="https://xiaozhiscig.biz.id/static/img/logo.png">
+    <meta property="og:image:width" content="1254">
+    <meta property="og:image:height" content="1254">
+    <meta property="og:locale" content="id_ID">
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@xiaozhiscig">
+    <meta name="twitter:title" content="{% block tw_title %}Xiaozhi AI - Xiaozhi Indonesia Asisten Suara Cerdas IoT & Smart Home | xiaozhiscig{% endblock %}">
+    <meta name="twitter:description" content="{% block tw_desc %}Platform resmi Xiaozhi AI & Xiaozhi Indonesia (xiaozhiscig.biz.id): asisten suara ESP32, 66 Tools FastMCP, dan smart home IoT.{% endblock %}">
+    <meta name="twitter:image" content="https://xiaozhiscig.biz.id/static/img/logo.png">
+
+    <!-- Canonical URL & Hreflang -->
+    <link rel="canonical" href="{% block canonical_url %}https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}{% endblock %}">
+    <link rel="alternate" hreflang="id" href="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
+    <link rel="alternate" hreflang="x-default" href="https://xiaozhiscig.biz.id{{ request.url.path if request else '' }}">
+
+    <!-- Schema.org JSON-LD Structured Data for Google Rich Results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://xiaozhiscig.biz.id/#website",
+          "url": "https://xiaozhiscig.biz.id/",
+          "name": "Xiaozhi AI Indonesia",
+          "alternateName": [
+            "xiaozhiscig",
+            "xiaozhiscig.biz.id",
+            "Xiaozhi AI",
+            "Xiaozhi Indonesia",
+            "Xiaozhi AI Indonesia",
+            "Xiaozhi ESP32",
+            "Xiaozhi"
+          ],
+          "description": "Platform resmi Xiaozhi AI & Xiaozhi Indonesia (xiaozhiscig.biz.id): Asisten suara cerdas berbasis IoT ESP32, Smart Home, dan FastMCP Tools.",
+          "inLanguage": "id-ID"
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://xiaozhiscig.biz.id/#organization",
+          "name": "Xiaozhi Indonesia",
+          "alternateName": ["xiaozhiscig", "Xiaozhi AI Indonesia", "Xiaozhi AI"],
+          "url": "https://xiaozhiscig.biz.id/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://xiaozhiscig.biz.id/static/img/logo.png"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://xiaozhiscig.biz.id/#software",
+          "name": "Xiaozhi AI Indonesia",
+          "alternateName": ["xiaozhiscig", "Xiaozhi AI", "Xiaozhi Indonesia"],
+          "applicationCategory": "UtilitiesApplication, EducationalApplication",
+          "operatingSystem": "All",
+          "url": "https://xiaozhiscig.biz.id/",
+          "description": "Platform resmi Xiaozhi AI Indonesia (xiaozhiscig.biz.id) untuk asisten suara cerdas ESP32, kontrol Smart Home, Web Flasher firmware online, dan 66 Tools FastMCP.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "IDR"
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Icons & Manifest -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/img/favicon-16x16.png">
+    <link rel="icon" type="image/png" href="/static/img/logo.png">
     <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+    <link rel="shortcut icon" href="/static/img/favicon.ico">
     <link rel="manifest" href="/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Xiaozhi AI">
+    <meta name="application-name" content="Xiaozhi AI">
+
+    <!-- CSS -->
     <link rel="stylesheet" href="/static/css/app.min.css">
     <link rel="stylesheet" href="/static/css/auth.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
