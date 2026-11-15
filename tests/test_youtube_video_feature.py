@@ -158,7 +158,7 @@ def test_inspect_youtube_video_with_auto_save(test_setup):
 
 
 def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
-    """Test full multi-turn workflow: inspect -> confirm play and save."""
+    """Confirm the exact video without adding it to materials or the playlist."""
     owner_id, store, mcp = test_setup
     inspect_fn = mcp.tools["inspect_youtube_video"]
     confirm_fn = mcp.tools["confirm_play_and_save_video"]
@@ -195,25 +195,18 @@ def test_inspect_and_confirm_workflow_without_auto_save(test_setup):
         assert cached is not None
         assert cached["has_transcript"] is True
 
-        # Step 2: User confirms playing (play_now=True) -> automatically saves to memory database!
         confirm_res = confirm_fn(request_id=req_id, play_now=True)
         assert confirm_res["success"] is True
         assert confirm_res["played"] is True
-        assert confirm_res["saved_to_materials"] is True
+        assert confirm_res["playback_queued"] is True
+        assert confirm_res["saved_to_materials"] is False
         assert "Memutar video" in confirm_res["message"]
-        assert "database memori" in confirm_res["message"]
-
-        # Verify saved in Database Materi (materials)
-        mats = store.list_materials(owner_id)
-        assert len(mats) == 1
-        assert mats[0]["category"] == "Video YouTube"
-        assert "ESP32 S3 Cam" in mats[0]["title"]
-        assert "Konfigurasi pin D0 sampai D7" in mats[0]["content"]
-
-        # Verify saved in User Playlist memory
-        playlist_tracks = store.get_user_playlist(owner_id)
-        assert len(playlist_tracks) >= 1
-        assert any(t["video_id"] == "testvid2022" for t in playlist_tracks)
+        assert "video_id='testvid2022'" in confirm_res["instructions"]
+        command, = store.get_pending_audio_commands(owner_id)
+        assert command["video_id"] == "testvid2022"
+        assert command["stream_url"].endswith("&mode=video")
+        assert not store.list_materials(owner_id)
+        assert not store.get_user_playlist(owner_id)
 
 
 def test_play_youtube_song_routes_explicit_video_to_selection(test_setup):

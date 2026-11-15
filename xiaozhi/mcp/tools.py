@@ -2797,7 +2797,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 mac_param = f"&mac={user_mac}" if user_mac else ""
                 base = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
                 device_base = base.replace("https://", "http://") if user_mac else base
-                stream_url = f"{device_base}/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}"
+                stream_url = f"{device_base}/api/audio/stream/{vid}?owner_id={owner_id}{mac_param}&mode=video"
                 try:
                     store.queue_audio_command(
                         owner_id,
@@ -2811,7 +2811,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 except Exception as q_err:
                     logger.warning("Failed to queue video audio stream: %s", q_err)
 
-            instructions = f"Panggil tool perangkat `self.audio.play_youtube` dengan query='{v_title}' dan video_id='{vid}' agar speaker XiaoZhi memutar videonya."
+            instructions = f"Panggil tool perangkat `self.audio.play_youtube` dengan video_id='{vid}'. Jika perangkat memerlukan query, gunakan ID yang sama agar speaker XiaoZhi memutar video yang dikonfirmasi."
 
         # Pesan ramah untuk user
         parts = []

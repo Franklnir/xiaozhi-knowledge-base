@@ -168,38 +168,20 @@ func confirmedVideoStreamDevice(streamURL string) (bool, string) {
 	return params.Get("mode") == "video" && (rawMAC == "" || mac != ""), mac
 }
 
-func resolveVideoBitrate(requested string, rssi *int, chip string, sampleRate int) string {
+func resolveVideoBitrate(requested string, rssi *int, chip string) string {
 	bitrate := ResolveBitrate(requested, rssi, chip)
-	if requested != "" && !strings.EqualFold(requested, "auto") && rssi != nil {
+	if rssi != nil && *rssi < 0 {
 		adaptive := ResolveBitrate("auto", rssi, chip)
 		if bitrateKbps(adaptive) < bitrateKbps(bitrate) {
-			bitrate = adaptive
+			return adaptive
 		}
 	}
-	limit := "24k"
-	if sampleRate == 16000 {
-		limit = "16k"
-	}
+	// Explicit requests should stay within the device's normal bandwidth.
+	limit := ResolveBitrate("auto", nil, chip)
 	if bitrateKbps(bitrate) > bitrateKbps(limit) {
 		return limit
 	}
 	return bitrate
-}
-
-func bitrateKbps(bitrate string) int {
-	kbps, _ := strconv.Atoi(strings.TrimSuffix(bitrate, "k"))
-	return kbps
-}
-
-// Read enough Opus data before sending the first video audio bytes so small
-// FFmpeg reads do not consume the player's initial burst one page at a time.
-func bufferVideoAudio(source io.Reader, bitrate string) (io.Reader, int, error) {
-	buffer := make([]byte, max(2600, 3*bitrateKbps(bitrate)*1000/8))
-	n, err := io.ReadFull(source, buffer)
-	if err == io.EOF || err == io.ErrUnexpectedEOF {
-		err = nil
-	}
-	return io.MultiReader(bytes.NewReader(buffer[:n]), source), n, err
 }
 
 // ResolveBitrate chooses optimal bitrate according to ESP32 chip profile and Wi-Fi RSSI
@@ -379,8 +361,10 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 			videoCommandID = id
 		}
 	}
+	streamAudio := h.streamWithAdaptivePacing
 	if isVideo {
-		bitrate = resolveVideoBitrate(requestedBr, rssi, chip, sampleRate)
+		bitrate = resolveVideoBitrate(requestedBr, rssi, chip)
+		streamAudio = h.streamVideoAudio
 	}
 	safeVid := safeFilenameRegex.ReplaceAllString(videoID, "_")
 
@@ -456,7 +440,7 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 					_ = h.audioStore.AckCommand(r.Context(), ownerID, videoCommandID)
 				}
 
-				totalBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate, sessionID, ownerID)
+				totalBytes, streamErr := streamAudio(r.Context(), w, streamReader, flusher, bitrate, sessionID, ownerID)
 				if cmd != nil {
 					if cmd.Process != nil {
 						_ = cmd.Process.Kill()
@@ -467,6 +451,8 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 				reason := "finished"
 				if r.Context().Err() != nil {
 					reason = "stopped"
+				} else if isVideo && streamErr != nil {
+					reason = "aborted"
 				}
 				log.Printf("[AUDIO CACHE END] Video %s finished, streamed %d bytes", videoID, totalBytes)
 				h.notifyPlaybackEnd(ownerID, sessionID, reason, totalBytes)
@@ -606,8 +592,8 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 		_ = h.audioStore.AckCommand(r.Context(), ownerID, videoCommandID)
 	}
 	var totalBytes int64
+	reason := "finished"
 	defer func() {
-		reason := "finished"
 		if r.Context().Err() != nil {
 			reason = "stopped"
 		}
@@ -633,13 +619,18 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 
 	log.Printf("[STREAM START] Video %s -> ESP32 %s (%s, %dHz, br=%s)", videoID, mac, chip, sampleRate, bitrate)
 
-	streamBytes, _ := h.streamWithAdaptivePacing(r.Context(), w, streamReader, flusher, bitrate, sessionID, ownerID)
+	streamBytes, streamErr := streamAudio(r.Context(), w, streamReader, flusher, bitrate, sessionID, ownerID)
 	totalBytes = streamBytes
 
-	if cmd.Process != nil {
+	if (!isVideo || streamErr != nil) && cmd.Process != nil {
 		_ = cmd.Process.Kill()
 	}
-	_ = cmd.Wait()
+	waitErr := cmd.Wait()
+	if isVideo && (streamErr != nil || waitErr != nil) && r.Context().Err() == nil {
+		reason = "aborted"
+		log.Printf("[VIDEO AUDIO] Stream interrupted for %s after %d bytes (read/write: %v, encoder: %v)", videoID, totalBytes, streamErr, waitErr)
+		return
+	}
 	log.Printf("[STREAM END] Video %s finished, streamed %d bytes", videoID, totalBytes)
 }
 
