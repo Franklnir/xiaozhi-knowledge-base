@@ -27,6 +27,34 @@ def test_generate_sse_stream_token():
     assert len(parts[2]) == 64, "Signature must be 64-char hex string (SHA-256)"
 
 
+def test_admin_stream_authorization_checks_current_account_role(monkeypatch):
+    from types import SimpleNamespace
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from xiaozhi import dependencies
+    from xiaozhi.config import SESSION_COOKIE, session_serializer
+    from xiaozhi.routers import admin
+
+    accounts = {
+        1: {"id": 1, "username": "ordinary", "role": "user"},
+        2: {"id": 2, "username": "administrator", "role": "admin"},
+    }
+    monkeypatch.setattr(dependencies, "_store", SimpleNamespace(get_user=accounts.get))
+    app = FastAPI()
+    app.include_router(admin.router)
+    client = TestClient(app, headers={"Accept": "application/json"})
+    path = "/admin/api/logs/authorize"
+    assert client.get(path).status_code == 401
+
+    for account_id, expected in ((1, 403), (2, 204)):
+        client.cookies.set(SESSION_COOKIE, session_serializer.dumps(accounts[account_id]))
+        result = client.get(path)
+        assert result.status_code == expected
+    assert result.content == b""
+    assert result.headers["Cache-Control"] == "no-store"
+
+
 def test_emit_user_event_queue():
     """Verify emit_user_event enqueues correctly for background dispatcher."""
     # Drain any existing items

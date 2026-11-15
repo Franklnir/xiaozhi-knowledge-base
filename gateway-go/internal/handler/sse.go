@@ -18,6 +18,7 @@ type SSEHandler struct {
 	userEventHub *hub.UserEventHub
 	deviceHub    *hub.DeviceHub
 	startTime    time.Time
+	adminAuth    *http.Client
 }
 
 func NewSSEHandler(cfg *config.Config, sseHub *hub.SSEHub, userEventHub *hub.UserEventHub, deviceHub *hub.DeviceHub) *SSEHandler {
@@ -27,11 +28,50 @@ func NewSSEHandler(cfg *config.Config, sseHub *hub.SSEHub, userEventHub *hub.Use
 		userEventHub: userEventHub,
 		deviceHub:    deviceHub,
 		startTime:    time.Now(),
+		adminAuth: &http.Client{
+			Timeout: 3 * time.Second,
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+	}
+}
+
+func (h *SSEHandler) adminLogAccess(r *http.Request) int {
+	cookie, authorization := r.Header.Get("Cookie"), r.Header.Get("Authorization")
+	if cookie == "" && authorization == "" {
+		return http.StatusUnauthorized
+	}
+
+	target := strings.TrimRight(h.cfg.PythonBackendURL, "/") + "/admin/api/logs/authorize"
+	probe, err := http.NewRequestWithContext(r.Context(), http.MethodGet, target, nil)
+	if err != nil {
+		return http.StatusServiceUnavailable
+	}
+	probe.Header.Set("Accept", "application/json")
+	probe.Header.Set("Cookie", cookie)
+	probe.Header.Set("Authorization", authorization)
+	response, err := h.adminAuth.Do(probe)
+	if err != nil {
+		return http.StatusServiceUnavailable
+	}
+	defer response.Body.Close()
+	switch response.StatusCode {
+	case http.StatusNoContent, http.StatusUnauthorized, http.StatusForbidden:
+		return response.StatusCode
+	default:
+		return http.StatusServiceUnavailable
 	}
 }
 
 // HandleLogsStream handles GET /admin/api/logs/stream
 func (h *SSEHandler) HandleLogsStream(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "private, no-store, no-transform")
+	if status := h.adminLogAccess(r); status != http.StatusNoContent {
+		http.Error(w, http.StatusText(status), status)
+		return
+	}
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
@@ -39,10 +79,8 @@ func (h *SSEHandler) HandleLogsStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	// 1. Send recent backlog (last 25 logs)
 	recent := h.sseHub.GetRecent(25)

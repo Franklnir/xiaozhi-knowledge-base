@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import APIRouter, HTTPException, Request, Form, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from xiaozhi.config import ALL_MCP_TOOLS_CATALOG
 from xiaozhi.dependencies import (
@@ -835,6 +835,12 @@ async def api_v1_admin_users(request: Request):
     }
 
 
+@router.get("/admin/api/logs/authorize", include_in_schema=False, status_code=204)
+def admin_api_logs_authorize(request: Request):
+    require_admin(request)
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/admin/api/logs/stream")
 async def admin_api_logs_stream(request: Request):
     """Real-time SSE event stream for live admin console and MCP logging."""
@@ -844,7 +850,7 @@ async def admin_api_logs_stream(request: Request):
         stream_admin_logs(request),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "private, no-store, no-transform",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
