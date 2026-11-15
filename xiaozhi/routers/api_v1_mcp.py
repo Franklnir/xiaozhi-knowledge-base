@@ -7,7 +7,9 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from xiaozhi.dependencies import get_current_user, get_store
+from xiaozhi.mcp.bridge import reset_bridge_failure, validate_mcp_ws_url
 from xiaozhi.services.mcp_service import (
+    cancel_mcp_bridges,
     clear_mcp_state,
     is_mcp_connected,
     mcp_bridge_tasks,
@@ -81,11 +83,9 @@ async def save_mcp_token(body: SaveMcpRequest, request: Request):
         raise HTTPException(status_code=401, detail="Sesi tidak valid atau telah kedaluwarsa.")
 
     token = body.mcp_token.strip()
-    if not token.startswith("wss://") and not token.startswith("ws://"):
-        raise HTTPException(
-            status_code=400,
-            detail="URL endpoint MCP harus diawali dengan wss:// atau ws://"
-        )
+    valid, message = validate_mcp_ws_url(token)
+    if not valid:
+        raise HTTPException(status_code=400, detail=message)
 
     store = get_store()
     try:
@@ -97,9 +97,11 @@ async def save_mcp_token(body: SaveMcpRequest, request: Request):
         set_mcp_connection_state(user["id"], token_hash, connected=False, message="Menghubungkan ke XiaoZhi...")
         
         # Cancel any previous bridge task for this user and signal reload
-        user_task = mcp_bridge_tasks.pop(user["id"], None)
+        task_key = f"{user['id']}:1"
+        user_task = mcp_bridge_tasks.pop(task_key, None)
         if user_task and not user_task.done():
             user_task.cancel()
+        reset_bridge_failure(task_key)
         signal_mcp_reload()
 
         return SimpleResponse(
@@ -126,9 +128,7 @@ async def delete_mcp_token(request: Request):
     if hasattr(store, "detach_user_devices"):
         store.detach_user_devices(user["id"], reason="MCP diputuskan/dihapus oleh user")
     clear_mcp_state(user["id"])
-    user_task = mcp_bridge_tasks.pop(user["id"], None)
-    if user_task and not user_task.done():
-        user_task.cancel()
+    cancel_mcp_bridges(user["id"])
     signal_mcp_reload()
 
     return SimpleResponse(success=True, message="Endpoint MCP berhasil dihapus.")
@@ -149,11 +149,14 @@ async def reconnect_mcp(request: Request):
         raise HTTPException(status_code=400, detail="Belum ada endpoint MCP tersimpan.")
 
     token_hash = token_info.get("token_hash", "")
-    set_mcp_connection_state(user["id"], token_hash, connected=False, message="Menghubungkan ulang ke XiaoZhi...")
+    slot = int(token_info.get("slot_number") or 1)
+    set_mcp_connection_state(user["id"], token_hash, connected=False, message="Menghubungkan ulang ke XiaoZhi...", slot=slot)
 
-    user_task = mcp_bridge_tasks.pop(user["id"], None)
+    task_key = f"{user['id']}:{slot}"
+    user_task = mcp_bridge_tasks.pop(task_key, None)
     if user_task and not user_task.done():
         user_task.cancel()
+    reset_bridge_failure(task_key)
     signal_mcp_reload()
 
     return SimpleResponse(success=True, message="Mencoba menghubungkan ulang MCP...")

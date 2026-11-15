@@ -4,6 +4,7 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from hashlib import sha256
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -101,10 +102,11 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.warning("Failed to start PostgreSQL chat sync listener: %s", exc)
 
+    supervisor = None
     # Start MCP background task
     try:
         from xiaozhi.mcp.server import init_mcp_server
-        from xiaozhi.mcp.bridge import start_mcp_background
+        from xiaozhi.mcp.bridge import start_mcp_background, stop_mcp_background
 
         # Try to get youtube search function
         youtube_search_fn = None
@@ -118,18 +120,34 @@ async def lifespan(app: FastAPI):
         mcp_server = init_mcp_server(store, youtube_search_fn)
 
         if mcp_server:
-            await start_mcp_background(store)
+            supervisor = await start_mcp_background(store)
     except ImportError:
         logger.warning("MCP/WebSocket packages not available. UI runs without XiaoZhi bridge.")
 
     # Record startup
     add_alert("info", "Application started successfully", "system")
 
-    yield
+    loop_watch = asyncio.create_task(watch_event_loop(), name="event-loop-monitor")
+    try:
+        yield
+    finally:
+        loop_watch.cancel()
+        await asyncio.gather(loop_watch, return_exceptions=True)
+        if supervisor is not None:
+            await stop_mcp_background(supervisor)
+        logger.info("Shutting down Xiaozhi Indonesia...")
+        add_alert("info", "Application shutting down", "system")
 
-    # Shutdown
-    logger.info("Shutting down Xiaozhi Indonesia...")
-    add_alert("info", "Application shutting down", "system")
+
+async def watch_event_loop():
+    """Report when server work prevents the web process from scheduling requests."""
+    loop = asyncio.get_running_loop()
+    while True:
+        wake_at = loop.time() + 1
+        await asyncio.sleep(1)
+        lag_ms = (loop.time() - wake_at) * 1000
+        if lag_ms >= 500:
+            logger.warning("Event loop lag: %.0fms", lag_ms)
 
 
 enable_docs = os.getenv("ENABLE_API_DOCS", "false").lower() in ("true", "1", "yes")
@@ -151,6 +169,9 @@ app = FastAPI(
 STATIC_DIR = BASE_DIR / "static"
 if not STATIC_DIR.exists():
     STATIC_DIR = BASE_DIR.parent / "static"
+shell_css = STATIC_DIR / "css" / "app-shell.css"
+APP_SHELL_VERSION = sha256(shell_css.read_bytes()).hexdigest()[:12] if shell_css.is_file() else ""
+templates.env.globals["app_shell_version"] = APP_SHELL_VERSION
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -177,8 +198,12 @@ async def monitor_requests(request: Request, call_next):
     req_id = f"req-{uuid.uuid4().hex}"
     request.state.request_id = req_id
     login_request = request.url.path in {"/login", "/api/auth/web-login"}
-    if login_request:
-        request.state.login_timings = {}
+    dashboard_request = (
+        request.url.path in {"/dashboard", "/api/materials/list"}
+        or request.url.path.startswith("/api/materials/detail/")
+    )
+    if login_request or dashboard_request:
+        request.state.request_timings = {}
 
     response = await call_next(request)
     duration_ms = (time.perf_counter() - start) * 1000
@@ -189,17 +214,28 @@ async def monitor_requests(request: Request, call_next):
     status = response.status_code
     record_request(endpoint, method, status, duration_ms)
 
-    # Log slow requests
-    if login_request:
-        timings = request.state.login_timings
+    if login_request or dashboard_request:
+        timings = request.state.request_timings
         stages = [f"{stage};dur={ms:.1f}" for stage, ms in timings.items()]
         response.headers["Server-Timing"] = ", ".join([f"app;dur={duration_ms:.1f}", *stages])
+    if login_request:
         log = logger.warning if duration_ms >= 1000 else logger.info
         log("[%s] Login %s %s status=%d total_ms=%.1f stages=%s",
             req_id, method, endpoint, status, duration_ms, " ".join(stages))
         response.headers["Cache-Control"] = "no-store"
+    elif dashboard_request and duration_ms >= 1000:
+        logger.warning("[%s] Dashboard %s %s status=%d total_ms=%.1f stages=%s",
+                       req_id, method, endpoint, status, duration_ms, " ".join(stages))
     elif duration_ms > 5000:
-        logger.warning(f"[{req_id}] Slow request: {method} {endpoint} took {duration_ms:.0f}ms")
+        logger.warning("[%s] Slow request: %s %s took %.0fms", req_id, method, endpoint, duration_ms)
+
+    if (
+        endpoint == "/static/css/app-shell.css"
+        and APP_SHELL_VERSION
+        and request.query_params.get("v") == APP_SHELL_VERSION
+        and status in (200, 304)
+    ):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
 
     # Add performance headers
     response.headers["X-Response-Time"] = f"{duration_ms:.0f}ms"
@@ -438,7 +474,7 @@ async def sitemap_xml():
 
 
 @app.get("/health/db", tags=["Health"])
-async def health_check_db(request: Request):
+def health_check_db(request: Request):
     """Check database connection latency and backend health.
     
     Public users only see status + latency.

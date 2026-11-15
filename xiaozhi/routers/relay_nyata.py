@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import io
@@ -1377,7 +1378,7 @@ async def internal_relay_broadcast(request: Request):
         last_seen_at = utc_now() if connected else ""
         device_label = "ESP32 Terhubung" if connected else "ESP32 Terputus"
         if not connected:
-            last_room = get_store().get_relay_room(int(user_id), int(room_id))
+            last_room = await asyncio.to_thread(get_store().get_relay_room, int(user_id), int(room_id))
             if last_room:
                 last_seen_at = str(last_room.get("device_last_seen_at") or "")
         broadcast_relay_device_status(
@@ -1474,7 +1475,7 @@ async def internal_mqtt_gateway_event(request: Request):
         "cmd_id": str(data.get("cmd_id") or "")[:128],
     }
     try:
-        get_store().record_mqtt_gateway_event(event)
+        await asyncio.to_thread(get_store().record_mqtt_gateway_event, event)
     except Exception:
         return JSONResponse({"success": False, "detail": "Gagal menyimpan event MQTT."}, status_code=500)
 

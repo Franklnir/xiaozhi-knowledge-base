@@ -1470,8 +1470,10 @@ class HFJsonStore:
                         "user_id": int(item.get("user_id", 0)),
                         "slot_number": slot_num,
                         "device_label": item.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+                        "board_mac": item.get("board_mac") or "",
                         "token": token,
                         "token_hash": token_hash,
+                        "is_active": item.get("is_active", True),
                     })
             return tokens
 

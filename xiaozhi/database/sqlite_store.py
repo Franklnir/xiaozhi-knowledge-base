@@ -1392,6 +1392,7 @@ class SQLiteStore:
                     "user_id": r["user_id"],
                     "slot_number": slot_num,
                     "device_label": r.get("device_label", f"XiaoZhi {slot_num}") or f"XiaoZhi {slot_num}",
+                    "board_mac": r.get("board_mac") or "",
                     "token": token,
                     "token_hash": r["token_hash"],
                     "is_active": bool(r.get("is_active", 1)),
@@ -3476,12 +3477,12 @@ class SQLiteStore:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def delete_reminder(self, owner_id: int, reminder_id: str) -> bool:
+    def delete_reminder(self, owner_id: int, reminder_id: str, *, pending_only: bool = False) -> bool:
         conn = self._get_conn()
-        cursor = conn.execute(
-            "DELETE FROM reminders WHERE id = ? AND owner_id = ?",
-            (reminder_id, owner_id)
-        )
+        sql = "DELETE FROM reminders WHERE id = ? AND owner_id = ?"
+        if pending_only:
+            sql += " AND status = 'pending'"
+        cursor = conn.execute(sql, (reminder_id, owner_id))
         conn.commit()
         return cursor.rowcount > 0
 
@@ -3489,19 +3490,12 @@ class SQLiteStore:
         conn = self._get_conn()
         now = utc_now()
         rows = conn.execute(
-            "SELECT * FROM reminders WHERE status = 'pending' AND scheduled_at <= ?",
+            "UPDATE reminders SET status = 'triggered' "
+            "WHERE status = 'pending' AND julianday(scheduled_at) <= julianday(?) RETURNING *",
             (now,)
         ).fetchall()
-        reminders = [dict(row) for row in rows]
-        if reminders:
-            ids = [r["id"] for r in reminders]
-            placeholders = ",".join("?" * len(ids))
-            conn.execute(
-                f"UPDATE reminders SET status = 'triggered' WHERE id IN ({placeholders})",
-                ids
-            )
-            conn.commit()
-        return reminders
+        conn.commit()
+        return [dict(row) for row in rows]
 
     def mark_reminder_sent(self, reminder_id: str) -> None:
         conn = self._get_conn()

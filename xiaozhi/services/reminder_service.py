@@ -3,16 +3,17 @@ import asyncio
 import logging
 import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("xiaozhi.reminder")
+WIB = timezone(timedelta(hours=7))
 
 
 def parse_time_from_text(text: str) -> Optional[datetime]:
     """Parse time from natural language text."""
     text = text.lower().strip()
-    now = datetime.now()
+    now = datetime.now(WIB)
 
     # Pattern: "jam 3 sore", "jam 15:00", "pukul 3"
     time_match = re.search(r'(?:jam|pukul)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(pagi|siang|sore|malam)?', text)
@@ -92,7 +93,7 @@ def add_reminder(store, owner_id: int, text: str) -> Dict[str, Any]:
         owner_id=owner_id,
         reminder_id=reminder_id,
         message=parsed["message"],
-        scheduled_at=parsed["time"].isoformat(),
+        scheduled_at=parsed["time"].astimezone(timezone.utc).isoformat(),
     )
 
     time_str = parsed["time"].strftime("%H:%M")
@@ -103,14 +104,38 @@ def add_reminder(store, owner_id: int, text: str) -> Dict[str, Any]:
     }
 
 
-def list_reminders(store, owner_id: int) -> List[Dict[str, Any]]:
-    """List all reminders for a user."""
-    return store.list_reminders(owner_id)
+def list_reminders(store, owner_id: int, period: str = "semua") -> List[Dict[str, Any]]:
+    """List pending reminders, optionally filtered by their calendar day in WIB."""
+    today = datetime.now(WIB).date()
+    day = {"hari_ini": today, "besok": today + timedelta(days=1)}.get(period)
+    reminders = []
+    for row in store.list_reminders(owner_id):
+        if row.get("status") != "pending":
+            continue
+        try:
+            scheduled_at = datetime.fromisoformat(str(row["scheduled_at"]))
+        except (KeyError, ValueError):
+            continue
+        if scheduled_at.tzinfo is None:
+            scheduled_at = scheduled_at.replace(tzinfo=timezone.utc)
+        scheduled_at = scheduled_at.astimezone(WIB)
+        if day is None or scheduled_at.date() == day:
+            reminders.append({
+                "id": row["id"],
+                "message": row["message"],
+                "scheduled_at": scheduled_at.isoformat(),
+            })
+    return sorted(reminders, key=lambda row: row["scheduled_at"])
 
 
 def delete_reminder(store, owner_id: int, reminder_id: str) -> bool:
     """Delete a reminder."""
     return store.delete_reminder(owner_id, reminder_id)
+
+
+def cancel_reminder(store, owner_id: int, reminder_id: str) -> bool:
+    """Cancel only an owned reminder that is still pending."""
+    return store.delete_reminder(owner_id, reminder_id, pending_only=True)
 
 
 async def check_reminders_periodically(store):

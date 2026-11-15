@@ -109,6 +109,20 @@ def test_build_expression_payload_marah():
     assert res["vocal_cue"] in ["Hih!", "Astaga!", "Nyebelin banget!", "Argh!"]
 
 
+def test_serious_anger_and_audible_laugh():
+    angry = build_expression_payload("marah serius", intensity="tinggi")
+    profane = build_expression_payload("marah serius", intensity="tinggi", allow_profanity=True)
+    laugh = build_expression_payload("ketawa lepas", intensity="tinggi")
+
+    assert angry["emotion"] == "marah"
+    assert "tanpa tawa" in angry["instruksi_xiaozhi"]
+    assert "Sialan" not in angry["spoken_text"]
+    assert profane["spoken_text"].startswith("Sialan.")
+    assert "Hindari hinaan personal dan ancaman" in profane["instruksi_xiaozhi"]
+    assert laugh["spoken_text"] == "Ha ha ha ha! Hah… ha ha ha!"
+    assert "[" not in laugh["spoken_text"]
+
+
 def test_build_expression_custom_interjection():
     """Menguji custom interjection / kata seru kustom."""
     res = build_expression_payload(

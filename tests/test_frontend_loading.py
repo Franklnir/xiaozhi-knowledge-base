@@ -1,5 +1,9 @@
+import asyncio
 import re
+import threading
+from unittest.mock import Mock
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -87,6 +91,16 @@ def test_dashboard_search_pages_and_detail_are_scoped_to_the_owner(material_stor
 
     initial = client.get("/dashboard")
     assert initial.status_code == 200
+    stylesheet = re.search(r'/static/css/app-shell.css\?v=[a-f0-9]{12}', initial.text)
+    assert stylesheet
+    css = client.get(stylesheet.group())
+    assert css.status_code == 200
+    assert "immutable" in css.headers["Cache-Control"]
+    assert "immutable" not in client.get("/static/css/app-shell.css?v=old").headers.get("Cache-Control", "")
+    assert client.get(stylesheet.group(), headers={"If-None-Match": css.headers["ETag"]}).status_code == 304
+    assert initial.headers["Cache-Control"] == "no-store"
+    assert "db;dur=" in initial.headers["Server-Timing"]
+    assert "render;dur=" in initial.headers["Server-Timing"]
     assert initial.text.count('class="data-row ') == 20
     assert "unik_100%_di_akhir" not in initial.text
     assert "Halaman 1 dari 2" in initial.text
@@ -106,3 +120,72 @@ def test_dashboard_search_pages_and_detail_are_scoped_to_the_owner(material_stor
     assert own_detail.json()["content"] == content
     assert own_detail.headers["Cache-Control"] == "no-store"
     assert client.post("/api/materials/stream-index", json={"title": "tanpa CSRF"}).status_code == 403
+
+
+def test_web_responds_while_bridge_reads_and_searches_wait(material_store, monkeypatch):
+    from mcp.server.fastmcp import FastMCP
+    from xiaozhi.mcp import bridge
+    from xiaozhi.mcp.context import mcp_active_owner_ctx
+    from xiaozhi.mcp.server import _SearchToolRegistrar
+
+    _, owner, _ = material_store
+    owner_id = owner["id"]
+    release = threading.Event()
+
+    async def exercise():
+        loop = asyncio.get_running_loop()
+        scan_started, searches_started = asyncio.Event(), asyncio.Event()
+        started = set()
+        server = FastMCP("Performance test")
+        registrar = _SearchToolRegistrar(server)
+
+        def list_tokens():
+            loop.call_soon_threadsafe(scan_started.set)
+            assert release.wait(5)
+            return []
+
+        @registrar.tool()
+        def search_news(query: str) -> str:
+            def record_start():
+                started.add(query)
+                if len(started) == 2:
+                    searches_started.set()
+
+            loop.call_soon_threadsafe(record_start)
+            assert release.wait(5)
+            return f"{mcp_active_owner_ctx.get()}:{query}"
+
+        tools = {tool.name: tool for tool in await server.list_tools()}
+        assert "query" in tools["search_news"].inputSchema["properties"]
+        monkeypatch.setattr(bridge.mcp_service, "mcp_reload_event", None)
+        scope = mcp_active_owner_ctx.set(owner_id)
+        supervisor = asyncio.create_task(bridge.mcp_background_task(Mock(list_xiaozhi_tokens=list_tokens), server))
+        tasks = [asyncio.create_task(server.call_tool("search_news", {"query": str(i)})) for i in range(3)]
+        try:
+            await asyncio.wait_for(asyncio.gather(scan_started.wait(), searches_started.wait()), 2)
+            assert started == {"0", "1"}
+            tasks[0].cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await tasks[0]
+
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client:
+                login = await asyncio.wait_for(client.get("/login"), 2)
+                assert login.status_code == 200 and "playful" in login.text
+                client.cookies.set(SESSION_COOKIE, session_serializer.dumps({"id": owner_id, "username": owner["username"]}))
+                home, items = await asyncio.wait_for(
+                    asyncio.gather(client.get("/dashboard"), client.get("/api/materials/list")),
+                    2,
+                )
+                assert home.status_code == items.status_code == 200
+                assert len({page.headers["X-Request-ID"] for page in (login, home, items)}) == 3
+                assert len(started) == 2
+            release.set()
+            results = await asyncio.wait_for(asyncio.gather(*tasks[1:]), 2)
+            assert [content[0].text for content, _ in results] == [f"{owner_id}:1", f"{owner_id}:2"]
+        finally:
+            release.set()
+            supervisor.cancel()
+            await asyncio.gather(supervisor, *tasks, return_exceptions=True)
+            mcp_active_owner_ctx.reset(scope)
+
+    asyncio.run(exercise())

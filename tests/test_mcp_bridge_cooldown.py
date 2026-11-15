@@ -1,8 +1,12 @@
 import asyncio
 from contextlib import asynccontextmanager
-from unittest.mock import Mock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
+from websockets.exceptions import InvalidStatus
+from websockets.datastructures import Headers
+from websockets.http11 import Response
 
 from xiaozhi.mcp import bridge
 from xiaozhi.mcp.bridge import (
@@ -101,3 +105,289 @@ def test_bridge_hides_token_from_logs_and_status(monkeypatch, caplog, error_type
         assert not any(record.exc_info for record in caplog.records)
     finally:
         reset_bridge_failure(task_key)
+
+
+@pytest.mark.parametrize(("code", "expected", "delay"), [
+    (401, "Token MCP ditolak", 900),
+    (200, "tanpa upgrade WebSocket", 900),
+    (503, "HTTP 503", 30),
+])
+def test_bridge_handshake_status_and_retry(monkeypatch, code, expected, delay):
+    @asynccontextmanager
+    async def failed_connection(*args, **kwargs):
+        raise InvalidStatus(Response(code, "synthetic", Headers()))
+        yield
+
+    status = Mock()
+    monkeypatch.setattr(bridge, "websocket_client_server", failed_connection)
+    monkeypatch.setattr(bridge, "set_mcp_connection_state", status)
+    monkeypatch.setattr(bridge.time, "time", lambda: 1000)
+    task_key = "99999:2"
+    try:
+        asyncio.run(bridge.run_mcp_bridge(None, None, 99999, "wss://example.test/mcp", "", slot=2))
+        assert expected in status.call_args.kwargs["message"]
+        assert status.call_args.kwargs["connected"] is False
+        assert mcp_bridge_failure_cooldowns[task_key] == 1000 + delay
+    finally:
+        reset_bridge_failure(task_key)
+
+
+@pytest.mark.parametrize("url", [
+    "wss://",
+    "wss://api.xiaozhi.me/mcp/",
+    "wss://api.xiaozhi.me/mcp/?token=...",
+    "wss://example.test/console",
+])
+def test_incomplete_endpoint_is_rejected_before_connecting(monkeypatch, url):
+    connect = Mock()
+    status = Mock()
+    monkeypatch.setattr(bridge, "websocket_client_server", connect)
+    monkeypatch.setattr(bridge, "set_mcp_connection_state", status)
+    try:
+        asyncio.run(bridge.run_mcp_bridge(None, None, 99999, url, "", slot=2))
+        connect.assert_not_called()
+        assert status.call_args.kwargs["connected"] is False
+    finally:
+        reset_bridge_failure("99999:2")
+
+
+def test_bridge_rechecks_empty_store_when_signaled(monkeypatch):
+    async def exercise():
+        loop = asyncio.get_running_loop()
+        monkeypatch.setattr(bridge.mcp_service, "mcp_reload_event", asyncio.Event())
+        monkeypatch.setattr(bridge.mcp_service, "_mcp_reload_loop", loop)
+        monkeypatch.setattr(bridge, "_RELOAD_COALESCE_SECONDS", 0.02)
+        first_poll = asyncio.Event()
+        next_poll = asyncio.Event()
+        polls = []
+
+        def list_tokens():
+            polls.append(None)
+            loop.call_soon_threadsafe(first_poll.set if len(polls) == 1 else next_poll.set)
+            return []
+
+        task = asyncio.create_task(bridge.mcp_background_task(Mock(list_xiaozhi_tokens=list_tokens), None))
+        try:
+            await asyncio.wait_for(first_poll.wait(), timeout=1)
+            await asyncio.gather(*(asyncio.to_thread(bridge.signal_mcp_reload) for _ in range(10)))
+            await asyncio.wait_for(next_poll.wait(), timeout=1)
+            assert len(polls) == 2
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+    asyncio.run(exercise())
+
+
+def test_repeated_clean_disconnects_back_off_and_a_stable_session_resets_counter(monkeypatch):
+    task_key = "99999:2"
+    clock = Mock(monotonic=Mock(return_value=100), time=Mock(return_value=1000))
+    reload = Mock()
+    status = Mock()
+
+    @asynccontextmanager
+    async def connected(*args, **kwargs):
+        yield None, None
+
+    monkeypatch.setattr(bridge, "websocket_client_server", connected)
+    monkeypatch.setattr(bridge, "set_mcp_connection_state", status)
+    monkeypatch.setattr(bridge, "signal_mcp_reload", reload)
+    monkeypatch.setattr(bridge, "time", clock)
+    server = SimpleNamespace(_mcp_server=Mock(run=AsyncMock()))
+
+    async def exercise():
+        async def run_bridge():
+            await bridge.run_mcp_bridge(None, server, 99999, "wss://example.test/mcp", "", slot=2)
+
+        await run_bridge()
+        first_delay = mcp_bridge_failure_cooldowns[task_key] - 1000
+        assert 30 <= first_delay < 45
+        assert status.call_args.kwargs["failure_code"] == "closed"
+        await run_bridge()
+        assert mcp_bridge_failure_cooldowns[task_key] - 1000 == first_delay + 30
+        assert mcp_bridge_failure_counts[task_key] == 2
+
+        async def stable_session(*args):
+            clock.monotonic.return_value += 65
+
+        server._mcp_server.run.side_effect = stable_session
+        await run_bridge()
+        assert mcp_bridge_failure_counts[task_key] == 1
+        assert mcp_bridge_failure_cooldowns[task_key] - 1000 == first_delay
+        reload.assert_not_called()
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        reset_bridge_failure(task_key)
+
+
+def test_cancelled_bridge_does_not_overwrite_status_or_set_cooldown(monkeypatch):
+    status = Mock()
+    monkeypatch.setattr(bridge, "set_mcp_connection_state", status)
+
+    async def exercise():
+        started = asyncio.Event()
+
+        @asynccontextmanager
+        async def connected(*args, **kwargs):
+            started.set()
+            yield None, None
+
+        monkeypatch.setattr(bridge, "websocket_client_server", connected)
+        async def wait_for_cancel(*args):
+            await asyncio.Future()
+
+        server = SimpleNamespace(_mcp_server=Mock(run=AsyncMock(side_effect=wait_for_cancel)))
+        task = asyncio.create_task(bridge.run_mcp_bridge(None, server, 99999, "wss://example.test/mcp", "", slot=2))
+        await asyncio.wait_for(started.wait(), timeout=1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert [call.kwargs["connected"] for call in status.call_args_list] == [True]
+        assert not is_bridge_in_cooldown("99999:2")
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("close_code", [1000, 1011])
+def test_websocket_protocol_and_bridge_shutdown(monkeypatch, caplog, close_code):
+    from mcp import ClientSession, types
+    from mcp.server.fastmcp import FastMCP
+    from mcp.shared.message import SessionMessage
+    import anyio
+    import websockets
+
+    status = Mock()
+    capture = Mock()
+    monkeypatch.setattr(config, "IS_PRODUCTION", False)
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setattr(bridge, "_handshake_limit", asyncio.Semaphore(1))
+    monkeypatch.setattr(bridge, "set_mcp_connection_state", status)
+    monkeypatch.setattr(bridge, "capture_xiaozhi_ws_chat", capture)
+    caplog.set_level("INFO", logger=bridge.logger.name)
+    server = FastMCP("Bridge test")
+
+    @server.tool()
+    def echo_text(text: str) -> str:
+        return text
+
+    async def exercise():
+        async def peer(ws):
+            to_client, from_socket = anyio.create_memory_object_stream(0)
+            to_socket, from_client = anyio.create_memory_object_stream(0)
+
+            async def read_messages():
+                async for message in ws:
+                    await to_client.send(SessionMessage(types.JSONRPCMessage.model_validate_json(message)))
+
+            async def write_messages():
+                async for message in from_client:
+                    await ws.send(message.message.model_dump_json(by_alias=True, exclude_none=True))
+
+            async with anyio.create_task_group() as group:
+                group.start_soon(read_messages)
+                group.start_soon(write_messages)
+                try:
+                    async with ClientSession(from_socket, to_socket) as client:
+                        await client.initialize()
+                        assert [tool.name for tool in (await client.list_tools()).tools] == ["echo_text"]
+                        result = await client.call_tool("echo_text", {"text": "coba bridge"})
+                        assert result.content[0].text == "coba bridge"
+                finally:
+                    group.cancel_scope.cancel()
+            await ws.close(code=close_code)
+
+        async with websockets.serve(peer, "127.0.0.1", 0) as local:
+            port = local.sockets[0].getsockname()[1]
+            await asyncio.wait_for(
+                bridge.run_mcp_bridge(None, server, 99999, f"ws://127.0.0.1:{port}/mcp", "", slot=2),
+                timeout=3,
+            )
+        assert [call.kwargs["connected"] for call in status.call_args_list] == [True, False]
+        assert status.call_args.kwargs["failure_code"] == "closed"
+        assert len(capture.call_args_list) == 2
+        assert all("coba bridge" in call.args[2] for call in capture.call_args_list)
+
+    try:
+        asyncio.run(exercise())
+        assert f"close_code={close_code}" in caplog.text
+    finally:
+        reset_bridge_failure("99999:2")
+
+
+def test_tool_list_loads_permissions_once_per_account(monkeypatch):
+    from mcp.server.fastmcp import FastMCP
+    from xiaozhi.mcp import server as mcp
+    from xiaozhi.mcp.context import mcp_active_owner_ctx
+
+    server = FastMCP("Permissions test")
+    for name in ("get_weather_bmkg", "search_news", "list_user_playlist", "get_real_relay_status"):
+        server.add_tool(lambda: "ok", name=name)
+    store = Mock()
+    store.get_user_features.return_value = {"youtube_music": False}
+    store.get_feature_settings.return_value = {"virtual_smarthome_enabled": True}
+    store.get_mcp_tool_toggles.return_value = {"search_news": False}
+    monkeypatch.setattr(mcp, "mcp_server", server)
+    mcp.setup_mode_filtering(store)
+
+    async def exercise():
+        from mcp import types
+
+        scope = mcp_active_owner_ctx.set(99)
+        try:
+            list_tools = server._mcp_server.request_handlers[types.ListToolsRequest]
+            result = await list_tools(types.ListToolsRequest())
+            assert [tool.name for tool in result.root.tools] == ["get_weather_bmkg"]
+        finally:
+            mcp_active_owner_ctx.reset(scope)
+
+    asyncio.run(exercise())
+    store.get_user_features.assert_called_once_with(99)
+    store.get_feature_settings.assert_called_once_with(99)
+    store.get_mcp_tool_toggles.assert_called_once_with(99)
+
+
+def test_handshakes_are_limited_even_when_many_slots_start_at_once(monkeypatch):
+    import websockets
+
+    async def exercise():
+        active = peak = attempted = 0
+        limit = bridge._MAX_CONCURRENT_HANDSHAKES
+        at_capacity, release = asyncio.Event(), asyncio.Event()
+
+        @asynccontextmanager
+        async def handshake(*args, **kwargs):
+            nonlocal active, peak, attempted
+            attempted += 1
+            active += 1
+            peak = max(peak, active)
+            if active == limit:
+                at_capacity.set()
+            try:
+                await release.wait()
+            finally:
+                active -= 1
+            raise OSError("simulated failure")
+            yield
+
+        async def connect():
+            with pytest.raises(OSError):
+                async with bridge.websocket_client_server(99999, "wss://example.test/mcp", ""):
+                    pass
+
+        monkeypatch.setattr(websockets, "connect", handshake)
+        monkeypatch.setattr(bridge, "_handshake_limit", asyncio.Semaphore(limit))
+        monkeypatch.setattr(bridge, "_handshake_start_lock", asyncio.Lock())
+        monkeypatch.setattr(bridge, "_HANDSHAKE_START_INTERVAL", 0)
+        tasks = [asyncio.create_task(connect()) for _ in range(24)]
+        try:
+            await asyncio.wait_for(at_capacity.wait(), timeout=2)
+            assert attempted == limit
+        finally:
+            release.set()
+            await asyncio.wait_for(asyncio.gather(*tasks), timeout=2)
+        assert peak == limit and attempted == 24
+
+    asyncio.run(exercise())

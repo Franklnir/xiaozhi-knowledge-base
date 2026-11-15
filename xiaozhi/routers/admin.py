@@ -18,6 +18,7 @@ from xiaozhi.dependencies import (
     redirect_with_message,
 )
 from xiaozhi.services.mcp_service import (
+    cancel_mcp_bridges,
     clear_mcp_state,
     is_mcp_connected,
     mcp_bridge_tasks,
@@ -453,11 +454,8 @@ async def admin_api_mcp_disconnect(request: Request, target_user_id: int, csrf_t
     store = get_store()
     validate_csrf(request, csrf_token, admin)
 
-    user_task = mcp_bridge_tasks.pop(target_user_id, None)
-    if user_task and not user_task.done():
-        user_task.cancel()
-
     deleted = store.delete_xiaozhi_token(target_user_id)
+    cancel_mcp_bridges(target_user_id)
     clear_mcp_state(target_user_id)
     signal_mcp_reload()
 
@@ -466,6 +464,8 @@ async def admin_api_mcp_disconnect(request: Request, target_user_id: int, csrf_t
 
 @router.post("/admin/api/mcp/reconnect/{target_user_id}")
 async def admin_api_mcp_reconnect(request: Request, target_user_id: int, csrf_token: str = Form(...)):
+    from xiaozhi.mcp.bridge import reset_bridge_failure
+
     admin = require_admin(request)
     store = get_store()
     validate_csrf(request, csrf_token, admin)
@@ -474,13 +474,16 @@ async def admin_api_mcp_reconnect(request: Request, target_user_id: int, csrf_to
     if not token:
         raise HTTPException(status_code=404, detail="User ini tidak memiliki MCP endpoint tersimpan.")
 
-    user_task = mcp_bridge_tasks.pop(target_user_id, None)
+    token_info = store.get_xiaozhi_token_info(target_user_id)
+    slot = int((token_info or {}).get("slot_number") or 1)
+    task_key = f"{target_user_id}:{slot}"
+    user_task = mcp_bridge_tasks.pop(task_key, None)
     if user_task and not user_task.done():
         user_task.cancel()
 
-    token_info = store.get_xiaozhi_token_info(target_user_id)
+    reset_bridge_failure(task_key)
     token_hash = token_info.get("token_hash", "") if token_info else ""
-    set_mcp_connection_state(target_user_id, token_hash, connected=False, message="Admin memaksa reconnect...")
+    set_mcp_connection_state(target_user_id, token_hash, connected=False, message="Admin memaksa reconnect...", slot=slot)
     signal_mcp_reload()
 
     return {"success": True, "message": f"User {target_user_id} MCP reconnecting."}
@@ -549,9 +552,8 @@ async def admin_api_mcp_block(request: Request, target_user_id: int, csrf_token:
     store.set_mcp_blocked(target_user_id, True, reason)
 
     # Disconnect if currently connected
-    user_task = mcp_bridge_tasks.pop(target_user_id, None)
-    if user_task and not user_task.done():
-        user_task.cancel()
+    cancel_mcp_bridges(target_user_id)
+    signal_mcp_reload()
 
     clear_mcp_state(target_user_id)
     signal_mcp_reload()

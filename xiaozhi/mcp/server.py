@@ -1,3 +1,5 @@
+import asyncio
+import functools
 import logging
 from typing import Any, Dict, Optional
 
@@ -18,6 +20,17 @@ REAL_RELAY_MCP_TOOLS = {
     "all_real_relays_on",
     "all_real_relays_off",
 }
+_BLOCKING_SEARCH_TOOLS = {
+    "research_youtube_information", "find_youtube_video_to_play",
+    "search_web", "search_web_deep", "search_news", "search_places",
+    "search_social_media", "search_course_materials", "read_live_api_data",
+    "get_weather_bmkg", "get_earthquake_info", "lookup_kbbi", "search_wikipedia",
+    "convert_currency", "search_academic_papers", "autonomous_deep_research",
+}
+_MUSIC_TOOLS = {
+    "play_youtube_song", "play_playlist_song", "list_user_playlist",
+    "get_playlist_top_played", "get_playlist_cache_status",
+}
 
 
 def init_mcp_server(store, youtube_search_fn=None):
@@ -26,14 +39,12 @@ def init_mcp_server(store, youtube_search_fn=None):
 
     try:
         from mcp.server.fastmcp import FastMCP
-        from xiaozhi.mcp.context import mcp_active_owner_ctx
         from xiaozhi.mcp.tools import register_tools
         from xiaozhi.services.mcp_service import record_mcp_tool_history_to_store
 
         mcp_server = FastMCP("XiaozhiIndonesia")
 
-        # Register all tools
-        register_tools(mcp_server, store, record_mcp_tool_history_to_store, youtube_search_fn)
+        register_tools(_SearchToolRegistrar(mcp_server), store, record_mcp_tool_history_to_store, youtube_search_fn)
 
         # Setup mode filtering
         setup_mode_filtering(store)
@@ -43,6 +54,39 @@ def init_mcp_server(store, youtube_search_fn=None):
     except ImportError:
         logger.warning("MCP package not available. MCP server disabled.")
         return None
+
+
+class _SearchToolRegistrar:
+    """Keep blocking searches off the server loop without changing tool schemas."""
+
+    def __init__(self, server):
+        self.server = server
+        self.limit = asyncio.Semaphore(2)
+
+    def _search_finished(self, work):
+        self.limit.release()
+        if not work.cancelled():
+            work.exception()  # The client might have disconnected.
+
+    def tool(self, *args, **kwargs):
+        register = self.server.tool(*args, **kwargs)
+
+        def decorate(fn):
+            if fn.__name__ in _BLOCKING_SEARCH_TOOLS:
+
+                @functools.wraps(fn)
+                async def run_search(*call_args, **call_kwargs):
+                    await self.limit.acquire()
+                    # A disconnected client can exit while its search still occupies capacity.
+                    work = asyncio.create_task(asyncio.to_thread(fn, *call_args, **call_kwargs))
+                    work.add_done_callback(self._search_finished)
+                    return await asyncio.shield(work)
+
+                register(run_search)
+                return fn
+            return register(fn)
+
+        return decorate
 
 
 def handle_virtual_tool_with_real_relay(owner_id: int, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -185,39 +229,26 @@ def setup_mode_filtering(store):
     original_mcp_list_tools = mcp_server.list_tools
     original_mcp_call_tool = mcp_server.call_tool
 
-    def active_virtual_smarthome_enabled() -> Optional[bool]:
-        owner_id = mcp_active_owner_ctx.get()
-        if owner_id is None:
-            return None
-        return bool(store.get_feature_settings(owner_id).get("virtual_smarthome_enabled", True))
-
-    def tool_allowed_for_active_mode(tool_name: str) -> bool:
-        virtual_enabled = active_virtual_smarthome_enabled()
-        if virtual_enabled is None:
-            virtual_enabled = True
+    def tool_allowed_for_mode(tool_name: str, virtual_enabled: bool) -> bool:
         if virtual_enabled:
             return tool_name not in REAL_RELAY_MCP_TOOLS
         return tool_name not in VIRTUAL_SMARTHOME_MCP_TOOLS
 
-    def is_tool_allowed_for_user(owner_id: Optional[int], tool_name: str) -> bool:
-        if not tool_allowed_for_active_mode(tool_name):
-            return False
-        if owner_id is not None:
-            # Check user features (e.g. youtube_music)
-            features = store.get_user_features(owner_id)
-            if tool_name in {"play_youtube_song", "play_playlist_song", "list_user_playlist", "get_playlist_top_played", "get_playlist_cache_status"} and not features.get("youtube_music", True):
-                return False
-            # Check tool toggles set by admin
-            if hasattr(store, "get_mcp_tool_toggles"):
-                toggles = store.get_mcp_tool_toggles(owner_id)
-                if not toggles.get(tool_name, True):
-                    return False
-        return True
+    def load_tool_policy(owner_id: Optional[int]):
+        if owner_id is None:
+            return True, True, {}
+        features = store.get_user_features(owner_id)
+        virtual = store.get_feature_settings(owner_id).get("virtual_smarthome_enabled", True)
+        toggles = store.get_mcp_tool_toggles(owner_id) if hasattr(store, "get_mcp_tool_toggles") else {}
+        return bool(virtual), features.get("youtube_music", True), toggles
 
     async def list_mode_filtered_tools():
         tools = await original_mcp_list_tools()
-        owner_id = mcp_active_owner_ctx.get()
-        return [tool for tool in tools if is_tool_allowed_for_user(owner_id, tool.name)]
+        virtual_enabled, music_enabled, toggles = await asyncio.to_thread(load_tool_policy, mcp_active_owner_ctx.get())
+        return [
+            tool for tool in tools if tool_allowed_for_mode(tool.name, virtual_enabled)
+            and (music_enabled or tool.name not in _MUSIC_TOOLS) and toggles.get(tool.name, True)
+        ]
 
     async def call_mode_filtered_tool(name: str, arguments: Dict[str, Any]):
         # Tool name alias resolution agar LLM fleksibel memanggil fungsi
@@ -236,18 +267,15 @@ def setup_mode_filtering(store):
             name = tool_aliases[name]
 
         owner_id = mcp_active_owner_ctx.get()
+        virtual_enabled, music_enabled, toggles = await asyncio.to_thread(load_tool_policy, owner_id)
         if owner_id is not None:
-            features = store.get_user_features(owner_id)
-            if name in {"play_youtube_song", "play_playlist_song", "list_user_playlist", "get_playlist_top_played", "get_playlist_cache_status"} and not features.get("youtube_music", True):
+            if name in _MUSIC_TOOLS and not music_enabled:
                 return {"success": False, "message": "Anda tidak diizinkan putar lagu atau cek playlist. Fitur YouTube Music telah dinonaktifkan oleh administrator."}
-            if hasattr(store, "get_mcp_tool_toggles"):
-                toggles = store.get_mcp_tool_toggles(owner_id)
-                if not toggles.get(name, True):
-                    return {"success": False, "message": f"Tool '{name}' telah dinonaktifkan oleh administrator untuk akun Anda."}
+            if not toggles.get(name, True):
+                return {"success": False, "message": f"Tool '{name}' telah dinonaktifkan oleh administrator untuk akun Anda."}
 
-        if not tool_allowed_for_active_mode(name):
-            virtual_enabled = active_virtual_smarthome_enabled()
-            if virtual_enabled or virtual_enabled is None:
+        if not tool_allowed_for_mode(name, virtual_enabled):
+            if virtual_enabled:
                 if owner_id is not None and name in REAL_RELAY_MCP_TOOLS:
                     return handle_real_tool_with_virtual_relay(int(owner_id), name, arguments or {})
                 return {"success": False, "message": "Relay Nyata sedang nonaktif karena Simulasi Smart Home Virtual aktif."}

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from xiaozhi.database.dashboard_materials import PAGE_SIZE
+from xiaozhi.core.request_timing import measure
 from xiaozhi.services.sse_service import (
     broadcast_material_event,
     stream_material_events,
@@ -40,14 +41,16 @@ def dashboard_page(
     request: Request, q: str = Query("", max_length=200), category: str = Query("", max_length=120),
     page: int = Query(1, ge=1),
 ):
-    user = get_current_user(request)
+    with measure(request, "auth"):
+        user = get_current_user(request)
     if not user:
         return redirect_with_message("/login", "Silakan masuk terlebih dahulu.")
     store = get_store()
-    categories = store.list_categories(user["id"])
-    context = material_list_context(store, user["id"], q, category, page)
-    quota = store.user_quota(user["id"])
-    token_info = store.get_xiaozhi_token_info(user["id"])
+    with measure(request, "db"):
+        categories = store.list_categories(user["id"])
+        context = material_list_context(store, user["id"], q, category, page)
+        quota = store.user_quota(user["id"])
+        token_info = store.get_xiaozhi_token_info(user["id"])
     mcp_status = mcp_status_payload(
         user["id"],
         token_saved=bool(token_info),
@@ -87,23 +90,28 @@ def material_list_context(store, owner_id, query, category, page):
 @router.get("/api/materials/list", response_class=HTMLResponse)
 def dashboard_material_list(request: Request, q: str = Query("", max_length=200),
                             category: str = Query("", max_length=120), page: int = Query(1, ge=1)):
-    user = get_current_user(request)
+    with measure(request, "auth"):
+        user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Sesi telah berakhir.")
     store = get_store()
-    context = material_list_context(store, user["id"], q, category, page)
+    with measure(request, "db"):
+        context = material_list_context(store, user["id"], q, category, page)
     from xiaozhi.dependencies import templates
-    response = templates.TemplateResponse(request=request, name="dashboard/material_list.html", context=context)
+    with measure(request, "render"):
+        response = templates.TemplateResponse(request=request, name="dashboard/material_list.html", context=context)
     response.headers["Cache-Control"] = "no-store"
     return response
 
 
 @router.get("/api/materials/detail/{material_id}")
 def dashboard_material_detail(request: Request, material_id: int):
-    user = get_current_user(request)
+    with measure(request, "auth"):
+        user = get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Sesi telah berakhir.")
-    item = get_store().get_material(user["id"], material_id)
+    with measure(request, "db"):
+        item = get_store().get_material(user["id"], material_id)
     if not item:
         raise HTTPException(status_code=404, detail="Materi tidak ditemukan.")
     fields = ("id", "title", "category", "content", "keywords", "source_type", "api_url", "api_label", "masked_api_url")

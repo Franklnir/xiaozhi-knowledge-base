@@ -13,6 +13,16 @@ mcp_state_lock = RLock()
 mcp_connection_states: Dict[str, Dict[str, Any]] = {}
 mcp_bridge_tasks: Dict[str, asyncio.Task] = {}
 mcp_reload_event: Optional[asyncio.Event] = None
+_mcp_reload_loop: Optional[asyncio.AbstractEventLoop] = None
+_MCP_FAILURE_REASONS = {
+    "invalid_endpoint": "Format endpoint MCP tidak valid.",
+    "unauthorized": "Token MCP ditolak (HTTP 401). Salin ulang endpoint dari konsol XiaoZhi.",
+    "no_upgrade": "Endpoint menjawab HTTP 200 tanpa upgrade WebSocket.",
+    "handshake": "Server tujuan menolak koneksi WebSocket.",
+    "closed": "Koneksi WebSocket terputus.",
+    "network": "Koneksi jaringan MCP gagal.",
+    "connection": "Koneksi MCP gagal.",
+}
 
 
 def _slot_key(owner_id: int, slot: int = 1) -> str:
@@ -49,6 +59,7 @@ def set_mcp_connection_state(
     slot: int = 1,
     device_label: str = "",
     board_mac: str = "",
+    failure_code: str = "",
     **kwargs: Any,
 ) -> None:
     user_id = int(owner_id)
@@ -59,6 +70,9 @@ def set_mcp_connection_state(
     mac_val = (board_mac or "").strip()
     with mcp_state_lock:
         previous = dict(mcp_connection_states.get(key, {}))
+        if token_hash and previous.get("token_hash") != token_hash:
+            previous = {}
+        updated_at = utc_now()
         previous.update(
             {
                 "connected": bool(connected),
@@ -68,7 +82,9 @@ def set_mcp_connection_state(
                 "slot": slot_num,
                 "device_label": label,
                 "board_mac": mac_val or previous.get("board_mac", ""),
-                "updated_at": utc_now(),
+                "updated_at": updated_at,
+                "failure_code": failure_code if not connected else "",
+                "last_connected_at": updated_at if connected else previous.get("last_connected_at"),
             }
         )
         mcp_connection_states[key] = previous
@@ -210,6 +226,38 @@ def mcp_slots_payload(owner_id: int, store: Any) -> Dict[str, Any]:
     }
 
 
+def get_mcp_slot_diagnostics(owner_id: int, store: Any, slot: int = 0) -> Dict[str, Any]:
+    """Return owner-scoped status without credentials or raw bridge messages."""
+    tokens = {int(info["slot_number"]): info for info in store.list_user_xiaozhi_tokens(owner_id)}
+    access_plus = store.get_user_access_plus(owner_id)
+    blocked = store.is_mcp_blocked(owner_id) if hasattr(store, "is_mcp_blocked") else False
+    slots = []
+    with mcp_state_lock:
+        for number in ((slot,) if slot else (1, 2, 3)):
+            token = tokens.get(number)
+            token_hash = normalize_token_hash(token.get("token_hash", "")) if token else ""
+            state = mcp_connection_states.get(_slot_key(owner_id, number), {})
+            if not token_hash or state.get("token_hash") != token_hash:
+                state = {}
+            failure = state.get("failure_code")
+            restricted = number > 1 and not access_plus.get("mcp_multislot_allowed", True)
+            if blocked or restricted or (token and not token.get("is_active", True)):
+                status, reason = "disabled", "Akses MCP untuk slot ini dinonaktifkan."
+            elif not token:
+                status, reason = "not_configured", None
+            elif state.get("connected"):
+                status, reason = "connected", None
+            else:
+                status, reason = "disconnected", _MCP_FAILURE_REASONS.get(failure)
+            slots.append({
+                "slot": number,
+                "status": status,
+                "last_connected_at": state.get("last_connected_at"),
+                "failure_reason": reason,
+            })
+    return {"success": True, "slots": slots}
+
+
 def mcp_status_payload(
     owner_id: int,
     *,
@@ -243,10 +291,41 @@ def mcp_status_payload(
     }
 
 
+def init_mcp_reload() -> None:
+    global mcp_reload_event, _mcp_reload_loop
+    mcp_reload_event = asyncio.Event()
+    _mcp_reload_loop = asyncio.get_running_loop()
+
+
+def clear_mcp_reload() -> None:
+    global mcp_reload_event, _mcp_reload_loop
+    mcp_reload_event = None
+    _mcp_reload_loop = None
+
+
+def cancel_mcp_bridges(owner_id: int) -> None:
+    for key in (owner_id, *(_slot_key(owner_id, slot) for slot in (1, 2, 3))):
+        task = mcp_bridge_tasks.pop(key, None)
+        if task is not None and not task.done():
+            task.cancel()
+
+
 def signal_mcp_reload() -> None:
-    if mcp_reload_event:
-        mcp_reload_event.set()
-        logger.info("MCP reload signal sent")
+    event = mcp_reload_event
+    loop = _mcp_reload_loop
+    if event is None:
+        return
+    try:
+        caller_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        caller_loop = None
+    if loop is None or loop is caller_loop:
+        event.set()
+    elif loop.is_running():
+        try:
+            loop.call_soon_threadsafe(event.set)
+        except RuntimeError:
+            pass  # Application shutdown.
 
 
 _store_ref = None

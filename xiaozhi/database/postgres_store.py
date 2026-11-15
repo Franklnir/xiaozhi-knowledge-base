@@ -1677,7 +1677,7 @@ class PostgresStore:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 self.set_rls_context(cur, user_id=None, user_role="system")
-                cur.execute("SELECT user_id, slot_number, device_label, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active FROM xiaozhi_tokens ORDER BY user_id, slot_number")
+                cur.execute("SELECT user_id, slot_number, device_label, board_mac, token_ciphertext, token_hash, COALESCE(is_active, TRUE) as is_active FROM xiaozhi_tokens ORDER BY user_id, slot_number")
                 rows = cur.fetchall()
         result = []
         for row in rows:
@@ -1687,6 +1687,7 @@ class PostgresStore:
                     "user_id": row["user_id"],
                     "slot_number": row.get("slot_number", 1) or 1,
                     "device_label": row.get("device_label", "XiaoZhi 1") or "XiaoZhi 1",
+                    "board_mac": row.get("board_mac") or "",
                     "token": token,
                     "token_hash": row["token_hash"],
                     "is_active": bool(row.get("is_active", True)),
@@ -4063,10 +4064,13 @@ class PostgresStore:
                         r["created_at"] = _format_ts(r["created_at"]) or ""
                 return rows
 
-    def delete_reminder(self, owner_id: int, reminder_id: str) -> bool:
+    def delete_reminder(self, owner_id: int, reminder_id: str, *, pending_only: bool = False) -> bool:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM reminders WHERE id = %s AND owner_id = %s", (reminder_id, int(owner_id)))
+                sql = "DELETE FROM reminders WHERE id = %s AND owner_id = %s"
+                if pending_only:
+                    sql += " AND status = 'pending'"
+                cur.execute(sql, (reminder_id, int(owner_id)))
                 affected = cur.rowcount > 0
             conn.commit()
         return affected
@@ -4076,21 +4080,16 @@ class PostgresStore:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM reminders WHERE status = 'pending' AND scheduled_at <= %s ORDER BY scheduled_at ASC",
+                    "UPDATE reminders SET status = 'processing' "
+                    "WHERE status = 'pending' AND scheduled_at <= %s RETURNING *",
                     (now,),
                 )
                 reminders = [dict(r) for r in cur.fetchall()]
                 for r in reminders:
                     if "created_at" in r:
                         r["created_at"] = _format_ts(r["created_at"]) or ""
-                if reminders:
-                    ids = [r["id"] for r in reminders]
-                    cur.execute(
-                        "UPDATE reminders SET status = 'processing' WHERE id = ANY(%s)",
-                        (ids,),
-                    )
             conn.commit()
-        return reminders
+        return sorted(reminders, key=lambda row: row["scheduled_at"])
 
     def mark_reminder_sent(self, reminder_id: str) -> None:
         with self._get_conn() as conn:

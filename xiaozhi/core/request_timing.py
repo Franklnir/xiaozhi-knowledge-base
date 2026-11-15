@@ -1,4 +1,4 @@
-"""Request-scoped timings for the web login flow."""
+"""Stage timings for monitored web requests."""
 
 from contextlib import contextmanager
 from time import perf_counter
@@ -6,7 +6,7 @@ from time import perf_counter
 
 @contextmanager
 def measure(request, name, *, excluding=None):
-    timings = getattr(request.state, "login_timings", None)
+    timings = getattr(request.state, "request_timings", None)
     if timings is None:
         yield
         return

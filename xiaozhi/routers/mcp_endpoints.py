@@ -127,6 +127,12 @@ async def save_mcp(
             }, status_code=403)
     
     label_clean = (device_label or "").strip()[:60] or (f"{user.get('username')} - Slot 1" if slot_num == 1 else f"XiaoZhi {slot_num}")
+    from xiaozhi.mcp.bridge import reset_bridge_failure, run_mcp_bridge, validate_mcp_ws_url
+    mcp_token = mcp_token.strip()
+    valid, message = validate_mcp_ws_url(mcp_token)
+    if not valid:
+        return JSONResponse({"success": False, "request_id": req_id, "detail": message}, status_code=400)
+
     try:
         store.set_xiaozhi_token(user["id"], mcp_token, slot=slot_num, device_label=label_clean, request_id=req_id)
         token_info = store.get_xiaozhi_token_info(user["id"], slot=slot_num)
@@ -150,10 +156,7 @@ async def save_mcp(
             legacy_task.cancel()
 
         # Reset cooldown failure state so reconnect is immediate
-        from xiaozhi.mcp.bridge import reset_bridge_failure, run_mcp_bridge
         reset_bridge_failure(task_key)
-        reset_bridge_failure(f"{user['id']}:1")
-        reset_bridge_failure(str(user["id"]))
 
         # Launch bridge task immediately without waiting for 30s background poll
         from xiaozhi.mcp.server import mcp_server
@@ -293,8 +296,6 @@ async def reconnect_mcp(
     board_mac = token_info.get("board_mac", "") if token_info else ""
     from xiaozhi.mcp.bridge import reset_bridge_failure, run_mcp_bridge
     reset_bridge_failure(task_key)
-    reset_bridge_failure(f"{user['id']}:1")
-    reset_bridge_failure(str(user["id"]))
 
     from xiaozhi.mcp.server import mcp_server
     if mcp_server is not None and raw_token:

@@ -27,7 +27,7 @@ SUPPORTED_EMOTIONS: Dict[str, Dict[str, Any]] = {
         "tone_guidance": "Nada bicara tegas, ketus, sedikit meninggi, dan berapi-api. Gunakan kalimat pendek-pendek dengan penekanan keras pada kata utama tanpa tawa.",
         "pitch_and_speed": "Pitch meninggi +25%, tempo sedikit cepat dan agresif, volume tegas.",
         "tts_tags": ["[angry]", "<emotion value='angry'>", "[growl]", "[sigh]"],
-        "sample_dialogue": "Hih! Kamu ini bener-bener ya! Udah dibilangin berkali-kali masih aja ngeyel! Bikin kesal aja!",
+        "sample_dialogue": "Cukup. Ini sudah kelewatan. Saya benar-benar kesal dengan situasi ini.",
     },
     "senyum": {
         "title": "Senyum & Ramah",
@@ -123,7 +123,7 @@ SUPPORTED_EMOTIONS: Dict[str, Dict[str, Any]] = {
         "tone_guidance": "Nada suara diiringi tawa lepas yang renyah dan menggelitik. Selipkan hembusan nafas tawa di sela-sela kata ('haha', 'hihi', 'wkwk') dengan tempo naik-turun spontan dan sangat terhibur.",
         "pitch_and_speed": "Pitch bervariasi dengan getaran tawa, tempo lincah santai, hembusan nafas geli.",
         "tts_tags": ["[laugh]", "[giggle]", "[chuckle]", "<emotion value='laugh'>"],
-        "sample_dialogue": "Hahaha! Aduh lucu banget, wkwkwk! Beneran gak tahan pengen ngakak! Kamu ada-ada aja sih candaannya, haha aduh...",
+        "sample_dialogue": "Ha ha ha! Hah… ha ha ha!",
     },
     "sedih": {
         "title": "Sedih & Menangis Terharu",
@@ -361,6 +361,7 @@ def build_expression_payload(
     reason: str = "",
     custom_message: str = "",
     custom_interjection: str = "",
+    allow_profanity: bool = False,
 ) -> Dict[str, Any]:
     """
     Menghasilkan data terstruktur dan panduan vokal bagi AI XiaoZhi
@@ -384,17 +385,32 @@ def build_expression_payload(
     # Bangun instruksi aksi tegas untuk prompt XiaoZhi
     instruction_parts = [
         f"Gunakan ekspresi '{info['title']}' ({emoji}) dengan intensitas '{norm_intensity}'.",
-        f"WAJIB keluarkan reaksi vokal suara: '{selected_cue}' di awal jawaban Anda.",
         f"Atur nada bicaramu: {tone}",
         f"Modulasi suara: {pitch_speed}.",
     ]
+    if canon_key not in ("marah", "ketawa"):
+        instruction_parts.append(f"Keluarkan reaksi vokal '{selected_cue}' di awal jawaban.")
 
     if canon_key == "ketawa":
-        instruction_parts.append(f"Tertawalah dengan renyah dan santai di sela-sela kata ('{selected_cue}' atau 'wkwkwk').")
+        instruction_parts.append(
+            "Tertawalah langsung dalam beberapa hentakan, beri jeda singkat untuk menarik napas, "
+            "lalu lanjutkan tawa. Ucapkan 'ha ha ha' dengan ritme alami. "
+            "Jangan mengeja 'wkwkwk', membuat lelucon tambahan, atau menjelaskan bahwa Anda sedang tertawa."
+        )
     elif canon_key == "teriak":
         instruction_parts.append("Gunakan HURUF KAPITAL dan banyak tanda seru (!) untuk menandai seruan lantang/teriakan bervolume penuh.")
     elif canon_key == "marah":
-        instruction_parts.append("Tunjukkan kekesalan atau ketegasan membara dengan nada tajam tanpa menggunakan kata-kata kasar.")
+        instruction_parts.append(
+            "Sampaikan kemarahan dengan serius: kalimat pendek, jeda tegas, dan tekanan pada kata utama. "
+            "Pertahankan nada serius sampai selesai, tanpa tawa, ejekan, atau nada bercanda."
+        )
+        if allow_profanity:
+            instruction_parts.append(
+                "Jika sesuai konteks, ucapkan umpatan situasional seperti 'Sialan, ini sudah kelewatan.' "
+                "Arahkan kekesalan pada situasi. Hindari hinaan personal dan ancaman."
+            )
+        else:
+            instruction_parts.append("Gunakan bahasa tegas tanpa menambahkan umpatan.")
     elif canon_key == "bingung":
         instruction_parts.append("Gunakan intonasi naik di akhir kata dan selipkan keheranan ('Hah? Kok bisa ya?').")
     elif canon_key == "senyum":
@@ -407,10 +423,28 @@ def build_expression_payload(
     if reason:
         instruction_parts.append(f"Konteks penyebab emosi: {reason.strip()}.")
 
-    if custom_message:
-        sample_response = f"{primary_tts_tag} {selected_cue} {custom_message.strip()}"
+    if custom_message.strip():
+        spoken_text = f"{selected_cue} {custom_message.strip()}"
+    elif canon_key == "ketawa":
+        laugh = {
+            "ringan": "He he…",
+            "sedang": "Ha ha ha! Hah… ha ha!",
+            "tinggi": "Ha ha ha ha! Hah… ha ha ha!",
+            "ekstrem": "Ha ha ha ha ha! Hah… ha ha ha ha!",
+        }[norm_intensity]
+        spoken_text = custom_interjection.strip() or laugh
+    elif canon_key == "marah":
+        opening = custom_interjection.strip() or ("Sialan." if allow_profanity else "Cukup.")
+        spoken_text = f"{opening} Ini sudah kelewatan. Saya benar-benar kesal dengan situasi ini."
     else:
-        sample_response = f"{primary_tts_tag} {selected_cue} {info['sample_dialogue']}"
+        spoken_text = f"{selected_cue} {info['sample_dialogue']}"
+
+    if canon_key in ("marah", "ketawa"):
+        instruction_parts.append(
+            "Lakukan ekspresinya sekarang melalui ucapan. Gunakan spoken_text sebagai contoh bunyi, "
+            "sesuaikan kalimat marah dengan konteks, dan jangan bacakan nama emosi atau tag TTS. "
+            "Gunakan tag hanya bila mesin suara mendukungnya."
+        )
 
     return {
         "success": True,
@@ -425,7 +459,8 @@ def build_expression_payload(
         "tts_tag": primary_tts_tag,
         "all_tts_tags": tts_tags,
         "reason": reason or "Reaksi spontan percakapan",
-        "sample_response": sample_response,
+        "sample_response": f"{primary_tts_tag} {spoken_text}".strip(),
+        "spoken_text": spoken_text,
         "instruksi_xiaozhi": " ".join(instruction_parts),
         "metadata": {
             "face": canon_key,

@@ -1438,6 +1438,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         reason: str = "",
         custom_message: str = "",
         custom_interjection: str = "",
+        allow_profanity: bool = False,
     ) -> dict:
         """
         Mengekspresikan emosi vokal dan animasi wajah untuk XiaoZhi atau AI Persona saat sedang marah, senyum, bahagia, bingung, senang, teriak, ketawa, sedih, kaget, bisik, sarkas, bangga, ngantuk, tenang, atau takut.
@@ -1445,6 +1446,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         - User meminta XiaoZhi berekspresi: "coba kamu ketawa dong", "teriak sekerasnya", "marah dong", "senyum buat aku", "kamu bingung ya?"
         - Percakapan memicu emosi nyata: lelucon lucu (ketawa), kabar gembira/sukses (senang/bahagia/teriak gembira), hal aneh/paradoks (bingung), perlakuan kasar/kesal (marah), kabar duka (sedih/menangis), rahasia (bisik), dll.
         - Ingin memodulasi nada bicara, intonasi suara, onomatopoeia suara, dan ekspresi layar ESP32/display.
+        Untuk "marah serius" atau "ketawa lepas", gunakan intensitas tinggi bila tidak disebutkan.
+        Setelah tool merespons, langsung ekspresikan lewat ucapan sesuai instruksi_xiaozhi dan spoken_text.
 
         Args:
             emotion: Nama emosi/ekspresi ("marah", "senyum", "bahagia", "bingung", "senang", "teriak", "ketawa", "sedih", "kaget", "bisik", "sarkas", "bangga", "ngantuk", "tenang", "takut").
@@ -1452,6 +1455,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             reason: Alasan atau konteks pemicu emosi (contoh: "User menceritakan lelucon lucu", "Merayakan kelulusan user").
             custom_message: Kalimat respons atau kata-kata yang ingin diucapkan bersamaan dengan nada emosi ini (opsional).
             custom_interjection: Kata seru kustom jika ingin suara vokal khusus (contoh: "Wkwkwk", "Hahaha", "WAAAH!", "Grrr!").
+            allow_profanity: Set True jika pengguna meminta umpatan. Untuk marah, arahkan umpatan ke situasi.
         """
         owner_id = mcp_active_owner_ctx.get()
         from xiaozhi.services.expression_service import build_expression_payload
@@ -1461,6 +1465,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             reason=reason,
             custom_message=custom_message,
             custom_interjection=custom_interjection,
+            allow_profanity=allow_profanity,
         )
         if owner_id:
             q_str = f"{emotion} ({intensity}): {reason or custom_message or 'ekspresi vokal'}".strip()
@@ -1469,6 +1474,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 "intensity": intensity,
                 "reason": reason,
                 "custom_message": custom_message,
+                "allow_profanity": allow_profanity,
             }, result)
         return result
 
@@ -3842,6 +3848,21 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     # â”€â”€ New Tools â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @mcp_server.tool()
+    def get_mcp_connection_status(slot: int = 0) -> dict:
+        """Cek koneksi MCP milik akun aktif. Slot 0 menampilkan semua slot, atau pilih 1–3.
+
+        Gunakan untuk menjawab pertanyaan status koneksi, kapan slot terakhir terhubung,
+        atau alasan koneksi gagal. Panggilan memerlukan sesi MCP yang masih aktif.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if not owner_id:
+            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif."}
+        if slot not in (0, 1, 2, 3):
+            return {"success": False, "message": "Pilih slot 1–3, atau 0 untuk semua slot."}
+        from xiaozhi.services.mcp_service import get_mcp_slot_diagnostics
+        return get_mcp_slot_diagnostics(owner_id, store, slot)
+
+    @mcp_server.tool()
     def set_reminder(text: str) -> dict:
         """
         Set pengingat/alarm via perintah suara.
@@ -3859,6 +3880,44 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         if owner_id:
             record_mcp_tool_history(owner_id, "set_reminder", text, {"text": text}, result)
         return result
+
+    @mcp_server.tool()
+    def list_reminders(period: str = "semua") -> dict:
+        """Lihat pengingat yang masih terjadwal untuk akun aktif.
+
+        Args:
+            period: 'hari_ini', 'besok', atau 'semua'. Waktu ditampilkan dalam WIB.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if not owner_id:
+            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif."}
+        period = period.strip().lower().replace(" ", "_")
+        if period not in ("hari_ini", "besok", "semua"):
+            return {"success": False, "message": "Pilih hari_ini, besok, atau semua."}
+        if not hasattr(store, "list_reminders"):
+            return {"success": False, "message": "Penyimpanan ini belum mendukung pengingat."}
+        from xiaozhi.services.reminder_service import list_reminders as read_reminders
+        return {"success": True, "period": period, "reminders": read_reminders(store, owner_id, period)}
+
+    @mcp_server.tool()
+    def cancel_reminder(reminder_id: str) -> dict:
+        """Batalkan satu pengingat yang masih terjadwal atas permintaan pengguna.
+
+        Jika pengguna menyebut pesan atau jam, panggil list_reminders untuk mencari ID.
+        Jika ada beberapa pilihan yang cocok, tanyakan pengingat mana yang dimaksud.
+        """
+        owner_id = mcp_active_owner_ctx.get()
+        if not owner_id:
+            return {"success": False, "message": "Belum ada koneksi Xiaozhi aktif."}
+        if not hasattr(store, "delete_reminder"):
+            return {"success": False, "message": "Penyimpanan ini belum mendukung pengingat."}
+        reminder_id = reminder_id.strip()
+        if not reminder_id or len(reminder_id) > 64:
+            return {"success": False, "message": "Pilih ID pengingat yang valid dari daftar."}
+        from xiaozhi.services.reminder_service import cancel_reminder as cancel_pending_reminder
+        if not cancel_pending_reminder(store, owner_id, reminder_id):
+            return {"success": False, "message": "Pengingat aktif tidak ditemukan atau sudah diproses."}
+        return {"success": True, "message": "Pengingat berhasil dibatalkan.", "reminder_id": reminder_id}
 
     @mcp_server.tool()
     def calculate(expression: str) -> dict:
