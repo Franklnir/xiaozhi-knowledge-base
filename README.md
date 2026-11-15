@@ -58,6 +58,23 @@ Tanpa `HF_TOKEN`, app memakai cache lokal `.hf_db_cache/app_data.json` hanya unt
 - Endpoint MCP bisa diperbarui dari dashboard; nilai lama akan diganti dan disimpan terenkripsi.
 - Halaman auth menyediakan pilihan Login, Cari akun, dan Register. Pencarian akun dibatasi prefix minimal 2 karakter dan memakai rate limit dasar.
 - Relay Nyata memakai API polling dari ESP32/8266 dll, bukan broker MQTT. ESP32/8266 dll membaca perintah dari endpoint `/api/device/relay/{slug}/commands` dan mengirim status terbaru ke `/api/device/relay/{slug}/status` memakai token perangkat.
+## Radio Live di playlist
+
+Tambahkan stasiun yang mengizinkan integrasi di `data/radio_stations.json` pada server. Gunakan ID unik yang stabil (huruf kecil, angka, dan tanda hubung) serta URL HTTPS dari penyedia yang tepercaya.
+
+```json
+[
+  {
+    "id": "radio-contoh",
+    "title": "Radio Contoh",
+    "page_url": "https://radio.example.org/stasiun",
+    "stream_url": "https://radio.example.org/live/playlist.m3u8"
+  }
+]
+```
+
+Setelah stasiun terdaftar, pengguna bisa menempel `page_url` atau `stream_url` di menu Playlist dan membiarkan judul terisi otomatis. Ucapkan “Xiaozhi, putar radio Radio Contoh,” “putar radio nomor 2,” atau “berapa stasiun di playlist radio saya?”. Nomor mengikuti bagian **Playlist Stream Radio**, tempat status siaran juga ditampilkan. Tautan radio dari Noice bisa dipakai sebagai `page_url` untuk stasiun yang punya sumber stream yang diizinkan.
+
 ## Daftar 44 Tools MCP Xiaozhi
 
 Server MCP Xiaozhi menyediakan 44 tools siap pakai yang dipanggil secara otomatis oleh AI berdasarkan percakapan suara atau teks:

@@ -338,11 +338,11 @@ ALL_MCP_TOOLS_CATALOG = [
     },
     {
         "name": "play_playlist_song",
-        "title": "Putar Lagu dari Playlist",
+        "title": "Putar Lagu atau Radio dari Playlist",
         "category": "media",
         "category_label": "Media & Web",
         "icon": "🎶",
-        "description": "Memutar lagu dari daftar Playlist Musik YouTube pribadi pengguna berdasarkan nomor urut, judul, atau URL.",
+        "description": "Memutar lagu atau radio live dari playlist pengguna berdasarkan nomor, nama, atau tautan.",
     },
     {
         "name": "list_user_playlist",
@@ -350,7 +350,7 @@ ALL_MCP_TOOLS_CATALOG = [
         "category": "media",
         "category_label": "Media & Web",
         "icon": "📋",
-        "description": "Melihat seluruh daftar lagu yang tersimpan di Playlist Musik YouTube akun pengguna.",
+        "description": "Melihat jumlah dan daftar lagu YouTube/TikTok serta stasiun Stream Radio yang tersimpan.",
     },
     {
         "name": "get_playlist_top_played",

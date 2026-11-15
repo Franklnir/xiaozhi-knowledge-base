@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -248,12 +249,20 @@ func (h *WSDeviceHandler) HandleDeviceAudioWS(w http.ResponseWriter, r *http.Req
 			}
 
 			cmd := commands[0]
-			_ = h.audioStore.AckCommand(ctx, ownerID, cmd.ID)
-
 			streamURL := fmt.Sprintf("%s/api/audio/stream/%s?mac=%s&chip=%s&owner_id=%d", baseURL, cmd.VideoID, normMAC, chip, ownerID)
-			if isConfirmedVideoStream(cmd.StreamURL, normMAC) {
+			if radioAudioID.MatchString(cmd.VideoID) {
+				queuedURL, err := url.Parse(cmd.StreamURL)
+				if err == nil {
+					params := queuedURL.Query()
+					if target := store.NormalizeMAC(params.Get("mac")); target != "" && target != normMAC {
+						continue
+					}
+					streamURL += "&radio_ticket=" + url.QueryEscape(params.Get("radio_ticket"))
+				}
+			} else if isConfirmedVideoStream(cmd.StreamURL, normMAC) {
 				streamURL += "&mode=video"
 			}
+			_ = h.audioStore.AckCommand(ctx, ownerID, cmd.ID)
 
 			log.Printf("[WS-DEVICE] Dispatching audio command to %s: ID=%d, Title=%s", normMAC, cmd.ID, cmd.Title)
 

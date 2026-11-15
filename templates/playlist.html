@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Playlist Musik (YouTube & TikTok) - Xiaozhi Voice AI Assistant{% endblock %}
+{% block title %}Playlist Musik & Radio - Xiaozhi Voice AI Assistant{% endblock %}
 
 {% block content %}
 <style>
@@ -67,6 +67,49 @@
     :root[data-theme="dark"] .playlist-table tr:hover td {
         background: rgba(255, 255, 255, 0.03);
     }
+
+    .playlist-category-heading {
+        padding: 15px 16px 12px;
+        border-top: 1px solid var(--app-border);
+    }
+    .playlist-radio .playlist-category-heading,
+    .playlist-radio .playlist-table th,
+    .playlist-radio .playlist-table tr[data-radio] td {
+        background: rgba(13, 148, 136, 0.12);
+    }
+    .playlist-radio .playlist-table tr[data-radio]:hover td {
+        background: rgba(13, 148, 136, 0.18);
+    }
+    .playlist-radio .playlist-table tr[data-radio] td:first-child {
+        border-inline-start: 3px solid #0d9488;
+    }
+    .radio-track-icon {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 36px;
+        font-size: 18px;
+    }
+    .radio-stream-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        font-weight: 700;
+        color: var(--app-text);
+    }
+    .radio-stream-status::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #64748b;
+    }
+    .radio-stream-status[data-stream-state="streaming"]::before { background: #0d9488; }
+    .radio-stream-status[data-stream-state="connecting"]::before,
+    .radio-stream-status[data-stream-state="waiting"]::before { background: #d97706; }
+    .radio-stream-status[data-stream-state="interrupted"]::before,
+    .radio-stream-status[data-stream-state="unavailable"]::before { background: #e11d48; }
 
     .track-num-badge {
         display: inline-flex;
@@ -199,18 +242,18 @@
         <div>
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
                 <span class="app-eyebrow" style="margin:0;">Audio & Asisten Suara</span>
-                <span style="font-size:10px; background:#ef4444; color:#fff; font-weight:900; padding:2px 7px; border-radius:99px; text-transform:uppercase;">YouTube & TikTok Stream</span>
+                <span style="font-size:10px; background:#ef4444; color:#fff; font-weight:900; padding:2px 7px; border-radius:99px; text-transform:uppercase;">YouTube, TikTok & Radio Live</span>
             </div>
             <h1 class="app-title" style="display:flex; align-items:center; gap:10px;">
-                <span>🎵 Playlist Musik (YouTube & TikTok)</span>
+                <span>🎵 Playlist Musik & Radio</span>
             </h1>
             <p class="app-subtitle">
-                Atur daftar lagu favorit Anda dari YouTube maupun TikTok. Panggil lagu berdasarkan <strong>nomor (#1, #2)</strong>, <strong>judul lagu</strong>, atau <strong>link video</strong> melalui perintah suara Xiaozhi atau tombol play langsung ke ESP32.
+                Simpan lagu dari YouTube dan TikTok serta stasiun radio live. Gunakan nomor atau nama untuk memutarnya lewat perintah suara Xiaozhi.
             </p>
         </div>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; color:#fff; font-weight:800; display:inline-flex; align-items:center; gap:6px; padding:10px 18px;">
-                <span>➕</span> Tambah Lagu ke Playlist
+                <span>➕</span> Tambah ke Playlist
             </button>
             <button type="button" onclick="document.getElementById('playlistFirmwareModal').style.display='flex'" class="app-button" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
                 <span>ℹ️</span> Info Firmware
@@ -362,10 +405,10 @@
         <div class="app-card-header" style="flex-wrap:wrap; gap:14px;">
             <div>
                 <h2 class="app-section-title" style="display:flex; align-items:center; gap:8px;">
-                    <span>📋</span> Daftar Lagu Playlist Anda
+                    <span>📋</span> Daftar Playlist Anda
                 </h2>
                 <p class="app-section-subtitle">
-                    Total <strong id="tableTrackCount">{{ tracks|length }}</strong> lagu terdaftar di playlist akun Anda.
+                    Total <strong id="tableTrackCount">{{ tracks|length }}</strong> item di playlist.
                 </p>
             </div>
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -381,33 +424,46 @@
                     <span>⚡</span> Unduh Semua Cache
                 </button>
                 <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; font-size:12.5px; padding:7px 14px;">
-                    ➕ Tambah Lagu
+                    ➕ Tambah ke Playlist
                 </button>
             </div>
         </div>
 
+        {% for category, category_title, category_tracks in [('music', 'Playlist YouTube & TikTok', music_tracks), ('radio', 'Playlist Stream Radio', radio_tracks)] %}
+        {% set radio_track = category == 'radio' %}
+        <section class="playlist-category{% if radio_track %} playlist-radio{% endif %}" aria-labelledby="playlist-title-{{ category }}">
+        <div class="playlist-category-heading">
+            <h3 id="playlist-title-{{ category }}" class="app-section-title">{{ category_title }}</h3>
+            {% if radio_track %}
+            <p class="app-section-subtitle">Ucapkan “Xiaozhi, putar radio [nama stasiun]” atau “putar radio nomor 2.”</p>
+            {% endif %}
+        </div>
         <div class="app-table-wrap" style="border:none; border-radius:0;">
-            <table class="playlist-table" id="playlistTable">
+            <table class="playlist-table" id="{{ 'radioPlaylistTable' if radio_track else 'playlistTable' }}">
                 <thead>
                     <tr>
                         <th style="width:60px; text-align:center;">No</th>
-                        <th style="width:84px;">Preview</th>
-                        <th>Judul Lagu & Info</th>
-                        <th>Link YouTube / Video ID</th>
-                        <th style="width:160px; text-align:center;">Status Audio</th>
+                        <th style="width:84px;">{{ 'Radio' if radio_track else 'Preview' }}</th>
+                        <th>{{ 'Nama Stasiun' if radio_track else 'Judul Lagu & Info' }}</th>
+                        <th>Tautan</th>
+                        <th style="width:160px; text-align:center;">{{ 'Status Stream' if radio_track else 'Status Audio' }}</th>
                         <th style="width:130px; text-align:right;">Aksi</th>
                     </tr>
                 </thead>
-                <tbody id="playlistTableBody">
-                    {% if tracks %}
-                        {% for track in tracks %}
-                        <tr id="track-row-{{ track.id }}" data-search="{{ track.track_number }} {{ track.title|lower }} {{ track.artist|lower }} {{ track.youtube_url|lower }} {{ track.video_id|lower }}">
+                <tbody id="{{ 'radioPlaylistTableBody' if radio_track else 'playlistTableBody' }}" data-playlist-rows>
+                    {% if category_tracks %}
+                        {% for track in category_tracks %}
+                        {% set display_number = track.radio_number if radio_track else track.track_number %}
+                        <tr id="track-row-{{ track.id }}" {% if radio_track %}data-radio{% endif %} data-search="{{ display_number }} {{ track.title|lower }} {{ track.artist|lower }} {{ track.youtube_url|lower }} {{ track.video_id|lower }}">
                             <td style="text-align:center;">
-                                <span class="track-num-badge" title="Panggil dengan: 'putar lagu nomor {{ track.track_number }}'">
-                                    #{{ track.track_number }}
+                                <span class="track-num-badge" title="{{ 'Putar radio' if radio_track else 'Putar lagu' }} nomor {{ display_number }}">
+                                    #{{ display_number }}
                                 </span>
                             </td>
                             <td>
+                                {% if radio_track %}
+                                <div class="radio-track-icon" aria-hidden="true">📻</div>
+                                {% else %}
                                 <div class="track-thumb-box">
                                     {% if track.video_id.startswith('tt_') %}
                                     <div style="width:100%; height:100%; background:linear-gradient(135deg, #000 50%, #fe2c55 100%); display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px;">
@@ -423,10 +479,13 @@
                                     </div>
                                     {% endif %}
                                 </div>
+                                {% endif %}
                             </td>
                             <td>
                                 <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                    {% if track.video_id.startswith('tt_') %}
+                                    {% if radio_track %}
+                                    <span class="app-chip app-chip-small">📻 Radio Live</span>
+                                    {% elif track.video_id.startswith('tt_') %}
                                     <span style="background:#000; color:#00f2fe; border:1px solid #fe2c55; font-size:10px; font-weight:800; padding:1px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;">
                                         🎵 TikTok
                                     </span>
@@ -445,7 +504,8 @@
                                     {% endif %}
                                 </div>
                                 <div style="display:flex; align-items:center; gap:8px; margin-top:4px; font-size:12px; color:var(--app-muted);">
-                                    <span id="track-artist-{{ track.id }}">{{ track.artist or ('TikTok Creator' if track.video_id.startswith('tt_') else 'YouTube Audio') }}</span>
+                                    <span id="track-artist-{{ track.id }}">{{ track.artist or ('Siaran langsung' if radio_track else ('TikTok Creator' if track.video_id.startswith('tt_') else 'YouTube Audio')) }}</span>
+                                    {% if not radio_track %}
                                     <span>•</span>
                                     {% if track.duration %}
                                     <span style="font-weight:700; color:var(--app-text-muted, #888); font-size:11.5px;">⏱️ {{ track.duration }}</span>
@@ -454,20 +514,28 @@
                                     <span style="font-family:monospace; font-size:11px; background:var(--app-surface-muted); padding:1px 5px; border-radius:4px; border:1px solid var(--app-border);">
                                         ID: {{ track.video_id }}
                                     </span>
+                                    {% endif %}
                                 </div>
                             </td>
                             <td>
                                 <div style="display:flex; align-items:center; gap:6px;">
+                                    {% if radio_track %}
+                                    <span style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ track.youtube_url }}">{{ track.youtube_url }}</span>
+                                    {% else %}
                                     <a href="{{ track.youtube_url }}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px; color:{% if track.video_id.startswith('tt_') %}#fe2c55{% else %}#ef4444{% endif %}; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ track.youtube_url }}">
                                         <span>{% if track.video_id.startswith('tt_') %}🎵{% else %}📺{% endif %}</span> <span id="track-url-{{ track.id }}">{{ track.youtube_url }}</span> ↗
                                     </a>
-                                    <button type="button" onclick="navigator.clipboard.writeText('{{ track.youtube_url }}'); if(window.App&&App.toast)App.toast.success('Link disalin!'); else alert('Link disalin!');" title="Salin Link" class="app-button" style="padding:2px 6px; font-size:11px;">
+                                    {% endif %}
+                                    <button type="button" onclick="navigator.clipboard.writeText({{ track.youtube_url|tojson|forceescape }}); if(window.App&&App.toast)App.toast.success('Link disalin!'); else alert('Link disalin!');" title="Salin Link" class="app-button" style="padding:2px 6px; font-size:11px;">
                                         📋
                                     </button>
                                 </div>
                             </td>
-                            <td style="text-align:center;" id="track-cache-cell-{{ track.id }}">
-                                {% if track.cache_status == 'ready' or track.is_cached %}
+                            <td style="text-align:center;"{% if not radio_track %} id="track-cache-cell-{{ track.id }}"{% endif %}>
+                                {% if radio_track %}
+                                {% set status = radio_statuses[track.id] %}
+                                <span id="radio-stream-status-{{ track.id }}" class="radio-stream-status" role="status" data-stream-state="{{ status.state }}">{{ status.label }}</span>
+                                {% elif track.cache_status == 'ready' or track.is_cached %}
                                 <span class="track-cache-badge" style="background:rgba(16, 185, 129, 0.15); color:#059669; border:1px solid rgba(16, 185, 129, 0.35); font-weight:800; font-size:11px; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;" title="Audio ter-cache 100% di server VPS. Siap diputar seketika tanpa jeda!">
                                     <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981;"></span>
                                     Siap Diputar (100%)
@@ -485,10 +553,10 @@
                             </td>
                             <td style="text-align:right;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
-                                    <button type="button" onclick="openEditTrackModal({{ track.id }}, '{{ track.title|escape }}', '{{ track.youtube_url|escape }}', '{{ track.artist|escape }}')" class="app-button" style="padding:5px 10px; font-size:12px; font-weight:700;" title="Edit Judul & Link">
+                                    <button type="button" onclick="openEditTrackModal({{ track.id }}, {{ track.title|tojson|forceescape }}, {{ track.youtube_url|tojson|forceescape }}, {{ track.artist|tojson|forceescape }})" class="app-button" style="padding:5px 10px; font-size:12px; font-weight:700;" title="Edit Judul & Link">
                                         ✏️ Edit
                                     </button>
-                                    <button type="button" onclick="deleteTrack({{ track.id }}, '{{ track.title|escape }}')" class="app-button app-button-danger" style="padding:5px 10px; font-size:12px; font-weight:700;" title="Hapus dari Playlist">
+                                    <button type="button" onclick="deleteTrack({{ track.id }}, {{ track.title|tojson|forceescape }})" class="app-button app-button-danger" style="padding:5px 10px; font-size:12px; font-weight:700;" title="Hapus dari Playlist">
                                         🗑️ Hapus
                                     </button>
                                 </div>
@@ -496,22 +564,17 @@
                         </tr>
                         {% endfor %}
                     {% else %}
-                        <tr id="emptyTableRow">
-                            <td colspan="6" style="text-align:center; padding:48px 16px; color:var(--app-muted);">
-                                <div style="font-size:36px; margin-bottom:12px;">🎵</div>
-                                <h3 style="font-size:16px; font-weight:800; color:var(--app-text); margin:0 0 6px;">Playlist Anda Masih Kosong</h3>
-                                <p style="font-size:13px; max-width:420px; margin:0 auto 16px;">
-                                    Tambahkan lagu favorit dengan memasukkan judul dan link YouTube agar Xiaozhi dapat memutarnya berdasarkan perintah suara Anda!
-                                </p>
-                                <button type="button" onclick="openAddTrackModal()" class="app-button app-button-primary" style="background:#ef4444; border-color:#dc2626; padding:8px 16px;">
-                                    ➕ Tambah Lagu Pertama
-                                </button>
+                        <tr>
+                            <td colspan="6" style="text-align:center; padding:22px 16px; color:var(--app-muted);">
+                                {{ 'Belum ada stasiun radio.' if radio_track else 'Belum ada lagu YouTube atau TikTok.' }}
                             </td>
                         </tr>
                     {% endif %}
                 </tbody>
             </table>
         </div>
+        </section>
+        {% endfor %}
     </div>
 </div>
 
@@ -524,7 +587,7 @@
         <div style="padding:20px 24px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                 <h3 id="addModalTitle" style="font-size:18px; font-weight:900; margin:0; display:flex; align-items:center; gap:8px;">
-                    <span>➕</span> Tambah Lagu ke Playlist
+                    <span>➕</span> Tambah ke Playlist
                 </h3>
                 <button type="button" onclick="closeAddTrackModal()" class="app-button" style="padding:4px 8px; font-size:14px; font-weight:900; border:none; background:transparent;">
                     ✕
@@ -537,7 +600,7 @@
                     <div>
                         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
                             <label class="app-label" for="addYoutubeUrl" style="margin:0;">
-                                Link YouTube atau TikTok <span style="color:#ef4444;">*</span>
+                                Link YouTube, TikTok, atau radio <span style="color:#ef4444;">*</span>
                             </label>
                             <span id="addDetectBadge" style="display:none; font-size:11px; font-weight:800; padding:2px 8px; border-radius:99px;"></span>
                         </div>
@@ -546,7 +609,7 @@
                                 type="text" 
                                 id="addYoutubeUrl" 
                                 required 
-                                placeholder="https://youtube.com/watch?v=... atau https://vt.tiktok.com/..." 
+                                placeholder="Tempel tautan video atau stasiun"
                                 class="app-input" 
                                 style="flex:1; font-family:monospace; font-size:12.5px;"
                                 oninput="onAddUrlChanged(this.value)"
@@ -555,7 +618,7 @@
                                 📋 Tempel
                             </button>
                         </div>
-                        <p class="app-field-hint">Auto-deteksi cerdas: Cukup tempel link YouTube (video, Shorts) atau TikTok (vt.tiktok.com, vm.tiktok.com, video link). Sistem otomatis mengenali platformnya.</p>
+                        <p class="app-field-hint">Untuk radio, tempel tautan halaman atau stream stasiun yang terdaftar di Xiaozhi.</p>
                         <div style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.25); border-radius:6px; padding:4px 10px; font-size:11.5px; color:#059669;">
                             <span>⚡</span> <strong>Ketentuan Durasi:</strong> Diizinkan 1 lagu versi 1 jam (maks. 1 jam 10 menit). Lagu lainnya maksimal 10 menit.
                         </div>
@@ -576,7 +639,7 @@
                     <!-- Track Title -->
                     <div>
                         <label class="app-label" for="addTrackTitle">
-                            Judul Lagu <span style="font-size:11px; color:var(--app-muted); font-weight:normal;">(Opsional - otomatis diambil dari YouTube / TikTok jika kosong)</span>
+                            Judul <span style="font-size:11px; color:var(--app-muted); font-weight:normal;">(Opsional, terisi otomatis jika kosong)</span>
                         </label>
                         <input 
                             type="text" 
@@ -624,7 +687,7 @@
         <div style="padding:20px 24px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                 <h3 id="editModalTitle" style="font-size:18px; font-weight:900; margin:0; display:flex; align-items:center; gap:8px;">
-                    <span>✏️</span> Edit Lagu Playlist
+                    <span>✏️</span> Edit Playlist
                 </h3>
                 <button type="button" onclick="closeEditTrackModal()" class="app-button" style="padding:4px 8px; font-size:14px; font-weight:900; border:none; background:transparent;">
                     ✕
@@ -651,7 +714,7 @@
                     <!-- YouTube / TikTok Link -->
                     <div>
                         <label class="app-label" for="editYoutubeUrl">
-                            Link YouTube / TikTok <span style="color:#ef4444;">*</span>
+                            Link video atau radio <span style="color:#ef4444;">*</span>
                         </label>
                         <input 
                             type="text" 
@@ -717,11 +780,28 @@
 
 <script>
     const csrfToken = {{ csrf_token|tojson }};
+    function radioLinkKey(value) {
+        try {
+            const url = new URL(value);
+            if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
+            for (const key of [...url.searchParams.keys()]) {
+                if (key.startsWith('utm_') || key === 'referrer_id') url.searchParams.delete(key);
+            }
+            url.searchParams.sort();
+            return url.hostname + url.pathname.replace(/\/+$/, '') + url.search;
+        } catch (_) {
+            return null;
+        }
+    }
+    const radioNames = new Map(Object.entries({{ radio_links|default({})|tojson }})
+        .map(([url, title]) => [radioLinkKey(url), title]));
 
     // Helper: Detect Media Source (YouTube or TikTok)
     function detectMediaSource(url) {
         if (!url) return null;
         url = url.trim();
+        const station = radioNames.get(radioLinkKey(url));
+        if (station) return { platform: 'radio', title: station };
         // 1. YouTube direct ID
         if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
             return { platform: 'youtube', id: url, title: 'YouTube Video ID' };
@@ -808,6 +888,12 @@
                     badge.style.border = '1px solid #fe2c55';
                     badge.textContent = '🎵 TikTok Terdeteksi';
                 }
+            } else if (info.platform === 'radio') {
+                thumb.style.display = 'none';
+                if (iconBox) iconBox.style.display = 'none';
+                tagEl.textContent = '📻 Radio Live';
+                idEl.textContent = info.title;
+                if (badge) badge.style.display = 'none';
             }
         } else {
             box.style.display = 'none';
@@ -951,6 +1037,10 @@
 
             if (window.App && App.toast) App.toast.success(data.message || "Perubahan disimpan!");
             closeEditTrackModal();
+            if (data.track.video_id.startsWith('radio_live_') || document.getElementById('track-row-' + trackId).hasAttribute('data-radio')) {
+                window.location.reload();
+                return;
+            }
 
             // Update DOM directly
             const titleEl = document.getElementById('track-title-' + trackId);
@@ -971,7 +1061,7 @@
 
     // Delete Track
     async function deleteTrack(trackId, title) {
-        if (!confirm("Hapus lagu '" + title + "' dari playlist Anda?")) return;
+        if (!confirm("Hapus '" + title + "' dari playlist Anda?")) return;
 
         try {
             const data = await safePlaylistApi('/api/v1/playlist/' + trackId, {
@@ -983,7 +1073,14 @@
 
             if (window.App && App.toast) App.toast.success(data.message || "Lagu berhasil dihapus.");
             const row = document.getElementById('track-row-' + trackId);
-            if (row) row.remove();
+            if (row) {
+                const categoryRows = row.parentElement;
+                row.remove();
+                if (!categoryRows.querySelector('tr[data-search]')) {
+                    window.location.reload();
+                    return;
+                }
+            }
 
             // Decrement counter
             const totalEl = document.getElementById('statTotalTracks');
@@ -1019,18 +1116,29 @@
     // Search / Filter Table
     function filterPlaylistTable() {
         const query = (document.getElementById('trackSearchInput').value || '').toLowerCase().trim();
-        const rows = document.querySelectorAll('#playlistTableBody tr[data-search]');
-        let matchCount = 0;
-
-        rows.forEach(row => {
-            const data = row.getAttribute('data-search') || '';
-            if (!query || data.includes(query)) {
-                row.style.display = '';
-                matchCount++;
-            } else {
-                row.style.display = 'none';
-            }
+        document.querySelectorAll('[data-playlist-rows] tr[data-search]').forEach(row => {
+            row.hidden = !row.dataset.search.includes(query);
         });
+    }
+
+    let radioStatusPending = false;
+    async function refreshRadioStatus() {
+        if (document.hidden || radioStatusPending) return;
+        radioStatusPending = true;
+        try {
+            const data = await safePlaylistApi('/api/v1/playlist/radio-status');
+            for (const [trackId, status] of Object.entries(data.tracks)) {
+                const badge = document.getElementById('radio-stream-status-' + trackId);
+                if (badge && badge.dataset.streamState !== status.state) {
+                    badge.dataset.streamState = status.state;
+                    badge.textContent = status.label;
+                }
+            }
+        } catch (_) {
+            // A missed poll can be retried on the next interval.
+        } finally {
+            radioStatusPending = false;
+        }
     }
 
     // ── Real-time Audio Disk Cache Monitoring & Triggers ──
@@ -1139,6 +1247,10 @@
         });
         if (needsPolling) {
             startCachePolling();
+        }
+        if (document.querySelector('#radioPlaylistTableBody [data-radio]')) {
+            setInterval(refreshRadioStatus, 5000);
+            document.addEventListener('visibilitychange', refreshRadioStatus);
         }
     });
 

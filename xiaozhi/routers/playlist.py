@@ -22,6 +22,7 @@ from xiaozhi.services.audio_cache_worker import (
     get_all_queue_status,
     get_track_cache_status,
 )
+from xiaozhi.services.radio_service import find_radio_station, is_radio_id, radio_playlist_tracks, radio_stations, radio_statuses
 
 logger = logging.getLogger("xiaozhi.playlist")
 router = APIRouter()
@@ -86,6 +87,9 @@ async def playlist_page(request: Request):
     max_tracks = plus_cfg.get("max_playlist_tracks", 15)
     active_tracks_count = sum(1 for t in tracks if t.get("is_active", True))
     disabled_tracks_count = len(tracks) - active_tracks_count
+    music_tracks = [track for track in tracks if not is_radio_id(track.get("video_id"))]
+    radio_tracks = radio_playlist_tracks(tracks)
+    stations = list(radio_stations())
 
     return render(
         request,
@@ -103,6 +107,10 @@ async def playlist_page(request: Request):
             "max_tracks": max_tracks,
             "active_tracks_count": active_tracks_count,
             "disabled_tracks_count": disabled_tracks_count,
+            "music_tracks": music_tracks,
+            "radio_tracks": radio_tracks,
+            "radio_statuses": radio_statuses(user["id"], radio_tracks, stations),
+            "radio_links": {station.page_url: station.title for station in stations},
         },
     )
 
@@ -152,6 +160,17 @@ async def api_get_playlist(
     }
 
 
+@router.get("/api/v1/playlist/radio-status")
+async def api_playlist_radio_status(request: Request):
+    user = require_user(request)
+    tracks = get_store().get_user_playlist(user["id"])
+    radio_tracks = [track for track in tracks if is_radio_id(track.get("video_id"))]
+    return JSONResponse(
+        {"success": True, "tracks": radio_statuses(user["id"], radio_tracks, list(radio_stations()))},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.post("/api/v1/playlist")
 async def api_add_playlist_track(request: Request):
     user = require_user(request)
@@ -176,13 +195,21 @@ async def api_add_playlist_track(request: Request):
     artist = str(body.get("artist") or "").strip()
 
     if not raw_url:
-        raise HTTPException(status_code=400, detail="Link YouTube atau TikTok wajib diisi.")
+        raise HTTPException(status_code=400, detail="Link YouTube, TikTok, atau stasiun radio wajib diisi.")
+
+    station = find_radio_station(raw_url)
+    if station:
+        track = store.add_playlist_track(
+            owner_id=user["id"], title=title or station.title, youtube_url=station.page_url,
+            video_id=station.video_id, artist=artist, duration="LIVE",
+        )
+        return {"success": True, "platform": "radio", "track": track, "message": f"Radio '{track['title']}' ditambahkan ke playlist."}
 
     media_info = detect_media_url_source(raw_url)
     if not media_info:
         raise HTTPException(
             status_code=400,
-            detail="Format link tidak valid. Masukkan link YouTube (youtube.com, youtu.be) atau TikTok (tiktok.com, vt.tiktok.com).",
+            detail="Masukkan link YouTube, TikTok, atau stasiun radio yang terdaftar di Xiaozhi.",
         )
 
     platform = media_info["platform"]
@@ -300,11 +327,19 @@ async def api_update_playlist_track(track_id: int, request: Request):
 
     if raw_url is not None:
         raw_url = str(raw_url).strip()
+        station = find_radio_station(raw_url)
+        if station:
+            updated = store.update_playlist_track(
+                owner_id=user["id"], track_id=track_id, title=str(title or "").strip() or station.title,
+                youtube_url=station.page_url, video_id=station.video_id, duration="LIVE",
+                artist=str(artist).strip() if artist is not None else None,
+            )
+            return {"success": True, "track": updated, "message": "Stasiun radio berhasil diperbarui."}
         media_info = detect_media_url_source(raw_url)
         if not media_info:
             raise HTTPException(
                 status_code=400,
-                detail="Format link tidak valid. Masukkan link YouTube atau TikTok yang valid.",
+                detail="Masukkan link YouTube, TikTok, atau stasiun radio yang terdaftar di Xiaozhi.",
             )
         video_id = media_info["video_id"]
         raw_url = media_info["canonical_url"]
@@ -349,7 +384,7 @@ async def api_update_playlist_track(track_id: int, request: Request):
                     ),
                 )
 
-        duration_str = dur_info.get("formatted_duration") or None
+        duration_str = dur_info.get("formatted_duration") or ("" if is_radio_id(existing.get("video_id")) else None)
         if not title and dur_info.get("title"):
             title = dur_info["title"]
         if not artist and dur_info.get("artist"):
@@ -392,6 +427,8 @@ async def api_delete_playlist_track(track_id: int, request: Request):
 
     deleted = store.delete_playlist_track(user["id"], track_id)
     cache_cleaned = 0
+    if deleted and is_radio_id(existing.get("video_id")):
+        return {"success": True, "cache_deleted": False, "message": f"Radio '{existing['title']}' dihapus dari playlist."}
     if deleted and existing.get("video_id"):
         vid = existing["video_id"]
         # If no other user still has this video in their playlist, delete the disk cache
@@ -426,6 +463,9 @@ async def api_play_playlist_track(track_id: int, request: Request):
             status_code=403,
             detail=f"Lagu '{track.get('title')}' telah dinonaktifkan oleh admin. Silakan hubungi admin untuk membuka paket langganan Akses Plus."
         )
+
+    if is_radio_id(track.get("video_id")):
+        raise HTTPException(status_code=403, detail="Putar stasiun radio lewat perintah suara Xiaozhi.")
 
     # Increment play count
     updated_track = store.increment_playlist_play_count(user["id"], track_id=track_id) or track
@@ -471,7 +511,7 @@ async def api_playlist_cache_status(request: Request):
     statuses = {}
     for t in tracks:
         vid = t.get("video_id", "")
-        if vid:
+        if vid and not is_radio_id(vid):
             statuses[str(t["id"])] = {
                 "video_id": vid,
                 **get_track_cache_status(vid),
@@ -492,6 +532,8 @@ async def api_cache_single_track(track_id: int, request: Request):
     if not track:
         raise HTTPException(status_code=404, detail="Lagu tidak ditemukan di playlist Anda.")
     vid = track.get("video_id", "")
+    if is_radio_id(vid):
+        raise HTTPException(status_code=400, detail="Radio diputar langsung dari siaran yang sedang berlangsung.")
     url = track.get("youtube_url", "")
     if not vid or not url:
         raise HTTPException(status_code=400, detail="Data lagu tidak valid.")
@@ -526,7 +568,7 @@ async def api_cache_all_tracks(request: Request):
     for t in tracks:
         vid = t.get("video_id", "")
         url = t.get("youtube_url", "")
-        if vid and url:
+        if vid and url and not is_radio_id(vid):
             st = get_track_cache_status(vid)
             if not st["is_cached"]:
                 dur_sec = parse_duration_to_seconds(t.get("duration"))

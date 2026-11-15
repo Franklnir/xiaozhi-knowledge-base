@@ -79,6 +79,29 @@ func TestReadVideoAudioCoalescesSmallReads(t *testing.T) {
 	}
 }
 
+func TestRadioAudioProxiesTicketAndStream(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/audio/stream/radio_live_test-station" ||
+			r.URL.Query().Get("radio_ticket") != "signed.test" || r.URL.Query().Get("chip") != "esp32s3" {
+			http.Error(w, "Unexpected radio request", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "audio/ogg")
+		w.Write([]byte("OggS fixture"))
+	}))
+	defer backend.Close()
+
+	h := NewAudioStreamHandler(&config.Config{PythonBackendURL: backend.URL}, nil, nil)
+	r := chi.NewRouter()
+	r.Get("/api/audio/stream/{video_id}", h.HandleStream)
+	request := httptest.NewRequest(http.MethodGet, "/api/audio/stream/radio_live_test-station?radio_ticket=signed.test&chip=esp32s3", nil)
+	response := httptest.NewRecorder()
+	r.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "audio/ogg" || response.Body.String() != "OggS fixture" {
+		t.Fatalf("unexpected radio response: %d %v %q", response.Code, response.Header(), response.Body.String())
+	}
+}
+
 func TestYouTubeAudioHandlerWithFFmpeg(t *testing.T) {
 	ffmpeg, err := exec.LookPath("ffmpeg")
 	if err != nil {

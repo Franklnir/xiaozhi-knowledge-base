@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -150,6 +151,7 @@ func (h *AudioStreamHandler) notifyPlaybackEnd(ownerID int64, sessionID, reason 
 
 var safeFilenameRegex = regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
 var youtubeVideoID = regexp.MustCompile(`^[a-zA-Z0-9_-]{11}$`)
+var radioAudioID = regexp.MustCompile(`^radio_live_[a-z0-9][a-z0-9-]{0,47}$`)
 
 func isConfirmedVideoStream(streamURL, mac string) bool {
 	isVideo, commandMAC := confirmedVideoStreamDevice(streamURL)
@@ -274,6 +276,17 @@ func (h *AudioStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request
 	videoID := chi.URLParam(r, "video_id")
 	if videoID == "" {
 		http.Error(w, "video_id is required", http.StatusBadRequest)
+		return
+	}
+	if radioAudioID.MatchString(videoID) {
+		backend, err := url.Parse(h.cfg.PythonBackendURL)
+		if err != nil || backend.Host == "" {
+			http.Error(w, "Radio backend unavailable", http.StatusBadGateway)
+			return
+		}
+		proxy := httputil.NewSingleHostReverseProxy(backend)
+		proxy.FlushInterval = -1
+		proxy.ServeHTTP(w, r)
 		return
 	}
 

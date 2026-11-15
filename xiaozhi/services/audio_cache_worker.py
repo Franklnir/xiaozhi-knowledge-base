@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from xiaozhi.core.utils import format_duration, normalize_tiktok_url_for_ytdlp
+from xiaozhi.services.radio_service import is_radio_id
 
 logger = logging.getLogger("xiaozhi.audio_cache_worker")
 
@@ -170,6 +171,8 @@ def get_track_cache_status(video_id: str) -> Dict[str, Any]:
     - 'downloading': Currently in the download queue or actively transcoding (with percent 0-99%)
     - 'uncached': Not yet in disk cache
     """
+    if is_radio_id(video_id):
+        return {"status": "live", "is_cached": False, "size_bytes": 0, "filename": "", "percent": 0}
     safe_vid = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(video_id or "").strip())
     if not safe_vid:
         return {"status": "uncached", "is_cached": False, "size_bytes": 0, "filename": "", "percent": 0}
@@ -538,7 +541,7 @@ async def enqueue_precache(
         return False
 
     status = get_track_cache_status(safe_vid)
-    if status["is_cached"]:
+    if status["is_cached"] or status["status"] == "live":
         return False
 
     if safe_vid in _queue_set or safe_vid in _active_downloads:

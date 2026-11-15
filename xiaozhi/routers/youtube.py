@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from xiaozhi.dependencies import get_current_user, get_store, require_user
 from xiaozhi.services.mcp_service import is_mcp_connected
+from xiaozhi.services.radio_service import is_radio_id, resolve_radio_playback
 from xiaozhi.core.utils import is_generic_playlist_query, normalize_tiktok_url_for_ytdlp
 
 logger = logging.getLogger("xiaozhi.youtube")
@@ -704,6 +705,7 @@ async def _stream_opus_audio(
     device_mac: str = "",
     chip: str = "",
     cache_path: Optional[Path] = None,
+    radio: bool = False,
 ) -> AsyncGenerator[bytes, None]:
     br = resolve_adaptive_bitrate(bitrate, rssi, chip=chip)
     ffmpeg_bin = _FFMPEG_PATH or shutil.which("ffmpeg")
@@ -715,7 +717,7 @@ async def _stream_opus_audio(
         username=username or (f"user-{user_id}" if user_id else "ESP32 Board"),
         video_id=video_id,
         title=title or f"Video {video_id}",
-        stream_type="HTTP Stream",
+        stream_type="Radio Live" if radio else "HTTP Stream",
         device_mac=device_mac or "ESP32 Board",
         bitrate=f"{br}@{sample_rate//1000}kHz",
         chip=chip or ""
@@ -724,11 +726,14 @@ async def _stream_opus_audio(
     cmd = [
         ffmpeg_bin,
     ]
+    if radio:
+        cmd.extend(["-nostdin", "-protocol_whitelist", "https,tls,tcp,crypto", "-rw_timeout", "12000000"])
+    radio_hls = radio and urlsplit(source_url).path.lower().endswith(".m3u8")
     if start_sec > 0:
         cmd.extend(["-ss", f"{start_sec:.2f}"])
     cmd.extend([
         "-reconnect", "1",
-        "-reconnect_at_eof", "1",
+        "-reconnect_at_eof", "0" if radio_hls else "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
         "-headers", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n",
@@ -763,7 +768,8 @@ async def _stream_opus_audio(
     # Berikan 45% delivery headroom di atas nominal bitrate agar buffer ESP32 selalu terisi mantap
     bytes_per_sec = max(1800, int(nominal_bps * 1.45))
     target_send_time = time.monotonic()
-    logger.info(f"Starting YouTube stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
+    stream_label = "Radio" if radio else "YouTube"
+    logger.info(f"Starting {stream_label} stream for {video_id}, FFmpeg PID={proc.pid} (user={user_id})")
 
     tmp_cache_path: Optional[Path] = None
     tmp_cache_file = None
@@ -783,13 +789,23 @@ async def _stream_opus_audio(
                 logger.info(f"Stream aborted by admin for video {video_id}")
                 end_reason = "aborted"
                 break
-            chunk = await proc.stdout.read(1536)
+            try:
+                if radio:
+                    chunk = await asyncio.wait_for(proc.stdout.read(1536), timeout=0.5)
+                else:
+                    chunk = await proc.stdout.read(1536)
+            except asyncio.TimeoutError:
+                if not radio:
+                    raise
+                continue
             if not chunk:
                 if total_bytes == 0:
                     end_reason = "error"
-                    logger.error(f"YouTube stream for {video_id} failed on start (0 bytes), FFmpeg returncode={proc.returncode}")
+                    logger.error(f"{stream_label} stream for {video_id} failed on start (0 bytes), FFmpeg returncode={proc.returncode}")
                     raise RuntimeError(f"FFmpeg failed to stream audio for {video_id}")
-                logger.info(f"YouTube stream for {video_id} reached EOF, total={total_bytes} bytes")
+                if radio and await proc.wait() != 0:
+                    end_reason = "error"
+                logger.info(f"{stream_label} stream for {video_id} reached EOF, total={total_bytes} bytes")
                 break
             total_bytes += len(chunk)
             loop_count += 1
@@ -808,7 +824,7 @@ async def _stream_opus_audio(
                     tmp_cache_file = None
 
             if total_bytes % (1536 * 50) == 0:
-                logger.info(f"YouTube stream for {video_id}: sent {total_bytes // 1024} KB")
+                logger.info(f"{stream_label} stream for {video_id}: sent {total_bytes // 1024} KB")
 
             # Adaptive Pacing:
             # 15 chunk pertama (~23KB = ~6-8 detik audio) dikirim instan tanpa delay agar buffer ESP32 penuh.
@@ -825,10 +841,10 @@ async def _stream_opus_audio(
             yield chunk
     except (asyncio.CancelledError, GeneratorExit) as exc:
         end_reason = "cancelled"
-        logger.warning(f"YouTube stream for {video_id} client disconnected or cancelled after {total_bytes} bytes")
+        logger.warning(f"{stream_label} stream for {video_id} client disconnected or cancelled after {total_bytes} bytes")
     except Exception as exc:
         end_reason = "error"
-        logger.error(f"YouTube stream for {video_id} error after {total_bytes} bytes: {exc}")
+        logger.error(f"{stream_label} stream for {video_id} error after {total_bytes} bytes: {exc}")
     finally:
         if tmp_cache_file:
             try:
@@ -864,7 +880,7 @@ async def _stream_opus_audio(
                 await proc.wait()
             except Exception:
                 pass
-        logger.info(f"YouTube stream for {video_id} closed, proc_returncode={proc.returncode}")
+        logger.info(f"{stream_label} stream for {video_id} closed, proc_returncode={proc.returncode}")
 
 
 @router.get("/api/audio/stream/{video_id}")
@@ -901,6 +917,20 @@ async def audio_stream_ogg_opus(
     sample_rate = resolve_chip_audio_profile(detected_chip)
 
     store = get_store()
+    if is_radio_id(video_id):
+        playback = resolve_radio_playback(store, video_id, request.query_params.get("radio_ticket", ""))
+        if playback is None:
+            raise HTTPException(status_code=403, detail="Sesi radio tidak valid. Minta Xiaozhi memutar ulang.")
+        radio_owner, radio_track, station = playback
+        return StreamingResponse(
+            _stream_opus_audio(
+                video_id, station.stream_url, bitrate=selected_br, sample_rate=sample_rate, rssi=rssi,
+                user_id=radio_owner, title=radio_track["title"],
+                device_mac=mac or request.headers.get("Device-Id", ""), chip=detected_chip, radio=True,
+            ),
+            media_type="audio/ogg",
+            headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no", "X-Audio-Sample-Rate": str(sample_rate)},
+        )
     user, title, device_mac = _resolve_stream_user_and_info(store, video_id, request, owner_id=owner_id, mac=mac, token=token)
     user_id = user["id"] if user else None
     username = user["username"] if user else ""
@@ -1416,6 +1446,8 @@ async def queue_audio(request: Request):
     video_url = str(body.get("video_url", "")).strip()
     duration = str(body.get("duration", "")).strip()
     video_id = str(body.get("video_id", "")).strip()
+    if is_radio_id(video_id):
+        raise HTTPException(status_code=403, detail="Putar stasiun radio lewat perintah suara Xiaozhi.")
     if not stream_url:
         if video_id:
             stream_url = f"/api/audio/stream/{video_id}"
@@ -1536,8 +1568,10 @@ async def audio_play_direct(
 
         # 0. Cek apakah query langsung berupa URL stream audio internal (misal: /api/audio/stream/xyz)
         m_stream = re.search(r"/(?:api/)?audio/stream/([a-zA-Z0-9_-]+)", q)
-        if m_stream:
-            stream_vid = m_stream.group(1)
+        stream_vid = m_stream.group(1) if m_stream else q
+        if is_radio_id(stream_vid):
+            raise HTTPException(status_code=403, detail="Putar stasiun radio lewat perintah suara Xiaozhi.")
+        elif m_stream:
             if resolved_owner_id and hasattr(store, "find_playlist_track_by_video_id"):
                 try:
                     matched_track = store.find_playlist_track_by_video_id(stream_vid, owner_id=resolved_owner_id)
@@ -1569,7 +1603,7 @@ async def audio_play_direct(
                     vid = matched_track.get("video_id", "")
                     title = matched_track.get("title", "")
                     target_video_url = matched_track.get("youtube_url", "")
-                    if hasattr(store, "increment_playlist_play_count") and matched_track.get("id"):
+                    if not is_radio_id(vid) and hasattr(store, "increment_playlist_play_count") and matched_track.get("id"):
                         try:
                             store.increment_playlist_play_count(resolved_owner_id, track_id=matched_track["id"])
                         except Exception:
@@ -1589,7 +1623,7 @@ async def audio_play_direct(
                     vid = matched_track.get("video_id", "")
                     title = matched_track.get("title", "")
                     target_video_url = matched_track.get("youtube_url", "")
-                    if hasattr(store, "increment_playlist_play_count") and matched_track.get("id"):
+                    if not is_radio_id(vid) and hasattr(store, "increment_playlist_play_count") and matched_track.get("id"):
                         try:
                             store.increment_playlist_play_count(resolved_owner_id, track_id=matched_track["id"])
                         except Exception:
@@ -1599,6 +1633,9 @@ async def audio_play_direct(
                 logger.debug(f"[PLAY DIRECT] Generic playlist fallback error: {exc}")
 
         # 2. Jika tidak ditemukan di playlist, lakukan ekstraksi / pencarian audio (YouTube atau TikTok)
+        if is_radio_id(vid):
+            raise HTTPException(status_code=403, detail="Putar stasiun radio lewat perintah suara Xiaozhi.")
+
         if not vid:
             results = youtube_search(q, max_results=1)
             if not results:

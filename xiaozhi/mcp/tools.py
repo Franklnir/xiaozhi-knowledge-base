@@ -6,7 +6,7 @@ import time
 import uuid
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 import requests
 from bs4 import BeautifulSoup
 
@@ -2096,6 +2096,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         video_request = re.match(r"^\s*(?:(?:tolong|coba)\s+)?(?:putar(?:kan)?|tonton|nonton|mainkan)\s+video(?:\s+youtube)?\b\s*(.*)", query, re.IGNORECASE)
         if video_request:
             return find_youtube_video_to_play(video_request[1])
+        from xiaozhi.services.radio_service import explicit_radio_query, is_radio_id
+        if explicit_radio_query(query) is not None:
+            return play_playlist_song(query)
         owner_id = mcp_active_owner_ctx.get()
         try:
             # 1. Cek jika user meminta playlist secara umum tanpa nomor/judul spesifik
@@ -2133,6 +2136,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             if owner_id and hasattr(store, "find_playlist_track_by_query"):
                 matched_track = store.find_playlist_track_by_query(owner_id, query)
                 if matched_track:
+                    if is_radio_id(matched_track.get("video_id")):
+                        return play_playlist_song(query)
                     if not bool(matched_track.get("is_active", True)):
                         track_no = matched_track.get("track_number", 1)
                         title = matched_track.get("title", "")
@@ -2841,21 +2846,24 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
     @mcp_server.tool()
     def play_playlist_song(query: str) -> dict:
-        """
-        Putar lagu dari daftar Playlist Musik YouTube pribadi pengguna berdasarkan:
-        - Nomor urut lagu (contoh: "1", "nomor 2", "track 3", "playlist 1")
-        - Judul lagu (contoh: "Bohemian Rhapsody", "Sempurna", "Lofi")
-        - Link YouTube / Video ID
-        Otomatis menambah statistik jumlah pemutaran (play count) lagu tersebut.
+        """Putar lagu atau radio tersimpan berdasarkan nomor, judul, atau tautan.
+        Untuk radio, kirim "putar radio [nama]" atau "putar radio nomor 2".
+        Pakai nomor di kategori Stream Radio. Ubah angka yang diucapkan menjadi digit.
+        Jika nama atau nomor belum jelas, tanyakan pilihan.
 
         Args:
-            query: Nomor lagu di playlist, judul lagu, atau link YouTube. Contoh: "1", "nomor 2", "Lofi Beat"
+            query: Contoh "nomor 2", "Lofi Beat", atau "putar radio Gen FM Jakarta".
         """
         owner_id = mcp_active_owner_ctx.get()
         if not owner_id:
             return {"success": False, "message": "Belum ada koneksi akun/perangkat aktif."}
 
         try:
+            from xiaozhi.services.radio_service import (
+                explicit_radio_query, find_radio_station, is_radio_id,
+                match_radio_tracks, queue_radio_track, radio_playlist_tracks,
+            )
+
             features = store.get_user_features(owner_id)
             if not features.get("youtube_music", True):
                 return {"success": False, "message": "Fitur YouTube Music telah dinonaktifkan untuk akun Anda."}
@@ -2871,8 +2879,27 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 record_mcp_tool_history(owner_id, "play_playlist_song", query, {"query": query}, response)
                 return response
 
-            is_generic = is_generic_playlist_query(query)
-            matched = None if is_generic else store.find_playlist_track_by_query(owner_id, query)
+            radio_query = explicit_radio_query(query)
+            station = find_radio_station(query.strip() if radio_query is None else radio_query)
+            if radio_query is not None or station:
+                radio_tracks = radio_playlist_tracks(all_tracks)
+                if station:
+                    matches = [track for track in radio_tracks if track["video_id"] == station.video_id]
+                else:
+                    matches = match_radio_tracks(radio_tracks, radio_query)
+                if not matches:
+                    return {"success": False, "message": "Stasiun radio ini tidak ditemukan di playlist Anda."}
+                if len(matches) > 1 or radio_query == "":
+                    choices = [{"number": track["radio_number"], "title": track["title"]} for track in matches[:10]]
+                    options = ", ".join(f"nomor {item['number']} {item['title']}" for item in choices)
+                    return {
+                        "success": False, "needs_clarification": True, "source": "radio",
+                        "message": f"Mau putar stasiun yang mana? {options}.",
+                        "choices": choices,
+                    }
+                matched = matches[0]
+            else:
+                matched = None if is_generic_playlist_query(query) else store.find_playlist_track_by_query(owner_id, query)
 
             if not matched:
                 # User tidak menyebutkan pilihan spesifik atau lagu tidak ditemukan: tanyakan ke user dengan menyebutkan opsi lagu
@@ -2905,9 +2932,12 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
             # Cek apakah lagu dinonaktifkan oleh Admin (Akses Plus)
             if not matched.get("is_active", True):
-                track_no = matched.get("track_number", 1)
+                track_no = matched.get("radio_number", matched.get("track_number", 1))
                 title = matched.get("title", "")
-                plus_msg = f"Lagu playlist nomor {track_no} '{title}' telah dinonaktifkan oleh admin. Silakan buka paket langganan Akses Plus untuk memutar kembali lagu ini."
+                if is_radio_id(matched.get("video_id")):
+                    plus_msg = f"Radio nomor {track_no} '{title}' telah dinonaktifkan oleh admin."
+                else:
+                    plus_msg = f"Lagu playlist nomor {track_no} '{title}' telah dinonaktifkan oleh admin. Silakan buka paket langganan Akses Plus untuk memutar kembali lagu ini."
                 response = {
                     "success": False,
                     "message": plus_msg,
@@ -2915,6 +2945,22 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     "track_number": track_no,
                     "title": title,
                     "instructions": f"Katakan langsung kepada pengguna dengan suara jelas: '{plus_msg}' Jangan memanggil tool pemutar audio.",
+                }
+                record_mcp_tool_history(owner_id, "play_playlist_song", query, {"query": query}, response)
+                return response
+
+            if is_radio_id(matched.get("video_id")):
+                from xiaozhi.mcp.context import mcp_active_mac_ctx
+
+                mac = mcp_active_mac_ctx.get() or store.get_user_mac_address(owner_id) or ""
+                base_url = os.getenv("SERVER_BASE_URL", "").rstrip("/") or "https://xiaozhiscig.biz.id"
+                queue_radio_track(store, owner_id, matched, base_url, mac)
+                response = {
+                    "success": True, "source": "radio", "playback_queued": True,
+                    "title": matched["title"],
+                    "radio_number": matched.get("radio_number"),
+                    "message": f"Perintah memutar radio '{matched['title']}' dikirim ke ESP32.",
+                    "instructions": "Perangkat menerima siaran dari perintah yang dikirim. Jangan lakukan pencarian YouTube.",
                 }
                 record_mcp_tool_history(owner_id, "play_playlist_song", query, {"query": query}, response)
                 return response
@@ -2995,13 +3041,11 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return {"success": False, "message": f"Gagal memutar lagu playlist: {exc}"}
 
     @mcp_server.tool()
-    def list_user_playlist() -> dict:
-        """
-        Ambil seluruh daftar lagu yang tersimpan di Playlist Musik YouTube pribadi pengguna.
-        Gunakan tool ini saat user bertanya:
-        - "Apa saja lagu di playlist saya?"
-        - "Cek daftar playlist saya"
-        - "Tampilkan lagu yang tersimpan di playlist"
+    def list_user_playlist(category: Literal["all", "music", "radio"] = "all") -> dict:
+        """Cek jumlah dan daftar playlist tanpa memutar audio.
+
+        Args:
+            category: "radio" untuk jumlah atau daftar stasiun radio, "music" untuk YouTube dan TikTok, atau "all" untuk keduanya.
         """
         owner_id = mcp_active_owner_ctx.get()
         if not owner_id:
@@ -3009,14 +3053,21 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
         try:
             from xiaozhi.services.audio_cache_worker import get_track_cache_status
-            tracks = store.get_user_playlist(owner_id)
-            if not tracks:
-                return {
-                    "success": True,
-                    "message": "Playlist Anda masih kosong. Anda dapat menambahkan lagu melalui menu Playlist di dashboard web.",
-                    "total": 0,
-                    "playlist": [],
-                }
+            from xiaozhi.services.radio_service import is_radio_id, radio_playlist_tracks
+
+            all_tracks = store.get_user_playlist(owner_id)
+            radios = radio_playlist_tracks(all_tracks)
+            radio_by_id = {track["id"]: track for track in radios}
+            music = [track for track in all_tracks if not is_radio_id(track.get("video_id"))]
+            if category == "radio":
+                tracks = radios
+                heading = f"Ada {len(radios)} stasiun di Playlist Stream Radio."
+            elif category == "music":
+                tracks = music
+                heading = f"Ada {len(music)} lagu di Playlist YouTube & TikTok."
+            else:
+                tracks = [radio_by_id.get(track["id"], track) for track in all_tracks]
+                heading = f"Playlist Anda berisi {len(music)} lagu dan {len(radios)} stasiun radio."
             summary = []
             for i, t in enumerate(tracks):
                 c_info = get_track_cache_status(t.get("video_id", ""))
@@ -3025,19 +3076,24 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     c_tag = " [Siap Lancar ⚡]"
                 elif c_status == "downloading":
                     c_tag = f" [Unduh {c_info.get('percent', 0)}% ⏳]"
+                elif c_status == "live":
+                    c_tag = " [Radio Live]"
                 else:
                     c_tag = " [Streaming ⚠️]"
 
                 status_tag = " [Dinonaktifkan - Akses Plus]" if not t.get("is_active", True) else c_tag
-                summary.append(f"{t.get('track_number', i+1)}. {t.get('title')}{status_tag}")
+                number = f"Radio {t['radio_number']}" if "radio_number" in t else str(t.get("track_number", i + 1))
+                summary.append(f"{number}. {t.get('title')}{status_tag}")
 
             response = {
                 "success": True,
-                "message": f"Ditemukan {len(tracks)} lagu di playlist Anda:\n" + "\n".join(summary[:10]),
+                "message": "\n".join([heading, *summary[:10]]),
                 "total": len(tracks),
+                "total_music": len(music),
+                "total_radio": len(radios),
                 "playlist": tracks,
             }
-            record_mcp_tool_history(owner_id, "list_user_playlist", "list playlist", {}, response)
+            record_mcp_tool_history(owner_id, "list_user_playlist", "list playlist", {"category": category}, response)
             return response
         except Exception as exc:
             logger.exception("Error in list_user_playlist: %s", exc)
@@ -3129,7 +3185,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     c_status = c_info.get("status", "uncached")
                     pct = c_info.get("percent", 0)
 
-                    if c_status == "ready":
+                    if c_status == "live":
+                        msg = f"Radio #{track_no} '{title}' diputar langsung dari siaran."
+                    elif c_status == "ready":
                         msg = (
                             f"Lagu #{track_no} '{title}' sudah 100% selesai diunduh ke cache server. "
                             f"Lagu ini siap diputar dengan lancar tanpa jeda atau kendala putus-putus."
@@ -3174,6 +3232,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                 t_title = t.get("title", "")
                 c_info = get_track_cache_status(vid)
                 c_status = c_info.get("status", "uncached")
+                if c_status == "live":
+                    continue
                 pct = c_info.get("percent", 0)
 
                 item = {
@@ -3467,18 +3527,28 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def stop_youtube_song() -> dict:
         """
-        Hentikan (stop/matikan/pause) pemutaran lagu YouTube yang sedang berputar di speaker perangkat XiaoZhi.
+        Hentikan pemutaran lagu YouTube atau siaran radio di speaker XiaoZhi.
         Gunakan tool ini saat user meminta:
         - "Stop lagunya" / "Stop musik"
         - "Matikan lagunya" / "Matikan musik"
         - "Berhenti putar lagu"
         - "Cukup lagunya"
+        - "Stop radio"
         """
         owner_id = mcp_active_owner_ctx.get()
         if owner_id is None:
             return {"success": False, "message": "Belum ada koneksi perangkat aktif."}
         from xiaozhi.services.playback_tracker import playback_tracker
+        from xiaozhi.services.radio_service import is_radio_id
+        current = playback_tracker.get_user_session(owner_id) or {}
         stopped = playback_tracker.stop_user_playback(owner_id)
+        if is_radio_id(current.get("video_id")) and stopped:
+            response_r = {
+                "success": True, "stopped": True, "message": "Pemutaran radio dihentikan.",
+                "instructions": "Panggil tool perangkat `self.audio.abort` untuk mengosongkan buffer speaker.",
+            }
+            record_mcp_tool_history(owner_id, "stop_youtube_song", "stop radio", {}, response_r)
+            return response_r
         if stopped:
             response = {
                 "success": True,
