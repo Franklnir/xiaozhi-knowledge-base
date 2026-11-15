@@ -22,10 +22,18 @@ from xiaozhi.services.audio_cache_worker import (
     get_all_queue_status,
     get_track_cache_status,
 )
-from xiaozhi.services.radio_service import find_radio_station, is_radio_id, radio_playlist_tracks, radio_stations, radio_statuses
+from xiaozhi.services.radio_service import (
+    find_radio_station,
+    is_noice_station_url,
+    is_radio_id,
+    radio_playlist_tracks,
+    radio_stations,
+    radio_statuses,
+)
 
 logger = logging.getLogger("xiaozhi.playlist")
 router = APIRouter()
+NOICE_UNREGISTERED = "Tautan Noice terdeteksi. Stasiun belum terdaftar. Hubungi admin untuk menambahkan sumber stream."
 
 
 def _fetch_youtube_title_oembed(video_url: str) -> Optional[str]:
@@ -204,6 +212,8 @@ async def api_add_playlist_track(request: Request):
             video_id=station.video_id, artist=artist, duration="LIVE",
         )
         return {"success": True, "platform": "radio", "track": track, "message": f"Radio '{track['title']}' ditambahkan ke playlist."}
+    if is_noice_station_url(raw_url):
+        raise HTTPException(status_code=400, detail=NOICE_UNREGISTERED)
 
     media_info = detect_media_url_source(raw_url)
     if not media_info:
@@ -335,6 +345,8 @@ async def api_update_playlist_track(track_id: int, request: Request):
                 artist=str(artist).strip() if artist is not None else None,
             )
             return {"success": True, "track": updated, "message": "Stasiun radio berhasil diperbarui."}
+        if is_noice_station_url(raw_url):
+            raise HTTPException(status_code=400, detail=NOICE_UNREGISTERED)
         media_info = detect_media_url_source(raw_url)
         if not media_info:
             raise HTTPException(

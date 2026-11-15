@@ -95,6 +95,14 @@ def _page_key(value: str):
     return url.hostname, url.path.rstrip("/"), query
 
 
+def is_noice_station_url(url: str) -> bool:
+    key = _page_key(url)
+    return bool(
+        key and key[0] == "open.noice.id"
+        and re.fullmatch(r"/catalog/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", key[1])
+    )
+
+
 def radio_stations():
     try:
         data = json.loads(STATIONS_FILE.read_text(encoding="utf-8"))

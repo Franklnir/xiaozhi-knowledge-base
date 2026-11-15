@@ -796,12 +796,16 @@
     const radioNames = new Map(Object.entries({{ radio_links|default({})|tojson }})
         .map(([url, title]) => [radioLinkKey(url), title]));
 
-    // Helper: Detect Media Source (YouTube or TikTok)
+    // Detect media links and look up registered radio stations.
     function detectMediaSource(url) {
         if (!url) return null;
         url = url.trim();
-        const station = radioNames.get(radioLinkKey(url));
+        const radioKey = radioLinkKey(url);
+        const station = radioNames.get(radioKey);
         if (station) return { platform: 'radio', title: station };
+        if (radioKey && /^open\.noice\.id\/catalog\/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}(?:\?|$)/.test(radioKey)) {
+            return { platform: 'radio', unregistered: true };
+        }
         // 1. YouTube direct ID
         if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
             return { platform: 'youtube', id: url, title: 'YouTube Video ID' };
@@ -891,9 +895,17 @@
             } else if (info.platform === 'radio') {
                 thumb.style.display = 'none';
                 if (iconBox) iconBox.style.display = 'none';
-                tagEl.textContent = '📻 Radio Live';
-                idEl.textContent = info.title;
-                if (badge) badge.style.display = 'none';
+                tagEl.textContent = info.unregistered ? '📻 Tautan Noice terdeteksi' : '📻 Radio Live';
+                idEl.textContent = info.unregistered
+                    ? 'Stasiun belum terdaftar. Hubungi admin untuk menambahkan sumber stream.'
+                    : info.title;
+                if (badge) {
+                    badge.style.display = 'inline-block';
+                    badge.style.background = 'rgba(13, 148, 136, 0.14)';
+                    badge.style.color = 'var(--app-text)';
+                    badge.style.border = '1px solid #0d9488';
+                    badge.textContent = info.unregistered ? '📻 Noice terdeteksi' : '📻 Radio terdeteksi';
+                }
             }
         } else {
             box.style.display = 'none';

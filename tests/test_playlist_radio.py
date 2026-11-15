@@ -58,7 +58,15 @@ def test_save_and_play_registered_radio(tmp_path, monkeypatch):
     assert client.get(status_url).json()["tracks"][str(track_id)]["state"] == "registered"
 
     assert client.post("/api/v1/playlist", json={"youtube_url": "https://other.example.test/live.m3u8"}).status_code == 400
-    assert client.post("/api/v1/playlist", json={"youtube_url": "https://open.noice.id.evil.test/catalog/test-station"}).status_code == 400
+    noice_link = "https://open.noice.id/catalog/f7c42e96-4ce6-4788-b81b-ffc9c43e3529"
+    unregistered = {"youtube_url": noice_link + "?utm_source=app"}
+    response = client.post("/api/v1/playlist", json=unregistered)
+    assert response.status_code == 400 and "Tautan Noice terdeteksi" in response.json()["detail"]
+    response = client.put(f"/api/v1/playlist/{track_id}", json=unregistered)
+    assert response.status_code == 400 and "Stasiun belum terdaftar" in response.json()["detail"]
+    lookalike = noice_link.replace("open.noice.id", "open.noice.id.evil.test")
+    response = client.post("/api/v1/playlist", json={"youtube_url": lookalike})
+    assert response.status_code == 400 and "Tautan Noice terdeteksi" not in response.json()["detail"]
     assert client.post(f"/api/v1/playlist/{track_id}/cache").status_code == 400
     assert client.post("/api/v1/playlist/cache-all").json()["queued_count"] == 0
     store.add_playlist_track(owner["id"], title="Lagu YouTube", youtube_url="https://youtu.be/aaaaaaaaaaa", video_id="aaaaaaaaaaa")
