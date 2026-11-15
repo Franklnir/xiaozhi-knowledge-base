@@ -1,4 +1,6 @@
 import asyncio
+import inspect
+import json
 import logging
 import re
 import time
@@ -34,6 +36,21 @@ _HANDSHAKE_START_INTERVAL = 0.15
 _handshake_limit: Optional[asyncio.Semaphore] = None
 _handshake_start_lock: Optional[asyncio.Lock] = None
 _MCP_PROTOCOL_METHODS = {"initialize", "notifications/initialized", "ping", "tools/list"}
+
+
+def _serialize_websocket_tool_list(message):
+    """Send the full catalog with compact description and schema formatting."""
+    payload = message.model_dump(by_alias=True, exclude_none=True, mode="json")
+    for tool in payload["result"]["tools"]:
+        if tool.get("description"):
+            tool["description"] = inspect.cleandoc(tool["description"])
+        schema = tool["inputSchema"]
+        # FastMCP generates these titles from the model and parameter names.
+        # The name, types, required parameters and validation constraints stay in the catalog.
+        schema.pop("title", None)
+        for field in schema.get("properties", {}).values():
+            field.pop("title", None)
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
 def is_bridge_in_cooldown(task_key: str) -> bool:
@@ -125,7 +142,6 @@ async def start_mcp_background(store):
 
     # Set capture function
     from xiaozhi.core.utils import collect_chat_messages
-    import json
     import time
 
     pending_tool_calls: Dict[tuple, Dict[str, Any]] = {}
@@ -478,8 +494,11 @@ async def websocket_client_server(user_id: int, url: str, token_hash: str, slot:
                 async with write_stream_reader:
                     async for session_message in write_stream_reader:
                         message = session_message.message
-                        json_str = message.model_dump_json(by_alias=True, exclude_none=True)
                         result = getattr(message.root, "result", None)
+                        if result is not None and "tools" in result and result.keys() <= {"tools", "nextCursor", "_meta"}:
+                            json_str = _serialize_websocket_tool_list(message)
+                        else:
+                            json_str = message.model_dump_json(by_alias=True, exclude_none=True)
                         if result is None or not (
                             result.keys() <= {"tools", "nextCursor", "_meta"} or
                             result.keys() <= {"protocolVersion", "capabilities", "serverInfo", "instructions", "_meta"}

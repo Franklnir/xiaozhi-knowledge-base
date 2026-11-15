@@ -1,4 +1,5 @@
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -391,3 +392,28 @@ def test_handshakes_are_limited_even_when_many_slots_start_at_once(monkeypatch):
         assert peak == limit and attempted == 24
 
     asyncio.run(exercise())
+
+
+def test_full_websocket_catalog_fits_in_a_single_message(monkeypatch):
+    from mcp import types
+    from xiaozhi.mcp import server as mcp
+
+    monkeypatch.setattr(mcp, "mcp_server", None)
+    server = mcp.init_mcp_server(SimpleNamespace())
+    tools = asyncio.run(server.list_tools())
+    catalog = types.ListToolsResult(tools=tools).model_dump(by_alias=True, exclude_none=True, mode="json")
+    message = types.JSONRPCMessage(types.JSONRPCResponse(jsonrpc="2.0", id=3, result=catalog))
+
+    data = bridge._serialize_websocket_tool_list(message)
+    assert len(data.encode("utf-8")) < 60 * 1024
+    encoded = json.loads(data)
+    assert encoded["id"] == 3
+    compact_tools = encoded["result"]["tools"]
+    assert [tool["name"] for tool in compact_tools] == [tool.name for tool in tools]
+    for original, compact in zip(tools, compact_tools):
+        assert compact["description"].split() == original.description.split()
+        schema = compact["inputSchema"]
+        assert schema.get("required") == original.inputSchema.get("required")
+        assert set(schema["properties"]) == set(original.inputSchema["properties"])
+        for key, props in schema["properties"].items():
+            assert props == {name: value for name, value in original.inputSchema["properties"][key].items() if name != "title"}
