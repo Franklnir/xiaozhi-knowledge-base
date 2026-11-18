@@ -1223,9 +1223,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         font-size: 11.5px;
         min-height: 32px;
     }
-    .app-guest-nav a:not(.app-button-primary):nth-child(1) {
-        display: none;
-    }
     .app-main {
         padding: 12px 10px;
         padding-top: 64px;

@@ -43,6 +43,25 @@
         color: var(--app-muted);
         margin-top: 8px;
     }
+    @media (max-width: 640px) {
+        .profile-header {
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px;
+        }
+        .profile-avatar {
+            width: 44px;
+            height: 44px;
+            font-size: 20px;
+        }
+        .profile-info {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        .profile-name {
+            font-size: 20px;
+        }
+    }
     .photo-slot-box {
         border: 2px dashed var(--app-border-strong);
         border-radius: var(--app-radius);
@@ -496,7 +515,7 @@
     }
     .persona-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
         gap: 16px;
         margin-bottom: 16px;
     }

@@ -119,7 +119,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/app-shell.css?v={{ app_shell_version }}">
     <link rel="stylesheet" href="/static/css/claymorphism.css?v=3">
-    <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/responsive.css?v={{ responsive_css_version }}">
     <link rel="stylesheet" href="/static/css/playful.css">
     <script src="/static/js/app.js"></script>
     {% block page_styles %}{% endblock %}
@@ -485,11 +485,11 @@
                 <span class="app-brand-sub">Platform AI & IoT</span>
             </div>
         </a>
-        <div class="app-guest-nav">
+        <nav class="app-guest-nav" aria-label="Menu utama">
             <a href="/web-flasher" class="app-button" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><svg class="app-icon app-icon-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Flasher</a>
             <a href="/dokumentasi" class="app-button" style="text-decoration:none;">Dokumentasi</a>
             <a href="/login" class="app-button app-button-primary" style="text-decoration:none;">Masuk</a>
-        </div>
+        </nav>
     </header>
 
     {% endif %}

@@ -11,6 +11,21 @@
         padding: 32px 28px;
         box-shadow: var(--app-shadow);
     }
+    @media (max-width: 640px) {
+        .fw-sim-box {
+            margin: 0 auto;
+            padding: 18px 12px;
+            overflow-wrap: anywhere;
+        }
+        .fw-sim-details > div,
+        .fw-sim-details > div > div {
+            gap: 8px;
+        }
+        .fw-sim-details strong {
+            min-width: 0;
+            text-align: right;
+        }
+    }
 </style>
 
 <div class="fw-sim-box">
@@ -28,7 +43,7 @@
     </div>
 
     <!-- Order Detail Box -->
-    <div style="background:var(--app-surface-muted); border:1.5px solid var(--app-border); border-radius:var(--app-radius); padding:16px; margin-bottom:20px;">
+    <div class="fw-sim-details" style="background:var(--app-surface-muted); border:1.5px solid var(--app-border); border-radius:var(--app-radius); padding:16px; margin-bottom:20px;">
         <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:8px;">
             <span style="color:var(--app-muted);">Nomor Pesanan:</span>
             <strong style="font-family:monospace;">#{{ order.order_number }}</strong>

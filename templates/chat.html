@@ -359,9 +359,51 @@
     .scroll-down-btn:hover {
         transform: scale(1.05);
     }
+
+    @media (max-width: 1024px) {
+        .app-main:has(> .chat-page) {
+            --chat-bottom-space: max(14px, env(safe-area-inset-bottom));
+            padding-bottom: var(--chat-bottom-space);
+        }
+        .app-main .chat-page {
+            grid-template-rows: auto minmax(0, 1fr);
+            height: calc(100dvh - 82px - var(--chat-bottom-space) - var(--app-banner-offset, 0px));
+            min-height: 380px;
+            gap: 12px;
+        }
+        .chat-main-container {
+            height: auto;
+            min-height: 0;
+        }
+        .chat-page .app-page-header {
+            padding-bottom: 10px;
+            gap: 8px;
+        }
+        .chat-page .app-subtitle,
+        .chat-keyboard-hint {
+            display: none;
+        }
+        .chat-header-bar,
+        .chat-input-container {
+            padding: 10px;
+        }
+        .chat-scroll-area {
+            min-height: 0;
+            padding: 10px 12px;
+        }
+        .chat-text-input {
+            min-width: 0;
+            padding-inline: 10px;
+            font-size: 16px;
+        }
+        .chat-submit-btn {
+            flex-shrink: 0;
+            padding-inline: 12px;
+        }
+    }
 </style>
 
-<div class="app-page">
+<div class="app-page chat-page">
     <!-- Page Header -->
     <header class="app-page-header">
         <div>
@@ -398,7 +440,7 @@
                     </span>
                 </div>
             </div>
-            <div style="font-size:12px; color:var(--app-muted); font-weight:600;">
+            <div class="chat-keyboard-hint" style="font-size:12px; color:var(--app-muted); font-weight:600;">
                 Tekan <kbd style="background:#e2e8f0; color:#000; padding:1px 5px; border-radius:3px; border:1px solid #94a3b8;">Enter</kbd> untuk mengirim teks
             </div>
         </div>
@@ -437,7 +479,9 @@
                 type="text" 
                 id="chatInput" 
                 class="chat-text-input" 
-                placeholder="Tulis pesan teks Anda di sini... (Enter untuk kirim)" 
+                aria-label="Pesan"
+                placeholder="Tulis pesan…"
+                enterkeyhint="send"
                 autocomplete="off" 
                 maxlength="2000"
                 required

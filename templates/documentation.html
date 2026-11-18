@@ -212,16 +212,46 @@
     .doc-tab-content.active {
         display: block;
     }
+    .doc-topic-picker {
+        display: none;
+    }
     .tool-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
         gap: 14px;
         margin-top: 12px;
         margin-bottom: 6px;
     }
     @media (max-width: 640px) {
+        .doc-tabs {
+            display: none;
+        }
+        .doc-topic-picker {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+        .doc-topic-picker .app-select {
+            width: 100%;
+        }
+        .doc-tab-content {
+            overflow-wrap: anywhere;
+        }
+        .doc-step {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 8px;
+            padding: 12px;
+        }
+        .doc-step-content {
+            min-width: 0;
+        }
+        .doc-step .doc-screenshot-caption {
+            flex-wrap: wrap;
+        }
         .tool-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
             gap: 10px;
         }
     }
@@ -358,18 +388,31 @@
     </header>
 
     <!-- Tabs -->
+    {% set doc_topics = [
+        ('quickstart', '🚀 Alur Cepat (0-100)'),
+        ('hardware', '⚡ Pinout ESP32-S3 & Layar'),
+        ('hardware-c3', '🔌 Pinout ESP32-C3'),
+        ('mcp', '🛠️ MCP Setup & Slot'),
+        ('youtube', '🎵 Musik & Playlist'),
+        ('smarthome', '🏠 Smart Home'),
+        ('tools', '📚 Tools MCP'),
+        ('knowledge', '💡 Knowledge Base'),
+        ('faq', '❓ FAQ'),
+        ('ecosystem', '🌐 Apa itu xiaozhiscig vs xiaozhi.me?')
+    ] %}
     <div class="doc-tabs">
-        <button class="doc-tab active" onclick="switchTab('quickstart')">🚀 Alur Cepat (0-100)</button>
-        <button class="doc-tab" onclick="switchTab('hardware')">⚡ Pinout ESP32-S3 &amp; Layar</button>
-        <button class="doc-tab" onclick="switchTab('hardware-c3')">🔌 Pinout ESP32-C3</button>
-        <button class="doc-tab" onclick="switchTab('mcp')">🛠️ MCP Setup &amp; Slot</button>
-        <button class="doc-tab" onclick="switchTab('youtube')">🎵 Musik &amp; Playlist</button>
-        <button class="doc-tab" onclick="switchTab('smarthome')">🏠 Smart Home</button>
-        <button class="doc-tab" onclick="switchTab('tools')">📚 Tools MCP</button>
-        <button class="doc-tab" onclick="switchTab('knowledge')">💡 Knowledge Base</button>
-        <button class="doc-tab" onclick="switchTab('faq')">❓ FAQ</button>
-        <button class="doc-tab" onclick="switchTab('ecosystem')">🌐 Apa itu xiaozhiscig vs xiaozhi.me?</button>
+        {% for key, title in doc_topics %}
+        <button type="button" class="doc-tab{% if loop.first %} active{% endif %}" data-topic="{{ key }}" onclick="switchTab(this.dataset.topic)">{{ title }}</button>
+        {% endfor %}
     </div>
+    <label class="doc-topic-picker" for="docTopic">
+        Topik dokumentasi
+        <select class="app-select" id="docTopic" onchange="switchTab(this.value)">
+            {% for key, title in doc_topics %}
+            <option value="{{ key }}">{{ title }}</option>
+            {% endfor %}
+        </select>
+    </label>
 
     <!-- ======================================================== -->
     <!-- TAB 1: 🚀 ALUR CEPAT MULAI DARI NOL (PANDUAN 5 LANGKAH)   -->
@@ -394,7 +437,7 @@
                 </div>
 
                 <!-- Visual Roadmap Indicator -->
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin:16px 0 28px; padding:14px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius);">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap:10px; margin:16px 0 28px; padding:14px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius);">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <div style="width:28px; height:28px; border-radius:50%; background:#2563eb; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex-shrink:0;">1</div>
                         <div>
@@ -559,7 +602,7 @@
                     </div>
 
                     <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 16px; background:rgba(2, 132, 199, 0.08); border:1.5px dashed #0284c7; border-radius:10px; margin-bottom:14px;">
-                        <div style="flex:1; min-width:260px;">
+                        <div style="flex:1; min-width:min(260px, 100%);">
                             <div style="font-size:13px; font-weight:800; color:var(--app-text); margin-bottom:3px;">
                                 📖 Butuh panduan visual dengan tangkapan layar (screenshot)?
                             </div>
@@ -567,7 +610,7 @@
                                 Buka tab MCP Setup &amp; Slot untuk melihat posisi persis tombol "+ Tambah Perangkat" dan tab "Integrasi MCP" di xiaozhi.me.
                             </div>
                         </div>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; min-width:0; max-width:100%;">
                             <button type="button" onclick="switchTab('mcp'); window.scrollTo({top:0, behavior:'smooth'});" class="app-button" style="background:#0284c7; color:#fff; border-color:#0369a1; font-size:12px; font-weight:800; padding:8px 14px; cursor:pointer;">
                                 <span>📖 Lihat Detail Panduan MCP Setup &amp; Slot</span>
                             </button>
@@ -1133,7 +1176,7 @@
                     <div class="doc-step-content">
                         <div class="doc-step-title">Daftar 6 Layar Utama Chronchi (Dapat Diganti dengan 1x Klik Tombol BOOT)</div>
                         <div class="doc-step-desc">
-                            <div style="margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+                            <div style="margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap:12px;">
                                 <!-- Layar 1 -->
                                 <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
                                     <strong style="color:var(--app-brand);">1. ⌚ Layar Jam Utama (Watchface)</strong>
@@ -1610,7 +1653,7 @@
                         <div class="doc-step-title">Pilihan Model Wake Word (Kata Pemicu Suara Bawaan)</div>
                         <div class="doc-step-desc">
                             Pada portal konfigurasi, tersedia menu pemilihan model deteksi kata pemicu (WakeNet On-Device) tanpa memerlukan koneksi cloud:
-                            <div style="margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:10px;">
+                            <div style="margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap:10px;">
                                 <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:10px;">
                                     <strong style="color:var(--app-brand);">1. "Hi Jason" (<code>hijason</code>) — Default</strong>
                                     <div style="font-size:12px; color:var(--app-muted); margin-top:3px;">
@@ -1818,7 +1861,7 @@
                     <div class="doc-step-content">
                         <div class="doc-step-title">Data &amp; Layar yang Tampil pada Layar OLED SSD1306 (128x64)</div>
                         <div class="doc-step-desc">
-                            <div style="margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+                            <div style="margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap:12px;">
                                 <!-- Layar 1 -->
                                 <div style="background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:var(--app-radius); padding:12px;">
                                     <strong style="color:var(--app-brand);">1. ⌚ Layar Home (Clock &amp; Status)</strong>
@@ -2206,7 +2249,7 @@
                     <p style="font-size:13.5px; color:var(--app-muted); line-height:1.6; margin:0 0 14px;">
                         Panduan praktis cara mengelola lagu favorit Anda di Web Dashboard, menggunakan fitur <strong>Siap Putar Cepat (Audio Cache)</strong> agar lagu tidak tersendat, serta daftar perintah suara terlengkap untuk speaker XiaoZhi ESP32.
                     </p>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px;">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap:12px;">
                         <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:10px; padding:12px 14px;">
                             <div style="font-weight:750; font-size:13px; color:#10b981; display:flex; align-items:center; gap:6px; margin-bottom:4px;">
                                 <span>⚡</span> Playlist Musik (Diputar Instan &amp; Lancar)
@@ -2300,7 +2343,7 @@
                             Kendalikan seluruh pemutaran musik langsung dengan berbicara ke speaker Xiaozhi:
                         </div>
 
-                        <div style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:10px;">
+                        <div style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap:10px;">
                             <!-- Command 1 -->
                             <div style="padding:12px; background:var(--app-surface-muted); border:1px solid var(--app-border); border-radius:10px;">
                                 <div style="font-weight:750; font-size:12.5px; color:var(--app-text); margin-bottom:4px;">
@@ -2424,7 +2467,7 @@
                 </p>
 
                 <!-- Dual Mode Navigation Banner -->
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin:20px 0;">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap:16px; margin:20px 0;">
                     <div style="border:1.5px solid #0284c7; background:rgba(2, 132, 199, 0.04); border-radius:10px; padding:16px;">
                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
                             <span style="font-size:24px;">🎛️</span>
@@ -2665,7 +2708,7 @@
                     <span>🎤</span> Ragam Contoh Perintah Suara (Voice Commands)
                 </div>
 
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px;">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap:14px;">
                     <div style="background:var(--app-surface); border:1px solid var(--app-border); border-radius:8px; padding:14px;">
                         <div style="font-weight:750; font-size:13.5px; color:var(--app-text); margin-bottom:6px;">
                             💡 Kontrol Saklar Tunggal:
@@ -4133,7 +4176,7 @@
                     <span>⚖️</span> Peran, Karakteristik &amp; Fungsi Masing-Masing
                 </div>
 
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-top:16px;">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap:20px; margin-top:16px;">
                     <!-- KARTU 1: XIAOZHI.ME -->
                     <div style="border:2px solid #7c3aed; background:rgba(124, 58, 237, 0.03); border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:space-between;">
                         <div>
@@ -4374,7 +4417,7 @@
         if (target) {
             target.classList.add('active');
         }
-        const btn = document.querySelector(`.doc-tab[onclick*="'${tabName}'"]`);
+        const btn = document.querySelector(`.doc-tab[data-topic="${CSS.escape(tabName)}"]`);
         if (btn) {
             btn.classList.add('active');
         } else if (window.event && window.event.currentTarget) {
@@ -4383,6 +4426,7 @@
         if (history.replaceState) {
             history.replaceState(null, null, '#' + tabName);
         }
+        document.getElementById('docTopic').value = tabName;
     }
 
     // Auto-switch based on URL hash (e.g., #hardware)

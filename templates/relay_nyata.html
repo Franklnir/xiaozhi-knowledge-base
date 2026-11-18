@@ -1251,10 +1251,22 @@
     /* ── Responsive Mobile Optimizations ────────────────────────── */
     @media (max-width: 768px) {
         .relay-mode-nav {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .relay-mode-nav .relay-mode-btn {
+            gap: 8px;
+            padding: 10px;
+        }
+        .relay-mode-subtitle {
+            white-space: normal;
+        }
+        .relay-mode-badge {
+            max-width: 28%;
+            padding-inline: 6px;
+            text-align: center;
         }
         .relay-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
         }
         .relay-room-header-top {
             flex-direction: column;
@@ -1263,6 +1275,9 @@
         .relay-room-actions-menu {
             width: 100%;
             justify-content: flex-end;
+        }
+        .relay-add-button {
+            width: 100%;
         }
     }
 </style>

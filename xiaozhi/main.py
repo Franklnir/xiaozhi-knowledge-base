@@ -172,6 +172,10 @@ if not STATIC_DIR.exists():
 shell_css = STATIC_DIR / "css" / "app-shell.css"
 APP_SHELL_VERSION = sha256(shell_css.read_bytes()).hexdigest()[:12] if shell_css.is_file() else ""
 templates.env.globals["app_shell_version"] = APP_SHELL_VERSION
+responsive_css = STATIC_DIR / "css" / "responsive.css"
+templates.env.globals["responsive_css_version"] = (
+    sha256(responsive_css.read_bytes()).hexdigest()[:12] if responsive_css.is_file() else ""
+)
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

@@ -114,11 +114,16 @@ body.has-pwa-banner {
         visibility: hidden;
         overscroll-behavior: contain;
         padding-bottom: env(safe-area-inset-bottom);
-        transition: transform .25s ease, visibility .25s;
+        transition: transform .25s ease, visibility 0s .25s;
     }
 
     .app-nav-aside.is-open {
         visibility: visible;
+        transition-delay: 0s;
+    }
+
+    body:has(.app-nav-aside.is-open) {
+        overflow: hidden;
     }
 
     .app-sidebar-header .app-drawer-close {
@@ -145,10 +150,6 @@ body.has-pwa-banner {
     .app-main :is(.app-page, .dashboard-container, .dashboard-grid, .app-content-grid) > * {
         min-width: 0;
     }
-
-    .app-main .chat-main-container {
-        height: calc(100dvh - 120px - var(--app-banner-offset, 0px));
-    }
 }
 
 @media (max-width: 767px) {
@@ -165,6 +166,40 @@ body.has-pwa-banner {
 
     .auth-card :is(.app-input, .app-select) {
         font-size: 16px;
+    }
+
+    .app-main .app-page {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .app-main :is(.app-page-header, .app-card-header, .app-toolbar) > * {
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .app-main .app-card-header {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    :is(.app-main, [role="dialog"], .relay-modal) :is(.app-button, .app-input, .app-select) {
+        min-height: 44px;
+        max-width: 100%;
+    }
+
+    :is(.app-main, [role="dialog"], .relay-modal) .app-button {
+        white-space: normal;
+    }
+
+    .app-main :is(pre, .app-table-wrap) {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .app-main .app-table-wrap {
+        margin-inline: 0;
     }
 
     .app-main .app-content-grid {
@@ -194,5 +229,49 @@ body.has-pwa-banner {
 
     .app-main .fw-grid {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    body:has(> .app-guest-header) {
+        flex-direction: column;
+    }
+
+    .app-guest-header {
+        position: sticky;
+        top: var(--app-banner-offset, 0px);
+        inset-inline: auto;
+        height: auto;
+        min-height: 60px;
+        gap: 8px;
+        padding-block: 6px;
+    }
+
+    .app-main-wrapper.is-guest {
+        padding-top: 0;
+        min-height: 0;
+    }
+
+    .app-guest-nav .app-button {
+        justify-content: center;
+        min-height: 44px;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-guest-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .app-guest-header .app-brand {
+        align-self: center;
+    }
+
+    .app-guest-nav {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
     }
 }
