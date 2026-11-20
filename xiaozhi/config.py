@@ -658,7 +658,7 @@ ALL_MCP_TOOLS_CATALOG = [
         "category": "education",
         "category_label": "Edukasi & Riset",
         "icon": "🤖",
-        "description": "Pencarian sumber terpercaya dan sintesis dokumen mandiri tanpa perlu copy link manual (dengan konfirmasi simpan).",
+        "description": "Mencari referensi web, paper, dan video YouTube sekaligus serta menyiapkan hasil untuk dikonfirmasi sebelum disimpan.",
     },
     {
         "name": "confirm_and_save_research_material",
@@ -667,6 +667,14 @@ ALL_MCP_TOOLS_CATALOG = [
         "category_label": "Knowledge & Memori",
         "icon": "📥",
         "description": "Menyimpan materi riset mandiri ke database Knowledge Base setelah memperoleh konfirmasi persetujuan pengguna.",
+    },
+    {
+        "name": "deep_research_workspace",
+        "title": "Buka atau Lanjutkan Deep Riset",
+        "category": "education",
+        "category_label": "Edukasi & Riset",
+        "icon": "🔎",
+        "description": "Bandingkan bukti dan sitasi, buka riwayat per sesi atau ID, lalu lanjutkan riset dari pertanyaan terbuka atau masukan.",
     },
     {
         "name": "test_user_knowledge_quiz",

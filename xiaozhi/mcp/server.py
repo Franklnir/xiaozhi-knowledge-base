@@ -25,7 +25,7 @@ _BLOCKING_SEARCH_TOOLS = {
     "search_web", "search_web_deep", "search_news", "search_places",
     "search_social_media", "search_course_materials", "read_live_api_data",
     "get_weather_bmkg", "get_earthquake_info", "lookup_kbbi", "search_wikipedia",
-    "convert_currency", "search_academic_papers", "autonomous_deep_research",
+    "convert_currency", "search_academic_papers", "autonomous_deep_research", "deep_research_workspace",
 }
 _MUSIC_TOOLS = {
     "play_youtube_song", "play_playlist_song", "list_user_playlist",

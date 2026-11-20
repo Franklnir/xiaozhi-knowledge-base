@@ -12,6 +12,8 @@ from bs4 import BeautifulSoup
 
 from xiaozhi.core.utils import clean_text, is_generic_playlist_query
 from xiaozhi.mcp.context import mcp_active_owner_ctx, mcp_active_slot_ctx
+from xiaozhi.database.research_store import ResearchStore
+from xiaozhi.services.research_workspace import research_history_reply, run_research
 from xiaozhi.services.scraper_service import (
     conduct_autonomous_research,
     extract_structured_text_bs4,
@@ -1056,6 +1058,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         percakapan sebelumnya, memakai kata seperti "tadi", "kemarin", "pernah", "yang itu", "lanjutkan",
         atau menyebut topik yang mungkin pernah dibahas. Jika tidak ada bukti relevan, lanjutkan dengan tool
         domain lain yang sesuai; jangan berpura-pura mengingat.
+        Untuk hasil, sumber, atau riwayat sesi Deep Riset, gunakan deep_research_workspace.
 
         Args:
             query: Kata kunci topik atau konsep yang ingin dicari (contoh: "keuangan", "tugas fisika", "resep", "koding"). Kosongkan untuk membaca percakapan paling terkini.
@@ -3483,6 +3486,19 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return {"success": False, "is_playing": False, "message": "Belum ada koneksi perangkat aktif."}
 
         clean_q = (query or "").strip().lower()
+        if ("riset" in clean_q and re.search(r"\b(tadi|terakhir|barusan)\b", clean_q)
+                and ResearchStore.supported(store)):
+            active_slot = mcp_active_slot_ctx.get(None)
+            if active_slot:
+                workspace = ResearchStore(store, owner_id, active_slot)
+                topic = workspace.detail()
+                if topic:
+                    audit = bool(re.search(r"\b(gagal|timeout|akses|log)\b", clean_q))
+                    return {
+                        **research_history_reply(workspace, topic, "audit" if audit else "read",
+                                                 access_status="errors" if "gagal" in clean_q else "all"),
+                        "request_id": f"req-{uuid.uuid4().hex}",
+                    }
         video_status = re.search(r"\b(video|tayangan|klip)\b", clean_q)
         video_summary = re.search(r"\b(kesimpulan|ringkas\w*|rangkum\w*|inti|isi)\b", clean_q)
         if video_status and (video_summary or re.search(r"\b(terakhir|tadi|barusan|status|diputar)\b", clean_q)):
@@ -4631,24 +4647,135 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def autonomous_deep_research(topic_or_question: str, mode: str = "auto") -> dict:
         """
-        Autonomous Deep Research: XiaoZhi secara mandiri mencari sumber artikel, paper ilmiah, atau
-        dokumentasi teknis terbaik tanpa mengharuskan pengguna menyalin tautan URL manual.
+        Gunakan saat pengguna berkata "riset", "tolong teliti", atau meminta menelusuri suatu topik.
+        Mode auto mencari artikel web, paper, dan video YouTube secara bersamaan.
+        Sertakan tautan video yang relevan. Ringkas isi video jika cuplikan subtitle tersedia.
+        Jika satu pencarian lambat, sampaikan sumber yang sudah ditemukan dan keterbatasannya.
         
-        PENTING (ADAPTIF & AMAN - ATURAN KONFIRMASI PENGGUNA):
-        Tool ini TIDAK LANGSUNG menyimpan materi ke database Knowledge Base.
-        XiaoZhi wajib mempresentasikan intisari temuan kepada pengguna terlebih dahulu, lalu menanyakan konfirmasi:
-        'Apakah Anda ingin saya menyimpan materi ini ke Knowledge Base Anda? Dan ada hal lain yang ingin Anda tanyakan atau pelajari?'
-        Jika pengguna menyetujui, panggil tool 'confirm_and_save_research_material'.
+        Hasil pencarian masuk ke riwayat Deep Riset. Sebutkan nomor riset dan nomor sumber aslinya.
+        Untuk pertanyaan "hasil riset tadi" atau "lanjutkan riset nomor dua", gunakan deep_research_workspace.
+        Untuk menyalin ringkasan ke Knowledge Base, minta persetujuan dan panggil confirm_and_save_research_material.
 
         Args:
             topic_or_question: Topik penelitian mandiri (contoh: "cara menghubungkan sensor thermocouple MAX6675 ke ESP32", "paper Transformer di mikrokontroler").
-            mode: 'auto' (otomatis deteksi akademis vs tutorial web), 'academic' (jurnal/paper), atau 'web' (tutorial/Wikipedia/dokumentasi).
+            mode: Gunakan 'auto' untuk riset gabungan web, paper, dan YouTube.
+                Gunakan 'academic' atau 'web' jika pengguna meminta fokus tersebut secara eksplisit.
         """
         owner_id = mcp_active_owner_ctx.get()
-        res = conduct_autonomous_research(topic_or_question, mode=mode)
+        slot = mcp_active_slot_ctx.get(None)
+        request_id = f"req-{uuid.uuid4().hex}"
+        try:
+            if owner_id and slot and ResearchStore.supported(store):
+                workspace = ResearchStore(store, owner_id, slot)
+                topic = workspace.create_or_find(topic_or_question)
+                res = run_research(workspace, workspace.detail(topic["number"]), request_id=request_id, mode=mode)
+            else:
+                res = {**conduct_autonomous_research(topic_or_question, mode=mode), "request_id": request_id}
+        except ValueError as exc:
+            res = {"success": False, "message": str(exc), "request_id": request_id}
         if owner_id:
-            record_mcp_tool_history(owner_id, "autonomous_deep_research", topic_or_question, {"topic": topic_or_question, "mode": mode}, res)
+            record_mcp_tool_history(owner_id, "autonomous_deep_research", topic_or_question,
+                                    {"topic": topic_or_question, "mode": mode}, res, request_id=request_id)
         return res
+
+    @mcp_server.tool()
+    def deep_research_workspace(
+        action: Literal["list", "read", "history", "sources", "evidence", "audit", "compare", "continue", "source", "video"] = "read",
+        research_number: int | None = None,
+        question: str = "",
+        source_number: int | None = None,
+        session_number: int | None = None,
+        topic_query: str = "",
+        record_request_id: str = "",
+        compare_session: int | None = None,
+        access_status: Literal["all", "errors", "success", "failed", "timeout", "empty"] = "all",
+        page: int = 1,
+        day: str = "",
+        source_numbers: list[int] | None = None,
+    ) -> dict:
+        """
+        Kelola konteks Deep Riset untuk akun dan slot MCP aktif.
+        read: "apa hasil riset tadi", "buka riset nomor dua sesi pertama", serta penilaian yang sudah tersimpan.
+        history: "bacakan riwayat riset nomor dua". day opsional: YYYY-MM-DD, hari ini, atau kemarin (WIB).
+        Jika diminta hasil dari hari tertentu, cari sesi dengan history lalu buka sesi yang cocok dengan read.
+        sources: "daftar sumber" atau "jelaskan sumber nomor tiga". Isi source_number untuk melihat cuplikan,
+        halaman PDF atau timestamp. Isi session_number untuk melihat versi sumber yang tercatat di sesi itu.
+        evidence: "apa dasar kesimpulannya", "bandingkan sumber [2] dan [4]", atau "apa yang belum terjawab".
+        Isi source_numbers dengan nomor sitasi yang disebut, misalnya [2, 4], dan question bila ada fokus.
+        Bandingkan isi cuplikan, sebutkan sitasi per klaim, dan jelaskan perbedaan yang masih perlu diperiksa.
+        audit: "akses apa yang gagal", "lamanya berapa", atau "lihat log". Gunakan access_status='errors'
+        untuk kegagalan dan habis waktu. Gunakan page untuk membaca lanjutan riwayat, daftar sumber, atau log.
+        compare: "apa yang berubah sejak sesi pertama" atau "bandingkan percobaan ulang dengan sesi asal".
+        session_number memilih sesi yang dinilai dan compare_session memilih pembanding. Retry memakai sesi asal
+        secara otomatis jika pengguna tidak menyebut pembanding.
+        list: jumlah dan daftar topik. Isi topic_query dengan judul untuk mencari topik lama.
+        Untuk pertanyaan tentang ID permintaan tertentu, isi record_request_id untuk menemukan sesi yang tepat.
+        Jawab dari data yang tercatat, utamakan yang ditanya, dan jangan ulangi pencarian saat pengguna bertanya tentang riwayat.
+        Gunakan continue untuk mencari informasi baru sebagai sesi lanjutan, dengan fokus opsional pada question.
+        Jika question kosong, pakai masukan atau pertanyaan terbuka yang tercatat sebagai fokus lanjutan.
+        Gunakan source bersama source_number untuk membaca PDF atau teks dari nomor sitasi tersimpan.
+        Gunakan video hanya jika pengguna meminta memutar video riset. Pilih source_number dari sitasi
+        video yang dimaksud dan teruskan playback_request_id serta playback_choice ke play_confirmed_youtube_video.
+        Jika pengguna tidak menyebut nomor, judul, atau ID permintaan, gunakan topik terakhir di slot aktif.
+        """
+        owner_id, slot = mcp_active_owner_ctx.get(), mcp_active_slot_ctx.get(None)
+        request_id = f"req-{uuid.uuid4().hex}"
+        if not (owner_id and slot and ResearchStore.supported(store)):
+            return {"success": False, "request_id": request_id, "message": "Penyimpanan Deep Riset belum tersedia."}
+        workspace = ResearchStore(store, owner_id, slot)
+        if action == "list":
+            count, topics = workspace.list_topics(page=max(1, min(page, 100_000)), title=topic_query[:160])
+            return {"success": True, "request_id": request_id, "active_count": count, "topics": [
+                {field: topic[field] for field in ("number", "title", "archived", "last_session")}
+                for topic in topics
+            ]}
+        if record_request_id.strip():
+            match = workspace.find_run(record_request_id.strip()[:100])
+            if (not match or research_number not in {None, match["topic_number"]}
+                    or session_number not in {None, match["session_number"]}):
+                return {"success": False, "request_id": request_id, "message": "ID permintaan tidak ditemukan untuk riset, sesi, atau slot ini."}
+            research_number, session_number = match["topic_number"], match["session_number"]
+        elif research_number is None and topic_query.strip():
+            key = " ".join(topic_query.casefold().split())[:160]
+            _, matches = workspace.list_topics(title=key)
+            exact = next((item for item in matches if item["title_key"] == key), None)
+            if exact or len(matches) == 1:
+                research_number = (exact or matches[0])["number"]
+            else:
+                message = "Ada beberapa topik yang cocok. Pilih nomor riset." if matches else "Topik tidak ditemukan pada slot ini."
+                return {"success": False, "request_id": request_id, "message": message,
+                        "matches": [{"number": item["number"], "title": item["title"]} for item in matches[:8]]}
+        topic = workspace.detail(research_number)
+        if action in {"read", "history", "sources", "evidence", "audit", "compare"}:
+            return {**research_history_reply(workspace, topic, action, session_number=session_number,
+                                             source_number=source_number, compare_session=compare_session,
+                                             access_status=access_status, page=page, day=day,
+                                             source_numbers=source_numbers, question=question),
+                    "request_id": request_id}
+        if action == "video" and topic and source_number:
+            from xiaozhi.services.scraper_service import extract_youtube_video_id
+            from xiaozhi.services.youtube_playback_service import remember_playback_choices
+
+            source = next((item for item in topic["sources"]
+                           if item["number"] == source_number and item["kind"] == "youtube"), None)
+            video_id = extract_youtube_video_id(source["url"]) if source else None
+            if not video_id:
+                return {"success": False, "request_id": request_id, "message": "Sitasi ini bukan video YouTube."}
+            playback_request, choices = remember_playback_choices(owner_id, slot, [{
+                "video_id": video_id, "title": source["title"], "channel": source["publisher"], "url": source["url"],
+            }])
+            return {"success": bool(choices), "request_id": request_id, "source_number": source_number,
+                    "playback_request_id": playback_request, "playback_choice": 1,
+                    "instruksi_ai": "Lanjutkan ke play_confirmed_youtube_video dengan pilihan pemutaran yang dikembalikan."}
+        if action == "video":
+            return {"success": False, "request_id": request_id, "message": "Pilih nomor sitasi video yang ingin diputar."}
+        if not topic or (action == "source" and not source_number):
+            return {"success": False, "request_id": request_id, "message": "Pilih riset atau nomor sumber yang tersedia."}
+        try:
+            return run_research(workspace, topic, question, request_id=request_id,
+                                source_number=source_number if action == "source" else None)
+        except ValueError as exc:
+            return {"success": False, "request_id": request_id, "message": str(exc)}
 
     @mcp_server.tool()
     def confirm_and_save_research_material(title: str, content: str, url: str = "", category: str = "Riset Mandiri", save_confirmed: bool = True) -> dict:

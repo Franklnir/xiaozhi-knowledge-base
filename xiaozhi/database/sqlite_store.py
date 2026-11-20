@@ -45,6 +45,7 @@ from xiaozhi.core.utils import (
 )
 from xiaozhi.database.helpers import empty_database
 from xiaozhi.database.dashboard_materials import PAGE_SIZE, clamp_page, material_page_queries, summary_query
+from xiaozhi.database.research_store import RESEARCH_RETRY_INDEX, RESEARCH_SCHEMA
 
 logger = logging.getLogger("xiaozhi.sqlite")
 
@@ -58,6 +59,16 @@ class SQLiteStore:
         self.db_path = db_path or os.getenv("SQLITE_DB_PATH", "data/xiaozhi.db")
         self._local = threading.local()
         self._init_db()
+        conn = self._get_conn()
+        conn.executescript(RESEARCH_SCHEMA)
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if not any(column["name"] == "retry_of" for column in conn.execute("PRAGMA table_info(research_runs)")):
+                conn.execute("ALTER TABLE research_runs ADD COLUMN retry_of INTEGER")
+            conn.execute(RESEARCH_RETRY_INDEX)
+
+    def _get_research_conn(self, owner_id: int):
+        return self._get_conn()
 
     def _get_conn(self) -> sqlite3.Connection:
         """Get thread-local connection."""

@@ -1,0 +1,85 @@
+from threading import Barrier, Event
+from unittest.mock import Mock
+
+from xiaozhi.services import scraper_service as scraper
+from xiaozhi.services import youtube_research_service as youtube
+from xiaozhi.services.research_audit import opened_research_urls
+
+
+def test_auto_research_searches_all_sources_concurrently(monkeypatch):
+    started = Barrier(3)
+    article = {"title": "Panduan ESP32", "url": "https://example.com/guide"}
+    paper = {"title": "Studi ESP32", "url": "https://example.com/paper", "abstract": "Abstrak riset"}
+    video = {"id": "aaaaaaaaaaa", "title": "Tutorial ESP32", "channel": "Edukasi"}
+
+    def result(value):
+        def search(*args, **kwargs):
+            started.wait(timeout=2)
+            return value
+        return search
+
+    monkeypatch.setattr(scraper, "search_web_sources", result([article]))
+    monkeypatch.setattr(scraper, "search_academic_papers_unified", result({"papers": [paper]}))
+    monkeypatch.setattr(youtube, "search_youtube_candidates", result(([video], "youtube_data_api")))
+    monkeypatch.setattr(scraper, "scrape_url", lambda *args, **kwargs: {"success": True, "content": "Isi panduan"})
+    monkeypatch.setattr(youtube, "read_research_video_captions", lambda source: (
+        {**source, "transcript_excerpt": "[00:00] Pembahasan ESP32"}, None,
+    ))
+
+    research = scraper.conduct_autonomous_research("ESP32")
+
+    assert research["sources"]["web"][0]["excerpt"] == "Isi panduan"
+    assert research["sources"]["academic"] == [paper]
+    assert research["sources"]["youtube"][0]["url"] == "https://www.youtube.com/watch?v=aaaaaaaaaaa"
+    assert "[00:00] Pembahasan ESP32" in research["summary"]
+    assert research["needs_user_confirmation"]
+    assert not research["saved_to_db"]
+
+
+def test_auto_research_keeps_video_link_when_other_sources_timeout(monkeypatch):
+    release = Event()
+    video = {"video_id": "aaaaaaaaaaa", "title": "Tutorial ESP32", "url": "https://www.youtube.com/watch?v=aaaaaaaaaaa"}
+
+    def slow(*args, **kwargs):
+        release.wait(timeout=3)
+        return {}
+
+    def unavailable(*args, **kwargs):
+        raise OSError("Source unavailable")
+
+    monkeypatch.setattr(scraper, "_RESEARCH_TIMEOUT_SECONDS", 0.3)
+    monkeypatch.setattr(scraper, "search_web_sources", unavailable)
+    monkeypatch.setattr(scraper, "search_academic_papers_unified", slow)
+    monkeypatch.setattr(youtube, "find_research_videos", lambda query: [video])
+    monkeypatch.setattr(youtube, "read_research_video_captions", slow)
+
+    try:
+        research = scraper.conduct_autonomous_research("ESP32")
+        assert research["success"]
+        assert research["sources"]["youtube"] == [video]
+        assert research["source_status"]["youtube_captions"] == "timeout"
+        assert research["source_status"]["academic"] == "timeout"
+        assert research["source_status"]["web"] == "error"
+    finally:
+        release.set()
+
+
+def test_continuation_opens_new_articles_and_does_not_fetch_existing_captions(monkeypatch):
+    known_page = {"title": "Panduan lama", "url": "https://example.com/old"}
+    new_page = {"title": "Panduan baru", "url": "https://example.com/new"}
+    known_video = {"title": "Video lama", "url": "https://www.youtube.com/watch?v=aaaaaaaaaaa"}
+    monkeypatch.setattr(scraper, "search_web_sources", Mock(return_value=[known_page, new_page]))
+    monkeypatch.setattr(scraper, "search_academic_papers_unified", Mock(return_value={"papers": []}))
+    monkeypatch.setattr(youtube, "find_research_videos", Mock(return_value=[known_video]))
+    web_read = Mock(return_value={"success": True, "content": "Cuplikan dari panduan yang baru."})
+    captions = Mock()
+    monkeypatch.setattr(scraper, "scrape_url", web_read)
+    monkeypatch.setattr(youtube, "read_research_video_captions", captions)
+    token = opened_research_urls.set(frozenset({known_page["url"], known_video["url"]}))
+    try:
+        result = scraper.conduct_autonomous_research("Panel surya")
+    finally:
+        opened_research_urls.reset(token)
+    web_read.assert_called_once_with(new_page["url"], max_length=2200)
+    captions.assert_not_called()
+    assert result["sources"]["web"][0]["url"] == new_page["url"]

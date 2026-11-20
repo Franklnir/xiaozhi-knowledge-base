@@ -277,6 +277,7 @@ from xiaozhi.routers import (
     google_auth,
     mcp_endpoints,
     relay_nyata,
+    research,
     search,
     smarthome,
     youtube,
@@ -297,6 +298,7 @@ from xiaozhi.routers import (
 app.include_router(auth.router)
 app.include_router(google_auth.router)
 app.include_router(dashboard.router)
+app.include_router(research.router)
 app.include_router(admin.router)
 app.include_router(chat.router)
 app.include_router(playlist.router)

@@ -131,6 +131,9 @@ class PostgresStore:
                 raise ValueError(exc.diag.message_primary) from exc
             raise
 
+    def _get_research_conn(self, owner_id: int):
+        return self._get_resource_conn(owner_id)
+
     def _verify_resource_schema(self) -> None:
         error = "PostgreSQL resource policies are unavailable. Run alembic upgrade head before starting Xiaozhi."
         try:
@@ -151,7 +154,11 @@ class PostgresStore:
                            row_security_active('public.feature_settings') AND
                            row_security_active('public.mcp_user_settings') AND
                            row_security_active('public.mcp_tool_toggles') AND
-                           row_security_active('public.user_access_plus_settings') AS rls_active,
+                           row_security_active('public.user_access_plus_settings') AND
+                           row_security_active('public.research_topics') AND
+                           row_security_active('public.research_runs') AND
+                           row_security_active('public.research_sources') AND
+                           row_security_active('public.research_counters') AS rls_active,
                            (SELECT COUNT(*) FROM pg_trigger
                             WHERE tgenabled IN ('O', 'A') AND
                                 ((tgrelid = 'public.materials'::regclass AND tgname = 'trg_enforce_material_quota') OR

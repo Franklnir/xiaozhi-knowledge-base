@@ -10,6 +10,8 @@ import requests
 import yt_dlp
 from youtube_transcript_api import NoTranscriptFound, YouTubeTranscriptApi
 
+from xiaozhi.services.research_audit import audited_call
+
 _VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
 _CAPTION_BUDGET = 3200
 
@@ -30,9 +32,9 @@ def _upload_date(entry):
     return None
 
 
-def search_youtube_candidates(query, newest, start, end, count):
+def search_youtube_candidates(query, newest, start, end, count, *, provider=""):
     api_key = os.getenv("YOUTUBE_DATA_API_KEY", "").strip()
-    if api_key:
+    if api_key and provider != "ytdlp":
         params = {"part": "snippet", "type": "video", "q": query, "maxResults": count,
                   "order": "date" if newest else "relevance"}
         if start:
@@ -40,7 +42,8 @@ def search_youtube_candidates(query, newest, start, end, count):
         if end:
             params["publishedBefore"] = f"{end}T23:59:59.999Z"
         try:
-            response = requests.get("https://www.googleapis.com/youtube/v3/search", params=params,
+            endpoint = "https://www.googleapis.com/youtube/v3/search"
+            response = audited_call("cari_youtube_api", endpoint, requests.get, endpoint, params=params,
                                     headers={"X-Goog-Api-Key": api_key}, timeout=(4, 6))
             response.raise_for_status()
             return [
@@ -55,7 +58,10 @@ def search_youtube_candidates(query, newest, start, end, count):
                 for item in response.json().get("items", [])
             ], "youtube_data_api"
         except (requests.RequestException, KeyError, ValueError, TypeError):
-            pass
+            if provider == "api":
+                raise
+    elif provider == "api":
+        raise RuntimeError("YouTube Data API belum dikonfigurasi.")
     terms = [query]
     if start and start > date.min:
         terms.append(f"after:{(start - timedelta(days=1)).isoformat()}")
@@ -71,15 +77,14 @@ def search_youtube_candidates(query, newest, start, end, count):
         "playlistend": count,
     }
     with yt_dlp.YoutubeDL(options) as downloader:
-        result = downloader.extract_info(f"ytsearch{count}:{' '.join(terms)}", download=False)
+        result = audited_call("cari_youtube_ytdlp", "https://www.youtube.com/results", downloader.extract_info,
+                              f"ytsearch{count}:{' '.join(terms)}", download=False)
         return list(islice((result or {}).get("entries") or (), count)), "youtube_search_sample"
 
 
 def _source(entry, start, end, newest, *, today_wib=None):
     from xiaozhi.services.youtube_playback_service import _enrich, _publication_time
 
-    video_id = entry["id"]
-    url = f"https://www.youtube.com/watch?v={video_id}"
     uploaded = _upload_date(entry)
     published_at = _publication_time(entry)
     if ((newest or start or end) and not (uploaded or published_at)) or (today_wib and not published_at):
@@ -97,25 +102,48 @@ def _source(entry, start, end, newest, *, today_wib=None):
     if uploaded and ((start and uploaded < start) or (end and uploaded > end)):
         return None, "di_luar_periode"
 
-    metadata = {
+    metadata = _video_source(entry, uploaded, published_at)
+    return read_research_video_captions(metadata)
+
+
+def _video_source(entry, uploaded, published_at):
+    video_id = entry["id"]
+    return {
         "video_id": video_id,
         "title": str(entry.get("title") or f"YouTube {video_id}")[:200],
         "channel": str(entry.get("channel") or entry.get("uploader") or "")[:120],
-        "url": url,
+        "url": f"https://www.youtube.com/watch?v={video_id}",
         "published_date_utc": uploaded.isoformat() if uploaded else None,
         "published_at_wib": published_at.astimezone(timezone(timedelta(hours=7))).isoformat() if published_at else None,
     }
+
+
+def find_research_videos(query: str, *, provider: str = "") -> list[dict]:
+    """Return relevant public video links before spending time on captions."""
+    from xiaozhi.services.youtube_playback_service import _publication_time
+
+    options = {"provider": provider} if provider else {}
+    entries, _ = search_youtube_candidates(query, False, None, None, 3, **options)
+    videos = {}
+    for entry in entries:
+        if entry and _VIDEO_ID.fullmatch(str(entry.get("id") or "")):
+            videos.setdefault(entry["id"], _video_source(entry, _upload_date(entry), _publication_time(entry)))
+    return list(videos.values())
+
+
+def read_research_video_captions(metadata: dict) -> tuple[dict, str | None]:
+    video_id = metadata["video_id"]
     try:
         with _CaptionSession() as session:
             api = YouTubeTranscriptApi(http_client=session)
-            tracks = api.list(video_id)
+            tracks = audited_call("cari_subtitle", metadata["url"], api.list, video_id)
             try:
                 track = tracks.find_transcript(["id", "en"])
             except NoTranscriptFound:
                 track = next(iter(tracks), None)
             if track is None:
                 return metadata, "subtitle_tidak_tersedia"
-            captions = track.fetch()
+            captions = audited_call("baca_subtitle", metadata["url"], track.fetch)
             language = captions.language_code
             paragraphs = []
             last_mark = -30
