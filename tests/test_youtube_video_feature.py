@@ -515,7 +515,7 @@ def test_option_c_material_consolidation(test_setup):
     mats = store.list_materials(owner_id)
     assert len(mats) == 1
     consolidated_mat = mats[0]
-    assert consolidated_mat["category"] == "Riset & Video YouTube"
+    assert consolidated_mat["category"] == "Penelitian & Video YouTube"
     assert "Golang" in consolidated_mat["title"]
     assert "Video YouTube Terkait" in consolidated_mat["content"]
     assert "goroutine" in consolidated_mat["content"]

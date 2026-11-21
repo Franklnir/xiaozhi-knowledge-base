@@ -10,7 +10,7 @@ from xiaozhi.database.research_store import ResearchStore
 from xiaozhi.database.sqlite_store import SQLiteStore
 from xiaozhi.dependencies import make_csrf_token
 from xiaozhi.services import research_workspace, scraper_service
-from xiaozhi.services.research_audit import audited_call
+from xiaozhi.services.research_audit import ResearchAudit, audited_call, is_source_access
 from xiaozhi.services.research_retries import retry_plan, retry_research
 
 
@@ -27,9 +27,28 @@ def sample_research(query, mode):
     }}
 
 
+def test_audit_measures_unfinished_access_and_recognizes_older_entries(monkeypatch):
+    from xiaozhi.services import research_audit
+
+    timeline = iter([10, 10.1, 10.3, 10.4, 10.5])
+    monkeypatch.setattr(research_audit, "time", SimpleNamespace(monotonic=lambda: next(timeline)))
+    audit = ResearchAudit()
+    audit.begin("cari_wikipedia", "https://example.com/?token=hidden")
+    extraction = audit.begin("ekstraksi_sumber", "https://example.com/study")
+    audit.end(extraction, "failed")
+    access, outcome = audit.close()
+
+    assert (access["status"], access["duration_ms"], access["started_after_ms"]) == ("timeout", 400, 100)
+    assert access["target"] == "https://example.com/"
+    assert is_source_access(access) and not is_source_access(outcome)
+    assert is_source_access({"operation": "cari_wikipedia", "started_after_ms": 0})
+    assert not is_source_access({"operation": "ekstraksi_sumber", "started_after_ms": 0})
+    assert not is_source_access({"operation": "academic", "status": "empty"})
+
+
 def test_numbering_is_stable_with_concurrent_creates_and_scoped_history(tmp_path, monkeypatch):
-    store = SQLiteStore(str(tmp_path / "riset.sqlite"))
-    user = store.create_user("riset", "password-demo-123")
+    store = SQLiteStore(str(tmp_path / "penelitian.sqlite"))
+    user = store.create_user("penelitian", "password-demo-123")
     other = store.create_user("other", "password-demo-456")
     workspace = ResearchStore(store, user["id"], 1)
     monkeypatch.setattr(scraper_service, "conduct_autonomous_research", sample_research)
@@ -51,7 +70,7 @@ def test_numbering_is_stable_with_concurrent_creates_and_scoped_history(tmp_path
     assert ResearchStore(store, user["id"], 2).detail(2) is None
     assert ResearchStore(store, other["id"], 1).detail(2) is None
     assert workspace.manage(1, "delete")
-    assert workspace.create_or_find("Riset baru")["number"] == 3
+    assert workspace.create_or_find("Penelitian baru")["number"] == 3
     assert workspace.manage(2, "archive")
     assert workspace.list_topics()[0] == 1
     assert workspace.manage(2, "restore")
@@ -62,8 +81,8 @@ def test_web_request_id_pdf_followup_and_citation_links(tmp_path, monkeypatch):
     from xiaozhi import dependencies
     from xiaozhi.main import app
 
-    store = SQLiteStore(str(tmp_path / "riset-web.sqlite"))
-    user = store.create_user("risetweb", "password-demo-123")
+    store = SQLiteStore(str(tmp_path / "penelitian-web.sqlite"))
+    user = store.create_user("penelitianweb", "password-demo-123")
     monkeypatch.setattr(dependencies, "_store", store)
     monkeypatch.setattr(scraper_service, "conduct_autonomous_research", sample_research)
     monkeypatch.setattr(scraper_service, "_scrape_url", lambda url, limit: {
@@ -73,25 +92,33 @@ def test_web_request_id_pdf_followup_and_citation_links(tmp_path, monkeypatch):
     })
     csrf = make_csrf_token(user)
     client = TestClient(app)
-    assert client.get("/deep-riset", headers={"Accept": "text/html"}, follow_redirects=False).status_code == 303
+    assert client.get("/penelitian", headers={"Accept": "text/html"}, follow_redirects=False).status_code == 303
+    old_link = client.get("/deep-riset/1?slot=2&session=1", follow_redirects=False)
+    assert old_link.status_code == 307
+    assert old_link.headers["Location"] == "/penelitian/1?slot=2&session=1"
     client.cookies.set(SESSION_COOKIE, session_serializer.dumps({"id": user["id"], "username": user["username"]}))
 
-    first = client.post("/deep-riset", data={"title": "Panel surya", "slot": 2, "csrf_token": csrf}, follow_redirects=False)
-    assert first.status_code == 303
-    assert first.headers["Location"] == "/deep-riset/1?slot=2"
-    assert client.get("/deep-riset/1?slot=1").status_code == 404
+    index = client.get("/penelitian")
+    assert index.status_code == 200
+    assert "<h1" in index.text and "Penelitian Saya" in index.text and "Deep Riset" not in index.text
 
-    pdf = client.post("/deep-riset/1", data={
+    first = client.post("/penelitian", data={"title": "Panel surya", "slot": 2, "csrf_token": csrf}, follow_redirects=False)
+    assert first.status_code == 303
+    assert first.headers["Location"] == "/penelitian/1?slot=2"
+    assert client.get("/penelitian/1?slot=1").status_code == 404
+
+    pdf = client.post("/penelitian/1", data={
         "slot": 2, "action": "source", "source_number": 2, "csrf_token": csrf,
     }, follow_redirects=False)
     assert pdf.status_code == 303
     assert pdf.headers["X-Request-ID"] != first.headers["X-Request-ID"]
     detail = client.get(first.headers["Location"])
     assert detail.status_code == 200
-    assert "Riset #1 — Panel surya" in detail.text
+    assert "Penelitian #1 — Panel surya" in detail.text
     assert 'href="#sumber-2"' in detail.text and 'id="sumber-2"' in detail.text
     assert "study.pdf#page=4" in detail.text
     assert "Habis waktu" in detail.text
+    assert "Log akses sumber" in detail.text and "Hasil pemrosesan" in detail.text
     assert pdf.headers["X-Request-ID"] in detail.text
     assert first.headers["X-Request-ID"] in detail.text
 
@@ -100,8 +127,8 @@ def test_voice_can_resume_and_recall_research_without_repeating_a_search(tmp_pat
     from xiaozhi.mcp.context import mcp_active_owner_ctx, mcp_active_slot_ctx, mcp_request_id_ctx
     from xiaozhi.mcp.tools import register_tools
 
-    store = SQLiteStore(str(tmp_path / "riset-mcp.sqlite"))
-    user = store.create_user("risetsuara", "password-demo-123")
+    store = SQLiteStore(str(tmp_path / "penelitian-mcp.sqlite"))
+    user = store.create_user("penelitiansuara", "password-demo-123")
     tools = {}
     server = Mock()
 
@@ -112,7 +139,9 @@ def test_voice_can_resume_and_recall_research_without_repeating_a_search(tmp_pat
         return decorate
 
     server.tool.side_effect = register
-    search = Mock(side_effect=sample_research)
+    search = Mock(side_effect=lambda query, mode: {
+        **sample_research(query, mode), "source_status": {"academic": "empty"},
+    })
     monkeypatch.setattr(scraper_service, "conduct_autonomous_research", search)
     register_tools(server, store, Mock())
     account_token = mcp_active_owner_ctx.set(user["id"])
@@ -120,7 +149,7 @@ def test_voice_can_resume_and_recall_research_without_repeating_a_search(tmp_pat
     connection_token = mcp_request_id_ctx.set("same-bridge")
     try:
         start_research = tools["autonomous_deep_research"]
-        assert start_research("Riset")["message"] == "Topik apa yang ingin ditelusuri?"
+        assert start_research("Penelitian")["message"] == "Topik apa yang ingin ditelusuri?"
         for command in ("XiaoZhi, tolong riset Wi‑Fi!", "Reset wifi", "Wi-Fi",
                         "Ganti jaringan Wi-Fi perangkat", "Buka konfigurasi Wi-Fi"):
             unclear = start_research(command)
@@ -149,7 +178,11 @@ def test_voice_can_resume_and_recall_research_without_repeating_a_search(tmp_pat
         assert first_audit["session_number"] == 1
         assert first_audit["counts_by_status"] == {"success": 1, "timeout": 1}
         assert [attempt["status"] for attempt in first_audit["attempts"]] == ["timeout"]
-        assert "/deep-riset/1?slot=2&session=1#sesi-1" == first_audit["session_url"]
+        assert first_audit["outcomes"] == []
+        full_audit = voice("audit", record_request_id=first["request_id"])
+        assert [outcome["operation"] for outcome in full_audit["outcomes"]] == ["academic"]
+        assert full_audit["total_matching"] == 2
+        assert "/penelitian/1?slot=2&session=1#sesi-1" == first_audit["session_url"]
         source = voice("sources", source_number=2, session_number=1, topic_query="Panel")
         assert source["source"]["pdf_url"] == "https://example.com/study.pdf"
         assert source["source"]["coverage"] == "Abstrak"
@@ -170,7 +203,7 @@ def test_voice_can_resume_and_recall_research_without_repeating_a_search(tmp_pat
             mcp_active_slot_ctx.reset(other_slot)
         assert search.call_count == 2
         assert "baterai" in search.call_args.args[0]
-        wifi_topic = start_research("Perbedaan Wi-Fi 6 dan Wi-Fi 7")
+        wifi_topic = start_research("Penelitian tentang perbedaan Wi-Fi 6 dan Wi-Fi 7")
         assert wifi_topic["success"] and wifi_topic["research_number"] == 2
         assert search.call_count == 3
     finally:
@@ -245,9 +278,9 @@ def test_web_retry_and_feedback_are_scoped_to_session(tmp_path, monkeypatch):
     client = TestClient(app)
     client.cookies.set(SESSION_COOKIE, session_serializer.dumps({"id": user["id"], "username": user["username"]}))
     csrf = make_csrf_token(user)
-    original = client.post("/deep-riset", data={"title": "Riset panel", "csrf_token": csrf}, follow_redirects=False)
-    assert "Coba Ulang Akses yang Gagal" in client.get("/deep-riset/1").text
-    retry = client.post("/deep-riset/1", data={"action": "retry", "session_number": 1, "csrf_token": csrf}, follow_redirects=False)
+    original = client.post("/penelitian", data={"title": "Penelitian panel", "csrf_token": csrf}, follow_redirects=False)
+    assert "Coba Ulang Akses yang Gagal" in client.get("/penelitian/1").text
+    retry = client.post("/penelitian/1", data={"action": "retry", "session_number": 1, "csrf_token": csrf}, follow_redirects=False)
     assert retry.status_code == 303 and "session=2#sesi-2" in retry.headers["Location"]
     assert retry.headers["X-Request-ID"] != original.headers["X-Request-ID"]
     page = client.get(retry.headers["Location"])
@@ -255,18 +288,18 @@ def test_web_retry_and_feedback_are_scoped_to_session(tmp_path, monkeypatch):
     assert retry.headers["X-Request-ID"] in page.text
 
     data = {"action": "feedback", "session_number": 2, "rating": "needs_work", "feedback_note": "Coba PDF lain."}
-    assert client.post("/deep-riset/1", data={**data, "csrf_token": "bad"}).status_code == 403
-    assert client.post("/deep-riset/1", data={**data, "csrf_token": csrf, "slot": 2}).status_code == 404
-    response = client.post("/deep-riset/1", data={**data, "csrf_token": csrf}, follow_redirects=False)
+    assert client.post("/penelitian/1", data={**data, "csrf_token": "bad"}).status_code == 403
+    assert client.post("/penelitian/1", data={**data, "csrf_token": csrf, "slot": 2}).status_code == 404
+    response = client.post("/penelitian/1", data={**data, "csrf_token": csrf}, follow_redirects=False)
     assert response.status_code == 303
-    assert "Masukan untuk sesi riset sudah disimpan." in client.get(response.headers["Location"]).text
+    assert "Masukan untuk sesi penelitian sudah disimpan." in client.get(response.headers["Location"]).text
     session = ResearchStore(store, user["id"], 1).get_run(1, 2)
     assert session["result"]["feedback"]["note"] == "Coba PDF lain."
     assert session["result"]["feedback"]["request_id"] == response.headers["X-Request-ID"]
     assert session["result"]["attempts"]
 
     client.cookies.set(SESSION_COOKIE, session_serializer.dumps({"id": peer["id"], "username": peer["username"]}))
-    assert client.post("/deep-riset/1", data={**data, "csrf_token": make_csrf_token(peer)}).status_code == 404
+    assert client.post("/penelitian/1", data={**data, "csrf_token": make_csrf_token(peer)}).status_code == 404
 
 
 def test_feedback_updates_notes_and_keeps_original_attempts(tmp_path, monkeypatch):
@@ -291,7 +324,7 @@ def test_retry_pdf_preserves_citation_and_page_number(tmp_path, monkeypatch):
     user = store.create_user("pdfretry", "password-demo-123")
     workspace = ResearchStore(store, user["id"], 1)
     monkeypatch.setattr(scraper_service, "conduct_autonomous_research", sample_research)
-    topic = workspace.create_or_find("Riset PDF")
+    topic = workspace.create_or_find("Penelitian PDF")
     research_workspace.run_research(workspace, topic, request_id="req-search")
 
     def failed_pdf(url, limit):
@@ -371,7 +404,7 @@ def test_cited_evidence_and_feedback_are_visible_and_guide_next_session(tmp_path
 
     client = TestClient(app)
     client.cookies.set(SESSION_COOKIE, session_serializer.dumps({"id": user["id"], "username": user["username"]}))
-    initial = client.get("/deep-riset/1")
+    initial = client.get("/penelitian/1")
     assert initial.status_code == 200
     assert "Angka yang perlu dibandingkan" in initial.text and "Pertanyaan terbuka" in initial.text
     assert 'href="#sumber-1"' in initial.text and "Data biaya Indonesia" in initial.text
@@ -380,7 +413,7 @@ def test_cited_evidence_and_feedback_are_visible_and_guide_next_session(tmp_path
         "title": "Laporan Indonesia", "url": "https://example.net/biaya",
         "excerpt": "Data biaya Indonesia berasal dari catatan pemasangan panel surya rumah.",
     }]}}
-    response = client.post("/deep-riset/1", data={
+    response = client.post("/penelitian/1", data={
         "action": "continue", "csrf_token": make_csrf_token(user),
     }, follow_redirects=True)
     assert response.status_code == 200

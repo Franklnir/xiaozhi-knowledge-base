@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Deep Riset | Xiaozhi{% endblock %}
+{% block title %}Penelitian Saya | Xiaozhi{% endblock %}
 
 {% block page_styles %}
 <style>
@@ -91,16 +91,16 @@
     <header class="app-page-header">
         <div>
             {% if topic %}
-            <a class="research-citation" href="/deep-riset?slot={{ slot }}">Deep Riset</a>
-            <h1 class="app-title">Riset #{{ topic.number }} — {{ topic.title }}</h1>
+            <a class="research-citation" href="/penelitian?slot={{ slot }}">Penelitian Saya</a>
+            <h1 class="app-title">Penelitian #{{ topic.number }} — {{ topic.title }}</h1>
             <p class="app-subtitle">Slot {{ slot }} · {{ topic.last_session }} sesi{% if topic.archived %} · Diarsipkan{% endif %}</p>
             {% else %}
-            <h1 class="app-title">Deep Riset</h1>
+            <h1 class="app-title">Penelitian Saya</h1>
             <p class="app-subtitle">Lanjutkan topik dan buka kembali sumber dari setiap sesi.</p>
             {% endif %}
         </div>
         {% if supported and not topic %}
-        <form method="get" action="/deep-riset" class="research-actions">
+        <form method="get" action="/penelitian" class="research-actions">
             <div><label class="app-label" for="researchSlot">Slot MCP</label>
                 <select class="app-select" id="researchSlot" name="slot">
                     {% for option in [1, 2, 3] %}<option value="{{ option }}"{% if slot == option %} selected{% endif %}>Slot {{ option }}</option>{% endfor %}
@@ -111,35 +111,35 @@
         {% endif %}
     </header>
     {% if research_error %}<p class="app-alert app-alert-danger" role="alert">{{ research_error }}</p>{% endif %}
-    {% if feedback_saved %}<p class="app-alert app-alert-success" role="status">Masukan untuk sesi riset sudah disimpan.</p>{% endif %}
+    {% if feedback_saved %}<p class="app-alert app-alert-success" role="status">Masukan untuk sesi penelitian sudah disimpan.</p>{% endif %}
     {% if not supported %}
-        <p class="app-alert app-alert-warning">Penyimpanan Deep Riset tersedia pada PostgreSQL atau SQLite.</p>
+        <p class="app-alert app-alert-warning">Penyimpanan Penelitian Saya tersedia pada PostgreSQL atau SQLite.</p>
     {% elif not topic %}
         <div class="research-layout">
             <section class="app-card">
-                <h2 class="app-section-title">Daftar riset</h2>
-                <p class="research-metadata">{{ topic_list[0] }} riset aktif di Slot {{ slot }}</p>
+                <h2 class="app-section-title">Daftar penelitian</h2>
+                <p class="research-metadata">{{ topic_list[0] }} penelitian aktif di Slot {{ slot }}</p>
                 {% for item in topic_list[1] %}
                 <div class="research-row">
-                    <a class="research-citation" href="/deep-riset/{{ item.number }}?slot={{ slot }}">Riset #{{ item.number }} — {{ item.title }}</a>
+                    <a class="research-citation" href="/penelitian/{{ item.number }}?slot={{ slot }}">Penelitian #{{ item.number }} — {{ item.title }}</a>
                     <span class="research-metadata">{{ item.last_session }} sesi{% if item.archived %} · Diarsipkan{% endif %}</span>
                 </div>
-                {% else %}<p class="app-subtitle">Belum ada topik riset di slot ini.</p>{% endfor %}
+                {% else %}<p class="app-subtitle">Belum ada topik penelitian di slot ini.</p>{% endfor %}
                 <div class="research-actions">
                     {% if research_page > 1 %}<a class="app-button" href="?slot={{ slot }}&amp;page={{ research_page - 1 }}">Sebelumnya</a>{% endif %}
                     {% if topic_list[1]|length == 25 %}<a class="app-button" href="?slot={{ slot }}&amp;page={{ research_page + 1 }}">Berikutnya</a>{% endif %}
                 </div>
             </section>
-            <form class="app-card app-form-section" action="/deep-riset" method="post">
+            <form class="app-card app-form-section" action="/penelitian" method="post">
                 {{ fields() }}
-                <h2 class="app-section-title">Mulai riset</h2>
+                <h2 class="app-section-title">Mulai penelitian</h2>
                 <div><label for="newResearchTitle" class="app-label">Judul topik</label>
                     <input class="app-input" id="newResearchTitle" name="title" maxlength="160" required>
                 </div>
                 <div><label for="newResearchQuestion" class="app-label">Pertanyaan awal, opsional</label>
                     <textarea class="app-textarea" id="newResearchQuestion" name="question" rows="3" maxlength="300"></textarea>
                 </div>
-                <button class="app-button app-button-primary" type="submit">Mulai Riset</button>
+                <button class="app-button app-button-primary" type="submit">Mulai Penelitian</button>
             </form>
         </div>
     {% else %}
@@ -170,15 +170,15 @@
                 </section>
                 {% endif %}
                 {% if not topic.archived %}
-                <form class="app-card app-form-section" method="post" action="/deep-riset/{{ topic.number }}">
+                <form class="app-card app-form-section" method="post" action="/penelitian/{{ topic.number }}">
                     {{ fields() }}
                     <input type="hidden" name="action" value="continue">
-                    <label class="app-label" for="researchQuestion">Fokus riset lanjutan, opsional</label>
+                    <label class="app-label" for="researchQuestion">Fokus penelitian lanjutan, opsional</label>
                     <textarea class="app-textarea" name="question" id="researchQuestion" rows="2" maxlength="300"></textarea>
                     {% if next_focus %}
                     <p class="research-metadata">Fokus jika dikosongkan{% if next_focus.origin == 'feedback' %} dari masukan Sesi {{ next_focus.from_session }}{% endif %} · {{ next_focus.focus }}</p>
                     {% endif %}
-                    <button class="app-button app-button-primary" type="submit">Lanjutkan Riset</button>
+                    <button class="app-button app-button-primary" type="submit">Lanjutkan Penelitian</button>
                 </form>
                 {% endif %}
                 <section class="app-card research-history">
@@ -206,12 +206,13 @@
                             {% else %}Belum ada cuplikan baru yang sesuai dengan fokus ini.{% endif %}
                         </p>
                         {% endif %}
-                        {% if run.result.attempts %}
-                        <ul class="research-access" aria-label="Log akses sesi {{ run.session_number }}">
-                            {% for attempt in run.result.attempts %}
+                        {% for label, entries in [('Log akses sumber', run.access_attempts), ('Hasil pemrosesan', run.processing_outcomes)] if entries %}
+                        <p class="research-metadata"><strong>{{ label }}</strong></p>
+                        <ul class="research-access" aria-label="{{ label }} sesi {{ run.session_number }}">
+                            {% for attempt in entries %}
                             <li>
                                 <div class="research-access-head">
-                                    <strong>{{ attempt.operation | replace('_', ' ') | capitalize }}</strong>
+                                    <strong>{{ 'Penelitian' if attempt.operation == 'riset' else attempt.operation | replace('_', ' ') | capitalize }}</strong>
                                     <span class="app-chip {{ 'app-chip-success' if attempt.status == 'success' else 'app-chip-neutral' }}">{{ labels.get(attempt.status, attempt.status) }}</span>
                                 </div>
                                 {% if attempt.target %}<p class="research-metadata">{{ attempt.target }}</p>{% endif %}
@@ -219,11 +220,11 @@
                             </li>
                             {% endfor %}
                         </ul>
-                        {% endif %}
+                        {% endfor %}
                         {% if run.retry_session %}
                         <p class="research-session-tools"><a class="research-citation" href="?slot={{ slot }}&amp;session={{ run.retry_session }}#sesi-{{ run.retry_session }}">Lihat percobaan ulang · Sesi {{ run.retry_session }}</a></p>
                         {% elif run.can_retry and not topic.archived %}
-                        <form class="research-session-tools" method="post" action="/deep-riset/{{ topic.number }}" data-research-retry>
+                        <form class="research-session-tools" method="post" action="/penelitian/{{ topic.number }}" data-research-retry>
                             {{ fields() }}
                             <input type="hidden" name="action" value="retry">
                             <input type="hidden" name="session_number" value="{{ run.session_number }}">
@@ -238,7 +239,7 @@
                             {% if feedback.applied_session %}
                             <p class="research-metadata">Cuplikan yang relevan ditemukan pada <a class="research-citation" href="?slot={{ slot }}&amp;session={{ feedback.applied_session }}#sesi-{{ feedback.applied_session }}">Sesi {{ feedback.applied_session }}</a>.</p>
                             {% endif %}
-                            <form method="post" action="/deep-riset/{{ topic.number }}" class="app-form-section">
+                            <form method="post" action="/penelitian/{{ topic.number }}" class="app-form-section">
                                 {{ fields() }}
                                 <input type="hidden" name="action" value="feedback">
                                 <input type="hidden" name="session_number" value="{{ run.session_number }}">
@@ -280,7 +281,7 @@
                             <a class="app-button app-button-small" href="{{ source.url }}" target="_blank" rel="noopener noreferrer">Buka sumber</a>
                             {% if source.pdf_url and source.pdf_url != source.url %}<a class="app-button app-button-small" href="{{ source.pdf_url }}{% if source.pages %}#page={{ source.pages[0] }}{% endif %}" target="_blank" rel="noopener noreferrer">Buka PDF</a>{% endif %}
                             {% if not topic.archived %}
-                            <form method="post" action="/deep-riset/{{ topic.number }}">
+                            <form method="post" action="/penelitian/{{ topic.number }}">
                                 {{ fields() }}
                                 <input type="hidden" name="action" value="source">
                                 <input type="hidden" name="source_number" value="{{ source.number }}">
@@ -293,7 +294,7 @@
                 </section>
                 <details class="app-card research-history">
                     <summary>Kelola topik</summary>
-                    <form method="post" action="/deep-riset/{{ topic.number }}" class="app-form-section">
+                    <form method="post" action="/penelitian/{{ topic.number }}" class="app-form-section">
                         {{ fields() }}
                         <input type="hidden" name="action" value="rename">
                         <label class="app-label" for="renameResearch">Judul</label>
@@ -301,12 +302,12 @@
                         <button class="app-button" type="submit">Simpan judul</button>
                     </form>
                     <div class="research-actions">
-                        <form method="post" action="/deep-riset/{{ topic.number }}">
+                        <form method="post" action="/penelitian/{{ topic.number }}">
                             {{ fields() }}
                             <input type="hidden" name="action" value="{{ 'restore' if topic.archived else 'archive' }}">
                             <button class="app-button" type="submit">{{ 'Pulihkan' if topic.archived else 'Arsipkan' }}</button>
                         </form>
-                        <form method="post" action="/deep-riset/{{ topic.number }}" onsubmit="return confirm('Hapus topik ini beserta sesi, sumber, dan riwayat aksesnya?')">
+                        <form method="post" action="/penelitian/{{ topic.number }}" onsubmit="return confirm('Hapus topik ini beserta sesi, sumber, dan riwayat aksesnya?')">
                             {{ fields() }}
                             <input type="hidden" name="action" value="delete">
                             <button class="app-button app-button-danger" type="submit">Hapus topik</button>

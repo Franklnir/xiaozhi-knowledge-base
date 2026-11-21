@@ -1,4 +1,4 @@
-"""Retry individual failed access attempts in Deep Riset."""
+"""Retry individual failed research accesses."""
 
 import logging
 import time
@@ -131,14 +131,14 @@ def retry_research(workspace, topic, parent, request_id):
                 except Exception:
                     logger.warning("Retry %s failed: %s", request_id, operation, exc_info=True)
                     status = "failed"
-            outcomes.append({"operation": operation, "target": target.split("?", 1)[0],
+            outcomes.append({"kind": "outcome", "operation": operation, "target": target.split("?", 1)[0],
                              "retry_target": target, "status": status, "detail": "Hasil percobaan ulang."})
     except RuntimeError:
         logger.exception("Unable to schedule retry %s", request_id)
         for future in pending:
             future.cancel()
         outcomes = [
-            {"operation": operation, "target": target.split("?", 1)[0], "retry_target": target,
+            {"kind": "outcome", "operation": operation, "target": target.split("?", 1)[0], "retry_target": target,
              "status": "failed", "detail": "Percobaan ulang belum bisa dijalankan."}
             for operation, target in plan
         ]

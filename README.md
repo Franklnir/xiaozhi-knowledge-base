@@ -112,8 +112,8 @@ Server MCP Xiaozhi menyediakan 44 tools siap pakai yang dipanggil secara otomati
 * `control_relay`, `control_smart_home_room`, `get_relay_status`, `all_relays_on`, `all_relays_off`: Kontrol perangkat rumah pintar virtual.
 * `control_real_relay_by_voice`, `get_real_relay_status`, `all_real_relays_on`, `all_real_relays_off`: Kontrol relay fisik nyata via polling ESP32.
 
-### 7. Riset Web Mendalam, Intelijen & Media Sosial (Deep Intelligence)
-* `search_web_deep`: Riset web multi-sumber mendalam (Wikipedia + Google News + automated full-article scraper hingga 1.500 karakter).
+### 7. Penelitian Web Mendalam, Intelijen & Media Sosial (Deep Intelligence)
+* `search_web_deep`: Penelitian web multi-sumber mendalam (Wikipedia + Google News + automated full-article scraper hingga 1.500 karakter).
 * `search_social_media`: Pemantauan opini publik, review jujur komunitas, dan tren viral di Reddit, X/Twitter, dan YouTube.
 * `osint_recon`: Investigasi intelijen pasif sumber terbuka: jejak digital username (12+ platform), geolokasi & ASN alamat IP, serta DNS/subdomain domain via Certificate Transparency (`crt.sh`).
 * `search_web`, `search_news`: Pencarian web kilat dan rangkuman berita aktual terpercaya.

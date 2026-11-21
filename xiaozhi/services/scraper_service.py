@@ -400,7 +400,7 @@ def format_html_table_to_markdown(table_el: Any, base_url: str = "", collected_l
 
 def extract_academic_and_article_metadata(soup: Any, url: str = "") -> Dict[str, Any]:
     """
-    Ekstrak metadata komprehensif untuk jurnal ilmiah, paper riset, dan artikel:
+    Ekstrak metadata komprehensif untuk jurnal ilmiah, paper penelitian, dan artikel:
     - Google Scholar / Highwire Press (citation_title, citation_author, citation_doi, citation_abstract, dsb.)
     - Dublin Core (DC.title, DC.creator, DC.date, DC.identifier, DC.description, dsb.)
     - Schema.org JSON-LD (ScholarlyArticle, Article, TechArticle, NewsArticle)
@@ -438,7 +438,7 @@ def extract_academic_and_article_metadata(soup: Any, url: str = "") -> Dict[str,
                     stype = str(si.get("@type", "")).lower()
                     if any(t in stype for t in ["scholarly", "article", "paper", "report", "news", "tech"]):
                         if "scholarly" in stype or "paper" in stype:
-                            meta["content_type"] = "Jurnal Ilmiah & Riset"
+                            meta["content_type"] = "Jurnal Ilmiah & Penelitian"
                         elif "tech" in stype:
                             meta["content_type"] = "Dokumentasi Teknis"
                         elif "news" in stype:
@@ -523,7 +523,7 @@ def extract_academic_and_article_metadata(soup: Any, url: str = "") -> Dict[str,
         )
     )
     if meta["journal"] or meta["doi"] or is_academic_site:
-        meta["content_type"] = "Jurnal Ilmiah & Riset"
+        meta["content_type"] = "Jurnal Ilmiah & Penelitian"
 
     # 3. arXiv specific extraction
     if "arxiv.org" in url_lower:
@@ -1810,7 +1810,7 @@ def create_material_from_url(url: str, title: str = "", category: str = "Web Scr
             final_category = "Video Edukasi"
         elif source_type == "pdf_document":
             final_category = "Dokumen Modul"
-        elif "Jurnal" in content_type or "Riset" in content_type:
+        elif "Jurnal" in content_type or "Penelitian" in content_type:
             final_category = "Jurnal Ilmiah"
         elif "Dokumentasi" in content_type or "Teknis" in content_type:
             final_category = "Dokumentasi Teknis"
@@ -2308,7 +2308,7 @@ def _parallel_research(topic: str) -> Dict[str, Any]:
         "confirmation_prompt": "Apakah Anda ingin saya menyimpan materi ini ke Knowledge Base Anda?",
         "materi_siap_simpan": {
             "title": topic[:160],
-            "category": "Riset Mandiri",
+            "category": "Penelitian Mandiri",
             "content": summary,
         },
         "instruksi_ai": (
@@ -2370,7 +2370,7 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
             if paper_url:
                 brief_parts.append(f"> 🌐 **URL Dokumen**: {paper_url}")
             brief_parts.append("\n---\n")
-            brief_parts.append("### 🔬 Intisari & Abstrak Riset\n")
+            brief_parts.append("### 🔬 Intisari & Abstrak Penelitian\n")
             brief_parts.append(f"> {abstract}\n")
 
             # Hasilkan Kuis Pemahaman Otomatis (3 Soal)
@@ -2385,7 +2385,7 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
                 "category": "Jurnal Ilmiah",
                 "content": full_briefing,
                 "url": paper_url,
-                "keywords": f"paper, riset, {source_platform.lower()}, {clean_topic[:60]}",
+                "keywords": f"paper, penelitian, {source_platform.lower()}, {clean_topic[:60]}",
             }
 
             return {
@@ -2419,7 +2419,7 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
                 ),
             }
 
-    # 2. Jalur Riset Web & Ensiklopedia / Dokumentasi Teknis
+    # 2. Jalur Penelitian Web & Ensiklopedia / Dokumentasi Teknis
     web_sources = search_web_sources(clean_topic, max_results=3)
     if web_sources:
         best_source = web_sources[0]
@@ -2431,10 +2431,10 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
 
             materi_payload = {
                 "title": title[:140],
-                "category": "Dokumentasi & Riset Mandiri",
+                "category": "Dokumentasi & Penelitian Mandiri",
                 "content": full_content,
                 "url": best_source["url"],
-                "keywords": f"riset, autonomous, {best_source.get('source', '').lower()}, {clean_topic[:60]}",
+                "keywords": f"penelitian, autonomous, {best_source.get('source', '').lower()}, {clean_topic[:60]}",
             }
 
             return {

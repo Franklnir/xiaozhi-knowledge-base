@@ -1255,16 +1255,16 @@ Tersedia dokumentasi khusus untuk hardware ESP32-C3 Super Mini pada file terpisa
 
 ---
 
-## 22. Panduan Lengkap Tools Riset Mendalam, Media Sosial & Passive OSINT
+## 22. Panduan Lengkap Tools Penelitian Mendalam, Media Sosial & Passive OSINT
 
-Sistem MCP (Model Context Protocol) Xiaozhi Indonesia telah ditingkatkan dengan **tiga modul intelijen dan riset web tingkat lanjut**. Ketiga tools ini dirancang untuk memberikan jawaban yang mendalam, kaya konteks, berbasis data fakta terkini, serta memungkinkan investigasi digital yang akurat dan aman.
+Sistem MCP (Model Context Protocol) Xiaozhi Indonesia telah ditingkatkan dengan **tiga modul intelijen dan penelitian web tingkat lanjut**. Ketiga tools ini dirancang untuk memberikan jawaban yang mendalam, kaya konteks, berbasis data fakta terkini, serta memungkinkan investigasi digital yang akurat dan aman.
 
 ---
 
 ### 22.1 `search_web_deep` (Deep Multi-Source Web Research & Content Extraction)
 
 #### A. Deskripsi & Keunggulan
-Pencarian web standar umumnya hanya mengembalikan judul artikel dan cuplikan (snippet) pendek 1-2 baris. Dengan `search_web_deep`, XiaoZhi melakukan proses riset 3 tingkat:
+Pencarian web standar umumnya hanya mengembalikan judul artikel dan cuplikan (snippet) pendek 1-2 baris. Dengan `search_web_deep`, XiaoZhi melakukan proses penelitian 3 tingkat:
 1. **Wikipedia Encyclopedia API:** Mengambil data ensiklopedia resmi, definisi saintifik, dan sejarah terverifikasi.
 2. **Google News & Web RSS:** Mengambil berita teraktual dan tautan artikel terpercaya dari berbagai media.
 3. **Automated Clean Content Scraper:** Mengunjungi tautan halaman web secara otomatis menggunakan `BeautifulSoup`, membuang elemen pengganggu (skrip JS, CSS, navbar, footer, sidebar iklan), lalu mengekstraksi hingga **1.500 karakter teks artikel bersih**. Dengan demikian, AI membaca isi utuh artikel dan memberikan sintesis analisis mendalam kepada pengguna.
@@ -1295,7 +1295,7 @@ Pencarian web standar umumnya hanya mengembalikan judul artikel dan cuplikan (sn
 ```
 
 #### D. Contoh Perintah Suara (Voice Triggers)
-- *"XiaoZhi, lakukan riset mendalam tentang perkembangan baterai solid state dan bacakan kesimpulannya."*
+- *"XiaoZhi, lakukan penelitian mendalam tentang perkembangan baterai solid state dan bacakan kesimpulannya."*
 - *"XiaoZhi, cari artikel lengkap tentang sejarah arsitektur RISC-V."*
 - *"XiaoZhi, telusuri berita dan analisis terbaru tentang eksplorasi planet Mars."*
 
@@ -1408,11 +1408,11 @@ Seluruh ekosistem Xiaozhi terintegrasi dengan **44 Tools MCP terstandarisasi**. 
 | 19 | `play_youtube_song` | Multimedia Audio | `song_name` | Mencari & memutar musik streaming YouTube ke speaker ESP32. |
 | 20 | `get_playback_status` | Multimedia Audio | `none` | Mengecek status dan judul lagu audio yang sedang diputar. |
 | 21 | `stop_youtube_song` | Multimedia Audio | `none` | Menghentikan pemutaran musik YouTube yang sedang aktif. |
-| 22 | `search_web` | Riset Web | `query` | Pencarian web cepat untuk verifikasi informasi umum. |
-| 23 | `search_web_deep` | Riset Web | `query`, `read_content` | Riset multi-sumber mendalam & otomatis membaca isi artikel. |
-| 24 | `search_social_media` | Riset Web | `query`, `platform` | Analisis opini & tren netizen di Reddit, X, dan YouTube. |
-| 25 | `osint_recon` | Riset Web | `target`, `target_type` | Investigasi pasif username (12+ platform), IP, dan domain. |
-| 26 | `search_news` | Riset Web | `query` | Menelusuri tajuk berita aktual dari media terpercaya. |
+| 22 | `search_web` | Penelitian Web | `query` | Pencarian web cepat untuk verifikasi informasi umum. |
+| 23 | `search_web_deep` | Penelitian Web | `query`, `read_content` | Penelitian multi-sumber mendalam & otomatis membaca isi artikel. |
+| 24 | `search_social_media` | Penelitian Web | `query`, `platform` | Analisis opini & tren netizen di Reddit, X, dan YouTube. |
+| 25 | `osint_recon` | Penelitian Web | `target`, `target_type` | Investigasi pasif username (12+ platform), IP, dan domain. |
+| 26 | `search_news` | Penelitian Web | `query` | Menelusuri tajuk berita aktual dari media terpercaya. |
 | 27 | `set_reminder` | Utilitas | `reminder_text`, `time` | Memasang pengingat jadwal, alarm, atau agenda penting. |
 | 28 | `calculate` | Utilitas | `expression` | Menghitung rumus matematika, trigonometri, dan aljabar. |
 | 29 | `translate_text` | Utilitas | `text`, `target_lang` | Menerjemahkan kalimat antar-bahasa dengan konteks alami. |

@@ -10,6 +10,12 @@ current_audit = ContextVar("current_research_audit", default=None)
 opened_research_urls = ContextVar("opened_research_urls", default=frozenset())
 
 
+def is_source_access(entry):
+    if "kind" in entry:
+        return entry["kind"] == "access"
+    return "started_after_ms" in entry and entry["operation"] != "ekstraksi_sumber"
+
+
 def public_url(url):
     """Keep identifiers like YouTube v while excluding private URL parameters."""
     try:
@@ -39,11 +45,12 @@ class ResearchAudit:
     def begin(self, operation, target):
         with self._lock:
             if self._closed:
-                raise TimeoutError("Waktu permintaan riset sudah selesai.")
+                raise TimeoutError("Waktu permintaan penelitian sudah selesai.")
             retry_target = public_url(target)
             parsed = urlsplit(retry_target)
             safe_target = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", "")) if parsed.netloc else ""
-            entry = {"operation": operation, "target": safe_target}
+            kind = "outcome" if operation == "ekstraksi_sumber" else "access"
+            entry = {"kind": kind, "operation": operation, "target": safe_target}
             if operation in {"ekstraksi_sumber", "buka_halaman", "unduh_pdf", "jina_reader", "cari_subtitle", "baca_subtitle"}:
                 entry["retry_target"] = retry_target
             self._entries.append((time.monotonic(), entry))
@@ -58,8 +65,10 @@ class ResearchAudit:
     def close(self):
         with self._lock:
             self._closed = True
+            closed_at = time.monotonic()
             return [
-                {"status": "timeout", "detail": "Belum selesai saat hasil riset ditutup.", **entry,
+                {"status": "timeout", "detail": "Belum selesai saat waktu penelitian habis.",
+                 "duration_ms": round((closed_at - started) * 1000), **entry,
                  "started_after_ms": round((started - self._started_at) * 1000)}
                 for started, entry in self._entries
             ]
@@ -72,17 +81,20 @@ def audited_call(operation, target, call, *args, classify=None, **kwargs):
     entry = audit.begin(operation, target)
     try:
         result = call(*args, **kwargs)
+        if classify is None:
+            code = getattr(result, "status_code", None)
+            if not isinstance(code, int):
+                code = getattr(result, "status", None)
+            status, detail = (("failed" if code >= 400 else "success", f"HTTP {code}")
+                              if isinstance(code, int) else ("success", ""))
+        else:
+            status, detail = classify(result)
     except Exception as error:
         code = getattr(error, "code", None)
-        timed_out = isinstance(error, TimeoutError) or "timeout" in type(error).__name__.lower()
+        reason = getattr(error, "reason", None)
+        timed_out = any(isinstance(exc, TimeoutError) or "timeout" in type(exc).__name__.lower()
+                        for exc in (error, reason))
         audit.end(entry, "timeout" if timed_out else "failed", f"HTTP {code}" if isinstance(code, int) else type(error).__name__)
         raise
-    if classify is None:
-        code = getattr(result, "status_code", None)
-        if not isinstance(code, int):
-            code = getattr(result, "status", None)
-        status, detail = ("failed" if code >= 400 else "success", f"HTTP {code}") if isinstance(code, int) else ("success", "")
-    else:
-        status, detail = classify(result)
     audit.end(entry, status, detail)
     return result

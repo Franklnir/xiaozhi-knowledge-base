@@ -39,6 +39,8 @@ from xiaozhi.services.smarthome_service import (
 
 logger = logging.getLogger("xiaozhi.mcp.tools")
 
+_RESEARCH_HISTORY_PHRASES = ("cek penelitian", "penelitian terakhir", "cek riset", "riset terakhir")
+
 
 def format_material_for_xiaozhi(item: dict, keyword: str = "") -> dict:
     """Format material for XiaoZhi consumption."""
@@ -79,7 +81,7 @@ def _research_voice_clarification(query: str) -> str | None:
         command,
     ) or command == "reset":
         return "Maksudnya mau mencari informasi tentang Wi-Fi atau mengganti jaringan Wi-Fi perangkat?"
-    if command in {"", "riset", "deep riset", "telusuri", "telusuri topik"}:
+    if command in {"", "penelitian", "penelitian saya", "riset", "deep riset", "telusuri", "telusuri topik"}:
         return "Topik apa yang ingin ditelusuri?"
     return None
 
@@ -486,7 +488,7 @@ def _deep_web_search(query: str, max_results: int = 5, read_content: bool = True
 
 
 def _auto_save_to_knowledge_base(store, owner_id: int, title: str, category: str, content: str, keywords: str = "") -> Optional[int]:
-    """Auto-save hasil riset/scraping dinonaktifkan: Database Materi Belajar murni untuk input manual pengguna."""
+    """Auto-save hasil penelitian/scraping dinonaktifkan: Database Materi Belajar murni untuk input manual pengguna."""
     return None
 
 
@@ -1074,7 +1076,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         percakapan sebelumnya, memakai kata seperti "tadi", "kemarin", "pernah", "yang itu", "lanjutkan",
         atau menyebut topik yang mungkin pernah dibahas. Jika tidak ada bukti relevan, lanjutkan dengan tool
         domain lain yang sesuai; jangan berpura-pura mengingat.
-        Untuk hasil, sumber, atau riwayat sesi Deep Riset, gunakan deep_research_workspace.
+        Untuk hasil, sumber, atau riwayat sesi Penelitian Saya, gunakan deep_research_workspace.
 
         Args:
             query: Kata kunci topik atau konsep yang ingin dicari (contoh: "keuangan", "tugas fisika", "resep", "koding"). Kosongkan untuk membaca percakapan paling terkini.
@@ -2124,7 +2126,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             "cek lagu", "lagu terakhir", "tadi lagu apa", "lagu apa tadi", "lagu yang tadi",
             "cek video", "video terakhir", "tadi video apa", "video apa tadi", "video yang tadi",
             "cek pemutaran", "pemutaran terakhir", "status pemutaran",
-            "cek riset", "cek pencarian", "riset terakhir", "pencarian terakhir", "tadi cari apa",
+            *_RESEARCH_HISTORY_PHRASES, "cek pencarian", "pencarian terakhir", "tadi cari apa",
             "tadi kita cari", "apa yang tadi kita cari", "apa yang tadi kita tonton", "tadi tonton apa",
             "tadi kita tonton apa", "lagu apa sekarang", "lagu yang sedang diputar"
         ]
@@ -2334,9 +2336,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         Jawab dengan membandingkan isi cuplikan dan menyebut judul serta tautan sumber.
         Bacakan nomor dari field number tanpa menomori ulang atau mengubah urutan sumber.
         Jika pengguna meminta putar suara sumber tertentu, panggil play_confirmed_youtube_video
-        dengan playback_request_id dari hasil riset itu dan choice sesuai field number sumber
+        dengan playback_request_id dari hasil penelitian itu dan choice sesuai field number sumber
         yang diminta. Jangan panggil pencarian video atau tool lagu untuk pilihan bernomor.
-        Jika nomornya belum jelas, tanyakan nomor sumber. Riset sendiri tidak memutar audio.
+        Jika nomornya belum jelas, tanyakan nomor sumber. Penelitian sendiri tidak memutar audio.
         Ikuti coverage_note dan freshness_note saat menjelaskan seberapa mutakhir hasilnya.
         Nyatakan jika hanya satu sumber tersedia atau cuplikan tidak cukup untuk menjawab.
         Jika ada videos_without_subtitles, boleh sebut judul, channel, tanggal, dan tautannya.
@@ -2728,8 +2730,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                         f"{subtitle_section}"
                     )
 
-                    # OPSI C: Cek apakah baru saja ada materi riset terkait topik yang sama
-                    # Jika ada, satukan ke dalam 1 materi gabungan (Riset & Video YouTube)
+                    # OPSI C: Cek apakah baru saja ada materi penelitian terkait topik yang sama
+                    # Jika ada, satukan ke dalam 1 materi gabungan (Penelitian & Video YouTube)
                     recent_materials = store.list_materials(owner_id) if hasattr(store, "list_materials") else []
                     related_mat = None
                     from xiaozhi.services.semantic_memory_service import clean_and_tokenize
@@ -2740,7 +2742,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                         rm_title = (rm.get("title") or "").lower()
                         rm_words = set(clean_and_tokenize(f"{rm_title} {rm.get('keywords', '')}"))
                         overlap = v_words.intersection(rm_words)
-                        is_recent_research = rm.get("source_type") == "auto_search_cache" or "riset" in rm_cat or "pengetahuan" in rm_cat
+                        is_recent_research = rm.get("source_type") == "auto_search_cache" or any(
+                            word in rm_cat for word in ("penelitian", "riset", "pengetahuan")
+                        )
                         if is_recent_research and (overlap or rm == recent_materials[0]):
                             related_mat = rm
                             break
@@ -2753,7 +2757,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                             merged_title = f"{base_title} & Video: {v_title}"[:160]
                         else:
                             merged_title = base_title
-                        merged_cat = "Riset & Video YouTube"
+                        merged_cat = "Penelitian & Video YouTube"
                         merged_kw = f"{related_mat.get('keywords', '')}, youtube, {v_channel}, {v_genre}"[:200]
                         merged_content = (
                             f"{related_mat.get('content', '')}\n\n"
@@ -2892,7 +2896,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             "cek lagu", "lagu terakhir", "tadi lagu apa", "lagu apa tadi", "lagu yang tadi",
             "cek video", "video terakhir", "tadi video apa", "video apa tadi", "video yang tadi",
             "cek pemutaran", "pemutaran terakhir", "status pemutaran",
-            "cek riset", "cek pencarian", "riset terakhir", "pencarian terakhir", "tadi cari apa",
+            *_RESEARCH_HISTORY_PHRASES, "cek pencarian", "pencarian terakhir", "tadi cari apa",
             "tadi kita cari", "apa yang tadi kita cari", "apa yang tadi kita tonton", "tadi tonton apa",
             "tadi kita tonton apa", "lagu apa sekarang", "lagu yang sedang diputar"
         ]
@@ -3485,11 +3489,11 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     def get_playback_status(query: str = "") -> dict:
         """
         Cek status dan informasi riwayat pemutaran lagu YouTube, video terakhir yang dicek/ditonton,
-        serta riset atau pencarian web terakhir TANPA memutar audio apapun.
+        serta penelitian atau pencarian web terakhir TANPA memutar audio apapun.
         Gunakan tool ini saat user bertanya atau ingin mengecek konteks terkini:
         - "Cek lagu terakhir kita" / "Tadi lagu apa yang diputar?"
         - "Cek video terakhir kita" / "Video apa yang tadi kita tonton atau cek?"
-        - "Cek pencarian terakhir kita" / "Tadi kita cari apa?" / "Riset terakhir kita tentang apa?"
+        - "Cek pencarian terakhir kita" / "Tadi kita cari apa?" / "Penelitian terakhir kita tentang apa?"
         - "Lagu apa yang sedang diputar?" / "Status pemutaran sekarang apa?"
         PENTING: Tool ini HANYA untuk mengecek dan melaporkan konteks/informasi ke user.
         JANGAN memutar audio dan JANGAN panggil self.audio.play_youtube kecuali pengguna secara eksplisit meminta 'putar lagi' atau 'mainkan kembali'.
@@ -3502,7 +3506,8 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return {"success": False, "is_playing": False, "message": "Belum ada koneksi perangkat aktif."}
 
         clean_q = (query or "").strip().lower()
-        if ("riset" in clean_q and re.search(r"\b(tadi|terakhir|barusan)\b", clean_q)
+        if (any(word in clean_q for word in ("penelitian", "riset"))
+                and re.search(r"\b(tadi|terakhir|barusan)\b", clean_q)
                 and ResearchStore.supported(store)):
             active_slot = mcp_active_slot_ctx.get(None)
             if active_slot:
@@ -3583,7 +3588,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                             "source": "chat_history"
                         }
 
-            # 3. Cari riwayat pencarian/riset web terakhir
+            # 3. Cari riwayat pencarian/penelitian web terakhir
             if not last_search and t_name in ("search_web", "search_web_deep", "search_news"):
                 req_p = chat.get("request_payload") or {}
                 q_term = req_p.get("query") or chat.get("user_message") or ""
@@ -3614,7 +3619,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
 
         # Tentukan pesan dan fokus respon berdasarkan query pengecekan user
         is_video_inquiry = any(k in clean_q for k in ["video", "tonton", "nonton", "clip", "klip", "tayangan", "channel"])
-        is_search_inquiry = any(k in clean_q for k in ["cari", "pencarian", "riset", "berita", "google", "web"])
+        is_search_inquiry = any(k in clean_q for k in ["cari", "pencarian", "penelitian", "riset", "berita", "google", "web"])
         is_song_inquiry = any(k in clean_q for k in ["lagu", "musik", "play", "playlist", "putar", "dengar", "audio"])
 
         response_message = ""
@@ -3727,7 +3732,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         try:
             clean_q = (query or "").strip().lower()
             search_check_indicators = [
-                "cek pencarian", "cek riset", "pencarian terakhir", "riset terakhir",
+                *_RESEARCH_HISTORY_PHRASES, "cek pencarian", "pencarian terakhir",
                 "tadi kita cari", "tadi cari apa", "apa yang tadi kita cari", "riwayat pencarian"
             ]
             if any(ind in clean_q for ind in search_check_indicators):
@@ -3768,14 +3773,14 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     mat_id = _auto_save_to_knowledge_base(
                         store=store,
                         owner_id=owner_id,
-                        title=f"Riset: {query.title()}",
-                        category="Riset & Pengetahuan",
+                        title=f"Penelitian: {query.title()}",
+                        category="Penelitian & Pengetahuan",
                         content=compiled_text,
                         keywords=query
                     )
                     if mat_id:
                         response["tersimpan_ke_database"] = True
-                        response["catatan_memori"] = f"Riset '{query}' otomatis tersimpan ke Knowledge Base (ID #{mat_id})."
+                        response["catatan_memori"] = f"Penelitian '{query}' otomatis tersimpan ke Knowledge Base (ID #{mat_id})."
 
             if owner_id:
                 record_mcp_tool_history(owner_id, "search_web", query, {"query": query}, response)
@@ -3793,10 +3798,10 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         Pencarian web mendalam tingkat tinggi: DuckDuckGo Web Engine + Wikipedia + Scraper paralel multi-halaman.
         Mengekstrak isi halaman lengkap termasuk tabel data, daftar poin penting, dan subjudul untuk rangkuman mendalam.
         Hasil otomatis disimpan ke memori database pengguna agar dapat diingat kembali tanpa cari ulang.
-        Gunakan tool ini untuk riset topik mendalam, profil kampus/lembaga, panduan teknis, tutorial, kurikulum, atau pertanyaan analitis.
+        Gunakan tool ini untuk penelitian topik mendalam, profil kampus/lembaga, panduan teknis, tutorial, kurikulum, atau pertanyaan analitis.
 
         Args:
-            query: Kata kunci atau topik riset mendalam.
+            query: Kata kunci atau topik penelitian mendalam.
             max_results: Jumlah sumber yang dikumpulkan (default 5).
             read_content: Ekstrak dan baca isi artikel/halaman secara mendalam (default True).
         """
@@ -3804,7 +3809,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         try:
             clean_q = (query or "").strip().lower()
             search_check_indicators = [
-                "cek pencarian", "cek riset", "pencarian terakhir", "riset terakhir",
+                *_RESEARCH_HISTORY_PHRASES, "cek pencarian", "pencarian terakhir",
                 "tadi kita cari", "tadi cari apa", "apa yang tadi kita cari", "riwayat pencarian"
             ]
             if any(ind in clean_q for ind in search_check_indicators):
@@ -3842,21 +3847,21 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                     mat_id = _auto_save_to_knowledge_base(
                         store=store,
                         owner_id=owner_id,
-                        title=f"Riset: {query.title()}",
-                        category="Riset & Pengetahuan",
+                        title=f"Penelitian: {query.title()}",
+                        category="Penelitian & Pengetahuan",
                         content=compiled_text,
                         keywords=query
                     )
                     if mat_id:
                         response["tersimpan_ke_database"] = True
-                        response["catatan_memori"] = f"Riset '{query}' otomatis tersimpan ke Knowledge Base (ID #{mat_id})."
+                        response["catatan_memori"] = f"Penelitian '{query}' otomatis tersimpan ke Knowledge Base (ID #{mat_id})."
 
             if owner_id:
                 record_mcp_tool_history(owner_id, "search_web_deep", query, {"query": query, "read_content": read_content}, response)
             return response
         except Exception as exc:
             logger.exception("Deep web search error")
-            response = {"success": False, "message": f"Riset mendalam gagal: {str(exc)[:100]}", "results": []}
+            response = {"success": False, "message": f"Penelitian mendalam gagal: {str(exc)[:100]}", "results": []}
             if owner_id:
                 record_mcp_tool_history(owner_id, "search_web_deep", query, {"query": query}, response)
             return response
@@ -4648,10 +4653,10 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         Pencarian jurnal ilmiah & paper akademis berbobot tinggi secara instan tanpa batasan paywall.
         Mengintegrasikan database arXiv, Semantic Scholar, dan CrossRef secara real-time.
         Menyajikan: Judul & Tahun terbit, Nama peneliti, Jumlah sitasi (citation count),
-        Intisari abstrak riset, dan opsi mengunduh/membaca teks lengkap PDF open-access.
+        Intisari abstrak penelitian, dan opsi mengunduh/membaca teks lengkap PDF open-access.
 
         Args:
-            query: Kata kunci riset (contoh: "edge AI speech recognition on microcontroller", "thermocouple MAX6675 ESP32").
+            query: Kata kunci penelitian (contoh: "edge AI speech recognition on microcontroller", "thermocouple MAX6675 ESP32").
             max_results: Batas jumlah paper yang ditampilkan (default: 3).
         """
         owner_id = mcp_active_owner_ctx.get()
@@ -4663,11 +4668,11 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def autonomous_deep_research(topic_or_question: str, mode: str = "auto") -> dict:
         """
-        Untuk topik jelas, misalnya "Telusuri topik panel surya". Jika hanya "riset", tanyakan topiknya.
-        Jika "riset/reset Wi-Fi" ambigu, tanyakan apakah pengguna ingin mencari informasi atau ganti jaringan.
+        "Mulai penelitian tentang panel surya". Jika hanya "penelitian", tanyakan topiknya.
+        Jika ucapan soal Wi-Fi ambigu, tanyakan apakah pengguna ingin mencari informasi atau ganti jaringan.
         Ganti jaringan memerlukan konfirmasi. Saat needs_clarification, bacakan message dan tunggu jawaban.
         Sertakan tautan video dan ringkas cuplikan subtitle yang tersedia. Jelaskan keterbatasan sumber.
-        Sebutkan nomor riset dan sitasi. Gunakan deep_research_workspace untuk riwayat dan lanjutan.
+        Sebutkan nomor penelitian dan sitasi. Gunakan deep_research_workspace untuk riwayat dan lanjutan.
         Minta izin sebelum menyalin hasil dengan confirm_and_save_research_material.
 
         Args:
@@ -4711,9 +4716,9 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         source_numbers: list[int] | None = None,
     ) -> dict:
         """
-        Kelola Deep Riset tersimpan di akun dan slot aktif. Klarifikasi perintah Wi-Fi yang ambigu.
-        read: "apa hasil riset tadi", "buka riset nomor dua sesi pertama", serta penilaian yang sudah tersimpan.
-        history: "bacakan riwayat riset nomor dua". day opsional: YYYY-MM-DD, hari ini, atau kemarin (WIB).
+        Kelola Penelitian Saya tersimpan di akun dan slot aktif. Klarifikasi perintah Wi-Fi yang ambigu.
+        read: "apa hasil penelitian tadi", "buka penelitian nomor dua sesi pertama", serta penilaian yang sudah tersimpan.
+        history: "bacakan riwayat penelitian nomor dua". day opsional: YYYY-MM-DD, hari ini, atau kemarin (WIB).
         Jika diminta hasil dari hari tertentu, cari sesi dengan history lalu buka sesi yang cocok dengan read.
         sources: "daftar sumber" atau "jelaskan sumber nomor tiga". Isi source_number untuk melihat cuplikan,
         halaman PDF atau timestamp. Isi session_number untuk melihat versi sumber yang tercatat di sesi itu.
@@ -4731,14 +4736,14 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         Gunakan continue untuk mencari informasi baru sebagai sesi lanjutan, dengan fokus opsional pada question.
         Jika question kosong, pakai masukan atau pertanyaan terbuka yang tercatat sebagai fokus lanjutan.
         Gunakan source bersama source_number untuk membaca PDF atau teks dari nomor sitasi tersimpan.
-        Gunakan video hanya jika pengguna meminta memutar video riset. Pilih source_number dari sitasi
+        Gunakan video hanya jika pengguna meminta memutar video penelitian. Pilih source_number dari sitasi
         video yang dimaksud dan teruskan playback_request_id serta playback_choice ke play_confirmed_youtube_video.
         Jika pengguna tidak menyebut nomor, judul, atau ID permintaan, gunakan topik terakhir di slot aktif.
         """
         owner_id, slot = mcp_active_owner_ctx.get(), mcp_active_slot_ctx.get(None)
         request_id = f"req-{uuid.uuid4().hex}"
         if not (owner_id and slot and ResearchStore.supported(store)):
-            return {"success": False, "request_id": request_id, "message": "Penyimpanan Deep Riset belum tersedia."}
+            return {"success": False, "request_id": request_id, "message": "Penyimpanan Penelitian Saya belum tersedia."}
         workspace = ResearchStore(store, owner_id, slot)
         if action == "list":
             count, topics = workspace.list_topics(page=max(1, min(page, 100_000)), title=topic_query[:160])
@@ -4750,7 +4755,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             match = workspace.find_run(record_request_id.strip()[:100])
             if (not match or research_number not in {None, match["topic_number"]}
                     or session_number not in {None, match["session_number"]}):
-                return {"success": False, "request_id": request_id, "message": "ID permintaan tidak ditemukan untuk riset, sesi, atau slot ini."}
+                return {"success": False, "request_id": request_id, "message": "ID permintaan tidak ditemukan untuk penelitian, sesi, atau slot ini."}
             research_number, session_number = match["topic_number"], match["session_number"]
         elif research_number is None and topic_query.strip():
             key = " ".join(topic_query.casefold().split())[:160]
@@ -4759,7 +4764,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             if exact or len(matches) == 1:
                 research_number = (exact or matches[0])["number"]
             else:
-                message = "Ada beberapa topik yang cocok. Pilih nomor riset." if matches else "Topik tidak ditemukan pada slot ini."
+                message = "Ada beberapa topik yang cocok. Pilih nomor penelitian." if matches else "Topik tidak ditemukan pada slot ini."
                 return {"success": False, "request_id": request_id, "message": message,
                         "matches": [{"number": item["number"], "title": item["title"]} for item in matches[:8]]}
         topic = workspace.detail(research_number)
@@ -4787,7 +4792,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         if action == "video":
             return {"success": False, "request_id": request_id, "message": "Pilih nomor sitasi video yang ingin diputar."}
         if not topic or (action == "source" and not source_number):
-            return {"success": False, "request_id": request_id, "message": "Pilih riset atau nomor sumber yang tersedia."}
+            return {"success": False, "request_id": request_id, "message": "Pilih penelitian atau nomor sumber yang tersedia."}
         try:
             return run_research(workspace, topic, question, request_id=request_id,
                                 source_number=source_number if action == "source" else None)
@@ -4795,16 +4800,16 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             return {"success": False, "request_id": request_id, "message": str(exc)}
 
     @mcp_server.tool()
-    def confirm_and_save_research_material(title: str, content: str, url: str = "", category: str = "Riset Mandiri", save_confirmed: bool = True) -> dict:
+    def confirm_and_save_research_material(title: str, content: str, url: str = "", category: str = "Penelitian Mandiri", save_confirmed: bool = True) -> dict:
         """
-        Simpan materi hasil riset otonom atau pencarian ke Knowledge Base pengguna SETELAH pengguna
+        Simpan materi hasil penelitian otonom atau pencarian ke Knowledge Base pengguna SETELAH pengguna
         memberikan konfirmasi persetujuan (contoh: "ya tolong simpan", "masukkan ke materiku", "simpan materi tadi").
 
         Args:
             title: Judul materi yang ingin disimpan.
-            content: Isi ringkasan riset atau dokumen lengkap.
+            content: Isi ringkasan penelitian atau dokumen lengkap.
             url: Sumber URL atau link paper/artikel.
-            category: Kategori materi (default: "Riset Mandiri" atau "Jurnal Ilmiah").
+            category: Kategori materi (default: "Penelitian Mandiri" atau "Jurnal Ilmiah").
             save_confirmed: Harus bernilai True sebagai bukti persetujuan eksplisit pengguna.
         """
         owner_id = mcp_active_owner_ctx.get()
@@ -4818,13 +4823,13 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
             }
 
         try:
-            clean_title = (title or "Materi Riset Mandiri").strip()[:160]
-            clean_cat = (category or "Riset Mandiri").strip()[:80]
+            clean_title = (title or "Materi Penelitian Mandiri").strip()[:160]
+            clean_cat = (category or "Penelitian Mandiri").strip()[:80]
             clean_content = content.strip()
             if url and ("🌐 **Sumber**" not in clean_content and "🌐 **URL**" not in clean_content):
                 clean_content = f"🌐 **Sumber**: {url}\n\n" + clean_content
 
-            keywords = f"riset, autonomous, {clean_cat.lower()}, {clean_title[:40].lower()}"
+            keywords = f"penelitian, autonomous, {clean_cat.lower()}, {clean_title[:40].lower()}"
             mat_id = store.add_material(
                 owner_id,
                 clean_title,

@@ -1,10 +1,15 @@
 """Persistence for numbered research topics, sessions and citations."""
 
 import json
+import logging
 from contextlib import contextmanager
 
 from xiaozhi.core.research_evidence import analyze_research_evidence, continuation_evidence
 from xiaozhi.core.utils import utc_now
+from xiaozhi.services.research_audit import is_source_access
+
+
+logger = logging.getLogger(__name__)
 
 
 RESEARCH_SCHEMA = """
@@ -100,7 +105,7 @@ class ResearchStore:
     def create_or_find(self, title):
         title = " ".join((title or "").split())[:160]
         if not title:
-            raise ValueError("Isi judul riset terlebih dahulu.")
+            raise ValueError("Isi judul penelitian terlebih dahulu.")
         with self._queries() as query:
             query("INSERT INTO research_counters(owner_id, slot) VALUES (?, ?) ON CONFLICT DO NOTHING")
             query("UPDATE research_counters SET last_number=last_number WHERE owner_id=? AND slot=?")
@@ -267,11 +272,11 @@ class ResearchStore:
             if not topic:
                 raise ValueError("Topik sudah dihapus saat permintaan berjalan.")
             active = query(
-                """SELECT question FROM research_runs WHERE owner_id=? AND slot=? AND topic_number=?
+                """SELECT question, request_id FROM research_runs WHERE owner_id=? AND slot=? AND topic_number=?
                    AND session_number=? AND status='running'""", (number, session),
             ).fetchone()
             if not active:
-                raise ValueError("Sesi riset sudah selesai atau tidak ditemukan.")
+                raise ValueError("Sesi penelitian sudah selesai atau tidak ditemukan.")
             existing = query(
                 "SELECT number, source_key, evidence FROM research_sources WHERE owner_id=? AND slot=? AND topic_number=?",
                 (number,),
@@ -324,6 +329,9 @@ class ResearchStore:
                    WHERE owner_id=? AND slot=? AND topic_number=? AND session_number=?""",
                 (number, session), values=(state, utc_now(), json.dumps(result, ensure_ascii=False)),
             )
+        access_count = sum(is_source_access(entry) for entry in attempts)
+        logger.info("research_session_finished request_id=%s session=%d status=%s citations=%d accesses=%d",
+                    active["request_id"], session, state, len(citations), access_count)
         return result
 
     @staticmethod
@@ -345,7 +353,7 @@ class ResearchStore:
 
     def save_feedback(self, number, session, rating, note, *, request_id=""):
         if rating not in {"helpful", "needs_work"}:
-            raise ValueError("Pilih apakah hasil riset membantu.")
+            raise ValueError("Pilih apakah hasil penelitian membantu.")
         with self._queries() as query:
             row = query(
                 """UPDATE research_runs SET result=result WHERE owner_id=? AND slot=? AND topic_number=?
@@ -385,7 +393,7 @@ class ResearchStore:
                     (number,), values=(title, title.casefold()),
                 ).rowcount)
             if action not in {"archive", "restore"}:
-                raise ValueError("Tindakan riset tidak dikenali.")
+                raise ValueError("Tindakan penelitian tidak dikenali.")
             return bool(query(
                 "UPDATE research_topics SET archived=? WHERE owner_id=? AND slot=? AND number=?",
                 (number,), values=(int(action == "archive"),),
