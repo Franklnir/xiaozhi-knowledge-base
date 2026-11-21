@@ -119,7 +119,18 @@ def test_voice_can_resume_and_recall_research_without_repeating_a_search(tmp_pat
     slot_token = mcp_active_slot_ctx.set(2)
     connection_token = mcp_request_id_ctx.set("same-bridge")
     try:
-        first = tools["autonomous_deep_research"]("Panel Surya")
+        start_research = tools["autonomous_deep_research"]
+        assert start_research("Riset")["message"] == "Topik apa yang ingin ditelusuri?"
+        for command in ("XiaoZhi, tolong riset Wi‑Fi!", "Reset wifi", "Wi-Fi",
+                        "Ganti jaringan Wi-Fi perangkat", "Buka konfigurasi Wi-Fi"):
+            unclear = start_research(command)
+            assert not unclear["success"] and unclear["needs_clarification"]
+            assert re.fullmatch(r"req-[a-f0-9]{32}", unclear["request_id"])
+            assert "informasi tentang Wi-Fi" in unclear["message"]
+        search.assert_not_called()
+        assert ResearchStore(store, user["id"], 2).list_topics()[0] == 0
+
+        first = start_research("Panel Surya")
         second = tools["deep_research_workspace"]("continue", 1, "baterai")
         read = tools["deep_research_workspace"]()
         assert first["research_number"] == second["research_number"] == read["research_number"] == 1
@@ -159,6 +170,9 @@ def test_voice_can_resume_and_recall_research_without_repeating_a_search(tmp_pat
             mcp_active_slot_ctx.reset(other_slot)
         assert search.call_count == 2
         assert "baterai" in search.call_args.args[0]
+        wifi_topic = start_research("Perbedaan Wi-Fi 6 dan Wi-Fi 7")
+        assert wifi_topic["success"] and wifi_topic["research_number"] == 2
+        assert search.call_count == 3
     finally:
         mcp_request_id_ctx.reset(connection_token)
         mcp_active_slot_ctx.reset(slot_token)

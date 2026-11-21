@@ -68,6 +68,22 @@ def _clean_search_query(raw_query: str) -> str:
     return q if len(q) >= 2 else raw_query.strip()
 
 
+def _research_voice_clarification(query: str) -> str | None:
+    command = re.sub(r"[^\w]+", " ", query.casefold()).strip()
+    command = re.sub(r"^(?:(?:xiaozhi|tolong|mohon|coba) )+", "", command)
+    command = re.sub(r"(?: (?:dong|ya|sekarang))+$", "", command)
+
+    if re.fullmatch(
+        r"(?:(?:reset|riset|ganti|atur ulang|buka konfigurasi|konfigurasi ulang) )?"
+        r"(?:(?:jaringan )?wi ?fi|jaringan)(?: perangkat)?",
+        command,
+    ) or command == "reset":
+        return "Maksudnya mau mencari informasi tentang Wi-Fi atau mengganti jaringan Wi-Fi perangkat?"
+    if command in {"", "riset", "deep riset", "telusuri", "telusuri topik"}:
+        return "Topik apa yang ingin ditelusuri?"
+    return None
+
+
 def _calculate_domain_authority(url: str, query: str) -> tuple:
     """
     Hitung skor reputasi & otoritas domain untuk memprioritaskan situs resmi dan referensi terpercaya.
@@ -4647,25 +4663,26 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
     @mcp_server.tool()
     def autonomous_deep_research(topic_or_question: str, mode: str = "auto") -> dict:
         """
-        Gunakan saat pengguna berkata "riset", "tolong teliti", atau meminta menelusuri suatu topik.
-        Mode auto mencari artikel web, paper, dan video YouTube secara bersamaan.
-        Sertakan tautan video yang relevan. Ringkas isi video jika cuplikan subtitle tersedia.
-        Jika satu pencarian lambat, sampaikan sumber yang sudah ditemukan dan keterbatasannya.
-        
-        Hasil pencarian masuk ke riwayat Deep Riset. Sebutkan nomor riset dan nomor sumber aslinya.
-        Untuk pertanyaan "hasil riset tadi" atau "lanjutkan riset nomor dua", gunakan deep_research_workspace.
-        Untuk menyalin ringkasan ke Knowledge Base, minta persetujuan dan panggil confirm_and_save_research_material.
+        Untuk topik jelas, misalnya "Telusuri topik panel surya". Jika hanya "riset", tanyakan topiknya.
+        Jika "riset/reset Wi-Fi" ambigu, tanyakan apakah pengguna ingin mencari informasi atau ganti jaringan.
+        Ganti jaringan memerlukan konfirmasi. Saat needs_clarification, bacakan message dan tunggu jawaban.
+        Sertakan tautan video dan ringkas cuplikan subtitle yang tersedia. Jelaskan keterbatasan sumber.
+        Sebutkan nomor riset dan sitasi. Gunakan deep_research_workspace untuk riwayat dan lanjutan.
+        Minta izin sebelum menyalin hasil dengan confirm_and_save_research_material.
 
         Args:
-            topic_or_question: Topik penelitian mandiri (contoh: "cara menghubungkan sensor thermocouple MAX6675 ke ESP32", "paper Transformer di mikrokontroler").
-            mode: Gunakan 'auto' untuk riset gabungan web, paper, dan YouTube.
-                Gunakan 'academic' atau 'web' jika pengguna meminta fokus tersebut secara eksplisit.
+            topic_or_question: Topik atau pertanyaan yang ingin ditelusuri.
+            mode: 'auto' mencari web, paper, dan YouTube. Pakai 'academic' atau 'web' jika diminta khusus.
         """
         owner_id = mcp_active_owner_ctx.get()
         slot = mcp_active_slot_ctx.get(None)
         request_id = f"req-{uuid.uuid4().hex}"
         try:
-            if owner_id and slot and ResearchStore.supported(store):
+            clarification = _research_voice_clarification(topic_or_question)
+            if clarification:
+                res = {"success": False, "needs_clarification": True, "message": clarification,
+                       "request_id": request_id}
+            elif owner_id and slot and ResearchStore.supported(store):
                 workspace = ResearchStore(store, owner_id, slot)
                 topic = workspace.create_or_find(topic_or_question)
                 res = run_research(workspace, workspace.detail(topic["number"]), request_id=request_id, mode=mode)
@@ -4694,7 +4711,7 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         source_numbers: list[int] | None = None,
     ) -> dict:
         """
-        Kelola konteks Deep Riset untuk akun dan slot MCP aktif.
+        Kelola Deep Riset tersimpan di akun dan slot aktif. Klarifikasi perintah Wi-Fi yang ambigu.
         read: "apa hasil riset tadi", "buka riset nomor dua sesi pertama", serta penilaian yang sudah tersimpan.
         history: "bacakan riwayat riset nomor dua". day opsional: YYYY-MM-DD, hari ini, atau kemarin (WIB).
         Jika diminta hasil dari hari tertentu, cari sesi dengan history lalu buka sesi yang cocok dengan read.
