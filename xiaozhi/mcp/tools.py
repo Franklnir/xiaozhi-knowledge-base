@@ -4666,18 +4666,13 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
         return res
 
     @mcp_server.tool()
-    def autonomous_deep_research(topic_or_question: str, mode: str = "auto") -> dict:
+    def autonomous_deep_research(topic_or_question: str, mode: str = "auto", new_topic: bool = False) -> dict:
         """
-        "Mulai penelitian tentang panel surya". Jika hanya "penelitian", tanyakan topiknya.
-        Jika ucapan soal Wi-Fi ambigu, tanyakan apakah pengguna ingin mencari informasi atau ganti jaringan.
-        Ganti jaringan memerlukan konfirmasi. Saat needs_clarification, bacakan message dan tunggu jawaban.
-        Sertakan tautan video dan ringkas cuplikan subtitle yang tersedia. Jelaskan keterbatasan sumber.
-        Sebutkan nomor penelitian dan sitasi. Gunakan deep_research_workspace untuk riwayat dan lanjutan.
-        Minta izin sebelum menyalin hasil dengan confirm_and_save_research_material.
-
-        Args:
-            topic_or_question: Topik atau pertanyaan yang ingin ditelusuri.
-            mode: 'auto' mencari web, paper, dan YouTube. Pakai 'academic' atau 'web' jika diminta khusus.
+        Perbarui penelitian aktif. Gunakan new_topic=true hanya saat pengguna meminta judul baru.
+        Pada slot kosong, topik pertama memakai judul yang disebut. Untuk nomor tertentu, gunakan
+        deep_research_workspace dengan continue. Sebutkan nomor penelitian, sitasi, dan batas sumber.
+        Jika ucapan Wi-Fi ambigu, bacakan message dan tunggu klarifikasi. Ganti jaringan perlu konfirmasi.
+        Mode auto mencari web, paper, dan YouTube. Minta izin sebelum menyimpan ke Knowledge Base.
         """
         owner_id = mcp_active_owner_ctx.get()
         slot = mcp_active_slot_ctx.get(None)
@@ -4689,15 +4684,30 @@ def register_tools(mcp_server, store, record_mcp_tool_history, youtube_search_fn
                        "request_id": request_id}
             elif owner_id and slot and ResearchStore.supported(store):
                 workspace = ResearchStore(store, owner_id, slot)
-                topic = workspace.create_or_find(topic_or_question)
-                res = run_research(workspace, workspace.detail(topic["number"]), request_id=request_id, mode=mode)
+                command = _clean_search_query(topic_or_question)
+                if not new_topic and re.fullmatch(
+                    r"(?:lanjutkan|lengkapi|perbarui|teliti lagi)(?: (?:penelitian|topik)(?: ini| tadi)?)?",
+                    command.casefold(),
+                ):
+                    topic = workspace.detail()
+                    if not topic:
+                        raise ValueError("Sebutkan judul penelitian yang ingin dimulai.")
+                    focus = ""
+                else:
+                    topic = workspace.create_or_find(topic_or_question, reuse_active=not new_topic)
+                    focus = command if "last_session" in topic and (
+                        " ".join(command.casefold().split()) != topic["title"].casefold()
+                    ) else ""
+                    topic = workspace.detail(topic["number"])
+                res = run_research(workspace, topic, focus, request_id=request_id, mode=mode)
             else:
                 res = {**conduct_autonomous_research(topic_or_question, mode=mode), "request_id": request_id}
         except ValueError as exc:
             res = {"success": False, "message": str(exc), "request_id": request_id}
         if owner_id:
             record_mcp_tool_history(owner_id, "autonomous_deep_research", topic_or_question,
-                                    {"topic": topic_or_question, "mode": mode}, res, request_id=request_id)
+                                    {"topic": topic_or_question, "mode": mode, "new_topic": new_topic},
+                                    res, request_id=request_id)
         return res
 
     @mcp_server.tool()

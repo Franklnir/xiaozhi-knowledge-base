@@ -6,7 +6,7 @@ from xiaozhi.database.research_store import ResearchStore
 from xiaozhi.dependencies import get_store, render, require_user, validate_csrf
 from xiaozhi.services.research_audit import is_source_access
 from xiaozhi.services.research_retries import retry_plan, retry_research
-from xiaozhi.services.research_workspace import research_continuation, run_research
+from xiaozhi.services.research_workspace import readable_excerpt, research_continuation, run_research, topic_report
 
 
 router = APIRouter()
@@ -22,6 +22,9 @@ def _workspace(request, slot):
 
 def _page(request, user, slot, workspace, *, topic=None, page=1, session=None, error=""):
     if topic:
+        for source in topic["sources"]:
+            if source.get("excerpt"):
+                source["readable_excerpt"] = readable_excerpt(source["excerpt"])
         for run in topic["runs"]:
             run["can_retry"] = bool(retry_plan(run)) and not run["retry_session"]
             run["access_attempts"] = accesses = []
@@ -37,6 +40,7 @@ def _page(request, user, slot, workspace, *, topic=None, page=1, session=None, e
         "open_session": session,
         "feedback_saved": request.query_params.get("notice") == "feedback",
         "topic_evidence": analyze_research_evidence(topic["sources"], topic["title"]) if topic else None,
+        "report": topic_report(topic) if topic else None,
         "next_focus": research_continuation(topic) if topic else None,
     }, status_code=400 if error else 200)
     response.headers["Cache-Control"] = "no-store"

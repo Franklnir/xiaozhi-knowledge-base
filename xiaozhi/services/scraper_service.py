@@ -2219,8 +2219,71 @@ def search_web_sources(query: str, max_results: int = 3, *, timeout: float = 5, 
     return sources[:max_results]
 
 
+def _alternative_research_query(topic, group):
+    title, _, focus = topic.partition(" — ")
+    title_terms = re.findall(r"[\w-]+", title)
+    focus_terms = re.findall(r"[\w-]+", focus)
+    query = " ".join([*title_terms[:9], *focus_terms[:4]])
+    if query.casefold() == topic.casefold():
+        suffix = {"web": "panduan", "academic": "study", "youtube": "tutorial"}[group]
+        query = f"{query} {suffix}"
+    return query[:300]
+
+
+def search_research_alternative(group, topic, *, blocked=()):
+    from xiaozhi.services.youtube_research_service import find_research_videos
+
+    audit = current_audit.get()
+    limited = (audit.rate_limited() if audit else set()).union(blocked)
+    query = _alternative_research_query(topic, group)
+    if group == "academic":
+        for operation, host, search in (
+            ("cari_crossref", "api.crossref.org", search_crossref_papers),
+            ("cari_arxiv", "export.arxiv.org", search_arxiv_papers),
+        ):
+            if (operation, host) not in limited:
+                return {"papers": search(query, max_results=2)}
+        return {"papers": []}
+    if group == "web":
+        for operation, host, provider in (
+            ("cari_google_news", "news.google.com", "news"),
+            ("cari_wikipedia", "en.wikipedia.org", "en"),
+            ("cari_wikipedia", "id.wikipedia.org", "id"),
+        ):
+            if (operation, host) not in limited:
+                return search_web_sources(query, 3, timeout=2, provider=provider)
+        return []
+    if ("cari_youtube_ytdlp", "www.youtube.com") in limited:
+        return []
+    return find_research_videos(query, provider="ytdlp")
+
+
+def _read_research_candidates(sources, opened, deadline, group):
+    from xiaozhi.services.youtube_research_service import read_research_video_captions
+
+    candidates = [source for source in sources if public_url(source["url"]) not in opened]
+    for source in candidates[:2]:
+        if time.monotonic() >= deadline:
+            break
+        try:
+            if group == "youtube":
+                video, reason = read_research_video_captions(source)
+                if not reason and video.get("transcript_excerpt"):
+                    return {**video, "subtitle_status": "available"}
+            else:
+                article = scrape_url(source["url"], max_length=2200)
+                if article.get("success") and article.get("content"):
+                    updated = {**source, "excerpt": article["content"][:2200]}
+                    if article.get("source_type") == "pdf_document":
+                        updated["pdf_url"] = article.get("url") or source["url"]
+                    return updated
+        except Exception:
+            logger.debug("Research candidate could not be read", exc_info=True)
+    return None
+
+
 def _parallel_research(topic: str) -> Dict[str, Any]:
-    from xiaozhi.services.youtube_research_service import find_research_videos, read_research_video_captions
+    from xiaozhi.services.youtube_research_service import find_research_videos
 
     def submit(call, *args, **kwargs):
         return _research_workers.submit(copy_context().run, call, *args, **kwargs)
@@ -2234,27 +2297,53 @@ def _parallel_research(topic: str) -> Dict[str, Any]:
     }
     results = {}
     status = {}
+    recovered_timeouts = False
     while pending:
         finished, _ = wait(pending, timeout=max(0, deadline - time.monotonic()), return_when=FIRST_COMPLETED)
         if not finished:
-            break
+            expired = [(future, lane) for future, lane in pending.items()
+                       if lane in {"web", "academic", "youtube"}]
+            if recovered_timeouts or not expired:
+                break
+            recovered_timeouts = True
+            deadline = time.monotonic() + min(3, _RESEARCH_TIMEOUT_SECONDS / 3)
+            for future, lane in expired:
+                pending.pop(future)
+                future.cancel()
+                status[lane] = "timeout"
+                pending[submit(search_research_alternative, lane, topic)] = f"{lane}_alternative"
+            continue
         for future in finished:
-            source = pending.pop(future)
+            lane = pending.pop(future)
             try:
                 data = future.result()
             except Exception:
-                logger.warning("Research source failed: %s", source, exc_info=True)
-                status[source] = "error"
+                logger.warning("Research source failed: %s", lane, exc_info=True)
+                data = None
+            source = lane.removesuffix("_alternative")
+            if source in {"web_article", "youtube_captions"}:
+                if data:
+                    results[source] = data
+                else:
+                    status[source] = "empty"
                 continue
+            found = bool(data.get("papers")) if source == "academic" and data else bool(data)
+            if lane.endswith("_alternative"):
+                status[lane] = "found" if found else "empty" if data is not None else "error"
+            if not found:
+                status.setdefault(source, "empty" if data is not None else "error")
+                if lane == source and time.monotonic() < deadline:
+                    pending[submit(search_research_alternative, source, topic)] = f"{source}_alternative"
+                continue
+            if lane == source:
+                status[source] = "found"
             if source in {"web", "youtube"} and opened:
                 data = sorted(data, key=lambda item: public_url(item["url"]) in opened)
             results[source] = data
             if (source in {"web", "youtube"} and data and public_url(data[0]["url"]) not in opened
                     and time.monotonic() < deadline):
-                if source == "youtube":
-                    pending[submit(read_research_video_captions, data[0])] = "youtube_captions"
-                else:
-                    pending[submit(scrape_url, data[0]["url"], max_length=2200)] = "web_article"
+                step = "youtube_captions" if source == "youtube" else "web_article"
+                pending[submit(_read_research_candidates, data, opened, deadline, source)] = step
 
     for future, source in pending.items():
         future.cancel()
@@ -2263,15 +2352,10 @@ def _parallel_research(topic: str) -> Dict[str, Any]:
     web = results.get("web", [])
     papers = results.get("academic", {}).get("papers", [])
     videos = results.get("youtube", [])
-    article = results.get("web_article", {})
-    if web and article.get("success"):
-        primary = {**web[0], "excerpt": article["content"][:2200]}
-        if article.get("source_type") == "pdf_document":
-            primary["pdf_url"] = article.get("url") or primary["url"]
-        web = [primary, *web[1:]]
-    if videos and "youtube_captions" in results:
-        video, reason = results["youtube_captions"]
-        videos = [{**video, "subtitle_status": reason or "available"}, *videos[1:]]
+    if article := results.get("web_article"):
+        web = [article if source["url"] == article["url"] else source for source in web]
+    if video := results.get("youtube_captions"):
+        videos = [video if source["url"] == video["url"] else source for source in videos]
 
     groups = {"web": web, "academic": papers, "youtube": videos}
     for name, sources in groups.items():
@@ -2344,10 +2428,14 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
     if mode == "auto":
         return _parallel_research(clean_topic)
 
+    status = {}
     # 1. Jalur Penelitian Akademis (arXiv / Semantic Scholar / CrossRef)
     if mode == "academic":
         res = search_academic_papers_unified(clean_topic, max_results=3)
-        if res.get("success") and res.get("papers"):
+        if not res.get("papers"):
+            res = search_research_alternative("academic", clean_topic)
+            status["academic_alternative"] = "found" if res.get("papers") else "empty"
+        if res.get("papers"):
             top_paper = res["papers"][0]
             title = top_paper["title"]
             authors_str = ", ".join(top_paper.get("authors", [])) or "Tim Peneliti"
@@ -2392,6 +2480,8 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
                 "success": True,
                 "mode": "academic",
                 "topic": clean_topic,
+                "sources": {"academic": res["papers"]},
+                "source_status": status,
                 "primary_source": {
                     "title": title,
                     "authors": authors_str,
@@ -2421,10 +2511,14 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
 
     # 2. Jalur Penelitian Web & Ensiklopedia / Dokumentasi Teknis
     web_sources = search_web_sources(clean_topic, max_results=3)
+    if not web_sources:
+        web_sources = search_research_alternative("web", clean_topic)
+        status["web_alternative"] = "found" if web_sources else "empty"
     if web_sources:
-        best_source = web_sources[0]
-        scrape_res = scrape_url(best_source["url"], max_length=15000)
-        if scrape_res.get("success"):
+        for best_source in web_sources[:2]:
+            scrape_res = scrape_url(best_source["url"], max_length=15000)
+            if not scrape_res.get("success") or not scrape_res.get("content"):
+                continue
             full_content = scrape_res["content"]
             title = scrape_res.get("title") or best_source["title"]
             quiz_items = scrape_res.get("quiz") or generate_quiz_from_content(full_content, title=title, num_questions=3)
@@ -2441,6 +2535,7 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
                 "success": True,
                 "mode": "web",
                 "topic": clean_topic,
+                "source_status": status,
                 "primary_source": {
                     "title": title,
                     "url": best_source["url"],
@@ -2466,12 +2561,14 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
 
     # 3. Fallback jika tidak menemukan sumber spesifik: coba CrossRef umum
     if mode != "academic":
-        fallback_academic = search_academic_papers_unified(clean_topic, max_results=2)
-        if fallback_academic.get("success") and fallback_academic.get("papers"):
-            return conduct_autonomous_research(clean_topic, mode="academic")
+        papers = search_academic_papers_unified(clean_topic, max_results=2).get("papers", [])
+        if papers:
+            return {"success": True, "mode": mode, "topic": clean_topic, "sources": {"academic": papers},
+                    "source_status": {**status, "academic_alternative": "found"}}
 
     return {
         "success": False,
+        "source_status": status,
         "error": f"Tidak dapat menemukan materi terverifikasi secara otomatis untuk topik '{clean_topic}'. Pengguna dapat memberikan link URL spesifik jika ada.",
     }
 

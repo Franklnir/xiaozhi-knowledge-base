@@ -46,6 +46,33 @@ def test_audit_measures_unfinished_access_and_recognizes_older_entries(monkeypat
     assert not is_source_access({"operation": "academic", "status": "empty"})
 
 
+def test_topic_report_keeps_old_findings_and_citations_after_continuation(tmp_path, monkeypatch):
+    store = SQLiteStore(str(tmp_path / "report.sqlite"))
+    user = store.create_user("report", "password-demo-123")
+    workspace = ResearchStore(store, user["id"], 1)
+    topic = workspace.create_or_find("Panel surya")
+    original = {"title": "Panduan panel", "url": "https://example.com/panel",
+                "excerpt": "**Panel surya** menghasilkan listrik dari cahaya matahari."}
+    next_page = {"title": "Evaluasi inverter", "url": "https://example.com/inverter",
+                 "excerpt": "Inverter mengubah arus searah menjadi arus bolak-balik."}
+    monkeypatch.setattr(scraper_service, "conduct_autonomous_research", Mock(side_effect=[
+        {"sources": {"web": [original]}},
+        {"sources": {"web": [
+            {"title": original["title"], "url": original["url"], "snippet": "Cuplikan pendek."}, next_page,
+        ]}},
+    ]))
+    research_workspace.run_research(workspace, workspace.detail(topic["number"]))
+    research_workspace.run_research(workspace, workspace.detail(topic["number"]), "fungsi inverter")
+    updated = workspace.detail(topic["number"])
+    report = research_workspace.recall_research(updated)["topic_report"]
+    assert report["findings"] == [
+        {"text": "Panel surya menghasilkan listrik dari cahaya matahari.", "source_numbers": [1]},
+        {"text": "Inverter mengubah arus searah menjadi arus bolak-balik.", "source_numbers": [2]},
+    ]
+    assert report["leads"] == []
+    assert workspace.list_topics()[0] == 1
+
+
 def test_numbering_is_stable_with_concurrent_creates_and_scoped_history(tmp_path, monkeypatch):
     store = SQLiteStore(str(tmp_path / "penelitian.sqlite"))
     user = store.create_user("penelitian", "password-demo-123")
@@ -203,9 +230,13 @@ def test_voice_can_resume_and_recall_research_without_repeating_a_search(tmp_pat
             mcp_active_slot_ctx.reset(other_slot)
         assert search.call_count == 2
         assert "baterai" in search.call_args.args[0]
-        wifi_topic = start_research("Penelitian tentang perbedaan Wi-Fi 6 dan Wi-Fi 7")
-        assert wifi_topic["success"] and wifi_topic["research_number"] == 2
+        wifi_followup = start_research("Penelitian tentang perbedaan Wi-Fi 6 dan Wi-Fi 7")
+        assert wifi_followup["success"] and wifi_followup["research_number"] == 1
+        assert wifi_followup["session_number"] == 3
+        assert ResearchStore(store, user["id"], 2).list_topics()[0] == 1
         assert search.call_count == 3
+        wifi_topic = start_research("Perbedaan Wi-Fi 6 dan Wi-Fi 7", new_topic=True)
+        assert wifi_topic["success"] and wifi_topic["research_number"] == 2
     finally:
         mcp_request_id_ctx.reset(connection_token)
         mcp_active_slot_ctx.reset(slot_token)
@@ -234,25 +265,25 @@ def test_retry_runs_only_failed_providers_and_is_idempotent(tmp_path, monkeypatc
     user = store.create_user("retry", "password-demo-123")
     workspace = ResearchStore(store, user["id"], 1)
     monkeypatch.setattr(scraper_service, "conduct_autonomous_research", retry_fixture)
-    arxiv = Mock()
+    arxiv = Mock(return_value=[{"title": "Paper", "url": "https://example.com/paper", "abstract": "Abstrak."}])
     wiki = Mock(return_value=[{"title": "Panduan kedua", "url": "https://example.com/b", "snippet": "Bukti tambahan."}])
-    paper = Mock(return_value=[{"title": "Paper", "url": "https://example.com/paper", "abstract": "Abstrak."}])
+    crossref = Mock()
     video = Mock(return_value=[])
     monkeypatch.setattr(scraper_service, "search_web_sources", wiki)
     monkeypatch.setattr(scraper_service, "search_arxiv_papers", arxiv)
-    monkeypatch.setattr(scraper_service, "search_crossref_papers", paper)
+    monkeypatch.setattr(scraper_service, "search_crossref_papers", crossref)
     monkeypatch.setattr(youtube_research_service, "find_research_videos", video)
     topic = workspace.create_or_find("Panel surya")
     research_workspace.run_research(workspace, topic, "Kapasitas baterai", request_id="req-original")
     original = workspace.get_run(1, 1)
-    assert {item[0] for item in retry_plan(original)} == {"cari_wikipedia", "cari_crossref", "cari_youtube_ytdlp"}
+    assert {item[0] for item in retry_plan(original)} == {"cari_wikipedia", "academic_alternative", "cari_youtube_ytdlp"}
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(lambda i: retry_research(workspace, workspace.detail(1), original, f"req-retry-{i}"), range(2)))
     assert results == [2, 2]
     wiki.assert_called_once_with(original["question"], 3, timeout=4, provider="en")
-    paper.assert_called_once_with(original["question"], 2)
+    arxiv.assert_called_once_with("Panel surya Kapasitas baterai", max_results=2)
     video.assert_called_once_with(original["question"], provider="ytdlp")
-    arxiv.assert_not_called()
+    crossref.assert_not_called()
     saved = workspace.detail(1)
     assert saved["runs"][0]["retry_of"] == 1
     assert saved["runs"][0]["request_id"].startswith("req-retry-")
@@ -271,7 +302,7 @@ def test_web_retry_and_feedback_are_scoped_to_session(tmp_path, monkeypatch):
     monkeypatch.setattr(dependencies, "_store", store)
     monkeypatch.setattr(scraper_service, "conduct_autonomous_research", retry_fixture)
     monkeypatch.setattr(scraper_service, "search_web_sources", Mock(return_value=[]))
-    monkeypatch.setattr(scraper_service, "search_crossref_papers", Mock(return_value=[]))
+    monkeypatch.setattr(scraper_service, "search_arxiv_papers", Mock(return_value=[]))
     from xiaozhi.services import youtube_research_service
     monkeypatch.setattr(youtube_research_service, "find_research_videos", Mock(return_value=[]))
 

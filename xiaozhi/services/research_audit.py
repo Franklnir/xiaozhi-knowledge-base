@@ -73,6 +73,11 @@ class ResearchAudit:
                 for started, entry in self._entries
             ]
 
+    def rate_limited(self):
+        with self._lock:
+            return {(entry["operation"], urlsplit(entry["target"]).hostname)
+                    for _, entry in self._entries if entry.get("detail") == "HTTP 429"}
+
 
 def audited_call(operation, target, call, *args, classify=None, **kwargs):
     audit = current_audit.get()

@@ -50,6 +50,7 @@ def test_auto_research_keeps_video_link_when_other_sources_timeout(monkeypatch):
     monkeypatch.setattr(scraper, "_RESEARCH_TIMEOUT_SECONDS", 0.3)
     monkeypatch.setattr(scraper, "search_web_sources", unavailable)
     monkeypatch.setattr(scraper, "search_academic_papers_unified", slow)
+    monkeypatch.setattr(scraper, "search_research_alternative", lambda group, query: [])
     monkeypatch.setattr(youtube, "find_research_videos", lambda query: [video])
     monkeypatch.setattr(youtube, "read_research_video_captions", slow)
 
@@ -70,6 +71,7 @@ def test_continuation_opens_new_articles_and_does_not_fetch_existing_captions(mo
     known_video = {"title": "Video lama", "url": "https://www.youtube.com/watch?v=aaaaaaaaaaa"}
     monkeypatch.setattr(scraper, "search_web_sources", Mock(return_value=[known_page, new_page]))
     monkeypatch.setattr(scraper, "search_academic_papers_unified", Mock(return_value={"papers": []}))
+    monkeypatch.setattr(scraper, "search_research_alternative", lambda group, query: {"papers": []})
     monkeypatch.setattr(youtube, "find_research_videos", Mock(return_value=[known_video]))
     web_read = Mock(return_value={"success": True, "content": "Cuplikan dari panduan yang baru."})
     captions = Mock()
@@ -83,3 +85,28 @@ def test_continuation_opens_new_articles_and_does_not_fetch_existing_captions(mo
     web_read.assert_called_once_with(new_page["url"], max_length=2200)
     captions.assert_not_called()
     assert result["sources"]["web"][0]["url"] == new_page["url"]
+
+
+def test_auto_research_recovers_empty_lane_and_cites_the_article_that_was_read(monkeypatch):
+    blocked = {"title": "Halaman dibatasi", "url": "https://example.com/blocked"}
+    readable = {"title": "Panduan resmi ESP32", "url": "https://example.com/guide"}
+    paper = {"title": "Pengujian ESP32", "url": "https://example.com/study"}
+    alternate = Mock(return_value={"papers": [paper]})
+    read = Mock(side_effect=[{"success": False}, {"success": True, "content": "Isi panduan ESP32."}])
+    monkeypatch.setattr(scraper, "search_web_sources", lambda *args, **kwargs: [blocked, readable])
+    monkeypatch.setattr(scraper, "search_academic_papers_unified", lambda *args, **kwargs: {"papers": []})
+    monkeypatch.setattr(scraper, "search_research_alternative", alternate)
+    monkeypatch.setattr(scraper, "scrape_url", read)
+    monkeypatch.setattr(youtube, "find_research_videos", lambda query: [
+        {"title": "Video lama", "url": "https://www.youtube.com/watch?v=aaaaaaaaaaa"},
+    ])
+
+    token = opened_research_urls.set(frozenset({"https://www.youtube.com/watch?v=aaaaaaaaaaa"}))
+    try:
+        research = scraper.conduct_autonomous_research("ESP32")
+    finally:
+        opened_research_urls.reset(token)
+    assert research["sources"]["web"] == [blocked, {**readable, "excerpt": "Isi panduan ESP32."}]
+    assert research["sources"]["academic"] == [paper]
+    assert research["source_status"]["academic_alternative"] == "found"
+    alternate.assert_called_once_with("academic", "ESP32")

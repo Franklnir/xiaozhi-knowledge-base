@@ -11,6 +11,14 @@ from xiaozhi.services.research_audit import is_source_access
 
 logger = logging.getLogger(__name__)
 
+_COVERAGE_STRENGTH = {
+    "Cuplikan hasil pencarian": 1,
+    "Abstrak": 2,
+    "Kutipan teks": 3,
+    "Cuplikan subtitle": 3,
+    "Cuplikan teks sumber": 3,
+    "Cuplikan teks PDF": 4,
+}
 
 RESEARCH_SCHEMA = """
 CREATE TABLE IF NOT EXISTS research_counters (
@@ -102,13 +110,28 @@ class ResearchStore:
             ).fetchall()
         return count, [dict(row) for row in rows]
 
-    def create_or_find(self, title):
+    @staticmethod
+    def _active_topic(query):
+        return query(
+            """SELECT t.* FROM research_topics t LEFT JOIN research_runs r
+               ON (r.owner_id, r.slot, r.topic_number) = (t.owner_id, t.slot, t.number)
+               WHERE t.owner_id=? AND t.slot=? AND t.archived=0
+               ORDER BY r.started_at DESC NULLS LAST, r.request_id DESC, t.number DESC LIMIT 1"""
+        ).fetchone()
+
+    def create_or_find(self, title, *, reuse_active=False):
         title = " ".join((title or "").split())[:160]
         if not title:
             raise ValueError("Isi judul penelitian terlebih dahulu.")
         with self._queries() as query:
             query("INSERT INTO research_counters(owner_id, slot) VALUES (?, ?) ON CONFLICT DO NOTHING")
             query("UPDATE research_counters SET last_number=last_number WHERE owner_id=? AND slot=?")
+            if reuse_active:
+                active = self._active_topic(query)
+                if active:
+                    return dict(active)
+                if query("SELECT 1 FROM research_topics WHERE owner_id=? AND slot=? LIMIT 1").fetchone():
+                    raise ValueError("Tidak ada penelitian aktif. Pulihkan topik lama atau minta penelitian baru.")
             topic = query(
                 "SELECT * FROM research_topics WHERE owner_id=? AND slot=? AND title_key=?",
                 (title.casefold(),),
@@ -129,12 +152,7 @@ class ResearchStore:
     def detail(self, number=None, page=1):
         with self._queries() as query:
             if number is None:
-                topic = query(
-                    """SELECT t.* FROM research_topics t JOIN research_runs r
-                       ON (r.owner_id, r.slot, r.topic_number) = (t.owner_id, t.slot, t.number)
-                       WHERE t.owner_id=? AND t.slot=? AND t.archived=0
-                       ORDER BY r.started_at DESC, r.request_id DESC LIMIT 1"""
-                ).fetchone()
+                topic = self._active_topic(query)
             else:
                 topic = query(
                     "SELECT * FROM research_topics WHERE owner_id=? AND slot=? AND number=?", (number,)
@@ -293,10 +311,11 @@ class ResearchStore:
                     if old.get("metadata"):
                         evidence_item = {**evidence_item,
                                          "metadata": {**old["metadata"], **evidence_item.get("metadata", {})}}
-                    if old.get("excerpt") and (
-                        not evidence_item.get("excerpt")
-                        or old.get("pages") and evidence_item.get("coverage") == "Abstrak"
-                    ):
+                    if old.get("pdf_url") and not evidence_item.get("pdf_url"):
+                        evidence_item = {**evidence_item, "pdf_url": old["pdf_url"]}
+                    old_coverage = _COVERAGE_STRENGTH.get(old.get("coverage"), 0)
+                    new_coverage = _COVERAGE_STRENGTH.get(evidence_item.get("coverage"), 0)
+                    if old.get("excerpt") and (not evidence_item.get("excerpt") or old_coverage > new_coverage):
                         evidence_item = {**evidence_item, **{
                             field: old[field] for field in ("excerpt", "finding", "coverage", "pages", "timestamps")
                             if field in old

@@ -35,7 +35,17 @@ def retry_plan(run):
     for attempt in attempts:
         operation = attempt["operation"]
         target = attempt.get("retry_target") or attempt.get("target") or ""
+        if attempt["status"] == "empty" and operation in _SEARCH_GROUPS:
+            retryable[(f"{operation}_alternative", "")] = attempt
+            continue
         if attempt["status"] not in {"failed", "timeout"} or (operation, target) in succeeded:
+            continue
+        if attempt.get("detail") == "HTTP 429":
+            group = next((name for name, operations in _SEARCH_GROUPS.items() if operation in operations), None)
+            if operation in _NETWORK_READ:
+                group = "youtube" if operation in {"cari_subtitle", "baca_subtitle"} else "web"
+            if group:
+                retryable[(f"{group}_alternative", "")] = attempt
             continue
         if operation in _ACADEMIC or operation in _VIDEO or operation == "cari_google_news":
             retryable[(operation, "")] = attempt
@@ -67,7 +77,13 @@ def _source_read(target, topic, *, jina=False):
     return _read_evidence(source, data)
 
 
-def _retry_access(operation, target, question, topic):
+def _retry_access(operation, target, question, topic, *, blocked=()):
+    if operation.endswith("_alternative"):
+        group = operation.removesuffix("_alternative")
+        query = topic["title"] if question.startswith("Baca sumber [") else question
+        found = scraper.search_research_alternative(group, query, blocked=blocked)
+        sources = found.get("papers", []) if group == "academic" else found
+        return _evidence({"sources": {group: sources}})
     if operation == "academic":
         papers = scraper.search_academic_papers_unified(question, 2).get("papers", [])
         return _evidence({"sources": {"academic": papers}})
@@ -101,7 +117,7 @@ def retry_research(workspace, topic, parent, request_id):
         raise ValueError("Sesi belum selesai atau tidak ditemukan.")
     plan = retry_plan(parent)
     if not plan:
-        raise ValueError("Sesi ini tidak memiliki akses gagal atau habis waktu yang bisa diulang.")
+        raise ValueError("Tidak ada akses atau jalur pencarian yang bisa dilengkapi pada sesi ini.")
     number, parent_number = topic["number"], parent["session_number"]
     question = parent["question"]
     session, created = workspace.start(number, request_id, question, retry_of=parent_number)
@@ -114,9 +130,15 @@ def retry_research(workspace, topic, parent, request_id):
     pending = {}
     evidence = {}
     outcomes = []
+    blocked = {
+        (entry["operation"], urlsplit(entry.get("target") or "").hostname)
+        for entry in parent["result"].get("attempts", []) if entry.get("detail") == "HTTP 429"
+    }
     try:
         for operation, target in plan:
-            future = scraper._research_workers.submit(copy_context().run, _retry_access, operation, target, question, topic)
+            future = scraper._research_workers.submit(
+                copy_context().run, _retry_access, operation, target, question, topic, blocked=blocked,
+            )
             pending[future] = (operation, target)
         done, _ = wait(pending, timeout=max(0, scraper._RESEARCH_TIMEOUT_SECONDS - (time.monotonic() - started)))
         for future, (operation, target) in pending.items():
