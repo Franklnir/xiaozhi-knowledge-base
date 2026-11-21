@@ -151,13 +151,30 @@
                 <section class="app-card research-stack" aria-labelledby="researchResults">
                     <h2 class="app-section-title" id="researchResults">Hasil penelitian</h2>
                     {% if report.findings %}
+                    <h3><strong>Kesimpulan sementara</strong></h3>
                     <ul class="research-list research-report">
-                        {% for finding in report.findings %}
+                        {% for finding in report.conclusion %}
                         <li>{{ finding.text }}{% for number in finding.source_numbers %} {{ cite(number) }}{% endfor %}</li>
                         {% endfor %}
                     </ul>
+                    {% if topic_evidence.differences %}
+                    <p class="research-metadata">Ada perbedaan angka antar sumber. Periksa kondisi dan metode di bagian perbandingan bukti.</p>
+                    {% endif %}
+                    {% if report.findings|length > report.conclusion|length %}
+                    <h3><strong>Temuan pendukung</strong></h3>
+                    <ul class="research-list research-report">
+                        {% for finding in report.findings if finding not in report.conclusion %}
+                        <li>{{ finding.text }}{% for number in finding.source_numbers %} {{ cite(number) }}{% endfor %}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
                     {% else %}
                     <p class="app-subtitle">Belum ada temuan dari teks, PDF, atau subtitle sumber.</p>
+                    {% endif %}
+                    {% if report.coverage %}
+                    <p class="research-metadata">
+                        Cakupan sumber{% for coverage, count in report.coverage.items() %} · {{ count }} {{ coverage | lower }}{% endfor %}
+                    </p>
                     {% endif %}
                     {% if report.leads %}
                     <details>
@@ -313,6 +330,7 @@
                         <p class="research-metadata">{{ source.publisher or source.kind }} · {{ source.coverage }}</p>
                         {% if source.pages %}<p class="research-metadata">Halaman {{ source.pages|join(', ') }}</p>{% endif %}
                         {% if source.timestamps %}<p class="research-metadata">Cuplikan pada {{ source.timestamps|join(', ') }}</p>{% endif %}
+                        {% if source.excerpt_truncated %}<p class="research-metadata">Cuplikan sebagian. Buka sumber untuk membaca bagian lain.</p>{% endif %}
                         {% if source.readable_excerpt %}<details class="research-history"><summary>Baca cuplikan</summary><p class="research-excerpt">{{ source.readable_excerpt }}</p></details>{% endif %}
                         <div class="research-actions">
                             <a class="app-button app-button-small" href="{{ source.url }}" target="_blank" rel="noopener noreferrer">Buka sumber</a>

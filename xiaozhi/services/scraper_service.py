@@ -26,6 +26,8 @@ from xiaozhi.services.research_audit import audited_call, current_audit, opened_
 
 logger = logging.getLogger("xiaozhi.scraper")
 _RESEARCH_TIMEOUT_SECONDS = 9
+RESEARCH_READ_CHARS = 18000
+_RESEARCH_READ_STAGE = {"web": "web_article", "academic": "academic_pdf", "youtube": "youtube_captions"}
 _research_workers = ThreadPoolExecutor(max_workers=6, thread_name_prefix="xiaozhi-research")
 
 # HTTP Clients
@@ -2258,28 +2260,52 @@ def search_research_alternative(group, topic, *, blocked=()):
     return find_research_videos(query, provider="ytdlp")
 
 
-def _read_research_candidates(sources, opened, deadline, group):
+def _read_research_source(source, group, deadline):
     from xiaozhi.services.youtube_research_service import read_research_video_captions
 
-    candidates = [source for source in sources if public_url(source["url"]) not in opened]
-    for source in candidates[:2]:
-        if time.monotonic() >= deadline:
-            break
+    if time.monotonic() >= deadline:
+        return None
+    if group == "youtube":
+        video, reason = read_research_video_captions(source, max_chars=6500)
+        return {**video, "subtitle_status": "available"} if not reason and video.get("transcript_excerpt") else None
+
+    target = source["pdf_url"] if group == "academic" else source["url"]
+    article = scrape_url(target, max_length=RESEARCH_READ_CHARS)
+    is_pdf = article.get("source_type") == "pdf_document"
+    if not article.get("success") or not article.get("content") or (group == "academic" and not is_pdf):
+        return None
+    entry = {**source, "excerpt": article["content"]}
+    if is_pdf:
+        entry.update(pdf_url=article.get("url") or target, excerpt_source_type="pdf_document")
+    if article.get("is_truncated"):
+        entry["excerpt_truncated"] = True
+    return entry
+
+
+def _read_academic_pdfs(papers, status):
+    opened = opened_research_urls.get()
+    deadline = time.monotonic() + min(5, _RESEARCH_TIMEOUT_SECONDS)
+    pending = {
+        _research_workers.submit(copy_context().run, _read_research_source, paper, "academic", deadline): index
+        for index, paper in enumerate(papers)
+        if public_url(paper.get("pdf_url")) and public_url(paper.get("url") or paper["pdf_url"]) not in opened
+    }
+    completed, unfinished = wait(pending, timeout=max(0, deadline - time.monotonic()))
+    enriched = list(papers)
+    for future in completed:
         try:
-            if group == "youtube":
-                video, reason = read_research_video_captions(source)
-                if not reason and video.get("transcript_excerpt"):
-                    return {**video, "subtitle_status": "available"}
-            else:
-                article = scrape_url(source["url"], max_length=2200)
-                if article.get("success") and article.get("content"):
-                    updated = {**source, "excerpt": article["content"][:2200]}
-                    if article.get("source_type") == "pdf_document":
-                        updated["pdf_url"] = article.get("url") or source["url"]
-                    return updated
+            paper = future.result()
         except Exception:
-            logger.debug("Research candidate could not be read", exc_info=True)
-    return None
+            logger.debug("Research PDF could not be read", exc_info=True)
+            paper = None
+        if paper:
+            enriched[pending[future]] = paper
+        else:
+            status["academic_pdf"] = "empty"
+    for future in unfinished:
+        future.cancel()
+        status["academic_pdf"] = "timeout"
+    return enriched
 
 
 def _parallel_research(topic: str) -> Dict[str, Any]:
@@ -2290,16 +2316,21 @@ def _parallel_research(topic: str) -> Dict[str, Any]:
 
     opened = opened_research_urls.get()
     deadline = time.monotonic() + _RESEARCH_TIMEOUT_SECONDS
+    read_deadline = deadline + min(5, _RESEARCH_TIMEOUT_SECONDS / 2)
     pending = {
         submit(search_web_sources, topic, 3, timeout=2): "web",
         submit(search_academic_papers_unified, topic, 2): "academic",
         submit(find_research_videos, topic[:300]): "youtube",
     }
     results = {}
+    reading = {}
+    enriched = {}
     status = {}
     recovered_timeouts = False
-    while pending:
-        finished, _ = wait(pending, timeout=max(0, deadline - time.monotonic()), return_when=FIRST_COMPLETED)
+    while pending or reading:
+        wait_until = deadline if pending else read_deadline
+        finished, _ = wait(pending.keys() | reading.keys(), timeout=max(0, wait_until - time.monotonic()),
+                           return_when=FIRST_COMPLETED)
         if not finished:
             expired = [(future, lane) for future, lane in pending.items()
                        if lane in {"web", "academic", "youtube"}]
@@ -2314,6 +2345,18 @@ def _parallel_research(topic: str) -> Dict[str, Any]:
                 pending[submit(search_research_alternative, lane, topic)] = f"{lane}_alternative"
             continue
         for future in finished:
+            if future in reading:
+                group, url = reading.pop(future)
+                try:
+                    read = future.result()
+                except Exception:
+                    logger.debug("Research source content could not be read", exc_info=True)
+                    read = None
+                if read:
+                    enriched[(group, url)] = read
+                else:
+                    status.setdefault(_RESEARCH_READ_STAGE[group], "empty")
+                continue
             lane = pending.pop(future)
             try:
                 data = future.result()
@@ -2321,12 +2364,6 @@ def _parallel_research(topic: str) -> Dict[str, Any]:
                 logger.warning("Research source failed: %s", lane, exc_info=True)
                 data = None
             source = lane.removesuffix("_alternative")
-            if source in {"web_article", "youtube_captions"}:
-                if data:
-                    results[source] = data
-                else:
-                    status[source] = "empty"
-                continue
             found = bool(data.get("papers")) if source == "academic" and data else bool(data)
             if lane.endswith("_alternative"):
                 status[lane] = "found" if found else "empty" if data is not None else "error"
@@ -2337,27 +2374,27 @@ def _parallel_research(topic: str) -> Dict[str, Any]:
                 continue
             if lane == source:
                 status[source] = "found"
-            if source in {"web", "youtube"} and opened:
-                data = sorted(data, key=lambda item: public_url(item["url"]) in opened)
-            results[source] = data
-            if (source in {"web", "youtube"} and data and public_url(data[0]["url"]) not in opened
-                    and time.monotonic() < deadline):
-                step = "youtube_captions" if source == "youtube" else "web_article"
-                pending[submit(_read_research_candidates, data, opened, deadline, source)] = step
+            items = data["papers"] if source == "academic" else data
+            items = sorted(items, key=lambda item: public_url(item.get("url") or item.get("pdf_url")) in opened)
+            results[source] = items
+            for item in items:
+                url = item.get("url") or item.get("pdf_url")
+                if (not public_url(url) or public_url(url) in opened or
+                        source == "academic" and not public_url(item.get("pdf_url")) or
+                        time.monotonic() >= read_deadline):
+                    continue
+                reading[submit(_read_research_source, item, source, read_deadline)] = (source, url)
 
     for future, source in pending.items():
         future.cancel()
         status[source] = "timeout"
+    for future, (group, _) in reading.items():
+        future.cancel()
+        status[_RESEARCH_READ_STAGE[group]] = "timeout"
 
-    web = results.get("web", [])
-    papers = results.get("academic", {}).get("papers", [])
-    videos = results.get("youtube", [])
-    if article := results.get("web_article"):
-        web = [article if source["url"] == article["url"] else source for source in web]
-    if video := results.get("youtube_captions"):
-        videos = [video if source["url"] == video["url"] else source for source in videos]
-
-    groups = {"web": web, "academic": papers, "youtube": videos}
+    groups = {group: [enriched.get((group, item.get("url") or item.get("pdf_url")), item) for item in results.get(group, [])]
+              for group in ("web", "academic", "youtube")}
+    web, papers, videos = groups["web"], groups["academic"], groups["youtube"]
     for name, sources in groups.items():
         status.setdefault(name, "found" if sources else "empty")
     result = {"mode": "auto", "topic": topic, "sources": groups, "source_status": status}
@@ -2377,7 +2414,7 @@ def _parallel_research(topic: str) -> Dict[str, Any]:
             url = source.get("url") or source.get("pdf_url") or ""
             title = source["title"]
             lines.append(f"- [{title}]({url})" if url else f"- {title}")
-            excerpt = source.get(excerpt_key) or source.get("snippet")
+            excerpt = source.get("excerpt") or source.get(excerpt_key) or source.get("snippet")
             if excerpt:
                 lines.append(f"  {str(excerpt)[:900]}")
         sections.append("\n".join(lines))
@@ -2436,7 +2473,8 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
             res = search_research_alternative("academic", clean_topic)
             status["academic_alternative"] = "found" if res.get("papers") else "empty"
         if res.get("papers"):
-            top_paper = res["papers"][0]
+            papers = _read_academic_pdfs(res["papers"], status)
+            top_paper = papers[0]
             title = top_paper["title"]
             authors_str = ", ".join(top_paper.get("authors", [])) or "Tim Peneliti"
             year = top_paper.get("year", "N/A")
@@ -2480,7 +2518,7 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
                 "success": True,
                 "mode": "academic",
                 "topic": clean_topic,
-                "sources": {"academic": res["papers"]},
+                "sources": {"academic": papers},
                 "source_status": status,
                 "primary_source": {
                     "title": title,
@@ -2516,12 +2554,17 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
         status["web_alternative"] = "found" if web_sources else "empty"
     if web_sources:
         for best_source in web_sources[:2]:
-            scrape_res = scrape_url(best_source["url"], max_length=15000)
+            scrape_res = scrape_url(best_source["url"], max_length=RESEARCH_READ_CHARS)
             if not scrape_res.get("success") or not scrape_res.get("content"):
                 continue
             full_content = scrape_res["content"]
             title = scrape_res.get("title") or best_source["title"]
             quiz_items = scrape_res.get("quiz") or generate_quiz_from_content(full_content, title=title, num_questions=3)
+            enriched_source = {**best_source, "excerpt": full_content,
+                               "excerpt_source_type": scrape_res.get("source_type"),
+                               "excerpt_truncated": bool(scrape_res.get("is_truncated"))}
+            if scrape_res.get("source_type") == "pdf_document":
+                enriched_source["pdf_url"] = scrape_res.get("url") or best_source["url"]
 
             materi_payload = {
                 "title": title[:140],
@@ -2536,6 +2579,10 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
                 "mode": "web",
                 "topic": clean_topic,
                 "source_status": status,
+                "sources": {"web": [
+                    enriched_source,
+                    *(source for source in web_sources if source["url"] != best_source["url"]),
+                ]},
                 "primary_source": {
                     "title": title,
                     "url": best_source["url"],
@@ -2563,7 +2610,8 @@ def conduct_autonomous_research(topic: str, mode: str = "auto") -> Dict[str, Any
     if mode != "academic":
         papers = search_academic_papers_unified(clean_topic, max_results=2).get("papers", [])
         if papers:
-            return {"success": True, "mode": mode, "topic": clean_topic, "sources": {"academic": papers},
+            return {"success": True, "mode": mode, "topic": clean_topic,
+                    "sources": {"academic": _read_academic_pdfs(papers, status)},
                     "source_status": {**status, "academic_alternative": "found"}}
 
     return {

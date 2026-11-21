@@ -74,7 +74,7 @@ def _source_read(target, topic, *, jina=False):
         "url": target, "title": data.get("title") or target,
         "publisher": "", "kind": "web", "pdf_url": target if data.get("source_type") == "pdf_document" else "",
     }
-    return _read_evidence(source, data)
+    return _read_evidence(source, data, require_pdf=target == source.get("pdf_url"))
 
 
 def _retry_access(operation, target, question, topic, *, blocked=()):

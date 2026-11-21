@@ -131,7 +131,7 @@ def find_research_videos(query: str, *, provider: str = "") -> list[dict]:
     return list(videos.values())
 
 
-def read_research_video_captions(metadata: dict) -> tuple[dict, str | None]:
+def read_research_video_captions(metadata: dict, *, max_chars: int = _CAPTION_BUDGET) -> tuple[dict, str | None]:
     video_id = metadata["video_id"]
     try:
         with _CaptionSession() as session:
@@ -161,7 +161,7 @@ def read_research_video_captions(metadata: dict) -> tuple[dict, str | None]:
                     last_mark = mark
                 else:
                     piece = f" {text}"
-                if used + len(piece) > _CAPTION_BUDGET:
+                if used + len(piece) > max_chars:
                     truncated = True
                     break
                 paragraphs.append(piece)

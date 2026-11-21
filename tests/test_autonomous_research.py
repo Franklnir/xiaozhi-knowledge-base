@@ -22,7 +22,7 @@ def test_auto_research_searches_all_sources_concurrently(monkeypatch):
     monkeypatch.setattr(scraper, "search_academic_papers_unified", result({"papers": [paper]}))
     monkeypatch.setattr(youtube, "search_youtube_candidates", result(([video], "youtube_data_api")))
     monkeypatch.setattr(scraper, "scrape_url", lambda *args, **kwargs: {"success": True, "content": "Isi panduan"})
-    monkeypatch.setattr(youtube, "read_research_video_captions", lambda source: (
+    monkeypatch.setattr(youtube, "read_research_video_captions", lambda source, **kwargs: (
         {**source, "transcript_excerpt": "[00:00] Pembahasan ESP32"}, None,
     ))
 
@@ -82,7 +82,7 @@ def test_continuation_opens_new_articles_and_does_not_fetch_existing_captions(mo
         result = scraper.conduct_autonomous_research("Panel surya")
     finally:
         opened_research_urls.reset(token)
-    web_read.assert_called_once_with(new_page["url"], max_length=2200)
+    web_read.assert_called_once_with(new_page["url"], max_length=scraper.RESEARCH_READ_CHARS)
     captions.assert_not_called()
     assert result["sources"]["web"][0]["url"] == new_page["url"]
 
@@ -92,7 +92,8 @@ def test_auto_research_recovers_empty_lane_and_cites_the_article_that_was_read(m
     readable = {"title": "Panduan resmi ESP32", "url": "https://example.com/guide"}
     paper = {"title": "Pengujian ESP32", "url": "https://example.com/study"}
     alternate = Mock(return_value={"papers": [paper]})
-    read = Mock(side_effect=[{"success": False}, {"success": True, "content": "Isi panduan ESP32."}])
+    def read(url, **kwargs):
+        return {"success": True, "content": "Isi panduan ESP32."} if url == readable["url"] else {"success": False}
     monkeypatch.setattr(scraper, "search_web_sources", lambda *args, **kwargs: [blocked, readable])
     monkeypatch.setattr(scraper, "search_academic_papers_unified", lambda *args, **kwargs: {"papers": []})
     monkeypatch.setattr(scraper, "search_research_alternative", alternate)
@@ -110,3 +111,36 @@ def test_auto_research_recovers_empty_lane_and_cites_the_article_that_was_read(m
     assert research["sources"]["academic"] == [paper]
     assert research["source_status"]["academic_alternative"] == "found"
     alternate.assert_called_once_with("academic", "ESP32")
+
+
+def test_auto_research_reads_article_pdf_and_multiple_videos_as_source_content(monkeypatch):
+    articles = [
+        {"title": f"Artikel {index}", "url": f"https://example.com/article-{index}"}
+        for index in (1, 2)
+    ]
+    paper = {"title": "Jurnal pengukuran", "url": "https://example.com/journal",
+             "pdf_url": "https://example.com/full.pdf", "abstract": "Teks abstrak awal."}
+    videos = [
+        {"title": f"Video {index}", "url": f"https://www.youtube.com/watch?v={'a' * 10}{index}"}
+        for index in (1, 2)
+    ]
+    monkeypatch.setattr(scraper, "search_web_sources", lambda *args, **kwargs: articles)
+    monkeypatch.setattr(scraper, "search_academic_papers_unified", lambda *args, **kwargs: {"papers": [paper]})
+    monkeypatch.setattr(youtube, "find_research_videos", lambda query: videos)
+    monkeypatch.setattr(youtube, "read_research_video_captions", lambda item, **kwargs: (
+        {**item, "transcript_excerpt": "[01:00] Video menjelaskan batas pengukuran."}, None,
+    ))
+
+    def read(url, **kwargs):
+        if url == paper["pdf_url"]:
+            return {"success": True, "source_type": "pdf_document",
+                    "content": "### Halaman 5\n\nHasil pengukuran menunjukkan kenaikan lima volt."}
+        return {"success": True, "content": f"Teks dari {url}."}
+
+    monkeypatch.setattr(scraper, "scrape_url", read)
+    groups = scraper.conduct_autonomous_research("Pengukuran panel surya")["sources"]
+    assert all(item["excerpt"] == f"Teks dari {item['url']}." for item in groups["web"])
+    assert groups["academic"][0]["url"] == paper["url"]
+    assert groups["academic"][0]["excerpt_source_type"] == "pdf_document"
+    assert "Halaman 5" in groups["academic"][0]["excerpt"]
+    assert all(item["transcript_excerpt"] and item["subtitle_status"] == "available" for item in groups["youtube"])

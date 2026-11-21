@@ -316,10 +316,9 @@ class ResearchStore:
                     old_coverage = _COVERAGE_STRENGTH.get(old.get("coverage"), 0)
                     new_coverage = _COVERAGE_STRENGTH.get(evidence_item.get("coverage"), 0)
                     if old.get("excerpt") and (not evidence_item.get("excerpt") or old_coverage > new_coverage):
-                        evidence_item = {**evidence_item, **{
-                            field: old[field] for field in ("excerpt", "finding", "coverage", "pages", "timestamps")
-                            if field in old
-                        }}
+                        content_fields = ("excerpt", "finding", "coverage", "pages", "timestamps", "excerpt_truncated")
+                        evidence_item = {key: value for key, value in evidence_item.items() if key not in content_fields}
+                        evidence_item.update({key: old[key] for key in content_fields if key in old})
                     else:
                         changed = bool(evidence_item.get("excerpt") and evidence_item["excerpt"] != old.get("excerpt"))
                 else:

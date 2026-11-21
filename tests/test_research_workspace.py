@@ -73,6 +73,35 @@ def test_topic_report_keeps_old_findings_and_citations_after_continuation(tmp_pa
     assert workspace.list_topics()[0] == 1
 
 
+def test_report_prefers_pdf_passages_and_keeps_abstract_and_video_limits(tmp_path, monkeypatch):
+    store = SQLiteStore(str(tmp_path / "source-report.sqlite"))
+    user = store.create_user("source_report", "password-demo-123")
+    workspace = ResearchStore(store, user["id"], 1)
+    papers = [
+        {"title": "Uji tegangan", "url": "https://example.com/journal", "pdf_url": "https://example.com/full.pdf",
+         "abstract": "Abstrak lama tanpa rincian angka.", "excerpt_source_type": "pdf_document",
+         "excerpt": ("Metadata\n### Halaman 2\n\nSampel diuji dalam kondisi laboratorium.\n\n" +
+                     "Paragraf latar belakang kajian.\n" * 280 + "\n### Halaman 6\n\n## Hasil\n\n"
+                     "Hasil pengukuran menunjukkan tegangan naik sebesar 5 volt.")},
+        {"title": "Studi suhu", "url": "https://example.com/abstract", "abstract": "Studi membahas pengaruh suhu lingkungan."},
+    ]
+    monkeypatch.setattr(scraper_service, "conduct_autonomous_research", lambda *args: {"sources": {
+        "academic": papers, "youtube": [{"title": "Video tanpa subtitle",
+                                         "url": "https://www.youtube.com/watch?v=aaaaaaaaaaa"}],
+    }})
+    topic = workspace.create_or_find("Pengukuran tegangan")
+    outcome = research_workspace.run_research(workspace, workspace.detail(topic["number"]))
+    saved = workspace.detail(topic["number"])
+    report = research_workspace.topic_report(saved)
+    assert saved["sources"][0]["pages"] == ["2", "6"]
+    assert saved["sources"][0]["excerpt_truncated"]
+    assert report["coverage"] == {"Cuplikan teks PDF": 1, "Abstrak": 1, "Judul dan tautan": 1}
+    assert any("5 volt" in item["text"] and item["source_numbers"] == [1] for item in report["conclusion"])
+    assert all(3 not in item["source_numbers"] for item in report["findings"])
+    assert "## Kesimpulan sementara" in outcome["summary"]
+    assert "5 volt. [1]" in outcome["summary"]
+
+
 def test_numbering_is_stable_with_concurrent_creates_and_scoped_history(tmp_path, monkeypatch):
     store = SQLiteStore(str(tmp_path / "penelitian.sqlite"))
     user = store.create_user("penelitian", "password-demo-123")
@@ -145,6 +174,7 @@ def test_web_request_id_pdf_followup_and_citation_links(tmp_path, monkeypatch):
     assert 'href="#sumber-2"' in detail.text and 'id="sumber-2"' in detail.text
     assert "study.pdf#page=4" in detail.text
     assert "Habis waktu" in detail.text
+    assert "Kesimpulan sementara" in detail.text and "Cakupan sumber" in detail.text
     assert "Log akses sumber" in detail.text and "Hasil pemrosesan" in detail.text
     assert pdf.headers["X-Request-ID"] in detail.text
     assert first.headers["X-Request-ID"] in detail.text

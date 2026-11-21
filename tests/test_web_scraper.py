@@ -542,9 +542,15 @@ void setup() {
             "summary_markdown": "summary",
         }
 
-        with patch("xiaozhi.services.scraper_service.search_academic_papers_unified", return_value=mock_paper):
+        with (
+            patch("xiaozhi.services.scraper_service.search_academic_papers_unified", return_value=mock_paper),
+            patch("xiaozhi.services.scraper_service.scrape_url", return_value={
+                "success": True, "source_type": "pdf_document", "content": "### Halaman 2\n\nKalibrasi sensor dilakukan.",
+            }),
+        ):
             res = conduct_autonomous_research("paper MAX6675 ESP32", mode="academic")
             self.assertTrue(res["success"])
+            self.assertIn("Kalibrasi sensor", res["sources"]["academic"][0]["excerpt"])
             # Must NOT be saved directly to DB
             self.assertFalse(res["saved_to_db"])
             self.assertTrue(res["needs_user_confirmation"])
